@@ -103,19 +103,16 @@ impl HostRuntime {
         let grpc_installers = Arc::new(GrpcInstallerStore::new());
 
         // Build the context builder that will resolve per-module DbHandles
+        #[cfg(feature = "db")]
         let db_manager = match &db_options {
-            #[cfg(feature = "db")]
             DbOptions::Manager(mgr) => Some(mgr.clone()),
             DbOptions::None => None,
         };
 
-        let ctx_builder = ModuleContextBuilder::new(
-            instance_id,
-            modules_cfg,
-            client_hub.clone(),
-            cancel.clone(),
-            db_manager,
-        );
+        let ctx_builder =
+            ModuleContextBuilder::new(instance_id, modules_cfg, client_hub.clone(), cancel.clone());
+        #[cfg(feature = "db")]
+        let ctx_builder = ctx_builder.with_db_manager(db_manager);
 
         Self {
             registry,

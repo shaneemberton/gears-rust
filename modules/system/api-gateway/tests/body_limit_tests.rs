@@ -57,7 +57,6 @@ fn create_test_module_ctx_with_body_limit(limit_bytes: usize) -> ModuleCtx {
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     )
 }
 
@@ -169,7 +168,6 @@ async fn test_default_body_limit() {
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     );
 
     let api_gateway = api_gateway::ApiGateway::default();

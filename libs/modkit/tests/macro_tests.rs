@@ -34,7 +34,6 @@ fn test_module_ctx(cancel: tokio_util::sync::CancellationToken) -> ModuleCtx {
         Arc::new(EmptyConfigProvider),
         Arc::new(modkit::client_hub::ClientHub::default()),
         cancel,
-        None,
     )
 }
 

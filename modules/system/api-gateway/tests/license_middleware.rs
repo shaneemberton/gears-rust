@@ -40,7 +40,6 @@ fn create_api_gateway_ctx(config: serde_json::Value) -> ModuleCtx {
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     )
 }
 
@@ -51,7 +50,6 @@ fn create_test_module_ctx() -> ModuleCtx {
         Arc::new(TestConfigProvider { config: json!({}) }),
         Arc::new(ClientHub::new()),
         tokio_util::sync::CancellationToken::new(),
-        None,
     )
 }
 

@@ -9,22 +9,10 @@ use crate::{
     module_config_required,
 };
 
-// Note: runtime-dependent features are conditionally compiled
-
-// DB types are available only when feature "db" is enabled.
-// We keep local aliases so the rest of this file can compile without importing `modkit_db`.
 #[cfg(feature = "db")]
 pub(crate) type DbManager = modkit_db::DbManager;
 #[cfg(feature = "db")]
 pub(crate) type DbProvider = modkit_db::DBProvider<modkit_db::DbError>;
-
-// Stub types for no-db builds (never exposed; methods that would use them are cfg'd out).
-#[cfg(not(feature = "db"))]
-#[derive(Clone, Debug)]
-pub struct DbManager;
-#[cfg(not(feature = "db"))]
-#[derive(Clone, Debug)]
-pub struct DbProvider;
 
 #[derive(Clone)]
 #[must_use]
@@ -34,20 +22,21 @@ pub struct ModuleCtx {
     config_provider: Arc<dyn ConfigProvider>,
     client_hub: Arc<crate::client_hub::ClientHub>,
     cancellation_token: CancellationToken,
-    #[cfg_attr(not(feature = "db"), allow(dead_code))]
+    #[cfg(feature = "db")]
     db: Option<DbProvider>,
 }
 
 /// Builder for creating module-scoped contexts with resolved database handles.
 ///
-/// This builder internally uses `DbManager` to resolve per-module `Db` instances
-/// at build time, ensuring `ModuleCtx` contains only the final, ready-to-use entrypoint.
+/// Use [`ModuleContextBuilder::with_db_manager`] (feature `db`) to attach a
+/// `DbManager` so `for_module` can resolve a per-module `DbHandle`.
+#[must_use]
 pub struct ModuleContextBuilder {
     instance_id: Uuid,
     config_provider: Arc<dyn ConfigProvider>,
     client_hub: Arc<crate::client_hub::ClientHub>,
     root_token: CancellationToken,
-    #[cfg_attr(not(feature = "db"), allow(dead_code))]
+    #[cfg(feature = "db")]
     db_manager: Option<Arc<DbManager>>, // internal only, never exposed to modules
 }
 
@@ -57,15 +46,23 @@ impl ModuleContextBuilder {
         config_provider: Arc<dyn ConfigProvider>,
         client_hub: Arc<crate::client_hub::ClientHub>,
         root_token: CancellationToken,
-        db_manager: Option<Arc<DbManager>>,
     ) -> Self {
         Self {
             instance_id,
             config_provider,
             client_hub,
             root_token,
-            db_manager,
+            #[cfg(feature = "db")]
+            db_manager: None,
         }
+    }
+
+    /// Attach a `DbManager` used by [`for_module`](Self::for_module) to resolve
+    /// per-module database handles.
+    #[cfg(feature = "db")]
+    pub fn with_db_manager(mut self, db_manager: Option<Arc<DbManager>>) -> Self {
+        self.db_manager = db_manager;
+        self
     }
 
     /// Returns the process-level instance ID.
@@ -74,48 +71,46 @@ impl ModuleContextBuilder {
         self.instance_id
     }
 
-    /// Build a module-scoped context, resolving the `DbHandle` for the given module.
+    /// Build a module-scoped context, resolving the `DbHandle` for the given
+    /// module when the `db` feature is enabled.
+    ///
+    /// Kept `async` in both configurations so callers don't need cfg branches
+    /// around `.await`; under `not(feature = "db")` the future is ready on
+    /// first poll.
     ///
     /// # Errors
     /// Returns an error if database resolution fails.
     #[cfg_attr(not(feature = "db"), allow(clippy::unused_async))]
     pub async fn for_module(&self, module_name: &str) -> anyhow::Result<ModuleCtx> {
-        let db: Option<DbProvider> = {
-            #[cfg(feature = "db")]
-            {
-                if let Some(mgr) = &self.db_manager {
-                    mgr.get(module_name).await?.map(modkit_db::DBProvider::new)
-                } else {
-                    None
-                }
-            }
-            #[cfg(not(feature = "db"))]
-            {
-                let _ = module_name; // avoid unused in no-db builds
-                None
-            }
-        };
-
-        Ok(ModuleCtx::new(
+        let ctx = ModuleCtx::new(
             Arc::<str>::from(module_name),
             self.instance_id,
             self.config_provider.clone(),
             self.client_hub.clone(),
             self.root_token.child_token(),
-            db,
-        ))
+        );
+        #[cfg(feature = "db")]
+        let ctx = if let Some(mgr) = &self.db_manager
+            && let Some(handle) = mgr.get(module_name).await?
+        {
+            ctx.with_db(modkit_db::DBProvider::new(handle))
+        } else {
+            ctx
+        };
+        Ok(ctx)
     }
 }
 
 impl ModuleCtx {
     /// Create a new module-scoped context with all required fields.
+    ///
+    /// Attach a database entrypoint with [`with_db`](Self::with_db) (feature `db`).
     pub fn new(
         module_name: impl Into<Arc<str>>,
         instance_id: Uuid,
         config_provider: Arc<dyn ConfigProvider>,
         client_hub: Arc<crate::client_hub::ClientHub>,
         cancellation_token: CancellationToken,
-        db: Option<DbProvider>,
     ) -> Self {
         Self {
             module_name: module_name.into(),
@@ -123,8 +118,16 @@ impl ModuleCtx {
             config_provider,
             client_hub,
             cancellation_token,
-            db,
+            #[cfg(feature = "db")]
+            db: None,
         }
+    }
+
+    /// Attach the per-module database entrypoint.
+    #[cfg(feature = "db")]
+    pub fn with_db(mut self, db: DbProvider) -> Self {
+        self.db = Some(db);
+        self
     }
 
     // ---- public read-only API for modules ----
@@ -333,6 +336,7 @@ impl ModuleCtx {
             config_provider: self.config_provider.clone(),
             client_hub: self.client_hub.clone(),
             cancellation_token: self.cancellation_token.clone(),
+            #[cfg(feature = "db")]
             db: None,
         }
     }
@@ -398,7 +402,6 @@ mod tests {
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
             CancellationToken::new(),
-            None,
         );
 
         let result: Result<TestConfig, ConfigError> = ctx.config();
@@ -419,7 +422,6 @@ mod tests {
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
             CancellationToken::new(),
-            None,
         );
 
         let result: Result<TestConfig, ConfigError> = ctx.config();
@@ -438,7 +440,6 @@ mod tests {
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
             CancellationToken::new(),
-            None,
         );
 
         let result: Result<TestConfig, ConfigError> = ctx.config_or_default();
@@ -458,7 +459,6 @@ mod tests {
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
             CancellationToken::new(),
-            None,
         );
 
         assert_eq!(ctx.instance_id(), instance_id);
@@ -488,7 +488,6 @@ mod tests {
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
             CancellationToken::new(),
-            None,
         )
     }
 

@@ -34,7 +34,6 @@ fn create_test_module_ctx() -> ModuleCtx {
         Arc::new(EmptyConfigProvider),
         Arc::new(modkit::ClientHub::new()),
         tokio_util::sync::CancellationToken::new(),
-        None, // No database handle for these tests
     )
 }
 

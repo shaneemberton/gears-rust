@@ -336,7 +336,6 @@ async fn e2e_full_middleware_stack_logs_remote_addr() -> anyhow::Result<()> {
         Arc::new(TestConfigProvider { config: cfg }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     );
 
     let api = api_gateway::ApiGateway::default();

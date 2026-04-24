@@ -126,8 +126,8 @@ async fn users_info_registers_sdk_client_and_handles_basic_crud() {
         Arc::new(MockConfigProvider::new_users_info_default()),
         hub.clone(),
         CancellationToken::new(),
-        Some(dbp),
-    );
+    )
+    .with_db(dbp);
 
     let module = UsersInfo::default();
     run_migrations_for_module(&db, "users_info", module.migrations())

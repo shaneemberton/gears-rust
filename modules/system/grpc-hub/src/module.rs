@@ -881,7 +881,6 @@ mod tests {
             Arc::new(ConfigProviderWithAddr),
             Arc::new(ClientHub::default()),
             cancel,
-            None,
         );
 
         hub.init(&ctx).await.expect("init should succeed");
@@ -924,7 +923,6 @@ mod tests {
             Arc::new(ConfigProviderWithUds),
             Arc::new(ClientHub::default()),
             cancel,
-            None,
         );
 
         hub.init(&ctx).await.expect("init should succeed");
@@ -976,7 +974,6 @@ mod tests {
             Arc::new(config_provider),
             Arc::new(ClientHub::default()),
             cancel.clone(),
-            None,
         );
 
         hub.init(&ctx).await.expect("init should succeed");
@@ -1048,7 +1045,6 @@ mod tests {
             Arc::new(ConfigProviderWithNamedPipe),
             Arc::new(ClientHub::default()),
             cancel.clone(),
-            None,
         );
 
         hub.init(&ctx).await.expect("init should succeed");
@@ -1184,7 +1180,6 @@ mod tests {
             Arc::new(EmptyConfigProvider),
             Arc::clone(&client_hub),
             cancel,
-            None,
         );
 
         hub.init(&ctx).await.expect("init should succeed");

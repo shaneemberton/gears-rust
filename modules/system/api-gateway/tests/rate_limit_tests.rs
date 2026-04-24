@@ -50,7 +50,6 @@ fn create_test_module_ctx_with_config(config: &serde_json::Value) -> ModuleCtx {
         }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     )
 }
 

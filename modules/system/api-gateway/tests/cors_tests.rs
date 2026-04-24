@@ -57,7 +57,6 @@ fn create_test_module_ctx_with_cors() -> ModuleCtx {
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     )
 }
 
@@ -76,7 +75,6 @@ fn create_test_module_ctx_permissive_cors() -> ModuleCtx {
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     )
 }
 
@@ -189,7 +187,6 @@ async fn test_cors_disabled() {
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     );
 
     let api_gateway = api_gateway::ApiGateway::default();
@@ -232,7 +229,6 @@ async fn test_cors_config_validation() {
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
-        None,
     );
 
     let api_gateway = api_gateway::ApiGateway::default();

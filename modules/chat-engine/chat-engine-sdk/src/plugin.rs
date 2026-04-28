@@ -1,5 +1,8 @@
+use std::time::{Duration, Instant};
+
 use async_trait::async_trait;
 use futures::stream::{self, BoxStream, StreamExt};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::error::PluginError;
@@ -76,6 +79,39 @@ pub struct PluginCallContext {
     /// Capability values selected for this call (subset of those declared by
     /// the plugin via `Capability`).
     pub enabled_capabilities: Option<Vec<CapabilityValue>>,
+    /// Absolute monotonic deadline for this plugin call. Plugins should bound
+    /// long-running work (HTTP requests, retries) to remain within this budget.
+    /// `None` means Chat Engine did not set a deadline.
+    ///
+    /// Use `remaining()` for a convenient countdown duration.
+    pub deadline: Option<Instant>,
+    /// Cooperative cancellation signal. Cancelled by Chat Engine when:
+    /// - the client disconnects (HTTP stream closed)
+    /// - the deadline elapses (Chat Engine bridges deadline → cancel)
+    /// - explicit `DELETE /streaming` is invoked on a session
+    ///
+    /// Plugins should `select!` on `cancel.cancelled()` alongside their work
+    /// and return `PluginError::Transient("cancelled")` (or similar) when
+    /// the signal fires. `cancel.is_cancelled()` is also available for
+    /// pre-flight checks before expensive operations.
+    pub cancel: CancellationToken,
+}
+
+impl PluginCallContext {
+    /// True if cancellation has been signalled.
+    #[must_use]
+    pub fn is_cancelled(&self) -> bool {
+        self.cancel.is_cancelled()
+    }
+
+    /// Remaining time until the deadline, or `None` if no deadline is set
+    /// or it has already elapsed. Plugins typically pass this to
+    /// `tokio::time::timeout(...)` or `reqwest::Client::timeout(...)`.
+    #[must_use]
+    pub fn remaining(&self) -> Option<Duration> {
+        self.deadline
+            .and_then(|d| d.checked_duration_since(Instant::now()))
+    }
 }
 
 impl std::fmt::Debug for PluginCallContext {
@@ -93,26 +129,35 @@ impl std::fmt::Debug for PluginCallContext {
             .field("session_type_id", &self.session_type_id)
             .field("plugin_config", &plugin_config_redacted)
             .field("enabled_capabilities", &self.enabled_capabilities)
+            .field("remaining", &self.remaining())
+            .field("cancelled", &self.is_cancelled())
             .finish()
     }
 }
 
 #[cfg(test)]
-mod plugin_call_context_debug_tests {
-    use super::{PluginCallContext, TenantId, UserId};
+mod plugin_call_context_tests {
+    use super::{CancellationToken, Duration, Instant, PluginCallContext, TenantId, UserId};
     use uuid::Uuid;
 
-    #[test]
-    fn debug_redacts_plugin_config_when_present() {
-        let ctx = PluginCallContext {
+    fn make_ctx() -> PluginCallContext {
+        PluginCallContext {
             request_id: Uuid::nil(),
             tenant_id: TenantId::new("t"),
             user_id: UserId::new("u"),
             plugin_instance_id: "p".into(),
             session_type_id: Uuid::nil(),
-            plugin_config: Some(serde_json::json!({"api_key": "super-secret-123"})),
+            plugin_config: None,
             enabled_capabilities: None,
-        };
+            deadline: None,
+            cancel: CancellationToken::new(),
+        }
+    }
+
+    #[test]
+    fn debug_redacts_plugin_config_when_present() {
+        let mut ctx = make_ctx();
+        ctx.plugin_config = Some(serde_json::json!({"api_key": "super-secret-123"}));
         let printed = format!("{ctx:?}");
         assert!(printed.contains("<redacted>"), "got: {printed}");
         assert!(
@@ -123,18 +168,39 @@ mod plugin_call_context_debug_tests {
 
     #[test]
     fn debug_prints_none_when_plugin_config_absent() {
-        let ctx = PluginCallContext {
-            request_id: Uuid::nil(),
-            tenant_id: TenantId::new("t"),
-            user_id: UserId::new("u"),
-            plugin_instance_id: "p".into(),
-            session_type_id: Uuid::nil(),
-            plugin_config: None,
-            enabled_capabilities: None,
-        };
+        let ctx = make_ctx();
         let printed = format!("{ctx:?}");
         assert!(printed.contains("plugin_config: None"), "got: {printed}");
         assert!(!printed.contains("<redacted>"), "got: {printed}");
+    }
+
+    #[test]
+    fn is_cancelled_reflects_token_state() {
+        let ctx = make_ctx();
+        assert!(!ctx.is_cancelled());
+        ctx.cancel.cancel();
+        assert!(ctx.is_cancelled());
+    }
+
+    #[test]
+    fn remaining_is_none_when_no_deadline() {
+        let ctx = make_ctx();
+        assert!(ctx.remaining().is_none());
+    }
+
+    #[test]
+    fn remaining_returns_positive_duration_for_future_deadline() {
+        let mut ctx = make_ctx();
+        ctx.deadline = Some(Instant::now() + Duration::from_secs(10));
+        let r = ctx.remaining().expect("should be set");
+        assert!(r > Duration::from_secs(5) && r <= Duration::from_secs(10));
+    }
+
+    #[test]
+    fn remaining_is_none_when_deadline_already_elapsed() {
+        let mut ctx = make_ctx();
+        ctx.deadline = Some(Instant::now() - Duration::from_secs(1));
+        assert!(ctx.remaining().is_none());
     }
 }
 

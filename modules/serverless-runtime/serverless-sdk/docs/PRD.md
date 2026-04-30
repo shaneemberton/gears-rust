@@ -27,6 +27,7 @@ Updated: 2026-03-30 by Constructor Tech
   - [5.4 Environment](#54-environment)
   - [5.5 Error Model](#55-error-model)
   - [5.6 Tracing Instrumentation](#56-tracing-instrumentation)
+  - [5.7 Adapter Conformance Suite](#57-adapter-conformance-suite)
 - [6. Non-Functional Requirements](#6-non-functional-requirements)
   - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
   - [6.2 NFR Exclusions](#62-nfr-exclusions)
@@ -71,7 +72,7 @@ STANDARDS ALIGNMENT:
 
 ### 1.1 Purpose
 
-`cf-serverless-runtime-sdk` is the single engine-agnostic, stable Rust library of the
+`serverless-runtime-sdk` is the single engine-agnostic, stable Rust library of the
 CyberFabric Serverless Runtime module. It defines the types and traits shared by the
 host and by runtime plugins.
 
@@ -143,7 +144,7 @@ _Baseline: module is new (no prior implementation). All targets apply at first s
 
 - **FunctionHandler portability**: Adapter developers can implement handlers against a single
   contract that works unchanged across any CyberFabric execution engine.
-  _Target: zero engine-specific changes required to port a conformant adapter between engines, verified by a shared test suite._
+  _Target: zero engine-specific changes required to port a conformant adapter between engines, verified by the adapter conformance test suite (`cpt-cf-serverless-runtime-sdk-fr-conformance-suite`, §5.7)._
 - **Error categorisation completeness**: The SDK error model maps unambiguously to runtime
   `RuntimeErrorCategory` values, enabling correct retry and dead-letter routing without
   adapter-specific error handling.
@@ -275,6 +276,9 @@ _Baseline: module is new (no prior implementation). All targets apply at first s
   plugin-level helper crate (out of scope for this SDK). Keeping those primitives outside
   the SDK scopes the complexity to the plugins that need it instead of forcing every
   plugin to depend on a runtime-neutral substrate.
+- `JobTransport` and `ExecutionContext` host-callback abstractions — explicitly excluded
+  per `cpt-cf-serverless-runtime-adr-thin-host`. Plugins are autonomous; the host dispatches
+  through `dyn RuntimeAdapter` and receives index updates through `ServerlessRuntimeClient`.
 
 
 ---
@@ -323,7 +327,7 @@ returning success or a `ServerlessSdkError`.
 - [ ] `p1` - **ID**: `cpt-cf-serverless-runtime-sdk-fr-compensation-input`
 
 The crate MUST provide a `CompensationInput` struct that carries all fields from the runtime's
-`CompensationContext` (`gts.x.core.serverless.compensation_context.v1~`) required for
+`CompensationContext` (`gts.x.core.sless.compensation_context.v1~`) required for
 idempotent rollback: `trigger`, `original_workflow_invocation_id`, `failed_step_id`,
 `failed_step_error` (typed: `error_type`, `message`, `error_metadata`),
 `workflow_state_snapshot`, `timestamp`, `function_id`,
@@ -450,6 +454,23 @@ SDK consumers.
 
 - **Rationale**: FunctionHandler implementations remain clean and free of platform-specific observability
   wiring; adapters control the observability boundary.
+- **Actors**: `cpt-cf-serverless-runtime-sdk-actor-adapter-dev`
+
+### 5.7 Adapter Conformance Suite
+
+#### Conformance Test Suite
+
+- [ ] `p1` - **ID**: `cpt-cf-serverless-runtime-sdk-fr-conformance-suite`
+
+The crate MUST ship an adapter conformance test suite that every runtime plugin runs
+against its `RuntimeAdapter` implementation. Coverage MUST include: invocation status
+transitions, retry semantics, compensation triggering, suspension/resume visibility,
+and error taxonomy.
+
+- **Rationale**: Required by `cpt-cf-serverless-runtime-adr-thin-host`. With invocation,
+  scheduling, retry, and compensation execution distributed across plugins, the conformance
+  suite is the load-bearing mechanism for guaranteeing uniform user-visible semantics
+  across backends.
 - **Actors**: `cpt-cf-serverless-runtime-sdk-actor-adapter-dev`
 
 ---
@@ -585,7 +606,7 @@ surface, stability classifications, and breaking change policies, see [DESIGN.md
 **Actor**: `cpt-cf-serverless-runtime-sdk-actor-adapter-dev`
 
 **Preconditions**:
-- `cf-serverless-runtime-sdk` is a dependency of the adapter crate.
+- `serverless-runtime-sdk` is a dependency of the adapter crate.
 - The function's `IOSchema.params` and `IOSchema.returns` are known.
 
 **Main Flow**:
@@ -616,7 +637,7 @@ surface, stability classifications, and breaking change policies, see [DESIGN.md
 **Actor**: `cpt-cf-serverless-runtime-sdk-actor-adapter-dev`
 
 **Preconditions**:
-- `cf-serverless-runtime-sdk` is a dependency of the adapter crate.
+- `serverless-runtime-sdk` is a dependency of the adapter crate.
 - The adapter has access to an `InvocationRecord` and the runtime's `CompensationContext`.
 
 **Main Flow**:

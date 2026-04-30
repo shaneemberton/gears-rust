@@ -74,7 +74,7 @@ DESIGN LANGUAGE:
 
 ### 1.1 Architectural Vision
 
-`cf-serverless-runtime-sdk` is the engine-agnostic contract crate of the serverless-runtime module. It exposes traits and value types used by the host and by runtime plugins. It has no runtime state, no I/O, and no engine-specific dependencies.
+`serverless-runtime-sdk` is the engine-agnostic contract crate of the serverless-runtime module. It exposes traits and value types used by the host and by runtime plugins. It has no runtime state, no I/O, and no engine-specific dependencies.
 
 The invocation flow through this crate's types:
 
@@ -156,7 +156,7 @@ The serverless-runtime module has a thin host and fat runtime plugins. This SDK 
 ║  Host (serverless-runtime crate)                             ║
 ║  Registry · Tenant Policy · REST · GTS validation · audit    ║
 ║  plugin dispatch · lightweight invocation index              ║
-║  depends on: cf-serverless-runtime-sdk (RuntimeAdapter,      ║
+║  depends on: serverless-runtime-sdk (RuntimeAdapter,         ║
 ║              InvocationRecord, RuntimeErrorCategory, …)      ║
 ╚═══════════════════════╤══════════════════════════════════════╝
                         │ dispatches through dyn RuntimeAdapter
@@ -170,7 +170,7 @@ The serverless-runtime module has a thin host and fat runtime plugins. This SDK 
 ╚═══════════════════════╤══════════════════════════════════════╝
                         │ depends on
 ╔═══════════════════════▼══════════════════════════════════════╗
-║  cf-serverless-runtime-sdk  (this crate)                      ║
+║  serverless-runtime-sdk  (this crate)                         ║
 ║                                                               ║
 ║  Shared domain                                                ║
 ║  ┌────────────────────────────────────────────────────────┐   ║
@@ -201,7 +201,7 @@ The serverless-runtime module has a thin host and fat runtime plugins. This SDK 
 
 | Layer | Responsibility | Technology |
 |-------|---------------|------------|
-| Host | Registry, tenant policy, REST façade, GTS validation, audit, plugin dispatch, lightweight invocation index | Rust, ModKit, SecureORM |
+| Host | Registry, tenant policy, REST façade, GTS validation, audit, plugin dispatch, lightweight invocation index (host-indexed, plugin-detailed split per `cpt-cf-serverless-runtime-adr-thin-host`) | Rust, ModKit, SecureORM |
 | Runtime Plugin | Implements `RuntimeAdapter` for one backend; owns invocation, scheduling, event-trigger, retry, compensation using backend-native primitives; invokes user handlers through `FunctionHandler` / `WorkflowHandler` | Rust + `async-trait`, backend SDK |
 | SDK (this crate) | Shared domain types; `RuntimeAdapter` (plugins implement, host calls); `ServerlessRuntimeClient` (host implements, plugins call); `FunctionHandler`/`WorkflowHandler` (plugin implements wrapping user authoring asset, plugin calls); handler-author projections (`Context`, `CompensationInput`, `ServerlessSdkError`); plugin-only `trace` instrumentation | Rust stable, `serde`, `thiserror`, `async-trait`, `tracing`, `cf-credstore-sdk` |
 
@@ -313,7 +313,7 @@ The SDK constructs `Context` from the record before calling the handler via
 #### CompensationContext → CompensationInput Field Mapping
 
 `CompensationInput` is the SDK's projection of the runtime's `CompensationContext`
-(`gts.x.core.serverless.compensation_context.v1~`). The adapter deserialises the
+(`gts.x.core.sless.compensation_context.v1~`). The adapter deserialises the
 runtime's JSON envelope and populates this struct.
 
 | `CompensationInput` field | Source in Runtime's `CompensationContext` | Type |
@@ -344,9 +344,9 @@ Adapters use this mapping to produce the correct `RuntimeErrorPayload` from a
 
 | `ServerlessSdkError` | `RuntimeErrorCategory` | GTS Error Type Hint |
 |----------------------|------------------------|---------------------|
-| `UserError(msg)` | `NonRetryable` | `gts.x.core.serverless.err.v1~x.core.serverless.err.validation.v1~` |
-| `InvalidInput(msg)` | `NonRetryable` | `gts.x.core.serverless.err.v1~x.core.serverless.err.validation.v1~` |
-| `Timeout` | `Timeout` | `gts.x.core.serverless.err.v1~x.core.serverless.err.runtime_timeout.v1~` |
+| `UserError(msg)` | `NonRetryable` | `gts.x.core.sless.err.v1~x.core.sless.err.validation.v1~` |
+| `InvalidInput(msg)` | `NonRetryable` | `gts.x.core.sless.err.v1~x.core.sless.err.validation.v1~` |
+| `Timeout` | `Timeout` | `gts.x.core.sless.err.v1~x.core.sless.err.runtime_timeout.v1~` |
 | `NotSupported(msg)` | `NonRetryable` | adapter-defined |
 | `Internal(msg)` | `Retryable` | adapter-defined |
 
@@ -384,7 +384,7 @@ ensuring it stays in sync with `InvocationRecord`.
 
 ```mermaid
 graph TD
-    subgraph sdk["cf-serverless-runtime-sdk (this crate)"]
+    subgraph sdk["serverless-runtime-sdk (this crate)"]
         lib["lib.rs (re-exports)"]
 
         subgraph domain_grp["Shared domain"]
@@ -775,7 +775,7 @@ sequenceDiagram
     A->>R: ServerlessRuntimeClient index update (compensated | dead_lettered)
 ```
 
-**Note on uniform semantics**: because each plugin owns its own invocation bridge, this SDK does not centralise a `dispatch_invocation` helper. Uniform user-visible semantics (status transitions, retry contract, compensation triggering, error taxonomy, timeline events) are enforced by the typed contracts in this SDK — trait shapes, `ServerlessSdkError` → `RuntimeErrorCategory` mapping, and the `trace::*_instrumented` event taxonomy — together with per-plugin integration tests that each plugin author runs against their backend. A cross-plugin conformance test harness is not part of this SDK; it may be added later once at least two plugins exist to derive a stable contract from.
+**Note on uniform semantics**: because each plugin owns its own invocation bridge, this SDK does not centralise a `dispatch_invocation` helper. Uniform user-visible semantics are enforced through two layers in this SDK: (1) the typed contracts — trait shapes, `ServerlessSdkError` → `RuntimeErrorCategory` mapping, and the `trace::*_instrumented` event taxonomy; and (2) the **adapter conformance test suite** shipped with this SDK, which every plugin runs against its `RuntimeAdapter` implementation. The suite covers invocation status transitions, retry semantics, compensation triggering, suspension/resume visibility, and error taxonomy, per `cpt-cf-serverless-runtime-sdk-fr-conformance-suite` (see PRD §5.7) and `cpt-cf-serverless-runtime-adr-thin-host`.
 
 ### 3.7 Testability Architecture
 
@@ -841,7 +841,7 @@ This crate is the single shared SDK of the serverless-runtime module. It owns bo
 - **Projections used by handler code**:
   - `Context` is a projection of `InvocationRecord`.
   - `CompensationInput` is a projection of `CompensationContext`
-    (`gts.x.core.serverless.compensation_context.v1~`).
+    (`gts.x.core.sless.compensation_context.v1~`).
   - `ServerlessSdkError` variants map to `RuntimeErrorCategory` values (see §3.1).
   - `trace.rs` timeline events correspond to `TimelineEventType` values.
 
@@ -895,12 +895,10 @@ instrumentation point.
 
 ### Crate Naming Convention
 
-Following the workspace `cf-<name>` convention:
-
 | Artifact | Value |
 |----------|-------|
 | Directory | `modules/serverless-runtime/serverless-sdk/` (a rename to `serverless-runtime-sdk/` for consistency with the crate/package name is deferred) |
-| Package name | `cf-serverless-runtime-sdk` |
+| Package name | `serverless-runtime-sdk` |
 | Lib name | `serverless_runtime_sdk` |
 | Import | `use serverless_runtime_sdk::...` |
 

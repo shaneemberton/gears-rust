@@ -2787,6 +2787,7 @@ dependencies = [
  "axum",
  "cyberware-authz-resolver-sdk",
  "cyberware-modkit",
+ "cyberware-modkit-canonical-errors",
  "cyberware-modkit-db",
  "cyberware-modkit-db-macros",
  "cyberware-modkit-macros",

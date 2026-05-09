@@ -2,7 +2,7 @@
 cypilot: true
 type: requirement
 name: Rust PR Review Guidelines
-version: 1.0
+version: 1.1
 purpose: Idiomatic, engineering-grade checklist for reviewing Rust pull requests
 ---
 
@@ -15,19 +15,25 @@ Use this guideline to review Rust pull requests for correctness, idiomatic style
 This is a **PR review checklist**, not a language tutorial and not a generic architecture manifesto.  
 Focus on **real merge risk**, **idiomatic Rust**, and **actionable findings**.
 
+The checklist has two tiers:
+
+1. **Architecture review** — run once at the PR level before reading any file. Catches structural and design-level problems that span multiple files or are invisible inside a single hunk.
+2. **Code review** — run per-file. Catches implementation-level problems in the diff.
+
 ## Review Goals
 
 Review the PR as a senior Rust engineer. Prioritize:
 
-1. Correctness and invariant preservation
-2. Idiomatic Rust usage
-3. Error handling and panic safety
-4. Async and concurrency correctness
-5. API and type design
-6. Security and data handling
-7. Performance footguns
-8. Test adequacy
-9. Observability and operability
+1. Architecture and structural correctness (PR-level pass first)
+2. Correctness and invariant preservation
+3. Idiomatic Rust usage
+4. Error handling and panic safety
+5. Async and concurrency correctness
+6. API and type design
+7. Security and data handling
+8. Performance footguns
+9. Test adequacy
+10. Observability and operability
 
 ---
 
@@ -62,6 +68,117 @@ For each issue include:
 - **HIGH**: significant correctness, maintainability, or operability risk; should usually be fixed before merge
 - **MEDIUM**: meaningful improvement; fix if practical in this PR
 - **LOW**: minor issue or polish
+
+---
+
+# ARCHITECTURE REVIEW (PR-level pass — run before reading individual files)
+
+These checks are applied once per PR, not per file. Read the PR title, body, full file list, and skim the diff structure before answering each item.
+
+---
+
+## ARCH-001: Lifecycle Placement
+**Severity**: HIGH
+
+Async operations that are long-running, retry-heavy, or depend on external services must not run inside synchronous initialization hooks (e.g. `Module::init()`). Init hooks run before the module is declared healthy — blocking them prevents the orchestrator from observing readiness and makes clean shutdown impossible during the wait.
+
+Check:
+- Does any new code call a saga, retry loop, or blocking wait inside an `init()` or equivalent startup hook?
+- Is the operation bounded by a timeout short enough to be safe in an init context (< a few seconds)?
+- If a long-running startup task was added to `serve()` or an equivalent async context, does it accept a `CancellationToken` so shutdown can interrupt it?
+- Are background tasks spawned with lifecycle control (cancel token, join handle, error propagation)?
+
+**Red flags**: `tokio::time::sleep` inside `init()`, retry loops with external I/O in init, startup tasks with no shutdown signal.
+
+---
+
+## ARCH-002: Unguarded Safety Gaps
+**Severity**: HIGH
+
+Code that documents its own known-unsafe behavior in a comment but ships no compensating runtime control is a latent production incident. Comments are invisible to operators deploying from config.
+
+Check:
+- Does any new comment contain phrases like "not safe under X", "interim implementation", "gap tracked in #N", "not sufficient for Y failure model", or similar self-acknowledged limitations?
+- If yes: is there at least one of the following present?
+  - A config validation error or `warn!`/`error!` at startup that fires when the unsafe condition could be triggered
+  - A feature flag that defaults to the safe value (`false` / `disabled`) until the gap is resolved
+  - A startup log line that names the limitation and links the tracking issue
+
+**Red flags**: a "NOTE: this is unsafe under multi-replica" comment with no config guard; a "TODO: replace with X" comment on code that makes correctness guarantees it cannot keep.
+
+---
+
+## ARCH-003: Separation of Concerns Across Layers
+**Severity**: HIGH
+
+In a layered architecture (domain / application / infra), each layer has a defined role. Violations create tight coupling that makes the code hard to test, extend, and reason about.
+
+Check:
+- Does domain code import from infra (DB entities, ORM types, storage details)?
+- Does a handler or controller perform domain logic directly instead of delegating to a service?
+- Does a service own persistence decisions (transaction isolation, query shape) instead of delegating to a repository?
+- Is a new abstraction introduced that crosses layer boundaries without a clear justification?
+
+**Red flags**: domain structs with `sea_orm` derives; handlers constructing `ActiveModel`s; repository methods containing business rules.
+
+---
+
+## ARCH-004: Data Consistency and Transaction Scope
+**Severity**: HIGH
+
+Operations that mutate multiple resources must define what happens when they partially fail. An operation that can commit half its work and leave the system in an inconsistent state is a latent data corruption bug.
+
+Check:
+- Does the PR introduce a multi-step write that is not wrapped in a transaction?
+- If the operation fails midway, does the system end up in an inconsistent state that requires manual operator intervention?
+- Are compensating actions defined and tested for each failure arm of a saga or multi-step mutation?
+- Is idempotency considered — can the operation be safely retried after a partial failure?
+
+**Red flags**: two separate `repo.save()` calls with no transaction wrapper; a saga that writes step 1 and then calls an external service with no rollback for step 1 on external failure.
+
+---
+
+## ARCH-005: Cross-Component Algorithm Duplication
+**Severity**: MEDIUM
+
+When a PR introduces both an analysis/classification pass and a planning/execution pass over the same data structure, the planner often re-implements algorithms already present in the classifier. Two implementations of the same algorithm diverge silently — a bug fix in one is not applied to the other.
+
+Check:
+- Does the PR contain a classifier/analyzer and a planner/repairer operating over the same data?
+- Does the planner re-derive sets (e.g. cycle members, orphan-affected nodes) that the classifier already computed?
+- Could the planner consume the classifier's output directly instead of re-walking the source data?
+- Is graph-walk, tree-traversal, or recursive-descent logic copy-pasted across two or more files?
+
+**Red flags**: identical `while let Some(parent) = cursor` loops in both a classifier and a planner file; a repair function that re-runs detection as a precondition.
+
+---
+
+## ARCH-006: Observability for Operational Anomalies
+**Severity**: MEDIUM
+
+If an important operational event — degraded mode, skipped safety check, unexpected fallback, known-bad state — is only visible at `debug` or `info` level, operators filtering at `warn` and above will miss it. Silent anomalies become invisible production incidents.
+
+Check:
+- Are there new code paths where the system continues in a degraded or unexpected state after an error? Are those paths logged at `warn!` or higher?
+- Are there new fallback behaviors (e.g. "no plugin found, using noop") that an operator needs to know about in production?
+- Do new background loops or periodic tasks emit a metric on failure so alerting pipelines can detect silent breakage?
+- Are new critical-path operations covered by at least one metric (counter or gauge) so dashboards can reflect their health?
+
+**Red flags**: `info!` on a path where the system proceeds without a required resource; a background loop that catches all errors and logs nothing; a new periodic job with no `_failed` counter.
+
+---
+
+## ARCH-007: PR Scope and Cohesion
+**Severity**: LOW
+
+A PR that bundles multiple independently shippable features is harder to review accurately, harder to roll back safely, and harder to bisect when a bug is reported. This check does not block the review — record it as a note.
+
+Check:
+- Does the PR deliver more than one independently shippable feature (i.e. could feature B be merged without feature A being present)?
+- Does the PR mix behavioral changes with refactors in a way that makes it hard to distinguish what changed intentionally?
+- Is the diff so large (> ~800 lines of non-generated code) that reviewers cannot realistically catch all interactions?
+
+**Note to reviewer**: flag this in the summary, not as an inline comment. Do not block the review on it — provide the architectural feedback and note the scope concern separately.
 
 ---
 

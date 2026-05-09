@@ -31,9 +31,17 @@ Store the result as `REPO` and pass `--repo $REPO` to all `gh pr` commands, and 
 
 ## Review guidelines
 
-Apply **Rust idioms and engineering** (`docs/pr-review/modkit-rust-review.md`) to every `.rs` file in the diff.
+The review has two tiers:
+
+**Tier 1 — Architecture (PR-level, Step 0)**: Apply the `# ARCHITECTURE REVIEW` section of `docs/pr-review/modkit-rust-review.md` once across the whole PR before reading individual files. This catches structural and design-level problems that are invisible inside a single diff hunk.
+
+**Tier 2 — Code (per-file, Steps 2–4)**: Apply the remaining sections of `docs/pr-review/modkit-rust-review.md` to every `.rs` file in the diff.
 
 Apply **ModKit framework compliance** (`docs/pr-review/modkit-framework-compliance-review.md`) **only** to `.rs` files that belong to ModKit-owned code. A file is ModKit-owned when **any** of these signals is present:
+
+1. **Cargo.toml signals** — the nearest `Cargo.toml` (same crate or workspace member) declares a `modkit` dependency/feature, or the crate name starts with `modkit`.
+2. **Path heuristics** — the file lives under a path that matches ModKit module conventions (e.g. `modules/*/src/`, `crates/modkit-*/`, or similar namespace).
+3. **Source-level symbols** — the file imports from ModKit crates (`use modkit_*`, `use crate::` inside a modkit crate) or references ModKit-specific types/traits such as `OperationBuilder`, `SecureConn`, `SecureORM`, `ClientHub`, or `ModuleLifecycle`.
 
 Apply **Rust unit test quality review** (`docs/pr-review/modkit-tests-quality-review.md`) to every changed Rust test you can identify in the diff, including:
 - `#[test]` functions
@@ -43,12 +51,7 @@ Apply **Rust unit test quality review** (`docs/pr-review/modkit-tests-quality-re
 - integration tests under `tests/`
 - test-only helper code when it materially affects test validity
 
-
-1. **Cargo.toml signals** — the nearest `Cargo.toml` (same crate or workspace member) declares a `modkit` dependency/feature, or the crate name starts with `modkit`.
-2. **Path heuristics** — the file lives under a path that matches ModKit module conventions (e.g. `modules/*/src/`, `crates/modkit-*/`, or similar namespace).
-3. **Source-level symbols** — the file imports from ModKit crates (`use modkit_*`, `use crate::` inside a modkit crate) or references ModKit-specific types/traits such as `OperationBuilder`, `SecureConn`, `SecureORM`, `ClientHub`, or `ModuleLifecycle`.
-
-If none of these signals are detected, skip the framework compliance checklist for that file and apply only the general Rust idioms checklist.
+If none of the ModKit signals are detected, skip the framework compliance checklist for that file and apply only the general Rust idioms checklist.
 
 For non-Rust files in the diff (TOML, YAML, migrations, etc.) — apply only general correctness checks, do not force Rust-specific rules.
 
@@ -61,6 +64,24 @@ When reviewing, also consult:
 ---
 
 ## Steps
+
+### Step 0: PR-level architecture analysis
+
+Before reading any individual file, assess the PR as a whole.
+
+Read the PR title, body, and the complete list of changed files. Skim the diff structure (file names, module paths, what kinds of files are new vs modified) without reading implementation details yet.
+
+Apply every item in the `# ARCHITECTURE REVIEW` section of `docs/pr-review/modkit-rust-review.md` (ARCH-001 through ARCH-007). For each item, answer:
+
+- **ARCH-001**: Is any long-running or retry-heavy async work placed inside an init hook?
+- **ARCH-002**: Does any comment document a known safety gap without a runtime guard, startup warning, or feature flag?
+- **ARCH-003**: Does domain code import from infra, or do handlers do domain work directly?
+- **ARCH-004**: Are multi-step writes transactionally safe? Are partial-failure outcomes defined?
+- **ARCH-005**: Does the PR introduce both analysis and execution passes over the same data? Does the executor re-implement what the analyzer already computed?
+- **ARCH-006**: Do new degraded-mode or fallback paths log at an appropriate level? Do new background jobs emit failure metrics?
+- **ARCH-007**: Does the PR bundle more than one independently shippable feature?
+
+Record architecture findings now. ARCH-001 through ARCH-004 findings are posted as PR-level issue comments (not inline), since they describe structural problems not tied to a single line. ARCH-005 and ARCH-006 findings may be posted inline if a specific line is the best anchor. ARCH-007 is noted in the terminal summary only — do not post it as a comment.
 
 ### Step 1: Fetch PR metadata and diff
 
@@ -139,17 +160,24 @@ gh api repos/$REPO/pulls/<PR_NUMBER>/reviews \
 
 ### Step 7: Print summary
 
-After posting, print a compact summary table to the terminal:
+After posting, print a compact summary table to the terminal. Architecture findings appear first, followed by code-level findings.
 
 ```
 ## Rust PR Review: #<PR_NUMBER>
 
+### Architecture
+| # | ID | Sev | Issue | Fix |
+|---|----|-----|-------|-----|
+| 1 | ARCH-001 | HIGH | Long-running saga in init() blocks shutdown | Move to serve() with CancellationToken |
+| 2 | ARCH-002 | HIGH | Multi-replica gap documented but no runtime guard | Add startup warn! or config flag |
+
+### Code
 | # | ID | Sev | Location | Issue | Fix |
 |---|----|-----|----------|-------|-----|
-| 1 | RUST-ERR-001 | HIGH | service.rs:42 | Error context lost | Preserve source error |
-| 2 | MODKIT-SEC-001 | CRIT | handler.rs:18 | Raw DB connection | Use SecureConn |
+| 3 | RUST-ERR-001 | HIGH | service.rs:42 | Error context lost | Preserve source error |
+| 4 | MODKIT-SEC-001 | CRIT | handler.rs:18 | Raw DB connection | Use SecureConn |
 
-Posted <N> inline comments on PR #<PR_NUMBER>.
+Posted <N> inline comments and <M> PR-level comments on PR #<PR_NUMBER>.
 ```
 
 ---

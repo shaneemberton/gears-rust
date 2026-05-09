@@ -80,105 +80,63 @@ These checks are applied once per PR, not per file. Read the PR title, body, ful
 ## ARCH-001: Lifecycle Placement
 **Severity**: HIGH
 
-Async operations that are long-running, retry-heavy, or depend on external services must not run inside synchronous initialization hooks (e.g. `Module::init()`). Init hooks run before the module is declared healthy — blocking them prevents the orchestrator from observing readiness and makes clean shutdown impossible during the wait.
+Check that long-running or externally-dependent work is placed at the right phase of the application lifecycle. Blocking startup routines with retry loops, network waits, or saga-style operations prevents the process from signaling readiness, delays health checks, and makes clean shutdown impossible while the operation is in flight.
 
-Check:
-- Does any new code call a saga, retry loop, or blocking wait inside an `init()` or equivalent startup hook?
-- Is the operation bounded by a timeout short enough to be safe in an init context (< a few seconds)?
-- If a long-running startup task was added to `serve()` or an equivalent async context, does it accept a `CancellationToken` so shutdown can interrupt it?
-- Are background tasks spawned with lifecycle control (cancel token, join handle, error propagation)?
-
-**Red flags**: `tokio::time::sleep` inside `init()`, retry loops with external I/O in init, startup tasks with no shutdown signal.
+Look for async operations with high retry counts, external I/O, or wall-clock sleeps placed inside code that must complete before the service is considered ready. If such operations exist in startup, ask: can the process start without them completing? Can a shutdown signal interrupt them mid-wait?
 
 ---
 
 ## ARCH-002: Unguarded Safety Gaps
 **Severity**: HIGH
 
-Code that documents its own known-unsafe behavior in a comment but ships no compensating runtime control is a latent production incident. Comments are invisible to operators deploying from config.
+Code that documents a known correctness limitation in comments but ships no compensating runtime control is a latent incident. Inline comments describing gaps are invisible to operators deploying from config or reading dashboards.
 
-Check:
-- Does any new comment contain phrases like "not safe under X", "interim implementation", "gap tracked in #N", "not sufficient for Y failure model", or similar self-acknowledged limitations?
-- If yes: is there at least one of the following present?
-  - A config validation error or `warn!`/`error!` at startup that fires when the unsafe condition could be triggered
-  - A feature flag that defaults to the safe value (`false` / `disabled`) until the gap is resolved
-  - A startup log line that names the limitation and links the tracking issue
-
-**Red flags**: a "NOTE: this is unsafe under multi-replica" comment with no config guard; a "TODO: replace with X" comment on code that makes correctness guarantees it cannot keep.
+When the diff introduces code that self-documents a known-unsafe behavior, check whether a runtime signal exists that an operator would see before encountering the issue: a startup warning, a config validation error that fires on the dangerous configuration, or a feature flag defaulting to the safe value. If the only signal is a source comment, flag it.
 
 ---
 
-## ARCH-003: Separation of Concerns Across Layers
+## ARCH-003: Separation of Concerns
 **Severity**: HIGH
 
-In a layered architecture (domain / application / infra), each layer has a defined role. Violations create tight coupling that makes the code hard to test, extend, and reason about.
+Each layer in a layered architecture has a defined role, and crossing layer boundaries without justification creates coupling that makes code hard to test and evolve. The most common violations are business rules inside infrastructure code, persistence types leaking into the domain model, and entry points performing domain work directly instead of delegating.
 
-Check:
-- Does domain code import from infra (DB entities, ORM types, storage details)?
-- Does a handler or controller perform domain logic directly instead of delegating to a service?
-- Does a service own persistence decisions (transaction isolation, query shape) instead of delegating to a repository?
-- Is a new abstraction introduced that crosses layer boundaries without a clear justification?
-
-**Red flags**: domain structs with `sea_orm` derives; handlers constructing `ActiveModel`s; repository methods containing business rules.
+Look for imports that cross a layer boundary in the wrong direction, logic that belongs in one layer appearing in another, and new abstractions that mix concerns without a clear rationale.
 
 ---
 
 ## ARCH-004: Data Consistency and Transaction Scope
 **Severity**: HIGH
 
-Operations that mutate multiple resources must define what happens when they partially fail. An operation that can commit half its work and leave the system in an inconsistent state is a latent data corruption bug.
+Multi-step write operations must define what happens when they partially fail. An operation that can commit some steps and not others leaves the system in a state that may require manual intervention to repair, and that state may be invisible until it causes downstream failures.
 
-Check:
-- Does the PR introduce a multi-step write that is not wrapped in a transaction?
-- If the operation fails midway, does the system end up in an inconsistent state that requires manual operator intervention?
-- Are compensating actions defined and tested for each failure arm of a saga or multi-step mutation?
-- Is idempotency considered — can the operation be safely retried after a partial failure?
-
-**Red flags**: two separate `repo.save()` calls with no transaction wrapper; a saga that writes step 1 and then calls an external service with no rollback for step 1 on external failure.
+For any PR that writes to multiple resources, check that every failure arm is covered by a transaction, a rollback, or a defined compensating action. If the operation is a saga with external calls, check that partial completion is detectable and recoverable without operator intervention.
 
 ---
 
-## ARCH-005: Cross-Component Algorithm Duplication
+## ARCH-005: Logic Duplication Across Passes
 **Severity**: MEDIUM
 
-When a PR introduces both an analysis/classification pass and a planning/execution pass over the same data structure, the planner often re-implements algorithms already present in the classifier. Two implementations of the same algorithm diverge silently — a bug fix in one is not applied to the other.
+When a PR introduces both an analysis pass and an execution pass over the same data, the execution pass often re-implements detection or classification logic already present in the analysis pass. Two implementations of the same algorithm diverge silently — a bug fixed in one is not fixed in the other, and neither the compiler nor the tests will catch the drift.
 
-Check:
-- Does the PR contain a classifier/analyzer and a planner/repairer operating over the same data?
-- Does the planner re-derive sets (e.g. cycle members, orphan-affected nodes) that the classifier already computed?
-- Could the planner consume the classifier's output directly instead of re-walking the source data?
-- Is graph-walk, tree-traversal, or recursive-descent logic copy-pasted across two or more files?
-
-**Red flags**: identical `while let Some(parent) = cursor` loops in both a classifier and a planner file; a repair function that re-runs detection as a precondition.
+If the PR has a component that analyzes or classifies data and a separate component that acts on it, check whether the acting component consumes the analysis output or re-derives it independently. Re-deriving is the smell: the executor re-walks the same structure or recomputes the same sets the analyzer already resolved.
 
 ---
 
 ## ARCH-006: Observability for Operational Anomalies
 **Severity**: MEDIUM
 
-If an important operational event — degraded mode, skipped safety check, unexpected fallback, known-bad state — is only visible at `debug` or `info` level, operators filtering at `warn` and above will miss it. Silent anomalies become invisible production incidents.
+When the system continues in a degraded or unexpected state after an error, that state must be visible to operators through logs and metrics at the right severity level. Events logged below the level operators typically filter at are effectively silent in production.
 
-Check:
-- Are there new code paths where the system continues in a degraded or unexpected state after an error? Are those paths logged at `warn!` or higher?
-- Are there new fallback behaviors (e.g. "no plugin found, using noop") that an operator needs to know about in production?
-- Do new background loops or periodic tasks emit a metric on failure so alerting pipelines can detect silent breakage?
-- Are new critical-path operations covered by at least one metric (counter or gauge) so dashboards can reflect their health?
-
-**Red flags**: `info!` on a path where the system proceeds without a required resource; a background loop that catches all errors and logs nothing; a new periodic job with no `_failed` counter.
+Check that new fallback paths, skipped steps, or degraded-mode behaviors surface at `warn` or higher. Check that new background jobs or periodic loops emit a failure signal that alerting pipelines can consume. A job that silently absorbs errors and continues gives operators no indication it has stopped doing useful work.
 
 ---
 
 ## ARCH-007: PR Scope and Cohesion
 **Severity**: LOW
 
-A PR that bundles multiple independently shippable features is harder to review accurately, harder to roll back safely, and harder to bisect when a bug is reported. This check does not block the review — record it as a note.
+A PR that bundles multiple independently shippable features is harder to review accurately, harder to roll back, and harder to bisect after a regression. This is a note for the summary, not a blocking finding — do not post it as a comment on the PR.
 
-Check:
-- Does the PR deliver more than one independently shippable feature (i.e. could feature B be merged without feature A being present)?
-- Does the PR mix behavioral changes with refactors in a way that makes it hard to distinguish what changed intentionally?
-- Is the diff so large (> ~800 lines of non-generated code) that reviewers cannot realistically catch all interactions?
-
-**Note to reviewer**: flag this in the summary, not as an inline comment. Do not block the review on it — provide the architectural feedback and note the scope concern separately.
+If the PR delivers more than one feature that could be merged independently, or mixes behavioral changes with refactoring in a way that makes the actual behavioral delta hard to isolate, note it in the terminal summary table.
 
 ---
 

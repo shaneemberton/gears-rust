@@ -102,41 +102,13 @@ and lines added/removed per file. Use this to **focus the review on
 the files and areas actually changed by the PR**.
 
 b. **Architecture pass (PR-level, before reading any file)**
-Before examining individual files, assess the PR as a whole using
-the following checklist. These checks catch structural problems
-invisible inside a single diff hunk. Record findings in a dedicated
-"Architecture" section of the review output.
-
-- **Lifecycle placement**: Does the PR place long-running, retry-heavy,
-  or externally-dependent async work inside an init hook or synchronous
-  startup path? Such work belongs in an async `serve()` phase with a
-  `CancellationToken` so shutdown can interrupt it.
-- **Unguarded safety gaps**: Does any new comment document a known
-  correctness limitation ("not safe under X", "interim implementation",
-  "gap tracked in #N") without a compensating runtime guard — a startup
-  warning, a config validation error, or a feature flag that defaults safe?
-  Comments are invisible to operators; limitations must surface at runtime.
-- **Layering violations**: Does domain code import infra types (ORM
-  entities, DB connections)? Do handlers perform domain logic directly
-  instead of delegating to services? Does a service own query-shape or
-  transaction-isolation decisions that belong in a repository?
-- **Data consistency gaps**: Does the PR introduce multi-step writes with
-  no transaction boundary? If a step fails midway, is the resulting state
-  recoverable without operator intervention? For sagas, are compensating
-  actions defined for each failure arm?
-- **Algorithm duplication**: Does the PR introduce both an analysis pass
-  and an execution/repair pass over the same data? Does the executor
-  re-derive (via its own graph-walk or detection loop) what the analyzer
-  already computed and returned? Duplication across these layers diverges
-  silently — a bug fix in one is not applied to the other.
-- **Observability gaps**: Do new degraded-mode or fallback paths log at
-  `warn!` or higher? Do new background loops or periodic jobs emit a
-  failure counter or gauge so alert pipelines can detect silent breakage?
-  Is a significant operational anomaly (missing required resource, skipped
-  safety step) visible at `warn!` rather than `info!`?
-- **PR cohesion**: Does the PR bundle multiple independently shippable
-  features? Note this in the summary — it affects review confidence and
-  rollback safety.
+Before examining individual files, assess the PR as a whole. Apply
+the `# ARCHITECTURE REVIEW` checklist from the active review
+guidelines (ARCH-001 through ARCH-007). These checks catch structural
+and design-level problems invisible inside a single diff hunk.
+Record findings in a dedicated "Architecture" section of the review
+output; findings serious enough to affect the merge decision must
+appear in the final verdict.
 
 c. **Analyze existing PR feedback**
 Read `.prs/{ID}/review_threads.json` and the `comments` array in

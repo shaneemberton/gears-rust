@@ -67,21 +67,9 @@ When reviewing, also consult:
 
 ### Step 0: PR-level architecture analysis
 
-Before reading any individual file, assess the PR as a whole.
+Before reading any individual file, assess the PR as a whole. Read the PR title, body, and the complete list of changed files. Skim the diff structure (module paths, what is new vs modified) without reading implementation details yet.
 
-Read the PR title, body, and the complete list of changed files. Skim the diff structure (file names, module paths, what kinds of files are new vs modified) without reading implementation details yet.
-
-Apply every item in the `# ARCHITECTURE REVIEW` section of `docs/pr-review/modkit-rust-review.md` (ARCH-001 through ARCH-007). For each item, answer:
-
-- **ARCH-001**: Is any long-running or retry-heavy async work placed inside an init hook?
-- **ARCH-002**: Does any comment document a known safety gap without a runtime guard, startup warning, or feature flag?
-- **ARCH-003**: Does domain code import from infra, or do handlers do domain work directly?
-- **ARCH-004**: Are multi-step writes transactionally safe? Are partial-failure outcomes defined?
-- **ARCH-005**: Does the PR introduce both analysis and execution passes over the same data? Does the executor re-implement what the analyzer already computed?
-- **ARCH-006**: Do new degraded-mode or fallback paths log at an appropriate level? Do new background jobs emit failure metrics?
-- **ARCH-007**: Does the PR bundle more than one independently shippable feature?
-
-Record architecture findings now. ARCH-001 through ARCH-004 findings are posted as PR-level issue comments (not inline), since they describe structural problems not tied to a single line. ARCH-005 and ARCH-006 findings may be posted inline if a specific line is the best anchor. ARCH-007 is noted in the terminal summary only — do not post it as a comment.
+Apply every item in the `# ARCHITECTURE REVIEW` section of `docs/pr-review/modkit-rust-review.md` (ARCH-001 through ARCH-007). Architecture findings are posted as PR-level issue comments rather than inline, since they describe structural problems not anchored to a single line. ARCH-007 is noted in the terminal summary only — do not post it as a comment.
 
 ### Step 1: Fetch PR metadata and diff
 

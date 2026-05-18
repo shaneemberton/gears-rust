@@ -525,6 +525,41 @@ def extract_references(files: list[MarkdownFile]) -> list[dict[str, Any]]:
     return edges
 
 
+def extract_cpt_references(files: list[MarkdownFile]) -> list[dict[str, Any]]:
+    cpt_def = re.compile(r'\*\*ID\*\*:\s*`(cpt-[a-z0-9][a-z0-9_-]*)`')
+    cpt_ref = re.compile(r'`(cpt-[a-z0-9][a-z0-9_-]*)`')
+
+    cpt_def_map: dict[str, str] = {}
+    for file in files:
+        for m in cpt_def.finditer(file.content):
+            cpt_id = m.group(1)
+            if cpt_id not in cpt_def_map:
+                cpt_def_map[cpt_id] = file.rel
+
+    edges: list[dict[str, Any]] = []
+    edge_id = 0
+    for file in files:
+        seen_targets: set[str] = set()
+        for line in file.content.splitlines():
+            if cpt_def.search(line):
+                continue
+            for m in cpt_ref.finditer(line):
+                cpt_id = m.group(1)
+                target = cpt_def_map.get(cpt_id)
+                if target and target != file.rel and target not in seen_targets:
+                    seen_targets.add(target)
+                    edges.append({
+                        "id": f"cpt-{edge_id}",
+                        "from": file.rel,
+                        "to": target,
+                        "type": "cpt",
+                        "arrows": "to",
+                    })
+                    edge_id += 1
+
+    return edges
+
+
 def group_rects(groups: dict[str, Group]) -> dict[str, dict[str, float]]:
     cell_w = 650
     cell_h = 420
@@ -1261,6 +1296,15 @@ def render_html(
     grid-template-columns: minmax(0, 1fr);
   }}
 
+  #referenceTypeField {{
+    grid-column: 1 / -1;
+  }}
+
+  #referenceType:disabled {{
+    opacity: 0.5;
+    cursor: not-allowed;
+  }}
+
   .controlField {{
     display: grid;
     gap: 4px;
@@ -1710,6 +1754,14 @@ def render_html(
           <div class="controlHeader" id="viewDepthHeader">Link Depth</div>
           <input id="viewDepth" type="number" min="0" step="1" value="5" aria-label="Reference depth" />
         </div>
+        <div class="controlField" id="referenceTypeField">
+          <div class="controlHeader" id="referenceTypeHeader">Reference type</div>
+          <select id="referenceType" aria-label="Reference type" disabled>
+            <option value="file">File reference</option>
+            <option value="cpt">CPT ID reference</option>
+            <option value="both">File &amp; CPT ID reference</option>
+          </select>
+        </div>
       </div>
       <form id="searchForm">
         <input id="searchInput" type="search" placeholder="Filter files..." autocomplete="off" spellcheck="false" />
@@ -1762,10 +1814,15 @@ const categoryBands = {_cat_bands_json};
 const bucketRects = {_bkt_rects_json};
 const controlPlaneViews = {_views_json};
 
-function initGraph(rawNodes, rawEdges) {{
+function initGraph(rawNodes, rawEdges, rawCptEdges) {{
 
+const allRawEdges = [
+  ...rawEdges.map(e => ({{ ...e, type: "file" }})),
+  ...rawCptEdges.map(e => ({{ ...e, type: "cpt" }})),
+];
+const fileEdgePairs = new Set(rawEdges.map(e => `${{e.from}}---${{e.to}}`));
 const nodes = new vis.DataSet(rawNodes);
-const edges = new vis.DataSet(rawEdges);
+const edges = new vis.DataSet(allRawEdges);
 const nodeById = new Map(rawNodes.map(node => [node.id, node]));
 const edgeById = new Map(rawEdges.map((edge, index) => [edge.id ?? index, {{ ...edge, id: edge.id ?? index }}]));
 const adjacency = new Map();
@@ -1797,6 +1854,7 @@ const viewField = document.getElementById("viewField");
 const viewSelect = document.getElementById("viewSelect");
 const viewDepthField = document.getElementById("viewDepthField");
 const viewDepth = document.getElementById("viewDepth");
+const referenceType = document.getElementById("referenceType");
 const searchInput = document.getElementById("searchInput");
 const tooltip = document.getElementById("tooltip");
 const tooltipTitle = document.getElementById("tooltipTitle");
@@ -2166,8 +2224,17 @@ function updateStyles() {{
     return {{ id: node.id, hidden: false, opacity }};
   }}));
 
-  edges.update(rawEdges.map((edge, index) => {{
+  const refType = referenceType.value;
+  edges.update(allRawEdges.map((edge, index) => {{
     const edgeId = edge.id ?? index;
+    const isCpt = edge.type === "cpt";
+    if (isCpt) {{
+      if (refType === "file") return {{ id: edgeId, hidden: true }};
+      if (refType === "both" && fileEdgePairs.has(`${{edge.from}}---${{edge.to}}`)) return {{ id: edgeId, hidden: true }};
+      const bothVisible = filterActive ? (visibleSet.has(edge.from) && visibleSet.has(edge.to)) : true;
+      return {{ id: edgeId, hidden: false, dashes: [5, 5], color: {{ color: "#9b59b6", opacity: bothVisible ? 1 : 0.1 }}, width: bothVisible ? 2 : 1 }};
+    }}
+    if (refType === "cpt") return {{ id: edgeId, hidden: true }};
     const inView = activeViewEdgeIds.has(edgeId) && activeViewNodeIds.has(edge.from) && activeViewNodeIds.has(edge.to);
     let active, inactiveOpacity;
     if (filterActive) {{
@@ -2180,12 +2247,7 @@ function updateStyles() {{
       active = inView && sourceMatch && sourceSelected;
       inactiveOpacity = viewModeActive && !inView ? 0.12 : (sourceSelected ? 1 : 0.12);
     }}
-    return {{
-      id: edgeId,
-      hidden: false,
-      color: {{ color: active ? "#d98200" : "#bbbbbb", opacity: active ? 1 : inactiveOpacity }},
-      width: active ? 3 : 1
-    }};
+    return {{ id: edgeId, hidden: false, dashes: false, color: {{ color: active ? "#d98200" : "#bbbbbb", opacity: active ? 1 : inactiveOpacity }}, width: active ? 3 : 1 }};
   }}));
 }}
 
@@ -2940,6 +3002,16 @@ attachControlTooltip(
 );
 suppressControlTooltipOnInteract(viewSelect);
 attachControlTooltip(
+  document.getElementById("referenceTypeField"),
+  "Reference type",
+  `Controls which **link types** are shown on the graph.
+
+- **File reference**: solid arrows for direct markdown file links.
+- **CPT ID reference**: dashed purple arrows for CPT ID references (\`cpt-*\`) between files.
+- **File & CPT ID reference**: both types; if a direct file link already covers the same pair, the CPT arrow is hidden.`
+);
+suppressControlTooltipOnInteract(referenceType);
+attachControlTooltip(
   viewDepthField,
   "Link Depth",
   `Set how many **outbound markdown references** to follow from the selected view's entry files.
@@ -2964,6 +3036,9 @@ viewDepth.addEventListener("input", () => {{
 document.getElementById("filterDepth").addEventListener("input", () => {{
   updateStyles();
 }});
+referenceType.addEventListener("change", () => {{
+  updateStyles();
+}});
 applyViewState({{ fit: true }});
 
 function syncViewDepthVisibility() {{
@@ -2972,6 +3047,8 @@ function syncViewDepthVisibility() {{
   viewDepth.classList.toggle("hidden", isAllView);
   viewDepthField.classList.toggle("hidden", isAllView);
   viewControls.classList.toggle("all-files", isAllView);
+  referenceType.disabled = !isAllView;
+  if (!isAllView) referenceType.value = "file";
 }}
 
 let mmState = {{ minX: 0, minY: 0, s: 1, pad: 12 }};
@@ -3058,7 +3135,7 @@ window.fitCurrentView = fitCurrentView;
 
 }} // end initGraph
 
-initGraph(window.__graphData.nodes, window.__graphData.edges);
+initGraph(window.__graphData.nodes, window.__graphData.edges, window.__graphData.cptEdges || []);
 </script>
 </body>
 </html>
@@ -3091,6 +3168,7 @@ def main() -> None:
     template_vars = detect_template_vars(repo)
     files = scan_markdown(repo, groups, rules, skip_dirs, template_vars, categories or None)
     edges = extract_references(files)
+    cpt_edges = extract_cpt_references(files)
 
     cat_bands: dict[str, dict[str, Any]] = {}
     bkt_rects: dict[str, dict[str, Any]] = {}
@@ -3100,7 +3178,7 @@ def main() -> None:
     else:
         nodes, rects = build_nodes(files, groups, edges)
 
-    graph_data = {"nodes": nodes, "edges": edges}
+    graph_data = {"nodes": nodes, "edges": edges, "cptEdges": cpt_edges}
     js_content = render_graph_data_js(graph_data)
     js_path: Path | None = None
     if args.inline_data:
@@ -3118,6 +3196,7 @@ def main() -> None:
     print(f"Mode    : {'categories' if categories else 'groups'}")
     print(f"Scanned : {len(files)} Markdown files.")
     print(f"Edges   : {len(edges)}")
+    print(f"CPT Edges: {len(cpt_edges)}")
     print(f"Wrote   : {out_path}")
     if js_path is not None:
         print(f"Wrote   : {js_path} (graph data)")

@@ -47,7 +47,8 @@ pub fn ensure_crypto_provider() {
     use std::sync::Once;
     static INIT: Once = Once::new();
     INIT.call_once(|| {
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        #[cfg(not(feature = "fips"))]
+        rustls::crypto::aws_lc_rs::default_provider().install_default().ok();
     });
 }
 

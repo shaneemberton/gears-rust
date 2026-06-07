@@ -126,7 +126,7 @@ impl LazyIdpProvider {
         let gts_id: Arc<str> = self
             .selector
             .get_or_init(|| async {
-                let plugin_type_id = IdpPluginSpecV1::gts_schema_id();
+                let plugin_type_id = IdpPluginSpecV1::gts_type_id();
                 let instances = self
                     .registry
                     .list_instances(InstanceQuery::new().with_pattern(format!("{plugin_type_id}*")))

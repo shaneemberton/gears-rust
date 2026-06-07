@@ -476,7 +476,14 @@ impl De0901GtsStringPattern {
                 continue;
             };
 
-            if mi.path.segments.len() != 1 || mi.path.segments[0].ident.name.as_str() != "schema_id"
+            // gts 0.10.0 renamed the attribute `schema_id` -> `type_id`
+            // (the old name is still accepted by upstream as a deprecated
+            // alias, so validate either form).
+            if mi.path.segments.len() != 1
+                || !matches!(
+                    mi.path.segments[0].ident.name.as_str(),
+                    "type_id" | "schema_id"
+                )
             {
                 continue;
             }
@@ -517,7 +524,7 @@ impl De0901GtsStringPattern {
         }
 
         // Ensure it's actually a schema (type), not an instance
-        if result.is_schema != Some(true) {
+        if result.is_type != Some(true) {
             cx.span_lint(DE0901_GTS_STRING_PATTERN, span, |diag| {
                 diag.primary_message(format!(
                     "schema_id must be a type schema, not an instance: '{}' (DE0901)",

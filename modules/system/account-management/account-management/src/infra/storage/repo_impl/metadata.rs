@@ -71,7 +71,7 @@ use super::helpers::{TxError, map_scope_err, map_scope_to_tx, with_serializable_
 ///
 /// Mirrors the RG pattern in
 /// `resource_group::infra::storage::odata_mapper`. The chained
-/// `schema_id` is not a filter field — exact-schema lookups go through
+/// `type_id` is not a filter field — exact-schema lookups go through
 /// `get_metadata` instead; `SchemaUuid` is exposed so callers that
 /// already hold the derived `UUIDv5` can pin a row directly.
 struct MetadataODataMapper;

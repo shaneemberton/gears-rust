@@ -55,7 +55,7 @@ fn bootstrap_cfg() -> BootstrapConfig {
     BootstrapConfig {
         root_id: root_id(),
         root_name: "platform-root".into(),
-        root_tenant_type: gts::GtsSchemaId::new(ROOT_TENANT_TYPE),
+        root_tenant_type: gts::GtsTypeId::new(ROOT_TENANT_TYPE),
         root_tenant_metadata: None,
         idp_wait_timeout: std::time::Duration::from_secs(1),
         idp_retry_backoff_initial: std::time::Duration::from_secs(1),
@@ -1047,7 +1047,7 @@ fn bootstrap_cfg_long_deadline() -> BootstrapConfig {
     BootstrapConfig {
         root_id: root_id(),
         root_name: "platform-root".into(),
-        root_tenant_type: gts::GtsSchemaId::new(ROOT_TENANT_TYPE),
+        root_tenant_type: gts::GtsTypeId::new(ROOT_TENANT_TYPE),
         root_tenant_metadata: None,
         idp_wait_timeout: std::time::Duration::from_secs(30),
         idp_retry_backoff_initial: std::time::Duration::from_secs(1),

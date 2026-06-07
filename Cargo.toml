@@ -35,7 +35,7 @@ members = [
     "libs/modkit-canonical-errors",
     "libs/modkit-canonical-errors-macro",
     "libs/modkit-gts",
-    "libs/modkit-gts-macro",
+    "libs/modkit-gts-macros",
     "libs/modkit-http",
     "libs/modkit-sdk",
     "libs/modkit-odata-macros",
@@ -232,7 +232,7 @@ modkit-canonical-errors-macro = { package = "cyberware-modkit-canonical-errors-m
 modkit-db = { package = "cyberware-modkit-db", version = "0.8.2", path = "libs/modkit-db" }
 modkit-db-macros = { package = "cyberware-modkit-db-macros", version = "0.6.2", path = "libs/modkit-db-macros" }
 modkit-gts = { package = "cyberware-modkit-gts", version = "0.1.0", path = "libs/modkit-gts" }
-modkit-gts-macro = { package = "cyberware-modkit-gts-macro", version = "0.1.0", path = "libs/modkit-gts-macro" }
+modkit-gts-macros = { package = "cyberware-modkit-gts-macros", version = "0.1.0", path = "libs/modkit-gts-macros" }
 modkit-macros = { package = "cyberware-modkit-macros", version = "0.6.2", path = "libs/modkit-macros" }
 modkit-node-info = { package = "cyberware-modkit-node-info", version = "0.6.4", path = "libs/modkit-node-info" }
 modkit-odata = { package = "cyberware-modkit-odata", version = "0.8.0", path = "libs/modkit-odata" }
@@ -556,10 +556,10 @@ walkdir = "2.5"
 shellexpand = "3.1"
 
 # GTS library
-gts-id = "0.9.3"
-gts = "0.9.3"
-gts-macros = "0.9.3"
+gts-id = "0.10.0"
+gts = "0.10.0"
+gts-macros = "0.10.0"
 
 # GTS validator
-gts-validator = "0.9.3"
+gts-validator = "0.10.0"
 

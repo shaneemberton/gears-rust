@@ -65,7 +65,7 @@ pub struct BootstrapConfig {
     /// foreign-key value is derived from this GTS id at saga time
     /// via the same V5-UUID algorithm `create_tenant` uses, so
     /// operators only configure the canonical type identifier.
-    pub root_tenant_type: gts::GtsSchemaId,
+    pub root_tenant_type: gts::GtsTypeId,
 
     /// Opaque deployment-supplied metadata forwarded to the `IdP` plugin
     /// without interpretation. AM does **not** validate the shape of
@@ -117,7 +117,7 @@ impl Default for BootstrapConfig {
             // [bootstrap] TOML table.
             root_id: Uuid::nil(),
             root_name: "platform-root".to_owned(),
-            root_tenant_type: gts::GtsSchemaId::new(""),
+            root_tenant_type: gts::GtsTypeId::new(""),
             root_tenant_metadata: None,
             idp_wait_timeout: Duration::from_mins(5),
             idp_retry_backoff_initial: Duration::from_secs(2),

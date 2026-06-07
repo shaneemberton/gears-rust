@@ -5,7 +5,7 @@ use modkit_gts::gts_type_schema;
 #[gts_type_schema(
     dir_path = "schemas",
     base = PluginV1,
-    schema_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.credstore.plugin.v1~",
+    type_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.credstore.plugin.v1~",
     description = "CredStore plugin specification",
     properties = "",
 )]

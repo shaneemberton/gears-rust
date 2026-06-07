@@ -342,7 +342,7 @@ fn child_input(child_id: Uuid, parent_id: Uuid) -> CreateTenantRequest {
         child_id,
         parent_id,
         "child",
-        gts::GtsSchemaId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
+        gts::GtsTypeId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
     )
 }
 
@@ -4587,7 +4587,7 @@ async fn hard_delete_batch_redacts_vendor_detail_on_terminal_failure() {
 // `GtsTypeSchemaNotFound` on `get_type_schema_by_uuid` means the row's
 // `tenant_type_uuid` no longer resolves through the Types Registry.
 // The SDK contract on `IdpTenantContext::tenant_type` requires a
-// *resolved* chained `GtsSchemaId`, so the helper surfaces
+// *resolved* chained `GtsTypeId`, so the helper surfaces
 // `ServiceUnavailable` rather than fabricating a placeholder; the
 // cleanup pipeline (`reap_stuck_provisioning` / `hard_delete_batch`)
 // already routes that variant through its existing `Defer` /

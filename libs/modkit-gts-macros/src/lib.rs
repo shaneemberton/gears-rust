@@ -13,7 +13,7 @@
 //!
 //! - **`#[gts_type_schema(...)]`** — attribute macro applied to a struct.
 //!   Forwards all attrs verbatim to `gts_macros::struct_to_gts_schema` and
-//!   submits an `InventorySchema` entry (Type Schema record).
+//!   submits an `InventoryTypeSchema` entry (Type Schema record).
 //! - **`gts_instance! { ... }`** — typed Instance. Forwards verbatim to
 //!   `gts_macros::gts_instance!` and submits an `InventoryInstance`.
 //! - **`gts_instance_raw! { ... }`** — raw-JSON Instance. Forwards verbatim
@@ -80,32 +80,26 @@ fn instance_id_prefix(instance_id: &LitStr) -> LitStr {
 //                          #[gts_type_schema(...)]
 // =====================================================================
 
-/// Walk the attribute token stream and pull out the `schema_id = "..."`
-/// pair. Used to populate `InventorySchema::schema_id` — the only piece
+/// Walk the attribute token stream and pull out the `type_id = "..."`
+/// pair. Used to populate `InventoryTypeSchema::type_id` — the only piece
 /// of information the wrapper needs from the attribute. Everything else
 /// is forwarded verbatim and parsed by upstream.
-fn extract_schema_id(attr: &TokenStream2) -> syn::Result<LitStr> {
+fn extract_type_id(attr: &TokenStream2) -> syn::Result<LitStr> {
     let mut iter = attr.clone().into_iter().peekable();
     while let Some(tt) = iter.next() {
         if let TokenTree::Ident(ident) = &tt
-            && ident == "schema_id"
+            && ident == "type_id"
         {
             let Some(TokenTree::Punct(p)) = iter.next() else {
-                return Err(syn::Error::new_spanned(
-                    &tt,
-                    "expected `=` after `schema_id`",
-                ));
+                return Err(syn::Error::new_spanned(&tt, "expected `=` after `type_id`"));
             };
             if p.as_char() != '=' {
-                return Err(syn::Error::new_spanned(
-                    &tt,
-                    "expected `=` after `schema_id`",
-                ));
+                return Err(syn::Error::new_spanned(&tt, "expected `=` after `type_id`"));
             }
             let Some(TokenTree::Literal(lit)) = iter.next() else {
                 return Err(syn::Error::new_spanned(
                     &tt,
-                    "`schema_id = ...` must be a string literal",
+                    "`type_id = ...` must be a string literal",
                 ));
             };
             let lit_ts: TokenStream2 = TokenTree::Literal(lit).into();
@@ -114,23 +108,23 @@ fn extract_schema_id(attr: &TokenStream2) -> syn::Result<LitStr> {
     }
     Err(syn::Error::new(
         proc_macro2::Span::call_site(),
-        "missing `schema_id = \"...\"` attribute",
+        "missing `type_id = \"...\"` attribute",
     ))
 }
 
 /// Thin wrapper around `gts_macros::struct_to_gts_schema`. Forwards every
-/// attribute verbatim and additionally submits an `InventorySchema` entry
+/// attribute verbatim and additionally submits an `InventoryTypeSchema` entry
 /// pointing at the macro-generated `gts_schema_with_refs_as_string()`
 /// accessor.
 ///
 /// The wrapper takes no opinions on the upstream attrs: `dir_path`,
-/// `schema_id`, `description`, `properties`, and `base` are all required
+/// `type_id`, `description`, `properties`, and `base` are all required
 /// by upstream and are not defaulted here.
 ///
 /// ```ignore
 /// #[modkit_gts::gts_type_schema(
 ///     dir_path = "schemas",
-///     schema_id = "gts.cf.modkit.plugins.plugin.v1~",
+///     type_id = "gts.cf.modkit.plugins.plugin.v1~",
 ///     description = "Base modkit plugin schema",
 ///     properties = "id,vendor,priority,properties",
 ///     base = true,
@@ -149,7 +143,7 @@ pub fn gts_type_schema(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 fn expand_gts_type_schema(attr: &TokenStream2, input: &ItemStruct) -> syn::Result<TokenStream2> {
     let crate_path = resolve_crate_path()?;
-    let schema_id_lit = extract_schema_id(attr)?;
+    let type_id_lit = extract_type_id(attr)?;
     let struct_name = &input.ident;
 
     // Generic structs need turbofish on the schema-fn call. Upstream's
@@ -185,8 +179,8 @@ fn expand_gts_type_schema(attr: &TokenStream2, input: &ItemStruct) -> syn::Resul
         #input
 
         #crate_path::inventory::submit! {
-            #crate_path::InventorySchema {
-                schema_id: #schema_id_lit,
+            #crate_path::InventoryTypeSchema {
+                type_id: #type_id_lit,
                 schema_fn: || #schema_fn_body,
             }
         }

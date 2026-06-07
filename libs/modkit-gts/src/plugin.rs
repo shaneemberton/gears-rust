@@ -29,7 +29,7 @@ use gts::GtsInstanceId;
 #[derive(Debug)]
 #[gts_type_schema(
     dir_path = "schemas",
-    schema_id = "gts.cf.modkit.plugins.plugin.v1~",
+    type_id = "gts.cf.modkit.plugins.plugin.v1~",
     description = "Base modkit plugin schema",
     properties = "id,vendor,priority,properties",
     base = true
@@ -95,7 +95,7 @@ impl<P: gts::GtsSchema + gts::GtsSerialize + Default> PluginV1<P> {
         vendor: impl Into<String>,
         priority: i16,
     ) -> serde_json::Result<(GtsInstanceId, serde_json::Value)> {
-        let id = GtsInstanceId::new(<P as gts::GtsSchema>::SCHEMA_ID, instance_segment);
+        let id = GtsInstanceId::new(<P as gts::GtsSchema>::TYPE_ID, instance_segment);
         let instance = Self {
             id: id.clone(),
             vendor: vendor.into(),

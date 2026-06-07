@@ -38,7 +38,7 @@ pub const TENANT_RESOURCE_TYPE: &str = "gts.cf.core.am.tenant.v1~";
 /// raised by the metadata surface — both "schema not registered" and
 /// "entry not found" collapse to this single `resource_type` per the
 /// unified-404 contract; `resource_name` carries the chained
-/// `schema_id` string the caller supplied so consumers can still see
+/// `type_id` string the caller supplied so consumers can still see
 /// **which** schema was involved without needing a separate
 /// `resource_type` discriminator.
 pub const TENANT_METADATA_RESOURCE_TYPE: &str = "gts.cf.core.am.tenant_metadata.v1~";
@@ -102,18 +102,16 @@ pub const USER_RG_TYPE_CODE: &str = "gts.cf.core.rg.type.v1~cf.core.am.user.v1~"
 // AM base envelope schema registration
 // ---------------------------------------------------------------------------
 //
-// Registered AM-owned base envelopes (boot-time, via
-// `modkit_gts::inventory::submit!`):
+// Registered AM-owned base envelopes (boot-time, via the link-time
+// `modkit_gts` inventory the `#[gts_type_schema]` macro populates):
 //
 //   * `gts.cf.core.am.tenant_metadata.v1~` and
-//     `gts.cf.core.am.tenant_type.v1~` -- registered inline in
-//     `gts_envelopes.rs` so vendor metadata / tenant_type schemas
-//     deriving from them are admitted by `register_type_schemas`.
-//     The inline `inventory::submit!` is a workaround until the
-//     `#[gts_type_schema]` macro supports `x-gts-traits-schema` /
-//     `x-gts-traits` (tracked in
-//     <https://github.com/cyberfabric/cyberware-rust/issues/1928>,
-//     blocked upstream by GTS-rust/#85).
+//     `gts.cf.core.am.tenant_type.v1~` -- the abstract trait-carrier
+//     envelopes in `gts_envelopes.rs` so vendor metadata / tenant_type
+//     schemas deriving from them are admitted by `register_type_schemas`.
+//     They use the gts-rust 0.10.0 `traits_schema` + `gts_abstract` macro
+//     params to emit `x-gts-traits-schema` / `x-gts-abstract` from Rust
+//     trait structs (no more hand-authored inline JSON).
 //   * `gts.cf.core.am.user.v1~` -- registered via [`UserV1`] below.
 //     `domain::gts_validation::validate_new_user_payload_via_gts` is
 //     fail-closed and returns `ServiceUnavailable` if this envelope is
@@ -156,7 +154,7 @@ use modkit_gts::gts_type_schema;
 /// validates on the create-user payload. The `id` field is typed
 /// [`gts::GtsInstanceId`] only because `gts-macros` requires base
 /// structs to declare an `id: GtsInstanceId` (or a `gts_type:
-/// GtsSchemaId`) field; the real `IdpUser.id` is the IdP-issued UUID
+/// GtsTypeId`) field; the real `IdpUser.id` is the IdP-issued UUID
 /// per `cpt-cf-account-management-adr-idp-user-identity-source-of-truth`
 /// and the AM-side validator does not inspect `id`, so the
 /// generated-schema vs hand-authored docs divergence on the `id`
@@ -170,7 +168,7 @@ use modkit_gts::gts_type_schema;
 // <https://github.com/GlobalTypeSystem/gts-rust/issues/86>.
 #[gts_type_schema(
     dir_path = "schemas",
-    schema_id = "gts.cf.core.am.user.v1~",
+    type_id = "gts.cf.core.am.user.v1~",
     description = "Account Management user resource — IdP-issued user identity projection",
     properties = "id,username,email,display_name,first_name,last_name",
     base = true
@@ -239,7 +237,7 @@ pub struct UserV1 {
 #[gts_type_schema(
     dir_path = "schemas",
     base = PluginV1,
-    schema_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.idp.plugin.v1~",
+    type_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.idp.plugin.v1~",
     description = "IdP provider plugin specification",
     properties = "",
 )]

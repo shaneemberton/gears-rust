@@ -80,7 +80,7 @@ impl Service {
             .get::<dyn TypesRegistryClient>()
             .map_err(|e| DomainError::TypesRegistryUnavailable(e.to_string()))?;
 
-        let plugin_type_id = AuthNResolverPluginSpecV1::gts_schema_id().clone();
+        let plugin_type_id = AuthNResolverPluginSpecV1::gts_type_id().clone();
 
         let instances = registry
             .list_instances(InstanceQuery::new().with_pattern(format!("{plugin_type_id}*")))

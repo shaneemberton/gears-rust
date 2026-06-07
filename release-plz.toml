@@ -136,7 +136,7 @@ changelog_update = false
 git_release_enable = false
 
 [[package]]
-name = "cyberware-modkit-gts-macro"
+name = "cyberware-modkit-gts-macros"
 changelog_update = false
 git_release_enable = false
 

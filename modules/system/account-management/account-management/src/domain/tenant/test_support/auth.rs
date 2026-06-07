@@ -33,7 +33,7 @@
 //!   which permits every `Metadata.list` / non-metadata action (so
 //!   the outer list gate passes) and emits `decision: true` for
 //!   `Metadata.{read,write,delete,resolve}` only when the request's
-//!   `resource.properties["schema_id"]` is on the resolver's
+//!   `resource.properties["type_id"]` is on the resolver's
 //!   configured allow-list. Used by the tenant-metadata service
 //!   tests to pin the per-row schema-deny silent-drop in
 //!   `list_metadata` (PRD §1848: "list responses omit entries the
@@ -215,10 +215,10 @@ pub fn deny_all_enforcer() -> PolicyEnforcer {
 
 /// PDP fake that allows every non-`Metadata.read` action and only
 /// allows `Metadata.read` when the request's
-/// `resource.properties["schema_id"]` matches the configured
+/// `resource.properties["type_id"]` matches the configured
 /// allow-list. Drives the per-row schema-deny silent-drop pin in
 /// [`crate::domain::metadata::service::MetadataService::list_metadata`]:
-/// rows whose `schema_id` is **not** on the allow-list MUST be
+/// rows whose `type_id` is **not** on the allow-list MUST be
 /// omitted from the listing page rather than surfaced as an error.
 ///
 /// `Metadata.list` is always permitted (outer gate) so the listing
@@ -229,10 +229,10 @@ pub fn deny_all_enforcer() -> PolicyEnforcer {
 pub struct SchemaSelectiveAuthZResolver {
     /// Set of chained `gts.…~vendor.…~` schema ids the resolver
     /// permits `Metadata.read` on. Membership is checked against the
-    /// `pep::SCHEMA_ID` property
-    /// (`account_management::domain::metadata::service::pep::SCHEMA_ID`)
+    /// `pep::TYPE_ID` property
+    /// (`account_management::domain::metadata::service::pep::TYPE_ID`)
     /// supplied by the impl-side `MetadataService::authorize` call.
-    pub allowed_schema_ids: Vec<String>,
+    pub allowed_type_ids: Vec<String>,
 }
 
 #[async_trait]
@@ -262,20 +262,20 @@ impl AuthZResolverClient for SchemaSelectiveAuthZResolver {
             return Ok(permit_with_subtree(root));
         }
 
-        // `read` action: gate on the supplied `schema_id` property.
-        // Absence of `schema_id` on a `read` evaluation means the
+        // `read` action: gate on the supplied `type_id` property.
+        // Absence of `type_id` on a `read` evaluation means the
         // caller is the outer get_metadata path — we still allow it,
         // matching the production posture where the outer get_metadata
-        // authorize call also sets SCHEMA_ID and a missing slot is a
+        // authorize call also sets TYPE_ID and a missing slot is a
         // test-wiring bug rather than a denial signal.
-        let schema_id = request
+        let type_id = request
             .resource
             .properties
-            .get("schema_id")
+            .get("type_id")
             .and_then(serde_json::Value::as_str);
 
-        match schema_id {
-            Some(sid) if self.allowed_schema_ids.iter().any(|a| a == sid) => {
+        match type_id {
+            Some(sid) if self.allowed_type_ids.iter().any(|a| a == sid) => {
                 Ok(permit_with_subtree(root))
             }
             Some(_) => Ok(EvaluationResponse {
@@ -295,9 +295,9 @@ impl AuthZResolverClient for SchemaSelectiveAuthZResolver {
 /// resolver should permit on `Metadata.read`; everything else is
 /// denied. Drives the schema-deny silent-drop pin in `list_metadata`.
 #[must_use]
-pub fn schema_selective_enforcer(allowed_schema_ids: Vec<String>) -> PolicyEnforcer {
+pub fn schema_selective_enforcer(allowed_type_ids: Vec<String>) -> PolicyEnforcer {
     let authz: Arc<dyn AuthZResolverClient> =
-        Arc::new(SchemaSelectiveAuthZResolver { allowed_schema_ids });
+        Arc::new(SchemaSelectiveAuthZResolver { allowed_type_ids });
     PolicyEnforcer::new(authz).with_capabilities(vec![Capability::TenantHierarchy])
 }
 

@@ -1,10 +1,10 @@
-# cyberware-modkit-gts-macro
+# cyberware-modkit-gts-macros
 
 Proc-macros backing the [`cyberware-modkit-gts`](../modkit-gts/README.md) crate. Not intended for direct use — depend on `cyberware-modkit-gts` instead; it re-exports everything below and carries the `inventory` collectors the macros target.
 
 ## What's here
 
-- **`#[gts_type_schema(schema_id = "...", …)]`** — attribute macro. Applies
+- **`#[gts_type_schema(type_id = "...", …)]`** — attribute macro. Applies
   `#[gts_macros::struct_to_gts_schema(...)]` to the struct, emits an
   `InventorySchema` entry (the GTS Type Schema record) into the
   process-wide inventory, and — for derived unit structs
@@ -14,7 +14,7 @@ Proc-macros backing the [`cyberware-modkit-gts`](../modkit-gts/README.md) crate.
   declarations. Takes a single struct literal `Struct { id: "<full>", … }`,
   optionally preceded by `#[gts_static(NAME)]`. Upstream rewrites the
   `id`-field string literal into a `GtsInstanceId` and asserts at compile
-  time that its prefix equals `<Struct as GtsSchema>::SCHEMA_ID`. With
+  time that its prefix equals `<Struct as GtsSchema>::TYPE_ID`. With
   `#[gts_static(NAME)]`, additionally emits `pub static NAME: LazyLock<T>`
   for typed runtime access.
 - **`gts_instance_raw!({ … });`** — function-like macro for **raw-JSON**

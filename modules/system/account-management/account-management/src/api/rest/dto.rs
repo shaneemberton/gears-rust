@@ -8,7 +8,7 @@
 //! it (its module docs document the omission explicitly — only
 //! `updated_at` crosses the public contract for cache validation).
 
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use serde_json::{Map, Value};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -26,37 +26,37 @@ use crate::domain::conversion::service::{
 };
 
 /// One metadata entry. `tenant_id` is echoed from the path so consumers carry
-/// the full `(tenant_id, schema_id)` identity tuple; the SDK projection drops
+/// the full `(tenant_id, type_id)` identity tuple; the SDK projection drops
 /// `tenant_id` by design.
 #[derive(Debug, Clone)]
 #[modkit_macros::api_dto(response)]
 pub struct TenantMetadataEntryDto {
     pub tenant_id: Uuid,
-    pub schema_id: String,
+    pub type_id: String,
     pub value: Value,
     #[serde(with = "time::serde::rfc3339")]
     pub updated_at: OffsetDateTime,
 }
 
 impl TenantMetadataEntryDto {
-    /// Consumes `entry`: `schema_id` and `value` move without an extra clone.
+    /// Consumes `entry`: `type_id` and `value` move without an extra clone.
     #[must_use]
     pub(crate) fn from_entry(tenant_id: Uuid, entry: MetadataEntry) -> Self {
         Self {
             tenant_id,
-            schema_id: entry.schema_id.into(),
+            type_id: entry.type_id.into(),
             value: entry.value,
             updated_at: entry.updated_at,
         }
     }
 }
 
-/// Request body for `PUT /tenants/{tenant_id}/metadata/{schema_id}`.
+/// Request body for `PUT /tenants/{tenant_id}/metadata/{type_id}`.
 ///
 /// The wire shape is the JSON payload to upsert, transmitted in-place
 /// as `TenantMetadataValue` (`type: object, additionalProperties: true`
 /// per `OpenAPI`). No metadata fields cross the request envelope -- the
-/// chained `schema_id` is the path parameter, not part of the body.
+/// chained `type_id` is the path parameter, not part of the body.
 #[derive(Debug, Clone)]
 #[modkit_macros::api_dto(request)]
 #[serde(transparent)]
@@ -78,7 +78,7 @@ pub struct PutTenantMetadataDto {
 #[modkit_macros::api_dto(response)]
 pub struct ResolvedTenantMetadataDto {
     pub tenant_id: Uuid,
-    pub schema_id: String,
+    pub type_id: String,
     pub resolved: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<Value>,
@@ -92,19 +92,19 @@ impl ResolvedTenantMetadataDto {
     #[must_use]
     pub(crate) fn from_resolution(
         tenant_id: Uuid,
-        schema_id: String,
+        type_id: String,
         resolution: Option<MetadataEntry>,
     ) -> Self {
         match resolution {
             Some(entry) => Self {
                 tenant_id,
-                schema_id,
+                type_id,
                 resolved: true,
                 value: Some(entry.value),
             },
             None => Self {
                 tenant_id,
-                schema_id,
+                type_id,
                 resolved: false,
                 value: None,
             },
@@ -341,7 +341,7 @@ impl TenantCreateRequestDto {
             Uuid::new_v4(),
             self.parent_id,
             self.name,
-            GtsSchemaId::new(&self.tenant_type),
+            GtsTypeId::new(&self.tenant_type),
         )
         .with_self_managed(self.self_managed);
         if let Some(metadata) = self.provisioning_metadata {

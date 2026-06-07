@@ -69,7 +69,7 @@ fn validation_maps_to_invalid_argument_with_tenant_resource() {
 #[test]
 fn metadata_validation_maps_to_invalid_argument_with_metadata_resource() {
     // Pins the split introduced for the REST surface: metadata-content
-    // failures (malformed `schema_id`, null body, GTS body validation
+    // failures (malformed `type_id`, null body, GTS body validation
     // failure) MUST carry the metadata GTS resource type on the
     // canonical envelope. The tenant-state guards keep `Validation`
     // (and `TenantResource`) — see `validation_maps_to_invalid_argument_with_tenant_resource`
@@ -248,12 +248,12 @@ fn conversion_request_not_found_maps_to_not_found_404() {
 }
 
 #[test]
-fn metadata_entry_not_found_uses_metadata_resource_type_with_chained_schema_id_as_name() {
+fn metadata_entry_not_found_uses_metadata_resource_type_with_chained_type_id_as_name() {
     // Unified metadata 404: both "schema unknown to registry" and
     // "entry missing for tenant" collapse to
     // `MetadataEntryNotFound` and surface as
     // `TENANT_METADATA_RESOURCE_TYPE` (`gts.cf.core.am.tenant_metadata.v1~`)
-    // with the chained `schema_id` the caller supplied as
+    // with the chained `type_id` the caller supplied as
     // `resource_name`.
     let chain = "gts.cf.core.am.tenant_metadata.v1~cf.core.billing.usage.v1~";
     let canonical = round_trip(DomainError::MetadataEntryNotFound {

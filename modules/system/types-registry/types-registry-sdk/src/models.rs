@@ -6,19 +6,17 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use gts::{GtsID, GtsIdSegment, GtsInstanceId, GtsSchemaId};
+use gts::{GtsID, GtsIdSegment, GtsInstanceId};
 use serde_json::{Map, Value};
+
+/// SDK-facing GTS type-schema identifier, re-exported from the `gts` crate.
+///
+/// Within the types-registry SDK, schemas are *type-schemas* and their
+/// identifiers are *type ids*.
+pub use gts::GtsTypeId;
 use uuid::Uuid;
 
 use crate::error::TypesRegistryError;
-
-/// SDK-facing alias for a GTS type-schema identifier.
-///
-/// Backed by [`gts::GtsSchemaId`] from the `gts` crate. Exposed under the
-/// `GtsTypeId` name to keep the SDK's vocabulary consistent — within the
-/// types-registry SDK, schemas are *type-schemas* and their identifiers are
-/// *type ids*.
-pub type GtsTypeId = GtsSchemaId;
 
 /// Returns `true` if `s` is shaped like a type-schema GTS id (ends with `~`).
 ///
@@ -28,7 +26,7 @@ pub type GtsTypeId = GtsSchemaId;
 /// code (`local_client`, mocks, etc.). Pure string predicate — does not parse
 /// or otherwise validate the id.
 ///
-// TODO(#1752): drop this helper once `GtsSchemaId::try_new` /
+// TODO(#1752): drop this helper once `GtsTypeId::try_new` /
 // `GtsInstanceId::try_new` land upstream in `gts-rust`. Callers should
 // consume `&GtsTypeId` / `&GtsInstanceId` directly and the kind invariant
 // becomes a type-system property instead of a runtime predicate.

@@ -33,7 +33,7 @@ use account_management::domain::tenant::closure::build_activation_rows;
 use account_management::domain::tenant::model::{NewTenant, TenantStatus};
 use account_management::infra::storage::repo_impl::MetadataRepoImpl;
 use account_management_sdk::UpsertMetadataRequest;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_odata::ODataQuery;
 use sea_orm::ConnectionTrait;
 use serde_json::json;
@@ -45,12 +45,12 @@ use common::*;
 const SCHEMA_A: &str = "gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.feature_flag.v1~";
 const SCHEMA_B: &str = "gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.org_branding.v1~";
 
-fn schema_a() -> GtsSchemaId {
-    GtsSchemaId::new(SCHEMA_A)
+fn schema_a() -> GtsTypeId {
+    GtsTypeId::new(SCHEMA_A)
 }
 
-fn schema_b() -> GtsSchemaId {
-    GtsSchemaId::new(SCHEMA_B)
+fn schema_b() -> GtsTypeId {
+    GtsTypeId::new(SCHEMA_B)
 }
 
 async fn create_active_child(

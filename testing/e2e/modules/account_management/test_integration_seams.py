@@ -305,7 +305,7 @@ async def test_metadata_lifecycle_via_real_schema_registry(
     deeper descendant so the inheritance walk-up actually runs across
     the registered schema's ``__inheritance_policy``.
     """
-    schema_id = await create_metadata_schema()
+    type_id = await create_metadata_schema()
 
     parent = await create_tenant("s5parent")
     child = await create_tenant("s5child", parent_id=parent["id"])
@@ -315,19 +315,19 @@ async def test_metadata_lifecycle_via_real_schema_registry(
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as c:
         # PUT on the parent -- direct write through the GTS-validated path.
         r = await c.put(
-            _metadata_entry(am_base_url, parent["id"], schema_id),
+            _metadata_entry(am_base_url, parent["id"], type_id),
             headers=am_headers,
             json=payload,
         )
         assert r.status_code == 200, f"PUT metadata: {r.status_code} {r.text}"
         stored = r.json()
         assert stored["tenant_id"] == parent["id"]
-        assert stored["schema_id"] == schema_id
+        assert stored["type_id"] == type_id
         assert stored["value"] == payload
 
         # GET back the direct entry.
         r = await c.get(
-            _metadata_entry(am_base_url, parent["id"], schema_id),
+            _metadata_entry(am_base_url, parent["id"], type_id),
             headers=am_headers,
         )
         assert r.status_code == 200, f"GET metadata: {r.status_code} {r.text}"
@@ -335,7 +335,7 @@ async def test_metadata_lifecycle_via_real_schema_registry(
 
         # Resolve from the child -- walks up the chain and inherits.
         r = await c.get(
-            _metadata_resolved(am_base_url, child["id"], schema_id),
+            _metadata_resolved(am_base_url, child["id"], type_id),
             headers=am_headers,
         )
         assert r.status_code == 200, (
@@ -364,14 +364,14 @@ async def test_metadata_distinct_404_codes_propagate_through_envelope(
     references the missing entry. Both MUST surface as 404 with the
     unified metadata ``resource_type``.
     """
-    schema_id = await create_metadata_schema()
+    type_id = await create_metadata_schema()
     tenant = await create_tenant("s6codes")
     bogus_schema = "gts.cf.core.am.tenant_metadata.v1~x.never.am.registered.v1~"
 
     metadata_rt = "gts.cf.core.am.tenant_metadata.v1~"
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as c:
-        # Path A: GET with a schema_id that was never registered.
+        # Path A: GET with a type_id that was never registered.
         r = await c.get(
             _metadata_entry(am_base_url, tenant["id"], bogus_schema),
             headers=am_headers,
@@ -392,7 +392,7 @@ async def test_metadata_distinct_404_codes_propagate_through_envelope(
 
         # Path B: GET on a registered schema with no entry written.
         r = await c.get(
-            _metadata_entry(am_base_url, tenant["id"], schema_id),
+            _metadata_entry(am_base_url, tenant["id"], type_id),
             headers=am_headers,
         )
         assert r.status_code == 404, (

@@ -129,11 +129,11 @@ pub enum AccountManagementError {
     // Tenant Metadata
     // ===================================================================
     /// Metadata entry not found. Surfaces uniformly for both
-    /// "`schema_id` is unknown to the types-registry" and "schema is
+    /// "`type_id` is unknown to the types-registry" and "schema is
     /// registered but no row exists at `(tenant_id, schema_uuid)`" —
     /// AM intentionally does not distinguish the two on the wire so
     /// clients see a single `not_found` shape for every metadata
-    /// lookup miss. `entry` carries the chained `schema_id` string
+    /// lookup miss. `entry` carries the chained `type_id` string
     /// the caller supplied (or, on rare orphan-row paths, the bare
     /// `schema_uuid`).
     #[error("metadata entry {entry} not found: {detail}")]
@@ -164,7 +164,7 @@ pub enum AccountManagementError {
     /// to `gts.cf.core.am.tenant_metadata.v1~` instead of the tenant
     /// default — both still map to AIP-193 `InvalidArgument` (HTTP
     /// 400). Producers raise this when the metadata payload itself or
-    /// its `schema_id` is malformed (chain-shape, null body, GTS body
+    /// its `type_id` is malformed (chain-shape, null body, GTS body
     /// validation), keeping [`Self::InvalidRequest`] for tenant-state
     /// guards.
     #[error("metadata validation failed: {detail}")]

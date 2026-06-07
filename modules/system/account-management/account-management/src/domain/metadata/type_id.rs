@@ -1,10 +1,10 @@
-//! AM-internal validated `schema_id` type for the tenant-metadata flow.
+//! AM-internal validated `type_id` type for the tenant-metadata flow.
 //!
-//! [`ParsedSchemaId`] is the service-layer guard that turns a raw
-//! wire `schema_id` string into a typed value before any registry or
+//! [`ParsedTypeId`] is the service-layer guard that turns a raw
+//! wire `type_id` string into a typed value before any registry or
 //! repo call. Four checks run in order:
 //!
-//! 1. Parse the wire `schema_id` string via [`gts::GtsID::new`] —
+//! 1. Parse the wire `type_id` string via [`gts::GtsID::new`] —
 //!    rejects malformed GTS syntax.
 //! 2. Require the root segment match
 //!    [`METADATA_ROOT_SEGMENT`] (`cf.core.am.tenant_metadata.v1`) —
@@ -14,7 +14,7 @@
 //! 4. Require schema-shape (`GtsID::is_type` — every segment ends
 //!    with `~`); reject instance-id shapes.
 //!
-//! On success [`ParsedSchemaId`] also caches the deterministic
+//! On success [`ParsedTypeId`] also caches the deterministic
 //! `UUIDv5` derived through [`gts::GtsID::to_uuid`] — same namespace
 //! the upstream `gts` crate uses internally, so AM and any sibling
 //! consuming the `gts` crate directly agree on the storage-side
@@ -23,10 +23,10 @@
 //! All validation failures collapse onto
 //! [`DomainError::MetadataValidation`] which surfaces as
 //! `CanonicalError::InvalidArgument` (HTTP 400) at the AM canonical
-//! boundary. The SDK ships raw `String` for `schema_id` and never
+//! boundary. The SDK ships raw `String` for `type_id` and never
 //! sees the granular validation error variants.
 
-use gts::{GtsID, GtsSchemaId};
+use gts::{GtsID, GtsTypeId};
 use modkit_macros::domain_model;
 use uuid::Uuid;
 
@@ -41,18 +41,18 @@ const METADATA_ROOT_SEGMENT: &str = "cf.core.am.tenant_metadata.v1";
 /// deterministic `UUIDv5`. AM-internal — never crosses the SDK
 /// boundary.
 ///
-/// Construct via [`ParsedSchemaId::parse`]. The wire-shape boundary
-/// (REST handler, SDK trait `GtsSchemaId` input) calls `parse` as the
+/// Construct via [`ParsedTypeId::parse`]. The wire-shape boundary
+/// (REST handler, SDK trait `GtsTypeId` input) calls `parse` as the
 /// first step on every public metadata method.
 #[domain_model]
 #[derive(Debug)]
-pub(crate) struct ParsedSchemaId {
-    raw: GtsSchemaId,
+pub(crate) struct ParsedTypeId {
+    raw: GtsTypeId,
     uuid: Uuid,
 }
 
-impl ParsedSchemaId {
-    /// Validate and parse a wire-shape `schema_id` string.
+impl ParsedTypeId {
+    /// Validate and parse a wire-shape `type_id` string.
     ///
     /// # Errors
     ///
@@ -111,25 +111,25 @@ impl ParsedSchemaId {
         // whitespace; storing the trimmed form keeps schema_uuid
         // consistent with reverse-hydration.
         Ok(Self {
-            raw: GtsSchemaId::new(parsed.as_ref()),
+            raw: GtsTypeId::new(parsed.as_ref()),
             uuid,
         })
     }
 
     /// Borrow the chained id as a string slice (verbatim, no
-    /// re-formatting). Used by PEP `SCHEMA_ID` attribute and
-    /// `MetadataEntry.schema_id` echo on read responses.
+    /// re-formatting). Used by PEP `TYPE_ID` attribute and
+    /// `MetadataEntry.type_id` echo on read responses.
     pub(crate) fn as_str(&self) -> &str {
         self.raw.as_ref()
     }
 
-    /// Borrow the underlying [`gts::GtsSchemaId`] — platform-standard
+    /// Borrow the underlying [`gts::GtsTypeId`] — platform-standard
     /// marker for "this string is a GTS schema id". Preferred over
     /// [`Self::as_str`] when handing the id off to an API that takes
-    /// the typed `GtsSchemaId` form (e.g. the
+    /// the typed `GtsTypeId` form (e.g. the
     /// [`crate::domain::metadata::registry::MetadataSchemaRegistry`]
     /// trait surface).
-    pub(crate) const fn as_gts(&self) -> &GtsSchemaId {
+    pub(crate) const fn as_gts(&self) -> &GtsTypeId {
         &self.raw
     }
 
@@ -142,7 +142,7 @@ impl ParsedSchemaId {
 
     /// Consume into the normalised string form. Used when the caller
     /// no longer needs the UUID and wants to echo the validated id
-    /// back as a `MetadataEntry.schema_id` field without an extra
+    /// back as a `MetadataEntry.type_id` field without an extra
     /// `to_owned()`.
     #[allow(
         dead_code,
@@ -155,5 +155,5 @@ impl ParsedSchemaId {
 }
 
 #[cfg(test)]
-#[path = "schema_id_tests.rs"]
+#[path = "type_id_tests.rs"]
 mod tests;

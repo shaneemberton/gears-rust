@@ -20,7 +20,7 @@ fn tenant_not_found_is_recognised_as_not_found() {
 fn metadata_entry_not_found_is_not_found() {
     // Unified metadata 404: both "schema unknown to registry" and
     // "entry missing for tenant" surface as `MetadataEntryNotFound`
-    // — `entry` carries the chained `schema_id` (or, on orphan
+    // — `entry` carries the chained `type_id` (or, on orphan
     // paths, the bare `schema_uuid`).
     let err = AccountManagementError::MetadataEntryNotFound {
         entry: "gts.cf.core.am.tenant_metadata.v1~cf.core.billing.usage.v1~".to_owned(),

@@ -45,7 +45,7 @@ use crate::domain::user::test_support::{FakeIdpUserProvisioner, FakeUserOutcome}
 /// Canonical chained `tenant_type` every seeded tenant carries. The
 /// matching `GtsTypeSchema` is pre-registered in [`make_service`]'s
 /// `MockTypesRegistryClient` so `UserService::resolve_active_tenant`
-/// can resolve the typed `GtsSchemaId` via
+/// can resolve the typed `GtsTypeId` via
 /// `get_type_schema_by_uuid` (mandatory after the IdP-metadata
 /// isolation refactor — a missing schema now surfaces as
 /// `ServiceUnavailable` instead of `Option::None`). Tests that need

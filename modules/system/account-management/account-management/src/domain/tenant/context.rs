@@ -13,7 +13,7 @@
 //! `IdpTenantContext` from the AM-internal value via `(&ctx).into()`.
 
 use account_management_sdk::IdpTenantContext;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_macros::domain_model;
 use serde_json::Value;
 use uuid::Uuid;
@@ -49,12 +49,12 @@ pub struct TenantContext {
     /// source of truth at call time, not a snapshot from the
     /// provisioning call.
     pub tenant_name: String,
-    /// Resolved tenant type as a chained `GtsSchemaId`
+    /// Resolved tenant type as a chained `GtsTypeId`
     /// (e.g. `gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~`).
     /// Mandatory at the resolve-helper boundary — a Types Registry
     /// outage surfaces as `DomainError::ServiceUnavailable` rather
     /// than leaking an `Option` through this struct.
-    pub tenant_type: GtsSchemaId,
+    pub tenant_type: GtsTypeId,
     /// Opaque plugin-private metadata loaded from
     /// `tenant_idp_metadata`. AM does NOT interpret the shape; the
     /// plugin owns it end-to-end. `None` when no row exists for the
@@ -70,7 +70,7 @@ impl TenantContext {
     pub fn new(
         tenant_id: Uuid,
         tenant_name: impl Into<String>,
-        tenant_type: GtsSchemaId,
+        tenant_type: GtsTypeId,
         metadata: Option<Value>,
     ) -> Self {
         Self {

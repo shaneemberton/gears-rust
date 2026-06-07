@@ -12,7 +12,7 @@
 //! `PluginV1`.
 
 pub use modkit_gts::{
-    AuthzPermissionV1, InventoryInstance, InventorySchema, PluginV1, all_inventory_instances,
+    AuthzPermissionV1, InventoryInstance, InventoryTypeSchema, PluginV1, all_inventory_instances,
     all_inventory_type_schemas,
 };
 

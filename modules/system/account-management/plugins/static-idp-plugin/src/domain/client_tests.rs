@@ -25,8 +25,8 @@ fn ctx() -> SecurityContext {
 
 const TENANT_TYPE: &str = "gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~";
 
-fn tenant_type() -> gts::GtsSchemaId {
-    gts::GtsSchemaId::new(TENANT_TYPE)
+fn tenant_type() -> gts::GtsTypeId {
+    gts::GtsTypeId::new(TENANT_TYPE)
 }
 
 fn tenant_ctx(tenant_id: Uuid) -> IdpTenantContext {

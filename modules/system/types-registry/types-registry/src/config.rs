@@ -104,7 +104,7 @@ impl TypesRegistryConfig {
     pub fn to_gts_config(&self) -> gts::GtsConfig {
         gts::GtsConfig {
             entity_id_fields: self.entity_id_fields.clone(),
-            schema_id_fields: self.schema_id_fields.clone(),
+            type_id_fields: self.schema_id_fields.clone(),
         }
     }
 }
@@ -126,7 +126,7 @@ mod tests {
         let cfg = TypesRegistryConfig::default();
         let gts_cfg = cfg.to_gts_config();
         assert_eq!(gts_cfg.entity_id_fields, cfg.entity_id_fields);
-        assert_eq!(gts_cfg.schema_id_fields, cfg.schema_id_fields);
+        assert_eq!(gts_cfg.type_id_fields, cfg.schema_id_fields);
     }
 
     #[test]

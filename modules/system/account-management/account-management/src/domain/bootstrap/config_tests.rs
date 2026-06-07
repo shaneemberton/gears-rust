@@ -47,7 +47,7 @@ fn validate_accepts_fully_specified_config() {
     let cfg = BootstrapConfig {
         root_id: Uuid::from_u128(0xAA),
         root_name: "platform-root".into(),
-        root_tenant_type: gts::GtsSchemaId::new(
+        root_tenant_type: gts::GtsTypeId::new(
             "gts.cf.core.am.tenant_type.v1~cf.core.am.platform.v1~",
         ),
         root_tenant_metadata: None,
@@ -64,7 +64,7 @@ fn validate_rejects_zero_idp_wait_timeout() {
     let cfg = BootstrapConfig {
         root_id: Uuid::from_u128(0xAA),
         root_name: "platform-root".into(),
-        root_tenant_type: gts::GtsSchemaId::new(
+        root_tenant_type: gts::GtsTypeId::new(
             "gts.cf.core.am.tenant_type.v1~cf.core.am.platform.v1~",
         ),
         root_tenant_metadata: None,
@@ -85,7 +85,7 @@ fn validate_rejects_idp_wait_timeout_above_cap() {
     let cfg = BootstrapConfig {
         root_id: Uuid::from_u128(0xAA),
         root_name: "platform-root".into(),
-        root_tenant_type: gts::GtsSchemaId::new(
+        root_tenant_type: gts::GtsTypeId::new(
             "gts.cf.core.am.tenant_type.v1~cf.core.am.platform.v1~",
         ),
         root_tenant_metadata: None,
@@ -109,7 +109,7 @@ fn validate_accepts_idp_wait_timeout_at_cap() {
     let cfg = BootstrapConfig {
         root_id: Uuid::from_u128(0xAA),
         root_name: "platform-root".into(),
-        root_tenant_type: gts::GtsSchemaId::new(
+        root_tenant_type: gts::GtsTypeId::new(
             "gts.cf.core.am.tenant_type.v1~cf.core.am.platform.v1~",
         ),
         root_tenant_metadata: None,
@@ -126,7 +126,7 @@ fn validate_rejects_inverted_backoff_envelope() {
     let cfg = BootstrapConfig {
         root_id: Uuid::from_u128(0xAA),
         root_name: "platform-root".into(),
-        root_tenant_type: gts::GtsSchemaId::new(
+        root_tenant_type: gts::GtsTypeId::new(
             "gts.cf.core.am.tenant_type.v1~cf.core.am.platform.v1~",
         ),
         root_tenant_metadata: None,

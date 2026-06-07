@@ -69,7 +69,7 @@
 //! into the same trait's user-side methods.
 
 use async_trait::async_trait;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_security::SecurityContext;
 use serde_json::Value;
 use uuid::Uuid;
@@ -131,12 +131,12 @@ pub struct IdpProvisionTenantRequest {
     pub name: String,
     /// Full chained GTS schema identifier (e.g.
     /// `gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~`).
-    /// Typed via [`GtsSchemaId`] rather than `String` so the field
+    /// Typed via [`GtsTypeId`] rather than `String` so the field
     /// is self-describing for plugin authors and surfaces with
     /// `format: gts-schema-id` in any generated JSON Schema. The
     /// wire shape stays a string; AM-side consumers run full chain
     /// validation by passing the value through `gts::GtsID::new`.
-    pub tenant_type: GtsSchemaId,
+    pub tenant_type: GtsTypeId,
     /// Opaque provider-specific metadata from `TenantCreateRequest.provisioning_metadata`.
     pub metadata: Option<Value>,
 }
@@ -146,7 +146,7 @@ impl IdpProvisionTenantRequest {
     /// Emitted exactly once per deployment by the bootstrap saga;
     /// every steady-state tenant creation uses [`Self::new`] instead.
     #[must_use]
-    pub fn for_root(tenant_id: Uuid, name: impl Into<String>, tenant_type: GtsSchemaId) -> Self {
+    pub fn for_root(tenant_id: Uuid, name: impl Into<String>, tenant_type: GtsTypeId) -> Self {
         Self {
             tenant_id,
             target: IdpProvisionTarget::Root,
@@ -165,7 +165,7 @@ impl IdpProvisionTenantRequest {
         tenant_id: Uuid,
         parent_id: Uuid,
         name: impl Into<String>,
-        tenant_type: GtsSchemaId,
+        tenant_type: GtsTypeId,
     ) -> Self {
         Self {
             tenant_id,

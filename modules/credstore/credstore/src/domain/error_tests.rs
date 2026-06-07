@@ -40,7 +40,7 @@ fn from_serde_json_error_becomes_internal() {
 #[test]
 fn from_choose_plugin_error_not_found_becomes_plugin_not_found() {
     let src = ChoosePluginError::PluginNotFound {
-        schema_id: "gts.cf.core.test.plugin.v1~".into(),
+        type_id: "gts.cf.core.test.plugin.v1~".into(),
         vendor: "acme".into(),
     };
     let dst = DomainError::from(src);

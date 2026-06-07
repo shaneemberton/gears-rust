@@ -210,8 +210,8 @@ fn not_found_carries_resource_id() {
 }
 
 #[test]
-fn metadata_entry_not_found_carries_chained_schema_id() {
-    // `MetadataEntryNotFound` carries the chained `schema_id` the
+fn metadata_entry_not_found_carries_chained_type_id() {
+    // `MetadataEntryNotFound` carries the chained `type_id` the
     // caller supplied so the canonical envelope surfaces it as
     // `resource_name`.
     let ame: AccountManagementError = DomainError::MetadataEntryNotFound {

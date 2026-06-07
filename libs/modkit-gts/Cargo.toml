@@ -20,7 +20,7 @@ workspace = true
 
 [dependencies]
 # Workspace deps
-modkit-gts-macro = { workspace = true }
+modkit-gts-macros = { workspace = true }
 gts = { workspace = true }
 gts-macros = { workspace = true }
 

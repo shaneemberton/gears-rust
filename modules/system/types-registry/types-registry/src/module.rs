@@ -28,7 +28,7 @@ use crate::infra::InMemoryGtsRepository;
 ///
 /// At startup, this module seeds its own registry with every GTS Type Schema
 /// and well-known Instance submitted to the process-wide `modkit-gts`
-/// inventory — the `InventorySchema` / `InventoryInstance` collectors
+/// inventory — the `InventoryTypeSchema` / `InventoryInstance` collectors
 /// populated by `#[gts_type_schema]` / `gts_instance!` from any linked crate.
 /// The seeding happens via the internal `TypesRegistryService::register`
 /// (no `ClientHub` round-trip) before the client is published, so

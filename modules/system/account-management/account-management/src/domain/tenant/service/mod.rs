@@ -247,7 +247,7 @@ impl<R: TenantRepo> TenantService<R> {
     /// pipeline is about to feed into
     /// [`account_management_sdk::IdpPluginClient::deprovision_tenant`].
     /// Fetches the `tenants` row, resolves `tenant_type_uuid` to the
-    /// chained [`gts::GtsSchemaId`] via the configured registry, and
+    /// chained [`gts::GtsTypeId`] via the configured registry, and
     /// loads the opaque plugin-private metadata from
     /// `tenant_idp_metadata`. A registry blip surfaces as
     /// [`DomainError::service_unavailable`] (uniform with the user-ops
@@ -286,7 +286,7 @@ impl<R: TenantRepo> TenantService<R> {
             // `tenant_type_uuid` that the registry no longer
             // resolves. SDK contract on `IdpTenantContext::tenant_type`
             // is that the value is the *resolved* chained
-            // `GtsSchemaId` ("AM treats failures of the underlying
+            // `GtsTypeId` ("AM treats failures of the underlying
             // Types Registry reverse-resolve as service-level errors
             // rather than leaking an `Option` into the plugin"), so
             // a synthesised placeholder would violate the contract
@@ -1136,7 +1136,7 @@ impl<R: TenantRepo> TenantService<R> {
         if info.tenant_type.is_none() {
             // `Tenant.tenant_type` is `Option<String>` per the
             // tenant-resolver-sdk public shape; lower the typed
-            // `GtsSchemaId` back to its wire form.
+            // `GtsTypeId` back to its wire form.
             info.tenant_type = Some(input.tenant_type.into_string());
         }
         Ok(info)
@@ -1210,7 +1210,7 @@ impl<R: TenantRepo> TenantService<R> {
         ctx: &SecurityContext,
         parent: &TenantModel,
         provisioning_id: Uuid,
-        tenant_type: gts::GtsSchemaId,
+        tenant_type: gts::GtsTypeId,
         tenant_name: String,
         idp_metadata: Option<&Value>,
     ) {

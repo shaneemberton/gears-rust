@@ -1432,7 +1432,7 @@ impl<R: TenantRepo> BootstrapService<R> {
         // in-scope facts: `root_id`, the configured root name/type,
         // and whatever the plugin returned from `provision_tenant`
         // (we just got it in `finalize`). `cfg.root_tenant_type` is
-        // the typed `GtsSchemaId` the saga already passed into the
+        // the typed `GtsTypeId` the saga already passed into the
         // provision call, so we forward the same value here without
         // re-parsing. Convert to the SDK `IdpTenantContext` at the
         // plugin-SPI boundary.

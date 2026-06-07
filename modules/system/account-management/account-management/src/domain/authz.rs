@@ -7,7 +7,7 @@
 //! (`OWNER_TENANT_ID`, optional `RESOURCE_ID`,
 //! `require_constraints(true)`) and forwarded it through
 //! [`PolicyEnforcer::access_scope_with`]. The metadata variant had
-//! drifted to accept an extra `schema_id` argument the others lacked;
+//! drifted to accept an extra `type_id` argument the others lacked;
 //! any future change (extra default property, tracing fields,
 //! fail-closed posture tweak) had to land four times and stay in sync
 //! by eyeball. Routing every service through [`authz_scope`] collapses
@@ -17,7 +17,7 @@
 //! Per-service `authorize(...)` methods remain thin shims that
 //! choose the resource type and supply the optional per-service
 //! `AccessRequest` extension (e.g. `MetadataService` adds
-//! `SCHEMA_ID`).
+//! `TYPE_ID`).
 
 use authz_resolver_sdk::PolicyEnforcer;
 use authz_resolver_sdk::pep::{AccessRequest, ResourceType};
@@ -45,7 +45,7 @@ use crate::domain::error::DomainError;
 ///
 /// `extend` runs LAST on the assembled request, so per-service
 /// properties (the only current consumer is `MetadataService` which
-/// attaches `SCHEMA_ID`) compose over the defaults instead of being
+/// attaches `TYPE_ID`) compose over the defaults instead of being
 /// overwritten by them.
 ///
 /// # Errors

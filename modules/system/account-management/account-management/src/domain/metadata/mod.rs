@@ -15,8 +15,8 @@ use modkit_macros::domain_model;
 
 pub mod registry;
 pub mod repo;
-pub mod schema_id;
 pub mod service;
+pub mod type_id;
 
 #[cfg(test)]
 pub(crate) mod test_support;

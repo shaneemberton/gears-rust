@@ -35,7 +35,7 @@ use account_management_sdk::idp_user::{IdpNewUser, IdpUser, ListUsersQuery};
 use account_management_sdk::metadata::{MetadataEntry, UpsertMetadataRequest};
 use account_management_sdk::tenant::{CreateTenantRequest, Tenant, UpdateTenantRequest};
 use async_trait::async_trait;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_odata::{ODataQuery, Page};
 use modkit_security::SecurityContext;
 use uuid::Uuid;
@@ -228,10 +228,10 @@ where
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<MetadataEntry, AccountManagementError> {
         self.metadata_service
-            .get_metadata(ctx, tenant_id, schema_id)
+            .get_metadata(ctx, tenant_id, type_id)
             .await
             .map_err(AccountManagementError::from)
     }
@@ -240,10 +240,10 @@ where
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<Option<MetadataEntry>, AccountManagementError> {
         self.metadata_service
-            .resolve_metadata(ctx, tenant_id, schema_id)
+            .resolve_metadata(ctx, tenant_id, type_id)
             .await
             .map_err(AccountManagementError::from)
     }
@@ -276,10 +276,10 @@ where
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<(), AccountManagementError> {
         self.metadata_service
-            .delete_metadata(ctx, tenant_id, schema_id)
+            .delete_metadata(ctx, tenant_id, type_id)
             .await
             .map_err(AccountManagementError::from)
     }

@@ -11,7 +11,7 @@ fn sample_tenant_context() -> IdpTenantContext {
     IdpTenantContext::new(
         Uuid::nil(),
         "t",
-        gts::GtsSchemaId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
+        gts::GtsTypeId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
         None,
     )
 }
@@ -26,7 +26,7 @@ async fn noop_provider_reports_unsupported_operation_on_provision_tenant() {
     let req = IdpProvisionTenantRequest::for_root(
         Uuid::nil(),
         "t",
-        gts::GtsSchemaId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
+        gts::GtsTypeId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
     );
     let err = p
         .provision_tenant(&sec_ctx(), &req)

@@ -38,7 +38,7 @@
 //!   service-internal and is filtered out before any value crosses
 //!   this boundary.
 
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_odata_macros::ODataFilterable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -109,7 +109,7 @@ pub struct Tenant {
 /// `gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~`); AM derives
 /// the canonical `UUIDv5` via [`gts::GtsID`] internally so callers do not
 /// have to supply two parallel identifiers that can diverge. The field
-/// is typed [`GtsSchemaId`] rather than `String` so callers (REST
+/// is typed [`GtsTypeId`] rather than `String` so callers (REST
 /// handler, inter-module Rust consumers) get a self-documenting
 /// contract and any generated JSON Schema annotates the field with
 /// `format: gts-schema-id`. Wire shape stays a string.
@@ -121,7 +121,7 @@ pub struct CreateTenantRequest {
     pub name: String,
     #[serde(default)]
     pub self_managed: bool,
-    pub tenant_type: GtsSchemaId,
+    pub tenant_type: GtsTypeId,
     /// Opaque provider-specific metadata forwarded to the `IdP` plugin.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provisioning_metadata: Option<Value>,
@@ -137,7 +137,7 @@ impl CreateTenantRequest {
         child_id: Uuid,
         parent_id: Uuid,
         name: impl Into<String>,
-        tenant_type: GtsSchemaId,
+        tenant_type: GtsTypeId,
     ) -> Self {
         Self {
             child_id,

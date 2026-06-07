@@ -16,7 +16,7 @@ use modkit_gts::gts_type_schema;
 #[gts_type_schema(
     dir_path = "schemas",
     base = PluginV1,
-    schema_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.mini_chat_model_policy.plugin.v1~",
+    type_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.mini_chat_model_policy.plugin.v1~",
     description = "Mini-Chat Policy plugin specification",
     properties = "",
 )]
@@ -33,7 +33,7 @@ pub struct MiniChatModelPolicyPluginSpecV1;
 #[gts_type_schema(
     dir_path = "schemas",
     base = PluginV1,
-    schema_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.mini_chat_audit.plugin.v1~",
+    type_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.mini_chat_audit.plugin.v1~",
     description = "Mini-Chat Audit plugin specification",
     properties = "",
 )]

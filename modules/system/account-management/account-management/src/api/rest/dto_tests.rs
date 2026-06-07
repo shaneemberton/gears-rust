@@ -20,7 +20,7 @@ use time::macros::datetime;
 use uuid::Uuid;
 
 use account_management_sdk::{IdpUser, MetadataEntry, Tenant, TenantId, TenantStatus};
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 
 use super::{
     NewUserPasswordDto, PutTenantMetadataDto, ResolvedTenantMetadataDto, TenantCreateRequestDto,
@@ -42,7 +42,7 @@ fn sample_updated() -> OffsetDateTime {
 #[test]
 fn entry_dto_round_trip_carries_path_tenant_and_sdk_projection() {
     let entry = MetadataEntry::new(
-        GtsSchemaId::new(sample_schema()),
+        GtsTypeId::new(sample_schema()),
         json!({"primary": "blue"}),
         sample_updated(),
         1,
@@ -54,7 +54,7 @@ fn entry_dto_round_trip_carries_path_tenant_and_sdk_projection() {
         json,
         json!({
             "tenant_id": "11111111-1111-1111-1111-111111111111",
-            "schema_id": sample_schema(),
+            "type_id": sample_schema(),
             "value": {"primary": "blue"},
             "updated_at": "2026-05-16T12:00:00Z",
         }),
@@ -65,7 +65,7 @@ fn entry_dto_round_trip_carries_path_tenant_and_sdk_projection() {
 #[test]
 fn entry_dto_carries_arbitrary_json_payload() {
     let entry = MetadataEntry::new(
-        GtsSchemaId::new(sample_schema()),
+        GtsTypeId::new(sample_schema()),
         json!([1, 2, 3]),
         sample_updated(),
         1,
@@ -122,7 +122,7 @@ fn put_dto_is_transparent_over_the_value_payload() {
 #[test]
 fn resolved_dto_some_carries_value_and_resolved_true() {
     let entry = MetadataEntry::new(
-        GtsSchemaId::new(sample_schema()),
+        GtsTypeId::new(sample_schema()),
         json!({"foo": "bar"}),
         sample_updated(),
         1,
@@ -137,11 +137,11 @@ fn resolved_dto_some_carries_value_and_resolved_true() {
         json,
         json!({
             "tenant_id": "11111111-1111-1111-1111-111111111111",
-            "schema_id": sample_schema(),
+            "type_id": sample_schema(),
             "resolved": true,
             "value": {"foo": "bar"},
         }),
-        "resolved=true surfaces only tenant_id, schema_id, resolved, value",
+        "resolved=true surfaces only tenant_id, type_id, resolved, value",
     );
 }
 
@@ -157,7 +157,7 @@ fn resolved_dto_none_omits_value_and_carries_resolved_false() {
         json,
         json!({
             "tenant_id": "11111111-1111-1111-1111-111111111111",
-            "schema_id": sample_schema(),
+            "type_id": sample_schema(),
             "resolved": false,
         }),
         "empty walk-up serialises with resolved=false and no `value` key",

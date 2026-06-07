@@ -813,7 +813,7 @@ name = "cyberware-modkit-gts"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cyberware-modkit-gts-macro",
+ "cyberware-modkit-gts-macros",
  "gts",
  "gts-macros",
  "inventory",
@@ -823,7 +823,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cyberware-modkit-gts-macro"
+name = "cyberware-modkit-gts-macros"
 version = "0.1.0"
 dependencies = [
  "gts-macros",
@@ -1895,9 +1895,9 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "gts"
-version = "0.9.3"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a5643b7f259cc57b8822d78e7de34e6e31079a36ffb0a75ee8f685fd53595e5"
+checksum = "78d5445277d7f0df598295f7e53608540ae5fe0b830d5010f8f7cce21c69d09f"
 dependencies = [
  "gts-id",
  "jsonschema",
@@ -1914,18 +1914,18 @@ dependencies = [
 
 [[package]]
 name = "gts-id"
-version = "0.9.3"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9d8c6ff0c4fcdf993d2279f44a9edf1e66060fe55c59d5ce06b63a6fafaeafa"
+checksum = "a85a48bfcfaa558f7eaee74e9a7d153d0924eac2d4d287f93323b756fe2700fe"
 dependencies = [
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "gts-macros"
-version = "0.9.3"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fb502ca3db36348a24ccefcf7fa4eac1210c32544c718682cd5838503963004"
+checksum = "20a84d8b5e87ab37b5539bb5e9d830b40235918f375405569c219f4de9b3f7d4"
 dependencies = [
  "gts-id",
  "proc-macro2",

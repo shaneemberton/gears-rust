@@ -45,9 +45,9 @@ pub use gts::{GtsInstanceId, GtsSchema};
 pub use inventory;
 
 // Re-export the companion proc-macros so consumers need only one crate dep.
-pub use modkit_gts_macro::{gts_instance, gts_instance_raw, gts_type_schema};
+pub use modkit_gts_macros::{gts_instance, gts_instance_raw, gts_type_schema};
 
-/// Hidden re-exports used by the `cyberware-modkit-gts-macro` proc-macro
+/// Hidden re-exports used by the `cyberware-modkit-gts-macros` proc-macro
 /// expansions to reach the upstream construction macros without forcing
 /// consumers to take a direct dependency on `gts-macros`.
 #[doc(hidden)]
@@ -65,9 +65,9 @@ pub mod __private {
 /// invokes the macro-generated accessor (`gts_schema_with_refs_as_string`)
 /// to produce the JSON Schema document on demand.
 #[derive(Clone)]
-pub struct InventorySchema {
+pub struct InventoryTypeSchema {
     /// GTS Type Identifier (e.g. `gts.cf.modkit.authz.permission.v1~`).
-    pub schema_id: &'static str,
+    pub type_id: &'static str,
     /// Lazy accessor returning the GTS Type Schema as a JSON string.
     pub schema_fn: fn() -> String,
 }
@@ -100,7 +100,7 @@ pub struct InventoryInstance {
     pub payload_fn: fn() -> serde_json::Value,
 }
 
-inventory::collect!(InventorySchema);
+inventory::collect!(InventoryTypeSchema);
 inventory::collect!(InventoryInstance);
 
 /// Returns every GTS Type Schema declared via `#[gts_type_schema(...)]` in
@@ -117,12 +117,12 @@ inventory::collect!(InventoryInstance);
 /// macro and signals a macro regression.
 pub fn all_inventory_type_schemas() -> anyhow::Result<Vec<serde_json::Value>> {
     let mut out = Vec::new();
-    for entry in inventory::iter::<InventorySchema> {
+    for entry in inventory::iter::<InventoryTypeSchema> {
         let schema_str = (entry.schema_fn)();
         let value: serde_json::Value = serde_json::from_str(&schema_str).map_err(|e| {
             anyhow::anyhow!(
                 "invalid GTS Type Schema JSON emitted by GTS type {}: {e}",
-                entry.schema_id
+                entry.type_id
             )
         })?;
         out.push(value);
@@ -154,7 +154,7 @@ pub fn all_inventory_instances() -> anyhow::Result<Vec<serde_json::Value>> {
 #[cfg(test)]
 mod tests {
     use super::{
-        InventoryInstance, InventorySchema, all_inventory_instances, all_inventory_type_schemas,
+        InventoryInstance, InventoryTypeSchema, all_inventory_instances, all_inventory_type_schemas,
     };
 
     #[test]
@@ -162,9 +162,9 @@ mod tests {
         let schemas = all_inventory_type_schemas().expect("schemas collect cleanly");
 
         // Both platform base types shipped by this crate must be present.
-        let ids: Vec<&str> = inventory::iter::<InventorySchema>
+        let ids: Vec<&str> = inventory::iter::<InventoryTypeSchema>
             .into_iter()
-            .map(|e| e.schema_id)
+            .map(|e| e.type_id)
             .collect();
         assert!(
             ids.contains(&"gts.cf.modkit.plugins.plugin.v1~"),

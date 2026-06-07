@@ -41,7 +41,7 @@ use modkit_gts::gts_type_schema;
 #[gts_type_schema(
     dir_path = "schemas",
     base = PluginV1,
-    schema_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.tenant_resolver.plugin.v1~",
+    type_id = "gts.cf.modkit.plugins.plugin.v1~cf.core.tenant_resolver.plugin.v1~",
     description = "Tenant Resolver plugin specification",
     properties = "",
 )]

@@ -869,7 +869,7 @@ impl UserService {
         // route on it (Keycloak realm name, Zitadel organization
         // selection, vendor-side org id derivation).
         // `get_type_schema_by_uuid` returns the typed
-        // `GtsSchemaId` directly so no string round-trip is
+        // `GtsTypeId` directly so no string round-trip is
         // needed.
         let tenant_type = match self
             .types_registry

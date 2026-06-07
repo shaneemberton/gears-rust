@@ -20,21 +20,21 @@ mod common;
 
 use account_management::domain::metadata::registry::InheritancePolicy;
 use axum::http::StatusCode;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use common::*;
 
-fn schema_path(tenant: Uuid, schema_id: &str) -> String {
+fn schema_path(tenant: Uuid, type_id: &str) -> String {
     // The chained `~` characters are URI-safe; axum's `Path` extractor
     // handles them without percent-encoding.
-    format!("/account-management/v1/tenants/{tenant}/metadata/{schema_id}")
+    format!("/account-management/v1/tenants/{tenant}/metadata/{type_id}")
 }
 
 fn router_with_registered_schema(h: &Harness) -> (TestServices, axum::Router) {
     let registry = metadata_registry_with(vec![(
-        GtsSchemaId::new(REGISTERED_METADATA_SCHEMA),
+        GtsTypeId::new(REGISTERED_METADATA_SCHEMA),
         InheritancePolicy::OverrideOnly,
     )]);
     let services = build_services_with(h, fake_idp(), registry);
@@ -65,7 +65,7 @@ async fn put_metadata_returns_200_with_post_write_entry_on_insert() {
         "PUT must surface 200 per RFC 7231, never 201",
     );
     let body = response_body(resp).await;
-    assert_eq!(body["schema_id"], REGISTERED_METADATA_SCHEMA);
+    assert_eq!(body["type_id"], REGISTERED_METADATA_SCHEMA);
     assert_eq!(body["value"]["hello"], "world");
     assert_eq!(body["tenant_id"], root.to_string());
 }
@@ -271,7 +271,7 @@ async fn list_metadata_returns_200_with_page() {
     let body = response_body(resp).await;
     let items = body["items"].as_array().expect("items");
     assert_eq!(items.len(), 1);
-    assert_eq!(items[0]["schema_id"], REGISTERED_METADATA_SCHEMA);
+    assert_eq!(items[0]["type_id"], REGISTERED_METADATA_SCHEMA);
 }
 
 // ─── RESOLVED ────────────────────────────────────────────────────────
@@ -297,13 +297,13 @@ async fn resolve_metadata_returns_resolved_false_on_empty_walk() {
     let body = response_body(resp).await;
     assert_eq!(body["resolved"], false);
     assert_eq!(body["tenant_id"], root.to_string());
-    assert_eq!(body["schema_id"], REGISTERED_METADATA_SCHEMA);
+    assert_eq!(body["type_id"], REGISTERED_METADATA_SCHEMA);
 }
 
 // ─── Schema-id validation ────────────────────────────────────────────
 
 #[tokio::test]
-async fn put_metadata_malformed_schema_id_returns_400_metadata_validation() {
+async fn put_metadata_malformed_type_id_returns_400_metadata_validation() {
     // A schema-id that fails the GTS chain shape lower must surface a
     // wire-layer 400 with the `metadata_validation` family. Empty
     // strings / missing trailing `~` reach the service and route through
@@ -329,6 +329,6 @@ async fn put_metadata_malformed_schema_id_returns_400_metadata_validation() {
     let status = resp.status();
     assert!(
         status.is_client_error(),
-        "malformed schema_id MUST surface as a 4xx, got {status}"
+        "malformed type_id MUST surface as a 4xx, got {status}"
     );
 }

@@ -51,7 +51,7 @@ pub enum DomainError {
     /// Distinct from [`Self::Validation`] so the SDK boundary can
     /// route the canonical envelope to `gts.cf.core.am.tenant_metadata.v1~`
     /// instead of the tenant default. Used by metadata-content
-    /// rejections (malformed chained `schema_id`, null body, GTS
+    /// rejections (malformed chained `type_id`, null body, GTS
     /// body validation failure) — anything that describes the
     /// metadata payload rather than the owning tenant's state.
     ///
@@ -59,8 +59,8 @@ pub enum DomainError {
     /// coarse — the SDK-boundary mapping in
     /// [`crate::infra::sdk_error_mapping`] hardcodes `field: "metadata"`
     /// for every raise of this variant. If a future caller needs finer
-    /// `field_violation` attribution (e.g. `schema_id` from
-    /// `ParsedSchemaId::parse`, `value` from the null-body guard),
+    /// `field_violation` attribution (e.g. `type_id` from
+    /// `ParsedTypeId::parse`, `value` from the null-body guard),
     /// widen this variant to `{ detail, field: Option<String> }` and
     /// forward the field through the mapping.
     #[error("metadata validation failed: {detail}")]
@@ -114,11 +114,11 @@ pub enum DomainError {
     #[error("conversion request not found: {detail}")]
     ConversionRequestNotFound { detail: String, resource: String },
 
-    /// Metadata lookup miss. Covers both "`schema_id` unknown to the
+    /// Metadata lookup miss. Covers both "`type_id` unknown to the
     /// types-registry" and "schema known but no row exists at
     /// `(tenant_id, schema_uuid)`" — the two cases collapse to a
     /// single 404 per the unified-not-found contract.
-    /// `entry` carries the chained `schema_id` string the caller
+    /// `entry` carries the chained `type_id` string the caller
     /// supplied so the canonical envelope can surface it as
     /// `resource_name` without exposing AM-internal compound keys
     /// like `(tenant_uuid, schema_uuid)`.

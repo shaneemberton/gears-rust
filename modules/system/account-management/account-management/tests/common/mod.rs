@@ -637,7 +637,7 @@ use account_management_sdk::{
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, Response, StatusCode};
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use http_body_util::BodyExt;
 use modkit::api::OpenApiRegistry;
 use modkit::api::operation_builder::OperationSpec;
@@ -932,12 +932,12 @@ pub fn empty_metadata_registry() -> Arc<dyn MetadataSchemaRegistry> {
 }
 
 /// Metadata schema registry seeded with one
-/// `(schema_id, InheritancePolicy::OverrideOnly)` pair so writes /
+/// `(type_id, InheritancePolicy::OverrideOnly)` pair so writes /
 /// reads against a registered schema land cleanly while still
 /// distinguishing the "schema unknown" 404 path.
 #[must_use]
 pub fn metadata_registry_with(
-    schemas: Vec<(GtsSchemaId, InheritancePolicy)>,
+    schemas: Vec<(GtsTypeId, InheritancePolicy)>,
 ) -> Arc<dyn MetadataSchemaRegistry> {
     Arc::new(StubMetadataSchemaRegistry::with_seed(schemas))
 }

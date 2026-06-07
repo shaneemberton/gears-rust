@@ -4,6 +4,7 @@ edition.workspace = true
 license.workspace = true
 version = "0.1.0"
 description = "OIDC Authentication Resolver Plugin"
+metadata.docs.rs.all-features = true
 
 [lib]
 name = "oidc_authn_plugin"

@@ -25,7 +25,7 @@
 //! under test is built directly with `Arc::new(MetadataRepoImpl::new
 //! (provider))`, the `Arc<dyn TenantRepo>` from `h.repo`, and an
 //! `Arc<StubMetadataSchemaRegistry>` seeded with the
-//! `(GtsSchemaId, InheritancePolicy)` pairs each test needs.
+//! `(GtsTypeId, InheritancePolicy)` pairs each test needs.
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::too_many_lines)]
@@ -50,17 +50,17 @@ use serde_json::json;
 use uuid::Uuid;
 
 use common::*;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 
 const SCHEMA_A: &str = "gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.feature_flag.v1~";
 const SCHEMA_B: &str = "gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.org_branding.v1~";
 
-fn schema_a() -> GtsSchemaId {
-    GtsSchemaId::new(SCHEMA_A)
+fn schema_a() -> GtsTypeId {
+    GtsTypeId::new(SCHEMA_A)
 }
 
-fn schema_b() -> GtsSchemaId {
-    GtsSchemaId::new(SCHEMA_B)
+fn schema_b() -> GtsTypeId {
+    GtsTypeId::new(SCHEMA_B)
 }
 
 /// Compute the same deterministic `UUIDv5` the service / repo use
@@ -70,8 +70,8 @@ fn schema_b() -> GtsSchemaId {
     clippy::expect_used,
     reason = "test helpers only see hand-crafted valid schema ids"
 )]
-fn schema_uuid_for(schema_id: &str) -> Uuid {
-    gts::GtsID::new(schema_id)
+fn schema_uuid_for(type_id: &str) -> Uuid {
+    gts::GtsID::new(type_id)
         .expect("valid GTS id in tests")
         .to_uuid()
 }
@@ -223,7 +223,7 @@ async fn crud_round_trip_via_service() {
         .await
         .expect("list after delete");
     assert_eq!(page_after.items.len(), 1);
-    assert_eq!(page_after.items[0].schema_id.as_ref(), SCHEMA_B);
+    assert_eq!(page_after.items[0].type_id.as_ref(), SCHEMA_B);
 
     // GET on deleted entry surfaces `MetadataEntryNotFound` (unified 404).
     let err = svc

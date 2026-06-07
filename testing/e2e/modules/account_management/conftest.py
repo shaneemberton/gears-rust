@@ -145,12 +145,12 @@ def _metadata(base: str, tid: str) -> str:
     return f"{base}/account-management/v1/tenants/{tid}/metadata"
 
 
-def _metadata_entry(base: str, tid: str, schema_id: str) -> str:
-    return f"{base}/account-management/v1/tenants/{tid}/metadata/{schema_id}"
+def _metadata_entry(base: str, tid: str, type_id: str) -> str:
+    return f"{base}/account-management/v1/tenants/{tid}/metadata/{type_id}"
 
 
-def _metadata_resolved(base: str, tid: str, schema_id: str) -> str:
-    return f"{base}/account-management/v1/tenants/{tid}/metadata/{schema_id}/resolved"
+def _metadata_resolved(base: str, tid: str, type_id: str) -> str:
+    return f"{base}/account-management/v1/tenants/{tid}/metadata/{type_id}/resolved"
 
 
 def _users(base: str, tid: str) -> str:
@@ -248,7 +248,7 @@ def create_tenant(am_base_url, am_headers):
 def create_metadata_schema(am_base_url, am_headers):
     """Factory fixture: register a metadata GTS schema in the types-registry.
 
-    Returns the chained ``schema_id`` (a string). Idempotent on the wire
+    Returns the chained ``type_id`` (a string). Idempotent on the wire
     -- the types-registry batch endpoint always returns 200 with a
     per-item result; an already-registered entity surfaces as
     ``status=error`` with an "Entity already exists" message which the
@@ -257,13 +257,13 @@ def create_metadata_schema(am_base_url, am_headers):
     """
 
     async def _register(
-        schema_id: str = DEFAULT_METADATA_SCHEMA_ID,
+        type_id: str = DEFAULT_METADATA_SCHEMA_ID,
         inheritance_policy: str = "inherit",
     ) -> str:
         payload = {
             "entities": [
                 {
-                    "$id": f"gts://{schema_id}",
+                    "$id": f"gts://{type_id}",
                     "$schema": "gts://gts.cf.core.am.tenant_metadata.v1~",
                     "description": "E2E test metadata schema",
                     "type": "object",
@@ -281,21 +281,21 @@ def create_metadata_schema(am_base_url, am_headers):
             )
             assert resp.status_code == 200, (
                 f"types-registry register status {resp.status_code} "
-                f"for '{schema_id}': {resp.text}"
+                f"for '{type_id}': {resp.text}"
             )
             results = resp.json().get("results") or []
             assert results, (
-                f"types-registry returned no results for '{schema_id}': "
+                f"types-registry returned no results for '{type_id}': "
                 f"{resp.text}"
             )
             outcome = results[0]
             if outcome.get("status") == "ok":
-                return schema_id
+                return type_id
             err = (outcome.get("error") or "").lower()
             assert "already exists" in err, (
-                f"Failed to register schema '{schema_id}': {outcome}"
+                f"Failed to register schema '{type_id}': {outcome}"
             )
-            return schema_id
+            return type_id
 
     return _register
 

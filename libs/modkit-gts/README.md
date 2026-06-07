@@ -12,13 +12,13 @@ Module-specific Type Schemas (e.g. plugin specs or module-local permission exten
 ## Adding a platform base Type Schema (inside this crate)
 
 1. Create a new file, e.g. `src/role.rs`.
-2. Annotate a struct with `#[gts_type_schema(schema_id = "...", ...)]`:
+2. Annotate a struct with `#[gts_type_schema(type_id = "...", ...)]`:
 
    ```rust
-   use modkit_gts_macro::gts_type_schema;
+   use crate::gts_type_schema;
 
    #[gts_type_schema(
-       schema_id = "gts.cf.core.authz.role.v1~",
+       type_id = "gts.cf.core.authz.role.v1~",
        description = "Authorization role",
        properties = "name,permissions,display_name"
    )]

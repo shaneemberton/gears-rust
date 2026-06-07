@@ -8,7 +8,7 @@ use gts_macros::struct_to_gts_schema;
     dir_path = "schemas",
     base = true,
     // Should NOT trigger DE0901 - valid GTS schema_id string
-    schema_id = "gts.example.core.events.topic.v1~",
+    type_id = "gts.example.core.events.topic.v1~",
     description = "Event Topic definition",
     properties = "id,name"
 )]
@@ -23,7 +23,7 @@ pub struct EventTopicV1<T: gts::GtsSchema> {
     dir_path = "schemas",
     base = true,
     // Should NOT trigger DE0901- valid GTS schema_id string
-    schema_id = "gts.example.core.events.type.v1~",
+    type_id = "gts.example.core.events.type.v1~",
     description = "Base event type definition",
     properties = "id"
 )]
@@ -37,7 +37,7 @@ pub struct BaseEventTypeV1<P: gts::GtsSchema> {
     dir_path = "schemas",
     base = BaseEventTypeV1,
     // Should NOT trigger DE0901 - valid GTS schema_id string with inheritance
-    schema_id = "gts.example.core.events.type.v1~cf.core.audit.event.v1~",
+    type_id = "gts.example.core.events.type.v1~cf.core.audit.event.v1~",
     description = "Audit event",
     properties = "user_id"
 )]

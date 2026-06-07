@@ -74,7 +74,7 @@ pub trait MetadataRepo: Send + Sync {
     ///
     /// Returns a [`modkit_odata::Page<MetadataRow>`] whose `page_info`
     /// carries the next-cursor token the service forwards on. The
-    /// caller (service layer) re-hydrates the chained `schema_id` for
+    /// caller (service layer) re-hydrates the chained `type_id` for
     /// each row before exposing the result.
     async fn list_for_tenant(
         &self,

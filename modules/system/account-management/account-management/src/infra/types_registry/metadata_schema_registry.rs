@@ -28,7 +28,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use gts::{GtsID, GtsSchemaId};
+use gts::{GtsID, GtsTypeId};
 use serde_json::Value;
 use types_registry_sdk::{TypesRegistryClient, TypesRegistryError};
 use uuid::Uuid;
@@ -38,16 +38,9 @@ use crate::domain::metadata::registry::{InheritancePolicy, MetadataSchemaRegistr
 
 /// Top-level key in the effective trait map carrying the inheritance
 /// policy enum value. Defined on the `gts.cf.core.am.tenant_metadata.v1~`
-/// envelope's `x-gts-traits-schema`.
-// TODO(cyberfabric/cyberware-rust#1928): the base envelope
-// `gts.cf.core.am.tenant_metadata.v1~` is currently registered via the
-// `inventory::submit!` workaround in
-// `account-management-sdk/src/gts_envelopes.rs`. Once the
-// `#[gts_type_schema]` macro grows `x-gts-traits-schema` /
-// `x-gts-traits` support (tracked in #1928, blocked upstream by
-// GTS-rust/#85), the envelope migrates to a macro-derived
-// registration and this comment can disappear.
-// See <https://github.com/cyberfabric/cyberware-rust/issues/1928>.
+/// envelope's `x-gts-traits-schema` (see
+/// `account_management_sdk::gts_envelopes::TenantMetadataTraits`, the
+/// Rust source of truth the macro emits the trait schema from).
 const INHERITANCE_POLICY_TRAIT: &str = "inheritance_policy";
 
 /// Wire token for the `Inherit` policy. Anything else (missing key,
@@ -90,25 +83,25 @@ fn map_registry_err(err: TypesRegistryError, schema_token: &str) -> DomainError 
 }
 
 /// Compute the deterministic `schema_uuid` for an already-validated
-/// `schema_id` string. Mirrors the helper in
+/// `type_id` string. Mirrors the helper in
 /// [`crate::domain::metadata::registry`] — both rely on
 /// `gts::GtsID::to_uuid()` for the canonical namespace.
 ///
 /// # Panics
 ///
-/// Panics if `schema_id` is not parseable as a GTS id. Callers MUST
+/// Panics if `type_id` is not parseable as a GTS id. Callers MUST
 /// pass strings already validated by
-/// [`crate::domain::metadata::schema_id::ParsedSchemaId::parse`] (the
+/// [`crate::domain::metadata::type_id::ParsedTypeId::parse`] (the
 /// service-layer guard runs before the registry sees the value).
 #[allow(
     clippy::expect_used,
-    reason = "callers validate via ParsedSchemaId before invoking registry; \
+    reason = "callers validate via ParsedTypeId before invoking registry; \
               an unparseable input here is a service-layer contract break"
 )]
-fn uuid_for_registered_schema(schema_id: &str) -> Uuid {
-    GtsID::new(schema_id)
+fn uuid_for_registered_schema(type_id: &str) -> Uuid {
+    GtsID::new(type_id)
         .expect(
-            "types-registry returned a schema_id that does not parse as a GTS id - \
+            "types-registry returned a type_id that does not parse as a GTS id - \
              upstream SDK contract break",
         )
         .to_uuid()
@@ -118,12 +111,12 @@ fn uuid_for_registered_schema(schema_id: &str) -> Uuid {
 impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
     async fn resolve_inheritance_policy(
         &self,
-        schema_id: &GtsSchemaId,
+        type_id: &GtsTypeId,
     ) -> Result<InheritancePolicy, DomainError> {
         // Forward the public chained id to the registry. The registry's
         // local-client cache will resolve this against the in-memory
         // schema map (no extra hop in the steady state).
-        let schema_str = schema_id.as_ref();
+        let schema_str = type_id.as_ref();
         let schema = self
             .registry
             .get_type_schema(schema_str)
@@ -157,7 +150,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
             Some(other) => {
                 tracing::warn!(
                     target: "am.metadata",
-                    schema_id = %schema_id,
+                    type_id = %type_id,
                     raw_value = ?other,
                     "unknown inheritance_policy value; defaulting to override_only"
                 );
@@ -170,7 +163,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
     async fn resolve_ids_by_uuid(
         &self,
         schema_uuids: &[Uuid],
-    ) -> Result<std::collections::HashMap<Uuid, GtsSchemaId>, DomainError> {
+    ) -> Result<std::collections::HashMap<Uuid, GtsTypeId>, DomainError> {
         // The SDK has no native multi-id call; loop through
         // `resolve_id_by_uuid` and rely on the SDK's local-client
         // snapshot cache for amortisation (every steady-state hit is a
@@ -193,7 +186,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
         Ok(out)
     }
 
-    async fn resolve_id_by_uuid(&self, schema_uuid: Uuid) -> Result<GtsSchemaId, DomainError> {
+    async fn resolve_id_by_uuid(&self, schema_uuid: Uuid) -> Result<GtsTypeId, DomainError> {
         let schema = self
             .registry
             .get_type_schema_by_uuid(schema_uuid)
@@ -202,7 +195,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
 
         // The resolved `schema.type_id` is a `GtsTypeId` that the
         // registry has already validated. Defense-in-depth: re-derive
-        // the UUID from the resolved `schema_id` and confirm it matches
+        // the UUID from the resolved `type_id` and confirm it matches
         // the input. The SDK guarantees this on its own, but a future
         // SDK bug that mapped an arbitrary schema to a `schema_uuid`
         // would otherwise let a List flow re-hydrate the wrong public
@@ -215,7 +208,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
         // and a non-tenant-metadata schema in the storage row could
         // only have landed there via a manual write that bypassed
         // `MetadataService::upsert_metadata` (which validates via
-        // `ParsedSchemaId::parse`). The UUID round-trip check below
+        // `ParsedTypeId::parse`). The UUID round-trip check below
         // catches the same class of bug end-to-end without coupling
         // the registry adapter to the AM root-segment constant.
         let raw = schema.type_id.as_ref();
@@ -229,14 +222,10 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
                 cause: None,
             });
         }
-        Ok(GtsSchemaId::new(raw))
+        Ok(GtsTypeId::new(raw))
     }
 
-    async fn validate_value(
-        &self,
-        schema_id: &GtsSchemaId,
-        value: &Value,
-    ) -> Result<(), DomainError> {
+    async fn validate_value(&self, type_id: &GtsTypeId, value: &Value) -> Result<(), DomainError> {
         // Mirrors the `validate_provision_input_metadata_via_gts` pattern
         // from `domain::gts_validation` (the canonical AM seam for GTS
         // body validation) — single round-trip to the registry, then
@@ -250,7 +239,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
         // unified metadata `resource_type`), not `Internal` — metadata
         // schemas are caller-named so an unregistered chain is a
         // public 404, not a deploy-prerequisite failure.
-        let schema_str = schema_id.as_ref();
+        let schema_str = type_id.as_ref();
         let schema = self
             .registry
             .get_type_schema(schema_str)
@@ -277,7 +266,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
                 // caller's payload is the problem.
                 DomainError::Internal {
                     diagnostic: format!(
-                        "GTS metadata schema `{schema_id}` is not a valid JSON Schema \
+                        "GTS metadata schema `{type_id}` is not a valid JSON Schema \
                          (catalog drift): {err}"
                     ),
                     cause: None,
@@ -290,7 +279,7 @@ impl MetadataSchemaRegistry for GtsMetadataSchemaRegistry {
         if !errors.is_empty() {
             return Err(DomainError::MetadataValidation {
                 detail: format!(
-                    "metadata value violates registered schema `{schema_id}`: {}",
+                    "metadata value violates registered schema `{type_id}`: {}",
                     errors.join("; ")
                 ),
             });

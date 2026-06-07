@@ -21,7 +21,7 @@
 use std::sync::Arc;
 
 use account_management_sdk::{IdpPluginClient, IdpPluginSpecV1, IdpProvisionTenantRequest};
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit::ClientHub;
 use modkit::client_hub::ClientScope;
 use modkit::gts::PluginV1;
@@ -53,7 +53,7 @@ fn build_instance(
 /// test stays within the upstream-shared GTS namespace (no
 /// deployment-specific identifiers leak into `cyberfabric-core`).
 fn request() -> IdpProvisionTenantRequest {
-    let tenant_type = GtsSchemaId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~");
+    let tenant_type = GtsTypeId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~");
     IdpProvisionTenantRequest::new(
         Uuid::from_u128(0xC11D),
         Uuid::from_u128(0xBEEF),

@@ -14,11 +14,11 @@ const API_TAG: &str = "Tenant Metadata";
 
 /// Collection path: `GET /tenants/{tenant_id}/metadata`.
 const COLLECTION_PATH: &str = "/account-management/v1/tenants/{tenant_id}/metadata";
-/// Entry path: `GET / PUT / DELETE /tenants/{tenant_id}/metadata/{schema_id}`.
-const ENTRY_PATH: &str = "/account-management/v1/tenants/{tenant_id}/metadata/{schema_id}";
-/// Inheritance-aware read path: `GET /tenants/{tenant_id}/metadata/{schema_id}/resolved`.
+/// Entry path: `GET / PUT / DELETE /tenants/{tenant_id}/metadata/{type_id}`.
+const ENTRY_PATH: &str = "/account-management/v1/tenants/{tenant_id}/metadata/{type_id}";
+/// Inheritance-aware read path: `GET /tenants/{tenant_id}/metadata/{type_id}/resolved`.
 const RESOLVED_PATH: &str =
-    "/account-management/v1/tenants/{tenant_id}/metadata/{schema_id}/resolved";
+    "/account-management/v1/tenants/{tenant_id}/metadata/{type_id}/resolved";
 
 #[allow(
     clippy::too_many_lines,
@@ -64,20 +64,20 @@ pub(super) fn register_metadata_routes(
         )
         .register(router, openapi);
 
-    // GET /account-management/v1/tenants/{tenant_id}/metadata/{schema_id}
+    // GET /account-management/v1/tenants/{tenant_id}/metadata/{type_id}
     router = OperationBuilder::get(ENTRY_PATH)
         .operation_id("account_management.get_tenant_metadata")
         .summary("Get a tenant metadata entry")
         .description(
             "Read the metadata entry attached directly to the tenant for the given \
-             chained GTS `schema_id`. Does not walk up the ancestor chain -- use the \
+             chained GTS `type_id`. Does not walk up the ancestor chain -- use the \
              `/resolved` endpoint for inheritance-aware reads.",
         )
         .tag(API_TAG)
         .authenticated()
         .no_license_required()
         .path_param("tenant_id", "Tenant UUID")
-        .path_param("schema_id", "Full chained GTS schema identifier")
+        .path_param("type_id", "Full chained GTS schema identifier")
         .handler(handlers::get_metadata)
         .json_response_with_schema::<dto::TenantMetadataEntryDto>(
             openapi,
@@ -92,13 +92,13 @@ pub(super) fn register_metadata_routes(
         )
         .register(router, openapi);
 
-    // PUT /account-management/v1/tenants/{tenant_id}/metadata/{schema_id}
+    // PUT /account-management/v1/tenants/{tenant_id}/metadata/{type_id}
     router = OperationBuilder::put(ENTRY_PATH)
         .operation_id("account_management.put_tenant_metadata")
         .summary("Create or replace a tenant metadata entry")
         .description(
-            "Upsert the metadata entry at (tenant_id, schema_id). The request body is \
-             the GTS-validated payload; the chained `schema_id` is the path parameter. \
+            "Upsert the metadata entry at (tenant_id, type_id). The request body is \
+             the GTS-validated payload; the chained `type_id` is the path parameter. \
              Returns HTTP 200 with the post-write entry per RFC 7231 PUT semantics; \
              the insert-vs-update distinction is preserved on the \
              `am.events:metadata_upserted` audit line.",
@@ -107,7 +107,7 @@ pub(super) fn register_metadata_routes(
         .authenticated()
         .no_license_required()
         .path_param("tenant_id", "Tenant UUID")
-        .path_param("schema_id", "Full chained GTS schema identifier")
+        .path_param("type_id", "Full chained GTS schema identifier")
         .json_request::<dto::PutTenantMetadataDto>(openapi, "GTS-validated metadata payload")
         .handler(handlers::upsert_metadata)
         .json_response_with_schema::<dto::TenantMetadataEntryDto>(
@@ -123,13 +123,13 @@ pub(super) fn register_metadata_routes(
         )
         .register(router, openapi);
 
-    // DELETE /account-management/v1/tenants/{tenant_id}/metadata/{schema_id}
+    // DELETE /account-management/v1/tenants/{tenant_id}/metadata/{type_id}
     router = OperationBuilder::delete(ENTRY_PATH)
         .operation_id("account_management.delete_tenant_metadata")
         .summary("Delete a tenant metadata entry")
         .description(
             "Hard-delete the metadata entry attached directly to the tenant for the given \
-             chained GTS `schema_id`. Idempotent on missing rows: returns 204 whether the \
+             chained GTS `type_id`. Idempotent on missing rows: returns 204 whether the \
              direct entry existed and was removed or was already absent (mirrors `delete_user` \
              deprovision idempotency). The tenant-existence and schema-registration gates \
              still raise their own 404 codes.",
@@ -138,7 +138,7 @@ pub(super) fn register_metadata_routes(
         .authenticated()
         .no_license_required()
         .path_param("tenant_id", "Tenant UUID")
-        .path_param("schema_id", "Full chained GTS schema identifier")
+        .path_param("type_id", "Full chained GTS schema identifier")
         .handler(handlers::delete_metadata)
         .no_content_response(http::StatusCode::NO_CONTENT, "Metadata entry deleted")
         .standard_errors(openapi)
@@ -149,7 +149,7 @@ pub(super) fn register_metadata_routes(
         )
         .register(router, openapi);
 
-    // GET /account-management/v1/tenants/{tenant_id}/metadata/{schema_id}/resolved
+    // GET /account-management/v1/tenants/{tenant_id}/metadata/{type_id}/resolved
     router = OperationBuilder::get(RESOLVED_PATH)
         .operation_id("account_management.resolve_tenant_metadata")
         .summary("Resolve the effective metadata value for a tenant and schema")
@@ -163,7 +163,7 @@ pub(super) fn register_metadata_routes(
         .authenticated()
         .no_license_required()
         .path_param("tenant_id", "Tenant UUID")
-        .path_param("schema_id", "Full chained GTS schema identifier")
+        .path_param("type_id", "Full chained GTS schema identifier")
         .handler(handlers::resolve_metadata)
         .json_response_with_schema::<dto::ResolvedTenantMetadataDto>(
             openapi,

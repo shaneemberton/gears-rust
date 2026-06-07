@@ -19,24 +19,24 @@ use serde_json::json;
 use time::macros::datetime;
 
 /// Canonical valid chained schema id used across positive-path tests.
-const VALID_SCHEMA_ID: &str = "gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.branding.v1~";
+const VALID_TYPE_ID: &str = "gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.branding.v1~";
 
-fn valid_schema_id() -> GtsSchemaId {
-    GtsSchemaId::new(VALID_SCHEMA_ID)
+fn valid_type_id() -> GtsTypeId {
+    GtsTypeId::new(VALID_TYPE_ID)
 }
 
 #[test]
 fn metadata_entry_serde_roundtrip() {
     let when = datetime!(2025-01-15 12:34:56 UTC);
     let entry = MetadataEntry::new(
-        valid_schema_id(),
+        valid_type_id(),
         json!({"theme": "dark", "primary": "#3366ff"}),
         when,
         1,
     );
 
     let wire = serde_json::to_string(&entry).expect("serialize");
-    assert!(wire.contains("\"schema_id\":\""), "schema_id key on wire");
+    assert!(wire.contains("\"type_id\":\""), "type_id key on wire");
     assert!(
         wire.contains("\"updated_at\":\""),
         "rfc3339 updated_at on wire"
@@ -48,7 +48,7 @@ fn metadata_entry_serde_roundtrip() {
 
 #[test]
 fn upsert_metadata_request_serde_roundtrip() {
-    let req = UpsertMetadataRequest::new(valid_schema_id(), json!({"flag": true, "limit": 42}));
+    let req = UpsertMetadataRequest::new(valid_type_id(), json!({"flag": true, "limit": 42}));
 
     let wire = serde_json::to_string(&req).expect("serialize");
     let parsed: UpsertMetadataRequest = serde_json::from_str(&wire).expect("roundtrip");
@@ -56,19 +56,19 @@ fn upsert_metadata_request_serde_roundtrip() {
 }
 
 #[test]
-fn upsert_metadata_request_schema_id_serializes_as_plain_string() {
-    // Pin the wire shape: `GtsSchemaId` upstream serde forwards to
+fn upsert_metadata_request_type_id_serializes_as_plain_string() {
+    // Pin the wire shape: `GtsTypeId` upstream serde forwards to
     // a plain JSON string. Switching the Rust API from `String` to
-    // `GtsSchemaId` MUST NOT alter the bytes on the wire.
-    let req = UpsertMetadataRequest::new(valid_schema_id(), json!({"k": "v"}));
+    // `GtsTypeId` MUST NOT alter the bytes on the wire.
+    let req = UpsertMetadataRequest::new(valid_type_id(), json!({"k": "v"}));
     let value = serde_json::to_value(&req).expect("serialize");
     let object = value.as_object().expect("object");
-    let sid = object.get("schema_id").expect("schema_id key");
+    let sid = object.get("type_id").expect("type_id key");
     assert!(
         sid.is_string(),
-        "schema_id MUST serialize as plain JSON string, got: {sid:?}"
+        "type_id MUST serialize as plain JSON string, got: {sid:?}"
     );
-    assert_eq!(sid.as_str(), Some(VALID_SCHEMA_ID));
+    assert_eq!(sid.as_str(), Some(VALID_TYPE_ID));
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn metadata_entry_filter_fields_are_pinned() {
 /// addition to the field is flagged as a wire-contract change.
 #[test]
 fn upsert_metadata_request_rejects_missing_value() {
-    let bad = json!({ "schema_id": VALID_SCHEMA_ID });
+    let bad = json!({ "type_id": VALID_TYPE_ID });
     let err = serde_json::from_value::<UpsertMetadataRequest>(bad).expect_err("missing `value`");
     assert!(
         err.to_string().contains("missing field `value`"),
@@ -108,13 +108,13 @@ fn upsert_metadata_request_rejects_missing_value() {
 /// content-agnostic.
 #[test]
 fn upsert_metadata_request_accepts_any_non_missing_value() {
-    let null_payload = json!({ "schema_id": VALID_SCHEMA_ID, "value": null });
+    let null_payload = json!({ "type_id": VALID_TYPE_ID, "value": null });
     let parsed: UpsertMetadataRequest =
         serde_json::from_value(null_payload).expect("null OK at SDK");
     assert!(parsed.value.is_null(), "SDK does not reject Value::Null");
 
     let object_payload = json!({
-        "schema_id": VALID_SCHEMA_ID,
+        "type_id": VALID_TYPE_ID,
         "value": { "k": "v" }
     });
     let parsed: UpsertMetadataRequest = serde_json::from_value(object_payload).expect("object");
@@ -128,7 +128,7 @@ fn metadata_entry_omits_unknown_status_field_on_serialize() {
     // would silently round-trip as JSON. This test guards the
     // existing shape; SDK-minor field additions update the test.
     let entry = MetadataEntry::new(
-        valid_schema_id(),
+        valid_type_id(),
         json!({"k": "v"}),
         datetime!(2025-01-01 00:00:00 UTC),
         7,
@@ -140,7 +140,7 @@ fn metadata_entry_omits_unknown_status_field_on_serialize() {
     keys_sorted.sort_unstable();
     assert_eq!(
         keys_sorted,
-        vec!["schema_id", "updated_at", "value", "version"],
+        vec!["type_id", "updated_at", "value", "version"],
         "MetadataEntry wire keys drifted"
     );
 }

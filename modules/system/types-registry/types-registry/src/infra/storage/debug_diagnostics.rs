@@ -293,14 +293,14 @@ mod tests {
     #[test]
     fn test_cycle_detection_in_visited_set() {
         let mut visited: HashSet<String> = HashSet::new();
-        let schema_id = "gts.vendor.pkg.ns.type.v1~";
+        let type_id = "gts.vendor.pkg.ns.type.v1~";
 
         // First visit should succeed
-        assert!(!visited.contains(schema_id));
-        visited.insert(schema_id.to_owned());
+        assert!(!visited.contains(type_id));
+        visited.insert(type_id.to_owned());
 
         // Second visit should be detected as cycle
-        assert!(visited.contains(schema_id));
+        assert!(visited.contains(type_id));
     }
 
     #[test]

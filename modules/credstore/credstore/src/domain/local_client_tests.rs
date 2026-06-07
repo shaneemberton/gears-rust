@@ -22,7 +22,7 @@ fn make_client() -> CredStoreLocalClient {
 fn make_wired_client(plugin: Arc<dyn CredStorePluginClientV1>) -> CredStoreLocalClient {
     let instance_id = format!(
         "{}test.credstore.mock.local_client.v1",
-        CredStorePluginSpecV1::gts_schema_id()
+        CredStorePluginSpecV1::gts_type_id()
     );
     let hub = Arc::new(ClientHub::default());
 

@@ -570,7 +570,7 @@ paths:
         default:
           $ref: '#/components/responses/Problem'
 
-  /api/account-management/v1/tenants/{tenant_id}/metadata/{schema_id}:
+  /api/account-management/v1/tenants/{tenant_id}/metadata/{type_id}:
     parameters:
       - $ref: '#/components/parameters/TenantId'
       - $ref: '#/components/parameters/SchemaId'
@@ -612,7 +612,7 @@ paths:
       summary: Delete a tenant metadata entry
       description: |
         Hard-delete the metadata entry attached directly to this tenant
-        for the given chained `schema_id`. Idempotent on missing rows:
+        for the given chained `type_id`. Idempotent on missing rows:
         returns 204 whether the direct entry existed and was removed or
         was already absent (mirrors `delete_user` deprovision
         idempotency). The tenant-existence and schema-registration gates
@@ -624,7 +624,7 @@ paths:
         default:
           $ref: '#/components/responses/Problem'
 
-  /api/account-management/v1/tenants/{tenant_id}/metadata/{schema_id}/resolved:
+  /api/account-management/v1/tenants/{tenant_id}/metadata/{type_id}/resolved:
     parameters:
       - $ref: '#/components/parameters/TenantId'
       - $ref: '#/components/parameters/SchemaId'
@@ -673,7 +673,7 @@ components:
         format: uuid
         description: IdP-issued UUID user identifier.
     SchemaId:
-      name: schema_id
+      name: type_id
       in: path
       required: true
       schema:
@@ -1191,14 +1191,14 @@ components:
         Opaque GTS-schema-validated metadata payload. The wire shape is
         any JSON value (object, array, scalar, null) — the service-side
         validator checks the payload against the registered JSON Schema
-        for the targeted `schema_id`. A `null` body specifically is
+        for the targeted `type_id`. A `null` body specifically is
         rejected with `400 metadata_validation`; other shapes pass the
         DTO layer and are validated by the registered schema.
 
     TenantMetadataEntry:
       type: object
       additionalProperties: false
-      required: [tenant_id, schema_id, value, updated_at]
+      required: [tenant_id, type_id, value, updated_at]
       description: |
         Direct-on-tenant metadata entry. `created_at` is intentionally
         not exposed — the public contract only commits to `updated_at`
@@ -1209,7 +1209,7 @@ components:
         tenant_id:
           type: string
           format: uuid
-        schema_id:
+        type_id:
           type: string
           description: Chained `gts.cf.core.am.tenant_metadata.v1~vendor.pkg.ns.type.v1~` identifier.
         value:
@@ -1233,12 +1233,12 @@ components:
     ResolvedTenantMetadata:
       type: object
       additionalProperties: false
-      required: [tenant_id, schema_id, resolved]
+      required: [tenant_id, type_id, resolved]
       properties:
         tenant_id:
           type: string
           format: uuid
-        schema_id:
+        type_id:
           type: string
         resolved:
           type: boolean

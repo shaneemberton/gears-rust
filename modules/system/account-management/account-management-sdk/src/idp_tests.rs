@@ -20,7 +20,7 @@ fn sample_tenant_context() -> IdpTenantContext {
     IdpTenantContext::new(
         Uuid::nil(),
         "t",
-        gts::GtsSchemaId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
+        gts::GtsTypeId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
         None,
     )
 }
@@ -49,7 +49,7 @@ async fn provision_tenant_default_impl_returns_unsupported_operation() {
     let req = IdpProvisionTenantRequest::for_root(
         Uuid::nil(),
         "t",
-        gts::GtsSchemaId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
+        gts::GtsTypeId::new("gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~"),
     );
     let err = s
         .provision_tenant(&sample_security_context(), &req)

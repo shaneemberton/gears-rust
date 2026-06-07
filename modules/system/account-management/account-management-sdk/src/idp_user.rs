@@ -47,7 +47,7 @@
 //! themselves -- they pass the raw vendor text and AM owns the public-
 //! surface mapping.
 
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_odata_macros::ODataFilterable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -112,12 +112,12 @@ pub struct IdpTenantContext {
     /// provider-side identifiers from the tenant label (e.g. a
     /// Keycloak realm whose name follows the tenant slug).
     pub tenant_name: String,
-    /// Resolved tenant type as a chained `GtsSchemaId`
+    /// Resolved tenant type as a chained `GtsTypeId`
     /// (e.g. `gts.cf.core.am.tenant_type.v1~cf.core.am.customer.v1~`).
     /// Mandatory at the contract boundary — AM treats failures of
     /// the underlying Types Registry reverse-resolve as service-
     /// level errors rather than leaking an `Option` into the plugin.
-    pub tenant_type: GtsSchemaId,
+    pub tenant_type: GtsTypeId,
     /// Opaque plugin-private metadata persisted by AM in
     /// `tenant_idp_metadata`. AM replays whatever the plugin returned
     /// from [`crate::idp::IdpProvisionResult::metadata`] on every
@@ -134,7 +134,7 @@ impl IdpTenantContext {
     pub fn new(
         tenant_id: Uuid,
         tenant_name: impl Into<String>,
-        tenant_type: GtsSchemaId,
+        tenant_type: GtsTypeId,
         metadata: Option<Value>,
     ) -> Self {
         Self {
@@ -302,7 +302,7 @@ impl IdpNewUser {
 /// envelopes and PEP rules. The struct itself is not annotated with
 /// `gts_macros::struct_to_gts_schema` because the macro's "base
 /// type" contract requires the struct to carry either a
-/// `GtsInstanceId`-typed `id` field or a `GtsSchemaId`-typed
+/// `GtsInstanceId`-typed `id` field or a `GtsTypeId`-typed
 /// `gts_type` field — `IdpUser.id` is the `IdP`-issued domain UUID
 /// (Keycloak's user UUID, etc.), not a GTS instance identifier, so
 /// the two semantics are intentionally distinct.

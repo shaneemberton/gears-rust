@@ -110,7 +110,9 @@ impl<'a> Visitor<'a> {
                         .unwrap_or_default();
                     let val = expr_to_string(&nv.value);
                     match key.as_str() {
-                        "schema_id" => {
+                        // gts 0.10.0 renamed the attribute `schema_id` ->
+                        // `type_id`; accept either form.
+                        "type_id" | "schema_id" => {
                             if let Some(v) = val {
                                 td.gts_id = v;
                             }

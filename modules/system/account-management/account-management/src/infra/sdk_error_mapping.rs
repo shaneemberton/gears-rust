@@ -50,7 +50,7 @@ pub(crate) struct UserResource;
 // `TenantMetadataResource` carries the unified 404 for the metadata
 // surface — both "schema unknown to the registry" and "entry missing
 // for this tenant" resolve to this `resource_type`. The chained
-// `schema_id` the caller supplied is surfaced through
+// `type_id` the caller supplied is surfaced through
 // `resource_name`, so consumers still see *which* schema was
 // involved without a separate type-level discriminator.
 #[resource_error("gts.cf.core.am.tenant_metadata.v1~")]
@@ -255,7 +255,7 @@ pub(crate) fn account_management_error_to_canonical(err: AccountManagementError)
         // Both "schema unknown to registry" and "entry missing for
         // tenant" resolve to the same `TenantMetadataResource` 404 —
         // AM no longer distinguishes them on the wire. `entry`
-        // carries the chained `schema_id` the caller supplied (or a
+        // carries the chained `type_id` the caller supplied (or a
         // bare `schema_uuid` on the rare orphan-row paths handled
         // via `Internal` rather than this 404).
         A::MetadataEntryNotFound { entry, detail } => TenantMetadataResource::not_found(detail)

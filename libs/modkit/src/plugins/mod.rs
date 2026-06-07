@@ -112,10 +112,10 @@ pub enum ChoosePluginError {
     },
 
     /// No plugin instance matched the requested vendor.
-    #[error("no plugin instances found for schema '{schema_id}', vendor '{vendor}'")]
+    #[error("no plugin instances found for type '{type_id}', vendor '{vendor}'")]
     PluginNotFound {
-        /// GTS schema ID of the plugin type being resolved.
-        schema_id: String,
+        /// GTS Type Identifier of the plugin type being resolved.
+        type_id: String,
         /// The vendor that was requested.
         vendor: String,
     },
@@ -199,7 +199,7 @@ where
 
     best.map(|(gts_id, _)| gts_id.to_owned())
         .ok_or_else(|| ChoosePluginError::PluginNotFound {
-            schema_id: P::SCHEMA_ID.to_owned(),
+            type_id: P::TYPE_ID.to_owned(),
             vendor: vendor.to_owned(),
         })
 }

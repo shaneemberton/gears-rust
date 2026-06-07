@@ -35,7 +35,7 @@ use modkit_gts::gts_type_schema;
 /// ```
 #[gts_type_schema(
     dir_path = "schemas",
-    schema_id = "gts.cf.core.rg.type.v1~",
+    type_id = "gts.cf.core.rg.type.v1~",
     description = "Resource Group base type — defines placement and tenant scope traits",
     properties = "id,can_be_root,allowed_parent_types,allowed_membership_types",
     base = true

@@ -53,7 +53,7 @@
 //! `OverrideOnly` policy (returns `None` on a legitimate miss).
 
 use async_trait::async_trait;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_odata::{ODataQuery, Page};
 use modkit_security::SecurityContext;
 use uuid::Uuid;
@@ -356,7 +356,7 @@ pub trait AccountManagementClient: Send + Sync + 'static {
     // -----------------------------------------------------------------
 
     /// Read the metadata entry attached **directly** to `tenant_id`
-    /// for `schema_id`. Does NOT walk up the ancestor chain — use
+    /// for `type_id`. Does NOT walk up the ancestor chain — use
     /// [`Self::resolve_metadata`] for the inheritance-aware lookup.
     ///
     /// # Errors
@@ -364,7 +364,7 @@ pub trait AccountManagementClient: Send + Sync + 'static {
     /// * `PermissionDenied` (HTTP 403) — caller has no scope to read
     ///   metadata on this tenant.
     /// * `NotFound` (HTTP 404) — tenant does not exist OR no row
-    ///   exists at `(tenant_id, schema_id)`. The two cases carry
+    ///   exists at `(tenant_id, type_id)`. The two cases carry
     ///   distinct AM resource types
     ///   (`gts.cf.core.am.tenant.v1~` vs
     ///   `gts.cf.core.am.tenant_metadata.v1~`) on the canonical
@@ -376,11 +376,11 @@ pub trait AccountManagementClient: Send + Sync + 'static {
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<MetadataEntry, AccountManagementError>;
 
     /// Resolve the **effective** metadata for `tenant_id` at
-    /// `schema_id`, walking up the ancestor chain per the FEATURE
+    /// `type_id`, walking up the ancestor chain per the FEATURE
     /// algorithm:
     ///
     /// 1. Direct row at `tenant_id` — hit returns immediately.
@@ -404,13 +404,13 @@ pub trait AccountManagementClient: Send + Sync + 'static {
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<Option<MetadataEntry>, AccountManagementError>;
 
     /// List metadata entries attached directly to `tenant_id`,
     /// filtered + paginated via the supplied [`ODataQuery`]. The
     /// query supports `$filter`, `$orderby`, `$top` and `$cursor`
-    /// over `MetadataEntry` columns (`schema_id`, `updated_at`).
+    /// over `MetadataEntry` columns (`type_id`, `updated_at`).
     /// Inherited entries are NOT included — this is a direct-only
     /// listing (mirrors [`Self::get_metadata`] vs [`Self::resolve_metadata`]).
     ///
@@ -429,7 +429,7 @@ pub trait AccountManagementClient: Send + Sync + 'static {
         query: &ODataQuery,
     ) -> Result<Page<MetadataEntry>, AccountManagementError>;
 
-    /// Upsert the metadata row at `(tenant_id, input.schema_id)`.
+    /// Upsert the metadata row at `(tenant_id, input.type_id)`.
     /// Returns the post-write [`MetadataEntry`] — REST handlers
     /// in front of this method MAY emit HTTP 200 uniformly per
     /// RFC 7231 PUT semantics, OR distinguish 201/200 by GET-first;
@@ -460,7 +460,7 @@ pub trait AccountManagementClient: Send + Sync + 'static {
     ) -> Result<MetadataEntry, AccountManagementError>;
 
     /// Delete the metadata row attached **directly** to `tenant_id`
-    /// for `schema_id`. Inherited entries (resolved through an
+    /// for `type_id`. Inherited entries (resolved through an
     /// ancestor) are NOT affected — only the direct row is removed.
     ///
     /// Idempotent on missing rows: returns `Ok(())` whether the row
@@ -482,6 +482,6 @@ pub trait AccountManagementClient: Send + Sync + 'static {
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<(), AccountManagementError>;
 }

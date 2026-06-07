@@ -51,7 +51,7 @@ use crate::domain::tenant::test_support::{
     FakeTenantRepo, mock_enforcer, schema_selective_enforcer, schema_unavailable_enforcer,
 };
 use authz_resolver_sdk::PolicyEnforcer;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 
 // ---- helpers -------------------------------------------------------
 
@@ -95,28 +95,28 @@ fn first_page() -> ODataQuery {
     ODataQuery::default()
 }
 
-fn schema_a() -> GtsSchemaId {
-    GtsSchemaId::new("gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.theme.v1~")
+fn schema_a() -> GtsTypeId {
+    GtsTypeId::new("gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.theme.v1~")
 }
 
-fn schema_b() -> GtsSchemaId {
-    GtsSchemaId::new("gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.billing.v1~")
+fn schema_b() -> GtsTypeId {
+    GtsTypeId::new("gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.billing.v1~")
 }
 
-fn schema_unknown() -> GtsSchemaId {
-    GtsSchemaId::new("gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.absent.v1~")
+fn schema_unknown() -> GtsTypeId {
+    GtsTypeId::new("gts.cf.core.am.tenant_metadata.v1~vendor.app.metadata.absent.v1~")
 }
 
 /// Compute the same deterministic `UUIDv5` the service / repo use
 /// internally, via the upstream `gts` crate. Test-local helper —
-/// service-side flow validates schema ids via `ParsedSchemaId::parse`
+/// service-side flow validates schema ids via `ParsedTypeId::parse`
 /// before reaching the registry, so test inputs are always valid here.
 #[allow(
     clippy::expect_used,
     reason = "test helpers only see hand-crafted valid schema ids"
 )]
-fn schema_uuid_for(schema_id: &str) -> Uuid {
-    gts::GtsID::new(schema_id)
+fn schema_uuid_for(type_id: &str) -> Uuid {
+    gts::GtsID::new(type_id)
         .expect("valid GTS id in tests")
         .to_uuid()
 }
@@ -189,11 +189,11 @@ fn seed_tenant(
 async fn seed_metadata_row(
     fake: &FakeMetadataRepo,
     tenant_id: Uuid,
-    schema_id: &GtsSchemaId,
+    type_id: &GtsTypeId,
     value: Value,
     when: OffsetDateTime,
 ) {
-    let schema_uuid = schema_uuid_for(schema_id.as_ref());
+    let schema_uuid = schema_uuid_for(type_id.as_ref());
     // Drive the seed through the trait's upsert path so the
     // created_at / updated_at semantics match production exactly. We
     // feed `when` as the upsert timestamp; subsequent rewrites stamp
@@ -266,7 +266,7 @@ async fn list_happy_path_returns_only_direct_rows_in_uuid_order() {
     // Stable order on schema_uuid mirrors the repo contract; we just
     // assert both schemas are surfaced and each entry carries the
     // re-hydrated chained id.
-    let hydrated: Vec<&GtsSchemaId> = page.items.iter().map(|e| &e.schema_id).collect();
+    let hydrated: Vec<&GtsTypeId> = page.items.iter().map(|e| &e.type_id).collect();
     let sa = schema_a();
     let sb = schema_b();
     assert!(hydrated.contains(&&sa), "schema_a hydrated");
@@ -401,7 +401,7 @@ async fn list_drops_rows_for_schemas_caller_cannot_read() {
         .await
         .expect("list allowed (outer LIST gate passes; per-row deny is silent-drop)");
 
-    let hydrated: Vec<&GtsSchemaId> = page.items.iter().map(|e| &e.schema_id).collect();
+    let hydrated: Vec<&GtsTypeId> = page.items.iter().map(|e| &e.type_id).collect();
     let sa = schema_a();
     let sb = schema_b();
     assert_eq!(
@@ -487,7 +487,7 @@ async fn get_happy_path_returns_entry() {
         .await
         .expect("get happy path");
 
-    assert_eq!(entry.schema_id, schema_a());
+    assert_eq!(entry.type_id, schema_a());
     assert_eq!(entry.value, json!({"theme": "dark"}));
 }
 

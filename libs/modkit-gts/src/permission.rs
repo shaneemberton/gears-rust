@@ -53,7 +53,7 @@ use gts::GtsInstanceId;
 /// GTS Type Identifier: `gts.cf.modkit.authz.permission.v1~`
 #[gts_type_schema(
     dir_path = "schemas",
-    schema_id = "gts.cf.modkit.authz.permission.v1~",
+    type_id = "gts.cf.modkit.authz.permission.v1~",
     description = "Cyber Ware authorization permission",
     properties = "id,resource_type,action,display_name",
     base = true

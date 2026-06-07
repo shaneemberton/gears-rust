@@ -8,6 +8,7 @@ description = "Permissive echo IdP plugin for Account Management dev and E2E sta
 repository.workspace = true
 keywords = ["cyberfabric", "cyberware", "cyberfabric-system"]
 categories = ["authentication"]
+metadata.docs.rs.all-features = true
 
 [lib]
 name = "static_idp_plugin"

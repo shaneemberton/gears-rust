@@ -20,7 +20,7 @@ fn test_instance_id() -> String {
     // schema prefix + instance suffix (5-token: vendor.package.namespace.type.vMAJOR)
     format!(
         "{}test.credstore.mock.instance.v1",
-        CredStorePluginSpecV1::gts_schema_id()
+        CredStorePluginSpecV1::gts_type_id()
     )
 }
 

@@ -47,7 +47,7 @@ use std::sync::Arc;
 use account_management_sdk::{MetadataEntry, UpsertMetadataRequest};
 use authz_resolver_sdk::PolicyEnforcer;
 use authz_resolver_sdk::pep::ResourceType;
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_macros::domain_model;
 use modkit_odata::{ODataQuery, Page};
 use modkit_security::{AccessScope, SecurityContext, pep_properties};
@@ -58,7 +58,7 @@ use uuid::Uuid;
 use crate::domain::error::DomainError;
 use crate::domain::metadata::registry::{InheritancePolicy, MetadataSchemaRegistry};
 use crate::domain::metadata::repo::MetadataRepo;
-use crate::domain::metadata::schema_id::ParsedSchemaId;
+use crate::domain::metadata::type_id::ParsedTypeId;
 use crate::domain::metadata::{MetadataRow, UpsertOutcome};
 use crate::domain::tenant::model::{TenantModel, TenantStatus};
 use crate::domain::tenant::repo::TenantRepo;
@@ -85,7 +85,7 @@ pub(super) mod pep {
     ///   read to the caller's subtree against `tenant_metadata.tenant_id`
     ///   via the entity's `Scopable(tenant_col = "tenant_id", ...)`
     ///   declaration.
-    /// * [`SCHEMA_ID`] — AM-local PEP attribute carrying the chained
+    /// * [`TYPE_ID`] — AM-local PEP attribute carrying the chained
     ///   metadata schema id (`gts.cf.core.am.tenant_metadata.v1~vendor.app.foo.v1~`)
     ///   per DESIGN §`cpt-cf-account-management-fr-tenant-metadata-permissions`
     ///   and PRD §"Metadata steward". Set on every
@@ -94,28 +94,28 @@ pub(super) mod pep {
     ///   (`Metadata.read` for branding but not billing) can match. The
     ///   `list_metadata` flow authorises once at tenant scope to gate
     ///   the listing operation itself, then re-authorises per row
-    ///   with the row's resolved `schema_id` to drop entries the
+    ///   with the row's resolved `type_id` to drop entries the
     ///   caller cannot read — the PRD line 1848 contract.
     pub const METADATA: ResourceType = ResourceType::from_static(
         "gts.cf.core.am.tenant_metadata.v1~",
         &[
             pep_properties::OWNER_TENANT_ID,
             pep_properties::RESOURCE_ID,
-            SCHEMA_ID,
+            TYPE_ID,
         ],
     );
 
     /// AM-local PEP attribute name for the chained metadata schema id.
     /// Carries the wire-shaped `gts.…~vendor.…~` chain (the validated
     /// id obtained via
-    /// [`crate::domain::metadata::schema_id::ParsedSchemaId::as_str`])
+    /// [`crate::domain::metadata::type_id::ParsedTypeId::as_str`])
     /// so a PDP rule can match on the exact registered schema rather
     /// than the storage-internal `schema_uuid`. Lives on the AM service
     /// module rather than [`modkit_security::pep_properties`] because
     /// no other module currently carries a per-schema attribute; if a
     /// second consumer appears the const is the natural place to
     /// promote upstream.
-    pub const SCHEMA_ID: &str = "schema_id";
+    pub const TYPE_ID: &str = "type_id";
 
     /// Action vocabulary mirroring DESIGN §`cpt-cf-account-management-fr-tenant-metadata-permissions`
     /// (`Metadata.read`, `Metadata.write`, `Metadata.list`,
@@ -129,8 +129,8 @@ pub(super) mod pep {
     /// (the inheritance walk is bounded by `self_managed` barriers
     /// and the schema's policy), so it is logically still a read of
     /// that slot. A caller with `Metadata.read` grant on the schema
-    /// should be able to call both `GET /metadata/{schema_id}` and
-    /// `GET /metadata/{schema_id}/resolved` without an additional
+    /// should be able to call both `GET /metadata/{type_id}` and
+    /// `GET /metadata/{type_id}/resolved` without an additional
     /// per-endpoint permission. Per-row source disambiguation belongs
     /// in the response surface (the [`ResolvedTenantMetadataDto::source_tenant_id`](account_management_sdk)
     /// field is reserved for surfacing the ancestor that produced the
@@ -223,7 +223,7 @@ impl MetadataService {
     /// * `OWNER_TENANT_ID = tenant_id` — the row's owning tenant.
     /// * `RESOURCE_ID = tenant_id` — the same id; `tenant_metadata`
     ///   has no policy-visible resource id beyond its tenant scope.
-    /// * `SCHEMA_ID = schema_id` (when supplied) — the chained
+    /// * `TYPE_ID = type_id` (when supplied) — the chained
     ///   `gts.…~vendor.…~` id of the metadata schema this call
     ///   targets. Per DESIGN §`cpt-cf-account-management-fr-tenant-metadata-permissions`
     ///   policies may restrict `Metadata.read` / `Metadata.write` /
@@ -234,7 +234,7 @@ impl MetadataService {
     ///   constraints: []` fails closed via `CompileFailed →
     ///   CrossTenantDenied` rather than silently widening the read.
     ///
-    /// `schema_id` is `None` exclusively for the `list_metadata`
+    /// `type_id` is `None` exclusively for the `list_metadata`
     /// outer gate (the operation-level decision: "is the caller
     /// allowed to *list* on this tenant at all?"). Per-row schema
     /// filtering on the listing page happens through a separate
@@ -244,10 +244,10 @@ impl MetadataService {
         ctx: &SecurityContext,
         action: &str,
         tenant_id: Uuid,
-        schema_id: Option<&str>,
+        type_id: Option<&str>,
     ) -> Result<AccessScope, DomainError> {
         // Delegates to [`crate::domain::authz::authz_scope`] for the
-        // uniform PEP-gate shape; the metadata-specific `SCHEMA_ID`
+        // uniform PEP-gate shape; the metadata-specific `TYPE_ID`
         // property is layered on via the `extend` closure so the
         // shared helper does not have to know about per-service
         // AccessRequest attributes.
@@ -261,8 +261,8 @@ impl MetadataService {
             action,
             tenant_id,
             Some(tenant_id),
-            |req| match schema_id {
-                Some(sid) => req.resource_property(pep::SCHEMA_ID, sid),
+            |req| match type_id {
+                Some(sid) => req.resource_property(pep::TYPE_ID, sid),
                 None => req,
             },
         )
@@ -272,7 +272,7 @@ impl MetadataService {
     /// Per-row schema-scoped authorization helper used by
     /// [`Self::list_metadata`] to drop entries the caller is not
     /// permitted to read. Returns `true` iff the PDP allows
-    /// `Metadata.read` on `(tenant_id, schema_id)` under the same
+    /// `Metadata.read` on `(tenant_id, type_id)` under the same
     /// `SecurityContext` that gated the outer list operation; a
     /// `CrossTenantDenied` decision (the boundary error
     /// [`PolicyEnforcer::access_scope_with`] surfaces for "decision:
@@ -293,10 +293,10 @@ impl MetadataService {
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: &str,
+        type_id: &str,
     ) -> Result<bool, DomainError> {
         match self
-            .authorize(ctx, pep::actions::READ, tenant_id, Some(schema_id))
+            .authorize(ctx, pep::actions::READ, tenant_id, Some(type_id))
             .await
         {
             Ok(_) => Ok(true),
@@ -336,7 +336,7 @@ impl MetadataService {
     /// `schema_uuid` keeps cursor re-reads deterministic.
     ///
     /// Each returned [`MetadataEntry`] carries the public chained
-    /// `schema_id` re-hydrated from the registry per FEATURE §2 step
+    /// `type_id` re-hydrated from the registry per FEATURE §2 step
     /// 4 — `dbtable-tenant-metadata` MUST NOT retain the public id
     /// per `dod-tenant-metadata-schema-registration-and-uuid-derivation`.
     ///
@@ -382,7 +382,7 @@ impl MetadataService {
             .list_for_tenant(&scope, tenant_id, query)
             .await?;
 
-        // Reverse-hydrate the chained `schema_id` for the page rows in
+        // Reverse-hydrate the chained `type_id` for the page rows in
         // one batch call. The registry adapter resolves all uuids in a
         // single round-trip and the lookup below is a pure map read.
         // Rows whose `schema_uuid` is no longer registered are an
@@ -395,7 +395,7 @@ impl MetadataService {
         // definition here), and silently skipping the row would mask
         // a data-integrity drift behind a partial page.
         let uuids: Vec<Uuid> = page.items.iter().map(|r| r.schema_uuid).collect();
-        let id_by_uuid: HashMap<Uuid, GtsSchemaId> =
+        let id_by_uuid: HashMap<Uuid, GtsTypeId> =
             self.schema_registry.resolve_ids_by_uuid(&uuids).await?;
 
         // Per-row schema-scoped authorization. Per PRD §1848 ("list
@@ -411,7 +411,7 @@ impl MetadataService {
         // policy-load errors fail closed.
         let mut items: Vec<MetadataEntry> = Vec::with_capacity(page.items.len());
         for row in page.items {
-            let Some(gts_schema_id) = id_by_uuid.get(&row.schema_uuid).cloned() else {
+            let Some(gts_type_id) = id_by_uuid.get(&row.schema_uuid).cloned() else {
                 // Orphan row: `schema_uuid` is in `tenant_metadata`
                 // but its chained id is gone from the types registry.
                 // Loud `warn!` so the integrity-check pipeline can
@@ -436,12 +436,12 @@ impl MetadataService {
                 });
             };
             if !self
-                .caller_allows_schema_read(ctx, tenant_id, gts_schema_id.as_ref())
+                .caller_allows_schema_read(ctx, tenant_id, gts_type_id.as_ref())
                 .await?
             {
                 continue;
             }
-            items.push(project_to_entry(row, gts_schema_id));
+            items.push(project_to_entry(row, gts_type_id));
         }
 
         // Per-row deny filtering can return items.len() <
@@ -462,7 +462,7 @@ impl MetadataService {
     // get_for_tenant
     // ----------------------------------------------------------------
 
-    /// Single-entry read keyed by `(tenant_id, schema_id)`.
+    /// Single-entry read keyed by `(tenant_id, type_id)`.
     ///
     /// Implements `cpt-cf-account-management-flow-tenant-metadata-get`.
     ///
@@ -471,7 +471,7 @@ impl MetadataService {
     /// [`DomainError::MetadataEntryNotFound`] — AM does not
     /// distinguish them on the wire. The canonical envelope carries
     /// `resource_type = gts.cf.core.am.tenant_metadata.v1~` and
-    /// `resource_name` = the chained `schema_id` the caller supplied.
+    /// `resource_name` = the chained `type_id` the caller supplied.
     ///
     /// # Errors
     ///
@@ -482,14 +482,14 @@ impl MetadataService {
     // @cpt-begin:cpt-cf-account-management-flow-tenant-metadata-get:p1:inst-flow-mdget-service
     // @cpt-begin:cpt-cf-account-management-dod-tenant-metadata-crud-contract:p1:inst-dod-crud-get-service
     // @cpt-begin:cpt-cf-account-management-dod-tenant-metadata-schema-registration-and-uuid-derivation:p1:inst-dod-schema-registration-get-service
-    #[tracing::instrument(skip(self), fields(tenant_id = %tenant_id, schema_id = %schema_id))]
+    #[tracing::instrument(skip(self), fields(tenant_id = %tenant_id, type_id = %type_id))]
     pub async fn get_metadata(
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<MetadataEntry, DomainError> {
-        let parsed = ParsedSchemaId::parse(schema_id.as_ref())?;
+        let parsed = ParsedTypeId::parse(type_id.as_ref())?;
         let scope = self
             .authorize(ctx, pep::actions::READ, tenant_id, Some(parsed.as_str()))
             .await?;
@@ -501,14 +501,14 @@ impl MetadataService {
         // unregistered. We don't need the policy on the GET path but
         // the same RPC is the cheapest existence check (one round-trip
         // serves both reads and writes). The error variant carries
-        // `schema_id` verbatim so the canonical envelope can surface
+        // `type_id` verbatim so the canonical envelope can surface
         // the requested id without re-parsing the path.
         let _policy = self
             .schema_registry
             .resolve_inheritance_policy(parsed.as_gts())
             .await?;
 
-        // UUIDv5 derivation cached on `ParsedSchemaId` (matches the
+        // UUIDv5 derivation cached on `ParsedTypeId` (matches the
         // upstream `gts::GtsID::to_uuid()` namespace per
         // `dod-tenant-metadata-schema-registration-and-uuid-derivation`).
         let schema_uuid = parsed.uuid();
@@ -518,11 +518,11 @@ impl MetadataService {
             .get_for_tenant(&scope, tenant_id, schema_uuid)
             .await?
             .ok_or_else(|| DomainError::MetadataEntryNotFound {
-                detail: format!("no metadata entry for tenant {tenant_id} at schema {schema_id}"),
-                entry: schema_id.to_string(),
+                detail: format!("no metadata entry for tenant {tenant_id} at schema {type_id}"),
+                entry: type_id.to_string(),
             })?;
 
-        Ok(project_to_entry(row, schema_id))
+        Ok(project_to_entry(row, type_id))
     }
     // @cpt-end:cpt-cf-account-management-dod-tenant-metadata-schema-registration-and-uuid-derivation:p1:inst-dod-schema-registration-get-service
     // @cpt-end:cpt-cf-account-management-dod-tenant-metadata-crud-contract:p1:inst-dod-crud-get-service
@@ -544,9 +544,9 @@ impl MetadataService {
     /// is the handler's call.
     ///
     /// Guard ordering — pure → PEP → topology → schema → write:
-    /// 1. `ParsedSchemaId::parse` — pure input validation.
+    /// 1. `ParsedTypeId::parse` — pure input validation.
     /// 2. `value.is_null()` — pure input validation.
-    /// 3. `authorize` — PEP gate carrying the `SCHEMA_ID` attribute.
+    /// 3. `authorize` — PEP gate carrying the `TYPE_ID` attribute.
     /// 4. `resolve_visible_tenant` — tenant topology gate.
     /// 5. `schema_registry.resolve_inheritance_policy` — schema-existence gate.
     /// 6. `schema_registry.validate_value` — body validation before any DB write.
@@ -572,7 +572,7 @@ impl MetadataService {
     // @cpt-begin:cpt-cf-account-management-dod-tenant-metadata-schema-registration-and-uuid-derivation:p1:inst-dod-schema-registration-put-service
     #[tracing::instrument(
         skip(self, input),
-        fields(tenant_id = %tenant_id, schema_id = %input.schema_id, actor_uuid = %ctx.subject_id())
+        fields(tenant_id = %tenant_id, type_id = %input.type_id, actor_uuid = %ctx.subject_id())
     )]
     pub async fn upsert_metadata(
         &self,
@@ -581,12 +581,12 @@ impl MetadataService {
         input: UpsertMetadataRequest,
     ) -> Result<MetadataEntry, DomainError> {
         let UpsertMetadataRequest {
-            schema_id,
+            type_id,
             value,
             expected_version,
             ..
         } = input;
-        let parsed = ParsedSchemaId::parse(schema_id.as_ref())?;
+        let parsed = ParsedTypeId::parse(type_id.as_ref())?;
 
         // Service-side null gate — SDK accepts plain JSON without
         // validation, so the gate runs here and surfaces as
@@ -630,7 +630,7 @@ impl MetadataService {
         let row = match outcome {
             UpsertOutcome::Inserted(row) | UpsertOutcome::Updated(row) => row,
         };
-        let entry = project_to_entry(row, schema_id.clone());
+        let entry = project_to_entry(row, type_id.clone());
 
         // Audit line preserves the insert-vs-update split
         // (outcome=created/updated) that the SDK return type
@@ -639,7 +639,7 @@ impl MetadataService {
             target: "am.events",
             event = "metadata_upserted",
             tenant_id = %tenant_id,
-            schema_id = %schema_id,
+            type_id = %type_id,
             actor_uuid = %actor,
             outcome = if was_inserted { "created" } else { "updated" },
             "am tenant metadata upserted"
@@ -677,15 +677,15 @@ impl MetadataService {
     // @cpt-begin:cpt-cf-account-management-dod-tenant-metadata-schema-registration-and-uuid-derivation:p1:inst-dod-schema-registration-delete-service
     #[tracing::instrument(
         skip(self),
-        fields(tenant_id = %tenant_id, schema_id = %schema_id, actor_uuid = %ctx.subject_id())
+        fields(tenant_id = %tenant_id, type_id = %type_id, actor_uuid = %ctx.subject_id())
     )]
     pub async fn delete_metadata(
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<(), DomainError> {
-        let parsed = ParsedSchemaId::parse(schema_id.as_ref())?;
+        let parsed = ParsedTypeId::parse(type_id.as_ref())?;
         let actor = ctx.subject_id();
         let scope = self
             .authorize(ctx, pep::actions::DELETE, tenant_id, Some(parsed.as_str()))
@@ -708,7 +708,7 @@ impl MetadataService {
             target: "am.events",
             event = "metadata_deleted",
             tenant_id = %tenant_id,
-            schema_id = %schema_id,
+            type_id = %type_id,
             actor_uuid = %actor,
             outcome = "ok",
             "am tenant metadata deleted"
@@ -744,14 +744,14 @@ impl MetadataService {
     // @cpt-begin:cpt-cf-account-management-flow-tenant-metadata-resolve:p1:inst-flow-mdres-service
     // @cpt-begin:cpt-cf-account-management-dod-tenant-metadata-inheritance-resolution-contract:p1:inst-dod-inheritance-resolve-service
     // @cpt-begin:cpt-cf-account-management-dod-tenant-metadata-application-only-enforcement:p1:inst-dod-app-only-resolve-service
-    #[tracing::instrument(skip(self), fields(tenant_id = %tenant_id, schema_id = %schema_id))]
+    #[tracing::instrument(skip(self), fields(tenant_id = %tenant_id, type_id = %type_id))]
     pub async fn resolve_metadata(
         &self,
         ctx: &SecurityContext,
         tenant_id: Uuid,
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
     ) -> Result<Option<MetadataEntry>, DomainError> {
-        let parsed = ParsedSchemaId::parse(schema_id.as_ref())?;
+        let parsed = ParsedTypeId::parse(type_id.as_ref())?;
         // Reuse the READ action: the resolved value is the caller's
         // effective config for their schema slot, and the inheritance
         // walk is bounded by `self_managed` barriers and the schema's
@@ -777,7 +777,7 @@ impl MetadataService {
             .resolve_walk_up(&scope, &start_tenant, schema_uuid, policy)
             .await?;
 
-        Ok(row.map(|r| project_to_entry(r, schema_id)))
+        Ok(row.map(|r| project_to_entry(r, type_id)))
     }
     // @cpt-end:cpt-cf-account-management-dod-tenant-metadata-application-only-enforcement:p1:inst-dod-app-only-resolve-service
     // @cpt-end:cpt-cf-account-management-dod-tenant-metadata-inheritance-resolution-contract:p1:inst-dod-inheritance-resolve-service
@@ -1003,8 +1003,8 @@ impl MetadataService {
     }
 }
 
-/// Project a [`MetadataRow`] + its public chained `schema_id` into
+/// Project a [`MetadataRow`] + its public chained `type_id` into
 /// the [`MetadataEntry`] surface returned by every read-flow.
-fn project_to_entry(row: MetadataRow, schema_id: GtsSchemaId) -> MetadataEntry {
-    MetadataEntry::new(schema_id, row.value, row.updated_at, row.version)
+fn project_to_entry(row: MetadataRow, type_id: GtsTypeId) -> MetadataEntry {
+    MetadataEntry::new(type_id, row.value, row.updated_at, row.version)
 }

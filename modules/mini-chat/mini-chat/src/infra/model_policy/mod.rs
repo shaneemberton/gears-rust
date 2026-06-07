@@ -67,7 +67,7 @@ impl ModelPolicyGateway {
     /// Resolve the policy plugin instance from types-registry.
     async fn resolve_policy_plugin(&self) -> Result<String, anyhow::Error> {
         let registry = self.hub.get::<dyn TypesRegistryClient>()?;
-        let plugin_type_id = MiniChatModelPolicyPluginSpecV1::gts_schema_id().clone();
+        let plugin_type_id = MiniChatModelPolicyPluginSpecV1::gts_type_id().clone();
         let instances = registry
             .list_instances(InstanceQuery::new().with_pattern(format!("{plugin_type_id}*")))
             .await?;

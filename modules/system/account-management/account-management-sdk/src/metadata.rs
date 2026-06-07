@@ -2,7 +2,7 @@
 //!
 //! The SDK ships the JSON-serialisable shapes that cross the
 //! [`crate::AccountManagementClient`] trait boundary; validation of
-//! the chained `schema_id` string (root-segment check, schema-shape
+//! the chained `type_id` string (root-segment check, schema-shape
 //! check, GTS-syntax validation) lives **inside** the AM impl crate
 //! and surfaces as [`AccountManagementError::InvalidRequest`](crate::AccountManagementError::InvalidRequest) at the boundary.
 //! The SDK does not expose a wrapper newtype, the deterministic
@@ -16,16 +16,16 @@
 //!   [`serde_json::Value`] so downstream consumers do not need a typed
 //!   schema dependency. `updated_at` is wire-serialised as RFC 3339.
 //! * [`UpsertMetadataRequest`] — request body for the upsert flow.
-//!   Validation (`schema_id` chain shape, non-null `value`) happens
+//!   Validation (`type_id` chain shape, non-null `value`) happens
 //!   server-side; the SDK type is a plain JSON shape.
 //! * [`MetadataEntryQuery`] / [`MetadataEntryFilterField`] — `OData`
 //!   filter / orderby column declaration used by both the AM repo
 //!   layer (`paginate_odata`) and type-safe SDK consumers building
 //!   `$filter` predicates.
 //!
-//! # Why `GtsSchemaId` on the SDK boundary (no AM-local newtype)
+//! # Why `GtsTypeId` on the SDK boundary (no AM-local newtype)
 //!
-//! `schema_id` is typed as the upstream [`gts::GtsSchemaId`] —
+//! `type_id` is typed as the upstream [`gts::GtsTypeId`] —
 //! platform-standard marker for "this string is a GTS schema id" used
 //! by sibling SDKs that traffic in chained schema identifiers (e.g.
 //! `account_management_sdk::idp::TenantContext::tenant_type`,
@@ -36,10 +36,10 @@
 //! plain string and the Rust API gains a type-level discriminator
 //! over arbitrary strings. All validation + UUID derivation runs
 //! inside AM impl (see
-//! `crate::domain::metadata::schema_id::ParsedSchemaId`), keeping the
+//! `crate::domain::metadata::type_id::ParsedTypeId`), keeping the
 //! SDK free of AM-specific types.
 
-use gts::GtsSchemaId;
+use gts::GtsTypeId;
 use modkit_odata_macros::ODataFilterable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -49,7 +49,7 @@ use uuid::Uuid;
 
 /// Public projection of one direct-on-tenant metadata entry.
 ///
-/// Returned by the GET / list endpoints. `schema_id` is the chained
+/// Returned by the GET / list endpoints. `type_id` is the chained
 /// `gts.cf.core.am.tenant_metadata.v1~vendor.app.foo.v1~` identifier
 /// (always valid because AM impl hydrated it via the types-registry
 /// reverse lookup); `value` is the GTS-validated JSON payload;
@@ -65,10 +65,10 @@ pub struct MetadataEntry {
     /// Chained `gts.cf.core.am.tenant_metadata.v1~vendor.app.foo.v1~`
     /// identifier. Always a valid AM tenant-metadata schema id on the
     /// reads path (server hydrated from the types-registry). Typed
-    /// via [`GtsSchemaId`] so the Rust API discriminates it from
+    /// via [`GtsTypeId`] so the Rust API discriminates it from
     /// arbitrary strings; the JSON wire shape stays a plain string
     /// (upstream serde impls).
-    pub schema_id: GtsSchemaId,
+    pub type_id: GtsTypeId,
     /// Opaque GTS-validated payload.
     pub value: Value,
     /// Last-mutation timestamp.
@@ -92,13 +92,13 @@ impl MetadataEntry {
     /// syntax) so future field additions stay SemVer-safe.
     #[must_use]
     pub const fn new(
-        schema_id: GtsSchemaId,
+        type_id: GtsTypeId,
         value: Value,
         updated_at: OffsetDateTime,
         version: i64,
     ) -> Self {
         Self {
-            schema_id,
+            type_id,
             value,
             updated_at,
             version,
@@ -106,9 +106,9 @@ impl MetadataEntry {
     }
 }
 
-/// Request shape for `PUT /tenants/{tenant_id}/metadata/{schema_id}`.
+/// Request shape for `PUT /tenants/{tenant_id}/metadata/{type_id}`.
 ///
-/// The SDK side does **no** validation: `schema_id` chain-shape is
+/// The SDK side does **no** validation: `type_id` chain-shape is
 /// checked by AM impl on entry, and `value` non-null + GTS-schema
 /// validation runs there too. Failures surface as
 /// [`AccountManagementError::InvalidRequest`](crate::AccountManagementError::InvalidRequest).
@@ -116,11 +116,11 @@ impl MetadataEntry {
 #[non_exhaustive]
 pub struct UpsertMetadataRequest {
     /// Chained `gts.cf.core.am.tenant_metadata.v1~vendor.app.foo.v1~`
-    /// id. Typed via [`GtsSchemaId`] (platform-standard marker); the
+    /// id. Typed via [`GtsTypeId`] (platform-standard marker); the
     /// chain-shape / namespace-root validation runs server-side and
     /// surfaces as [`AccountManagementError::InvalidRequest`](crate::AccountManagementError::InvalidRequest) on failure. The
     /// JSON wire shape stays a plain string.
-    pub schema_id: GtsSchemaId,
+    pub type_id: GtsTypeId,
     /// Payload to upsert. Must be non-null and conform to the
     /// registered JSON Schema; both checks run server-side.
     pub value: Value,
@@ -145,9 +145,9 @@ impl UpsertMetadataRequest {
     /// precondition (`expected_version = None`) — last-write-wins
     /// semantics.
     #[must_use]
-    pub const fn new(schema_id: GtsSchemaId, value: Value) -> Self {
+    pub const fn new(type_id: GtsTypeId, value: Value) -> Self {
         Self {
-            schema_id,
+            type_id,
             value,
             expected_version: None,
         }
@@ -166,7 +166,7 @@ impl UpsertMetadataRequest {
 
 /// Drives [`ODataFilterable`] derive. Never constructed (struct +
 /// `dead_code` allow). Exposes `updated_at` + `schema_uuid`; chained
-/// `schema_id` is not filterable — exact lookups go through
+/// `type_id` is not filterable — exact lookups go through
 /// [`crate::AccountManagementClient::get_metadata`].
 #[derive(ODataFilterable)]
 #[allow(dead_code)]
@@ -176,13 +176,13 @@ pub struct MetadataEntryQuery {
     #[odata(filter(kind = "DateTimeUtc"))]
     pub updated_at: OffsetDateTime,
     /// Deterministic `UUIDv5` derived server-side from the chained
-    /// `schema_id` (via the upstream `gts::GtsID::to_uuid()` namespace).
+    /// `type_id` (via the upstream `gts::GtsID::to_uuid()` namespace).
     /// Exposed as a filter / order field so the repo layer can
     /// stable-sort rows whose `updated_at` collide. Callers can also
     /// use it for an exact `$filter=schema_uuid eq <uuid>` lookup
     /// when they already have the derived id in hand; the public
     /// `get_metadata` / `resolve_metadata` paths consume the chained
-    /// `schema_id` directly so most consumers will not touch this
+    /// `type_id` directly so most consumers will not touch this
     /// field on the filter surface.
     #[odata(filter(kind = "Uuid"))]
     pub schema_uuid: Uuid,

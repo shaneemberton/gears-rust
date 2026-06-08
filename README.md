@@ -8,22 +8,23 @@
 
 Gears span three broad categories: **Core** gears for platform foundations such as API gateway, authentication/authorization, account management, etc; **Serverless** gears for functions, workflows, and event-driven execution; and **GenAI** gears for chat, retrieval, prompt orchestration, and related AI capabilities.
 
+See [OVERVIEW](docs/slides/1_OVERVIEW.html) HTML slides explaining the key Consructor Fabric Gears concepts.
 See [GEARS](docs/GEARS.md) for gears overview.
 
 **Five defining Gears characteristics:**
 
 1. **Secure XaaS framework with defense-in-depth** — Every API handler enforces authentication, authorization, tenant isolation, and scoped DB access by default. Security is structural, not opt-in, validated at build time using integrated dynamic lints.
 
-2. **Three-tier module hierarchy** — *Gears Toolkit* (`libs/` — ToolKit, DB access, error model, API middleware), *System gears* (`gears/system/` — API gateway, authn/authz, tenancy, event system, resource groups, type registry), and *Service gears* (`gears/` — serverless runtime, GenAI subsystems, and domain-specific libraries).
+2. **Three-tier gear hierarchy** — *Gears Toolkit* (`libs/` — ToolKit, DB access, error model, API middleware), *System gears* (`gears/system/` — API gateway, authn/authz, tenancy, event system, resource groups, type registry), and *Service gears* (`gears/` — serverless runtime, GenAI subsystems, and domain-specific libraries).
 
-3. **Composable libraries, vendor-controlled deployment** — Each module owns its API surface and database, communicates via a Rust-native SDK that facades local vs. remote calls, and is fully infrastructure-agnostic. Vendors choose which gears to bundle and whether to deploy single-process (edge/on-prem), multi-node (bare metal), or on Kubernetes.
+3. **Composable libraries, vendor-controlled deployment** — Each gear owns its API surface and database, communicates via a Rust-native SDK that facades local vs. remote calls, and is fully infrastructure-agnostic. Vendors choose which gears to bundle and whether to deploy single-process (edge/on-prem), multi-node (bare metal), or on Kubernetes.
 
 4. **Pre-integrated XaaS backbone** — Deep integration with multi-tenancy, licensing and quota management, usage collection, and event systems. Gears provides its own backbone capabilities, but each can be replaced or integrated with existing vendor infrastructure via plugins (e.g. subscription management, product catalog, provisioning, or license enforcement).
 
 5. **Extensible domain model via Global Type System** — Gears expose extensible domain objects whose metadata and types are customizable through [GTS](https://github.com/globaltypesystem/gts-spec) — define new event types, user settings, LLM model attributes, etc. CRUD API handlers support customization via hooks and callbacks as serverless functions and workflows.
 
 **Engineering principles:**
-- **Spec-Driven Development**: [Specification templates](docs/spec-templates/README.md) (PRD, Design, ADR, Feature) define what gets built *before* code is written. Every module is well documented.
+- **Spec-Driven Development**: [Specification templates](docs/spec-templates/README.md) (PRD, Design, ADR, Feature) define what gets built *before* code is written. Every gear is well documented.
 - **Shift Left**: Custom [dylint](tools/dylint_lints/) architectural lints enforce design rules at compile time, alongside Clippy, [tests](#testing), fuzzing, and security audits in CI
 - **Quality First**: 90%+ test coverage target with unit, integration, E2E, performance, and security testing
 - **Core in Rust**: Compile-time safety, deep static analysis including project-specific lints, so more issues are prevented before review/runtime
@@ -53,7 +54,7 @@ cd gears-rust
 
 make build      # Build libraries and example server binary
 make test       # Run tests
-make example    # Run toolkit example module
+make example    # Run toolkit example gear
 ```
 
 ### Running the Server
@@ -121,7 +122,7 @@ gears:
     cors_enabled: false
 ```
 
-### Creating Your First Module
+### Creating Your First Gear
 
 See [TOOLKIT UNIFIED SYSTEM](docs/toolkit_unified_system/README.md) and [TOOLKIT_PLUGINS.md](docs/TOOLKIT_PLUGINS.md) for details.
 
@@ -144,7 +145,7 @@ Gears build with `--features fips` route every TLS data-path cryptographic opera
 
 | Target | Validated module | Backend |
 |---|---|---|
-| macOS (any arch) | Apple `corecrypto` User-Space Module (per-OS-version CMVP cert) | `cf-gears-rustls-corecrypto-provider` over Security.framework + CommonCrypto |
+| macOS (any arch) | Apple `corecrypto` User-Space Gear (per-OS-version CMVP cert) | `cf-gears-rustls-corecrypto-provider` over Security.framework + CommonCrypto |
 | Windows (x86_64) | Microsoft Windows CNG (per-OS-version CMVP cert) | `rustls-cng-crypto`'s `fips_provider()` over `bcrypt.dll` + `ncrypt.dll` |
 
 All branches share the same `rustls 0.23` state machine — only the `CryptoProvider` swaps per OS.
@@ -171,7 +172,7 @@ Explicitly **excluded**: ChaCha20-Poly1305, x25519, X25519MLKEM768 / post-quantu
 cargo build -p cf-gears-example-server --features fips
 ```
 
-This is *"uses FIPS-validated cryptography"* — Gears itself are not on the CMVP Validated Modules list; the validated modules belong to Apple, AWS Labs, and Microsoft.
+This is *"uses FIPS-validated cryptography"* — Gears itself are not on the CMVP Validated Gears list; the validated modules belong to Apple, AWS Labs, and Microsoft.
 
 For the full per-OS detail (algorithm scope, build prerequisites, verification gates, runtime OE-validation, dep-graph policy, what is and is not covered) see **[Security Overview §9](docs/security/SECURITY.md#9-cryptographic-stack--fips-140-3)**. Architecture, ecosystem constraints, alternatives we rejected, and per-OS rationale live in the **[FIPS PRD](docs/security/fips/PRD.md)** and the ADRs in [`docs/security/fips/adrs/`](docs/security/fips/adrs/).
 
@@ -217,7 +218,7 @@ A reboot is required after either change. See <https://learn.microsoft.com/en-us
 
 ### What this does NOT claim
 
-- Gears itself is **not** on the CMVP Validated Modules list. CMVP-listed modules are Apple `corecrypto` (macOS), AWS-LC FIPS Provider (Linux), and Microsoft Windows CNG (Windows); Gears are *consumers*.
+- Gears itself is **not** on the CMVP Validated Gears list. CMVP-listed modules are Apple `corecrypto` (macOS), AWS-LC FIPS Provider (Linux), and Microsoft Windows CNG (Windows); Gears are *consumers*.
 - Neither `rustls-cng-crypto` nor `cf-gears-rustls-corecrypto-provider` is itself CMVP-listed — both are thin wrappers over the CMVP-listed system module they consume (CNG and corecrypto respectively). The chain-of-trust comes from the underlying validated module, not the wrapper crate.
 - The FIPS claim on macOS / Windows is valid only when the running OS version is covered by the Operational Environment of the current CMVP certificate for the system module (`corecrypto` / CNG). Verify per release against <https://csrc.nist.gov/projects/cryptographic-module-validation-program/validated-modules/search>.
 - `rustls-cng-crypto` is a young, single-maintainer crate (first release 2024-12). We pin to `0.1.x` and re-evaluate against `rustls-symcrypt` per release; the choice is documented in [`docs/security/fips/adrs/0003-windows-fips-via-rustls-cng-crypto.md`](docs/security/fips/adrs/0003-windows-fips-via-rustls-cng-crypto.md).
@@ -263,7 +264,7 @@ logging:
     max_backups: 3
     max_size_mb: 1000
 
-# Per-module configuration
+# Per-gear configuration
 gears:
   api_gateway:
     config:

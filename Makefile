@@ -164,13 +164,13 @@ fmt:
 	cargo fmt --all --check
 	cargo fmt --all --check --manifest-path tools/dylint_lints/Cargo.toml
 
-# -------- Module naming validation --------
+# -------- Gear naming validation --------
 
-.PHONY: validate-module-names
+.PHONY: validate-gear-names
 
-## Validate module folder names follow kebab-case convention
-validate-module-names:
-	@python3 tools/scripts/validate_module_names.py
+## Validate gear folder names follow kebab-case convention
+validate-gear-names:
+	@python3 tools/scripts/validate_gear_names.py
 
 # -------- Code safety checks --------
 #
@@ -335,6 +335,11 @@ openapi:
 md-fabric:
 	python3 ./tools/scripts/md-fabric.py --out docs/md-fabric/md-fabric.html
 
+## Build the slides with Marp
+slides:
+	@command -v npx >/dev/null || (echo "npx is required to build slides. Install Node.js or run 'npm install' from the repo root." && exit 1)
+	npx marp docs/slides/1_OVERVIEW.md --theme-set docs/slides/css/slides.css --allow-local-files -o docs/slides/1_OVERVIEW.html
+
 # -------- Development and auto fix --------
 
 .PHONY: dev dev-fmt dev-clippy dev-test
@@ -386,7 +391,7 @@ test-mysql: install-tools
 # Run all database integration tests
 test-db: test-sqlite test-pg test-mysql
 
-## Run users-info module integration tests
+## Run users-info gear integration tests
 test-users-info-pg: install-tools
 	cargo nextest run -p users-info --features "integration"
 
@@ -605,16 +610,16 @@ quickstart:
 	mkdir -p data
 	cargo run --bin cf-gears-example-server -- --config config/quickstart.yaml run
 
-## Run server with example module
+## Run server with example gear
 example:
 	cargo run --bin cf-gears-example-server $(E2E_ARGS) -- --config config/quickstart.yaml run
 
-# mini-chat targets are for running the mini-chat module locally and in Kubernetes, with options for building Docker images and deploying with Helm.
-## Run server with fips module
+# mini-chat targets are for running the mini-chat gear locally and in Kubernetes, with options for building Docker images and deploying with Helm.
+## Run server with fips gear
 fips:
 	cargo run --bin cf-gears-example-server --features fips,static-authn,static-authz,single-tenant,static-credstore,otel -- --config config/quickstart.yaml run
 
-## Run server with mini-chat module
+## Run server with mini-chat gear
 mini-chat:
 	cargo run --bin cf-gears-example-server --features mini-chat,static-authn,static-authz,single-tenant,static-credstore,otel -- --config config/mini-chat.yaml run
 
@@ -731,7 +736,7 @@ mini-chat-down:
 	@echo "mini-chat uninstalled"
 
 oop-example:
-	cargo build -p calculator --features oop_module
+	cargo build -p calculator --features oop_gear
 	cargo run --bin cf-gears-example-server --features oop-example,users-info-example,static-authn,static-authz,static-tenants,static-credstore -- --config config/quickstart.yaml run
 
 # Run all quality checks

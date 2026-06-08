@@ -107,9 +107,9 @@ pub mod pep_properties {
 /// Used by the `SecureORM` condition builder to translate `InGroup`/`InGroupSubtree`
 /// scope filters into SQL subqueries without depending on entity types.
 ///
-/// **Note:** These tables are canonical to the RG module's database.
+/// **Note:** These tables are canonical to the RG gear's database.
 /// `resource_group_membership` is not projected to domain services.
-/// `InGroup`/`InGroupSubtree` predicates are only executable within the RG module.
+/// `InGroup`/`InGroupSubtree` predicates are only executable within the RG gear.
 pub mod rg_tables {
     /// Membership table (RG-internal, not projected to domain services).
     pub const MEMBERSHIP_TABLE: &str = "resource_group_membership";
@@ -131,8 +131,8 @@ pub mod rg_tables {
 /// Used by the `SecureORM` condition builder to translate `InTenantSubtree`
 /// scope filters into SQL subqueries without depending on entity types.
 ///
-/// **Note:** This table is canonical to the Account Management module's
-/// database. `InTenantSubtree` predicates are only executable in modules
+/// **Note:** This table is canonical to the Account Management gear's
+/// database. `InTenantSubtree` predicates are only executable in gears
 /// that share the AM database (or replicate `tenant_closure` from it).
 pub mod tenant_tables {
     /// Closure table for tenant hierarchy.

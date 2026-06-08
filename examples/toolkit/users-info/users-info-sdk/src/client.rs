@@ -1,4 +1,4 @@
-//! Object-safe streaming boundary for the `user_info` module.
+//! Object-safe streaming boundary for the `user_info` gear.
 //!
 //! This API is designed for `ClientHub` registration as `Arc<dyn UsersInfoClientV1>`.
 //! All type erasure (boxed streams/futures) lives here; internal implementations
@@ -24,7 +24,7 @@ use crate::odata::{AddressSchema, CitySchema, UserSchema};
 pub type UsersInfoStream<T> =
     Pin<Box<dyn Stream<Item = Result<T, UsersInfoError>> + Send + 'static>>;
 
-/// Object-safe client for inter-module consumption (`ClientHub` registered) (Version 1).
+/// Object-safe client for inter-gear consumption (`ClientHub` registered) (Version 1).
 ///
 /// This trait is registered in `ClientHub`:
 /// ```ignore

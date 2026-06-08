@@ -1,5 +1,5 @@
 //! `OData` (filters) → `sea_orm::Condition` compiler (AST in, SQL out).
-//! Parsing belongs to API/gateway. This module only consumes `toolkit_odata::ast::Expr`.
+//! Parsing belongs to API/gateway. This gear only consumes `toolkit_odata::ast::Expr`.
 
 use std::collections::HashMap;
 

@@ -179,7 +179,7 @@ async fn priority_tiebreak_within_same_vendor_lower_wins() {
 
 #[tokio::test]
 async fn does_not_cache_resolution_failure_so_late_registration_recovers() {
-    // Init-order race scenario: AM `Module::init` constructs the
+    // Init-order race scenario: AM `Gear::init` constructs the
     // wrapper before the plugin's scoped registration appears. The
     // first call resolves the catalogue (success — instance is
     // there) but the scoped `try_get_scoped` returns None. The

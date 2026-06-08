@@ -1,6 +1,6 @@
-//! Nodes Registry Module
+//! Nodes Registry Gear
 //!
-//! This module manages node information in the `Gears` deployment.
+//! This gear manages node information in the `Gears` deployment.
 //! A node represents a deployment unit (host, VM, container) where `Gears` components are running.
 //!
 //! Each node contains:
@@ -8,7 +8,7 @@
 //! - System capabilities (hardware, software features)
 //! - Node metadata (ID, hostname, IP, etc.)
 //!
-//! The module provides REST API endpoints to:
+//! The gear provides REST API endpoints to:
 //! - List all nodes
 //! - Get node information by ID
 //! - Access node sysinfo via /nodes/{id}/sysinfo
@@ -22,8 +22,8 @@ pub use nodes_registry_sdk::{
 };
 
 // === MODULE DEFINITION ===
-pub mod module;
-pub use module::NodesRegistry;
+pub mod gear;
+pub use gear::NodesRegistry;
 
 // === INTERNAL MODULES ===
 #[doc(hidden)]

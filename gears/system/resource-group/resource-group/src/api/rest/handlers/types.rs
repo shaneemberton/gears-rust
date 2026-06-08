@@ -12,7 +12,7 @@ use tracing::field::Empty;
 use toolkit::api::canonical_prelude::*;
 
 use super::{CreateTypeDto, SecurityContext, TypeDto, UpdateTypeDto, info};
-use crate::module::ConcreteTypeService;
+use crate::gear::ConcreteTypeService;
 
 /// List GTS types with optional `OData` filtering and pagination.
 #[tracing::instrument(

@@ -1,7 +1,7 @@
 //! [`OperationBuilder`](toolkit::api::operation_builder::OperationBuilder)
-//! route registration for the Account Management module.
+//! route registration for the Account Management gear.
 //!
-//! Each sub-module declares its `register_<area>_routes(router, openapi)`
+//! Each sub-gear declares its `register_<area>_routes(router, openapi)`
 //! function; [`register_routes`] wires them all into the runtime router
 //! and attaches the service-level axum extensions consumed by the
 //! handlers in [`super::handlers`].
@@ -23,7 +23,7 @@ mod users;
 
 /// Wire every Account Management REST route into the supplied
 /// `router`. Called once from
-/// [`crate::module::AccountManagementModule::register_rest`].
+/// [`crate::gear::AccountManagementGear::register_rest`].
 pub fn register_routes(
     mut router: Router,
     openapi: &dyn OpenApiRegistry,

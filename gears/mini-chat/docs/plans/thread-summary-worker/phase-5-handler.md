@@ -392,9 +392,9 @@ fn build_system_security_context(tenant_id: Uuid) -> SecurityContext {
 }
 ```
 
-### 5.7 Update handler registration in `module.rs`
+### 5.7 Update handler registration in `gear.rs`
 
-File: `src/module.rs`
+File: `src/gear.rs`
 
 Replace the stub handler registration (line ~515-516) with the real handler:
 

@@ -609,14 +609,14 @@ ALWAYS load before generating:
 ### Step 5.1: Define Feature Boundaries
 
 **Source**: OpenSpec task categories, spec capability groupings, DESIGN components
-**Verification**: Actual package/module boundaries in code
+**Verification**: Actual package/gear boundaries in code
 **Target**: DECOMPOSITION §2 Entries
 
 Feature decomposition strategy:
 
 1. Group by implementation unit (each logical feature = independently implementable)
 2. Map OpenSpec task categories (`## N. Category` in `tasks.md`) → feature candidates
-3. **Verify feature boundaries align with actual code module boundaries** — a feature should map to a cohesive set of source files
+3. **Verify feature boundaries align with actual code gear boundaries** — a feature should map to a cohesive set of source files
 4. Cross-reference with DESIGN components to ensure 100% coverage
 5. Assign `cpt-{system}-feature-{slug}` IDs
 
@@ -682,7 +682,7 @@ Checkbox cascade: all feature checkboxes checked → overall status checked.
 - [ ] 100% DESIGN element coverage (every component, principle, constraint, seq in at least one feature)
 - [ ] No scope overlap between features without explicit justification
 - [ ] Each feature has all required fields (Purpose, Depends On, Scope, Out of scope, all reference sections)
-- [ ] Feature boundaries align with actual code module boundaries
+- [ ] Feature boundaries align with actual code gear boundaries
 - [ ] Acyclic dependency graph
 - [ ] All checkboxes unchecked (will be checked as code markers are placed in Phase 7)
 

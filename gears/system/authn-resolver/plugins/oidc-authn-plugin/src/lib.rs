@@ -21,8 +21,8 @@
 
 pub mod config;
 pub mod domain;
+pub mod gear;
 pub mod infra;
-pub mod module;
 
 pub use domain::authenticate;
 pub use domain::claim_mapper;
@@ -40,7 +40,7 @@ pub use infra::oidc;
 #[cfg(test)]
 pub(crate) mod test_support;
 
-pub use module::OidcAuthNPluginModule;
+pub use gear::OidcAuthNPluginGear;
 
 #[cfg(test)]
 mod thread_safety {

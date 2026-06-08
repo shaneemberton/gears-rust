@@ -1,7 +1,7 @@
 //! FFI bindings to Apple's CommonCrypto library (`<CommonCrypto/CommonCrypto.h>`).
 //!
 //! CommonCrypto is shipped as part of `libSystem` and re-exports the FIPS
-//! 140-3 validated `corecrypto` module. We bind only the primitives we need:
+//! 140-3 validated `corecrypto` gear. We bind only the primitives we need:
 //! SHA-2 hashing, HMAC, and the modern `CCCryptor*` family in GCM mode.
 //!
 //! Constants and struct sizes mirror the headers shipped in the macOS SDK

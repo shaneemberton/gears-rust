@@ -5,7 +5,7 @@ Universal file storage and management service for the Gears middleware.
 ## Overview
 
 FileStorage provides upload, download, metadata management, access control, and sharing capabilities for all platform
-modules and users. It replaces ad-hoc per-module file handling with a centralized, tenant-aware storage service.
+gears and users. It replaces ad-hoc per-gear file handling with a centralized, tenant-aware storage service.
 
 ### Key Capabilities
 
@@ -23,7 +23,7 @@ modules and users. It replaces ad-hoc per-module file handling with a centralize
 | Actor               | Description                                                                   |
 |---------------------|-------------------------------------------------------------------------------|
 | Platform User       | Authenticated user managing files via UI or API                               |
-| CF/Gears | Any module requiring file operations (e.g., LLM Gateway, document management) |
+| CF/Gears | Any gear requiring file operations (e.g., LLM Gateway, document management) |
 
 ### Dependencies
 

@@ -15,7 +15,7 @@ thread_local! {
 }
 
 /// Known path prefixes for module directories, longest-first
-/// so that `gears/system/` matches before `modules/`.
+/// so that `gears/system/` matches before `gears/`.
 /// Top-level dirs (`examples/`, `apps/`, `plugins/`) are included so they
 /// go through the same segment-boundary check and config-driven exclusion.
 const MODULE_PREFIXES: &[&str] = &[
@@ -58,11 +58,11 @@ impl De1101TestsInSeparateFiles {
 
     fn is_in_scope(&self, normalized_path: &str) -> bool {
         // Try to extract a module key (e.g. "libs/toolkit", "gears/system/oagw",
-        // "examples/oop-modules").
+        // "examples/oop-gears").
         for prefix in MODULE_PREFIXES {
             if let Some(pos) = normalized_path.find(prefix) {
                 // Ensure match is at a path segment boundary, not inside
-                // a compound directory name like "oop-modules/".
+                // a compound directory name like "oop-gears/".
                 if pos > 0 && normalized_path.as_bytes()[pos - 1] != b'/' {
                     continue;
                 }

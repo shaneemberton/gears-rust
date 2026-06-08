@@ -9,9 +9,9 @@ use std::collections::HashMap;
 use tempfile::TempDir;
 use toolkit_db::{DbError, config::*, manager::DbManager};
 
-/// Test that module fields override server fields using `SQLite` for reliable testing.
+/// Test that gear fields override server fields using `SQLite` for reliable testing.
 #[tokio::test]
-async fn test_precedence_module_fields_override_server() {
+async fn test_precedence_gear_fields_override_server() {
     let global_config = GlobalDatabaseConfig {
         servers: {
             let mut servers = HashMap::new();
@@ -35,8 +35,8 @@ async fn test_precedence_module_fields_override_server() {
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
         "database": global_config,
-        "modules": {
-                "test_module": {
+        "gears": {
+                "test_gear": {
                     "database": {
                         "server": "sqlite_server",
                         "engine": "sqlite",
@@ -54,7 +54,7 @@ async fn test_precedence_module_fields_override_server() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(Some(_handle)) => {
@@ -62,7 +62,7 @@ async fn test_precedence_module_fields_override_server() {
             // and the SQLite connection was successful with merged parameters
         }
         Ok(None) => {
-            panic!("Expected database handle for module");
+            panic!("Expected database handle for gear");
         }
         Err(err) => {
             // Should not be a PRAGMA error if merging worked correctly
@@ -75,13 +75,13 @@ async fn test_precedence_module_fields_override_server() {
     }
 }
 
-/// Test that module DSN completely overrides server DSN using `SQLite`.
+/// Test that gear DSN completely overrides server DSN using `SQLite`.
 #[cfg(feature = "sqlite")]
 #[tokio::test]
-async fn test_precedence_module_dsn_override_server() {
+async fn test_precedence_gear_dsn_override_server() {
     let test_data = common::test_data_dir();
     let server_db = test_data.join(format!("server_{}.db", std::process::id()));
-    let module_db = test_data.join(format!("module_{}.db", std::process::id()));
+    let gear_db = test_data.join(format!("gear_{}.db", std::process::id()));
 
     let global_config = GlobalDatabaseConfig {
         servers: {
@@ -101,12 +101,12 @@ async fn test_precedence_module_dsn_override_server() {
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
         "database": global_config,
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "server": "sqlite_server",
                     "engine": "sqlite",
-                    "dsn": format!("sqlite://{}?synchronous=NORMAL", module_db.display())  // Should completely override server DSN
+                    "dsn": format!("sqlite://{}?synchronous=NORMAL", gear_db.display())  // Should completely override server DSN
                 }
             }
         }
@@ -115,16 +115,16 @@ async fn test_precedence_module_dsn_override_server() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(Some(_db)) => {
-            // Verify that the module DSN was used, not the server DSN:
-            // connecting should have created the module file but not the server file.
+            // Verify that the gear DSN was used, not the server DSN:
+            // connecting should have created the gear file but not the server file.
             assert!(
-                module_db.exists(),
-                "Expected module DB file to exist at {}",
-                module_db.display()
+                gear_db.exists(),
+                "Expected gear DB file to exist at {}",
+                gear_db.display()
             );
             assert!(
                 !server_db.exists(),
@@ -133,15 +133,15 @@ async fn test_precedence_module_dsn_override_server() {
             );
         }
         Ok(None) => {
-            panic!("Expected database handle for module");
+            panic!("Expected database handle for gear");
         }
         Err(err) => {
-            panic!("Expected successful connection with module DSN override, got: {err:?}");
+            panic!("Expected successful connection with gear DSN override, got: {err:?}");
         }
     }
 }
 
-/// Test that params maps are merged with module taking precedence.
+/// Test that params maps are merged with gear taking precedence.
 #[tokio::test]
 async fn test_precedence_params_merging() {
     let global_config = GlobalDatabaseConfig {
@@ -166,8 +166,8 @@ async fn test_precedence_params_merging() {
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
         "database": global_config,
-        "modules": {
-                "test_module": {
+        "gears": {
+                "test_gear": {
                     "database": {
                         "server": "sqlite_server",
                         "file": format!("params_test_{}.db", std::process::id()),
@@ -184,7 +184,7 @@ async fn test_precedence_params_merging() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     // Check that the merged parameters were applied correctly
     // This test will pass if the SQLite connection succeeds with correct PRAGMA values
@@ -205,8 +205,8 @@ async fn test_precedence_params_merging() {
 #[tokio::test]
 async fn test_conflict_detection_sqlite_dsn_with_server_fields() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "dsn": format!("sqlite:file:conflict_test_{}.db", std::process::id()),
                     "host": "localhost",        // Conflict: SQLite DSN with server field
@@ -219,7 +219,7 @@ async fn test_conflict_detection_sqlite_dsn_with_server_fields() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::ConfigConflict(msg)) = result {
@@ -233,8 +233,8 @@ async fn test_conflict_detection_sqlite_dsn_with_server_fields() {
 #[tokio::test]
 async fn test_conflict_detection_nonsqlite_dsn_with_sqlite_fields() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "dsn": "postgres://user:pass@localhost:5432/db",
                     "file": format!("pg_conflict_{}.db", std::process::id())           // Conflict: PostgreSQL DSN with SQLite field
@@ -246,7 +246,7 @@ async fn test_conflict_detection_nonsqlite_dsn_with_sqlite_fields() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::ConfigConflict(msg)) = result {
@@ -268,8 +268,8 @@ async fn test_file_and_path_handling() {
     let file = format!("file_path_test_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": file,            // Should be used (converted to absolute)
@@ -281,11 +281,11 @@ async fn test_file_and_path_handling() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(Some(_db)) => {
-            let expected_path = temp_dir.path().join("test_module").join(&file);
+            let expected_path = temp_dir.path().join("test_gear").join(&file);
             assert!(
                 expected_path.exists(),
                 "Expected DB file to exist at {}",
@@ -310,8 +310,8 @@ async fn test_file_and_path_handling() {
 #[tokio::test]
 async fn test_unknown_server_reference() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "server": "nonexistent_server"
                 }
@@ -322,7 +322,7 @@ async fn test_unknown_server_reference() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::InvalidConfig(msg)) = result {
@@ -337,8 +337,8 @@ async fn test_unknown_server_reference() {
 #[cfg(not(feature = "sqlite"))]
 async fn test_feature_disabled_error() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-                "test_module": {
+        "gears": {
+                "test_gear": {
                     "database": {
                         "engine": "sqlite",
                         "file": format!("feature_test_{}.db", std::process::id())
@@ -350,7 +350,7 @@ async fn test_feature_disabled_error() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::FeatureDisabled(msg)) = result {

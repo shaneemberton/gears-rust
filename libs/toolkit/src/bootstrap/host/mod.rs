@@ -1,9 +1,9 @@
-//! Host/in-process bootstrap module
+//! Host/in-process bootstrap gear
 //!
-//! This module provides logging initialization, signal handling,
+//! This gear provides logging initialization, signal handling,
 //! and path utilities for host processes.
 //!
-//! Configuration types are now in the top-level `config` module.
+//! Configuration types are now in the top-level `config` gear.
 
 pub mod logging;
 pub mod panic;

@@ -1,6 +1,6 @@
 //! Pure-logic retention primitives for the hard-delete pipeline.
 //!
-//! This module owns no I/O. The service layer (`service.rs`) drives the
+//! This gear owns no I/O. The service layer (`service.rs`) drives the
 //! pipeline; the repository layer (`infra/storage/repo_impl.rs`) owns the
 //! SQL. What lives here is the set of algebraic helpers that both layers
 //! reuse:

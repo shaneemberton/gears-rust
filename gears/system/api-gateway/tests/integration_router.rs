@@ -3,7 +3,7 @@
 //! Integration tests for the API Gateway router and new `OperationBuilder`
 //!
 //! This test demonstrates that the new type-safe `OperationBuilder` works
-//! correctly with the API Gateway module for routing and `OpenAPI` generation.
+//! correctly with the API Gateway gear for routing and `OpenAPI` generation.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -14,22 +14,22 @@ use axum::{
 };
 use std::sync::Arc;
 use toolkit::{
-    Module, ModuleCtx, RestApiCapability, config::ConfigProvider, contracts::OpenApiRegistry,
+    Gear, GearCtx, RestApiCapability, config::ConfigProvider, contracts::OpenApiRegistry,
 };
 use uuid::Uuid;
 
-/// Helper to create a test `ModuleCtx`
+/// Helper to create a test `GearCtx`
 struct EmptyConfigProvider;
 
 impl ConfigProvider for EmptyConfigProvider {
-    fn get_module_config(&self, _module: &str) -> Option<&serde_json::Value> {
+    fn get_gear_config(&self, _gear: &str) -> Option<&serde_json::Value> {
         None
     }
 }
 
-fn create_test_module_ctx() -> ModuleCtx {
-    ModuleCtx::new(
-        "test_module",
+fn create_test_gear_ctx() -> GearCtx {
+    GearCtx::new(
+        "test_gear",
         Uuid::new_v4(),
         Arc::new(EmptyConfigProvider),
         Arc::new(toolkit::ClientHub::new()),
@@ -56,20 +56,20 @@ pub struct CreateUserRequest {
     pub email: String,
 }
 
-/// Test module that demonstrates the new `OperationBuilder` API
-pub struct TestUsersModule;
+/// Test gear that demonstrates the new `OperationBuilder` API
+pub struct TestUsersGear;
 
 #[async_trait]
-impl Module for TestUsersModule {
-    async fn init(&self, _ctx: &toolkit::ModuleCtx) -> Result<()> {
+impl Gear for TestUsersGear {
+    async fn init(&self, _ctx: &toolkit::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
-impl RestApiCapability for TestUsersModule {
+impl RestApiCapability for TestUsersGear {
     fn register_rest(
         &self,
-        _ctx: &toolkit::ModuleCtx,
+        _ctx: &toolkit::GearCtx,
         router: axum::Router,
         openapi: &dyn OpenApiRegistry,
     ) -> Result<axum::Router> {
@@ -178,10 +178,10 @@ async fn test_operation_builder_integration() {
     let registry = api_gateway::ApiGateway::default();
     let router = Router::new();
 
-    let test_module = TestUsersModule;
-    // Create a test ModuleCtx directly for testing
-    let ctx = create_test_module_ctx();
-    let _final_router = test_module
+    let test_gear = TestUsersGear;
+    // Create a test GearCtx directly for testing
+    let ctx = create_test_gear_ctx();
+    let _final_router = test_gear
         .register_rest(&ctx, router, &registry)
         .expect("Failed to register routes");
 
@@ -195,9 +195,9 @@ async fn test_schema_registration() {
     let registry = api_gateway::ApiGateway::default();
     let router = Router::new();
 
-    let test_module = TestUsersModule;
-    let ctx = create_test_module_ctx();
-    let _final_router = test_module
+    let test_gear = TestUsersGear;
+    let ctx = create_test_gear_ctx();
+    let _final_router = test_gear
         .register_rest(&ctx, router, &registry)
         .expect("Failed to register routes");
 

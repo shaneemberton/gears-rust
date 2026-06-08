@@ -2,23 +2,23 @@ use parking_lot::Mutex;
 
 use crate::contracts::RegisterGrpcServiceFn;
 
-/// Installers for a specific module (module name + service installers).
+/// Installers for a specific gear (gear name + service installers).
 #[derive(Default)]
-pub struct ModuleInstallers {
-    pub module_name: String,
+pub struct GearInstallers {
+    pub gear_name: String,
     pub installers: Vec<RegisterGrpcServiceFn>,
 }
 
-/// Grouped installers for all modules in the process.
+/// Grouped installers for all gears in the process.
 #[derive(Default)]
 pub struct GrpcInstallerData {
-    pub modules: Vec<ModuleInstallers>,
+    pub gears: Vec<GearInstallers>,
 }
 
 /// Runtime-owned store for gRPC service installers.
 ///
 /// This replaces the previous global static storage with a proper
-/// runtime-scoped type that gets injected into the `grpc-hub` module.
+/// runtime-scoped type that gets injected into the `grpc-hub` gear.
 pub struct GrpcInstallerStore {
     inner: Mutex<Option<GrpcInstallerData>>,
 }
@@ -44,7 +44,7 @@ impl GrpcInstallerStore {
         Ok(())
     }
 
-    /// Consume and return all installers grouped by module.
+    /// Consume and return all installers grouped by gear.
     pub fn take(&self) -> Option<GrpcInstallerData> {
         let mut guard = self.inner.lock();
         guard.take()

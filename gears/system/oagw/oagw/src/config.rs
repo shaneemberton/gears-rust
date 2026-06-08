@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::ssrf::SsrfPolicy;
 
-/// Configuration for the OAGW module.
+/// Configuration for the OAGW gear.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OagwConfig {
@@ -76,7 +76,7 @@ pub struct OagwConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsConfig {
-    /// Metric name prefix. When empty (the default), derived from the module
+    /// Metric name prefix. When empty (the default), derived from the gear
     /// name by converting it to `snake_case` (e.g., `"oagw"` → `"oagw"`).
     #[serde(default)]
     pub prefix: String,
@@ -84,12 +84,12 @@ pub struct MetricsConfig {
 
 impl MetricsConfig {
     /// Resolve the effective prefix: explicit config value, or
-    /// `snake_case(module_name)`.
+    /// `snake_case(gear_name)`.
     #[must_use]
-    pub fn effective_prefix(&self, module_name: &str) -> String {
+    pub fn effective_prefix(&self, gear_name: &str) -> String {
         let trimmed = self.prefix.trim();
         if trimmed.is_empty() {
-            heck::ToSnakeCase::to_snake_case(module_name)
+            heck::ToSnakeCase::to_snake_case(gear_name)
         } else {
             trimmed.to_owned()
         }

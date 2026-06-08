@@ -20,7 +20,7 @@ COPY rust-toolchain.toml ./
 COPY apps/cf-gears-example-server ./apps/cf-gears-example-server
 COPY apps/gts-docs-validator ./apps/gts-docs-validator
 COPY libs ./libs
-COPY modules ./modules
+COPY gears ./gears
 COPY examples ./examples
 COPY config ./config
 COPY proto ./proto

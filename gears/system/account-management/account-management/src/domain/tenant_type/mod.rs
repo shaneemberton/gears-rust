@@ -5,8 +5,8 @@
 //! saga step 3 (`inst-algo-saga-type-check`). Production wiring resolves
 //! the trait via [`crate::infra::types_registry::GtsTenantTypeChecker`]
 //! against `types_registry_sdk::TypesRegistryClient` (the `ClientHub`
-//! binding is wired in the AM module entry-point
-//! [`crate::module::AccountManagementModule`]); dev / test wiring uses
+//! binding is wired in the AM gear entry-point
+//! [`crate::gear::AccountManagementGear`]); dev / test wiring uses
 //! [`InertTenantTypeChecker`].
 
 pub mod checker;

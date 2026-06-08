@@ -12,7 +12,7 @@ import os
 import argparse
 from typing import List
 
-# Add the scripts directory to the path so we can import our modules
+# Add the scripts directory to the path so we can import our gears
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.prereq import (

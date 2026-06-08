@@ -24,7 +24,7 @@ logging:
     file: "logs/cf-gears-scope-e2e.log"
     file_level: debug
 
-modules:
+gears:
   api-gateway:
     config:
       bind_addr: "0.0.0.0:8086"
@@ -134,19 +134,19 @@ modules:
   types-registry:
     config: {}
 
-  # File parser module (required by cf-gears-server)
+  # File parser gear (required by cf-gears-server)
   file-parser:
     config:
       allowed_local_base_dir: /tmp
 
-  # Simple user settings module (required by cf-gears-server)
+  # Simple user settings gear (required by cf-gears-server)
   simple-user-settings:
     database:
       server: "sqlite_users"
       file: "settings_scope_e2e.db"
     config: {}
 
-  # Users-info module for testing
+  # Users-info gear for testing
   users-info:
     database:
       server: "sqlite_users"

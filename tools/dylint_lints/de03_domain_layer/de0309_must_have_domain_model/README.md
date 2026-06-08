@@ -58,4 +58,4 @@ This lint is designed for Test-Driven Development:
 ## See Also
 
 - [`#[domain_model]` macro documentation](../../../../libs/toolkit-macros/src/domain_model.rs)
-- [Domain Layer Architecture](../../../../docs/toolkit_unified_system/02_module_layout_and_sdk_pattern.md)
+- [Domain Layer Architecture](../../../../docs/toolkit_unified_system/02_gear_layout_and_sdk_pattern.md)

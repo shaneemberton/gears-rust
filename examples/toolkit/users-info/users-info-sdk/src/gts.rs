@@ -1,15 +1,15 @@
-//! GTS resource type identifiers for the `users_info` example module.
+//! GTS resource type identifiers for the `users_info` example gear.
 //!
 //! Single source of truth for the resource-type strings used in:
 //!
 //! * `resource_type` field on the canonical-error envelope produced
 //!   when a `users_info` domain failure converts to
-//!   [`toolkit_canonical_errors::CanonicalError`] at the module boundary
+//!   [`toolkit_canonical_errors::CanonicalError`] at the gear boundary
 //!   (see `users_info::api::rest::error`).
-//! * Future PEP authorization checks and cross-module event consumers
+//! * Future PEP authorization checks and cross-gear event consumers
 //!   that pattern-match on resource type.
 //!
-//! Mirrors the `gts` module layout used by `account-management-sdk` and
+//! Mirrors the `gts` gear layout used by `account-management-sdk` and
 //! `resource-group-sdk`.
 //!
 //! # Note on `#[resource_error]` macro arguments

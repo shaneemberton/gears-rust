@@ -39,7 +39,7 @@ Chosen option: "Separate test files with a dylint lint", because it is the only 
 
 ### Consequences
 
-* All new modules must follow the `{stem}_tests.rs` companion file convention from day one.
+* All new gears must follow the `{stem}_tests.rs` companion file convention from day one.
 * Existing modules are migrated incrementally by removing entries from `excluded_paths` in `dylint.toml`.
 * The `extract_tests.py` migration script must be maintained alongside the lint.
 * Developers unfamiliar with the convention will see a clear lint error message explaining what to do.
@@ -98,7 +98,7 @@ max_inline_test_lines = 100
 excluded_paths = [
     "libs/toolkit",
     "gears/mini-chat",
-    # ... modules not yet migrated
+    # ... gears not yet migrated
 ]
 ```
 

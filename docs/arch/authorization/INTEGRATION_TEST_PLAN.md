@@ -13,7 +13,7 @@ For background on how AuthZ uses RG data, see [RESOURCE_GROUP_MODEL.md](./RESOUR
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| RG Module | **Done** | `ResourceGroupClient` + `ResourceGroupReadHierarchy` traits, `get_group_descendants` / `get_group_ancestors` endpoints |
+| RG Gear | **Done** | `ResourceGroupClient` + `ResourceGroupReadHierarchy` traits, `get_group_descendants` / `get_group_ancestors` endpoints |
 | AuthZ Resolver | Existing | Plugin discovery, `PolicyEnforcer`, `AccessScope` → SecureORM already exist in the platform |
 | Static AuthZ Plugin | Existing | Returns `In(owner_tenant_id, [tid])` — tenant predicates only |
 | **PolicyEnforcer in RG handlers** | **Done** | `GroupService` calls `enforcer.access_scope()` for all operations |
@@ -38,7 +38,7 @@ gears/system/resource-group/
     tenant_scoping_test.rs                 ← AccessScope scoping: 10 tests
 ```
 
-Follows existing project conventions: `testing/e2e/gears/{module}/` for HTTP-level tests (see `oagw/`, `mini_chat/`, `types_registry/`), `modules/.../tests/` for Rust in-process tests.
+Follows existing project conventions: `testing/e2e/gears/{gear}/` for HTTP-level tests (see `oagw/`, `mini_chat/`, `types_registry/`), `gears/.../tests/` for Rust in-process tests.
 
 ---
 
@@ -60,10 +60,10 @@ docker run -d --name rg-postgres \
 
 ### Server Configuration
 
-In `config/quickstart.yaml`, the resource-group module requires PostgreSQL:
+In `config/quickstart.yaml`, the resource-group gear requires PostgreSQL:
 
 ```yaml
-modules:
+gears:
   resource-group:
     database:
       dsn: "postgres://cf_gears:cf_gears@127.0.0.1:5433/resource_group"
@@ -105,7 +105,7 @@ E2E_BASE_URL=http://localhost:8087 pytest testing/e2e/gears/resource_group/ -v
 
 The intended AuthZ → RG chain is:
 
-1. **Module init** (`module.rs`): resolves `dyn AuthZResolverClient` from ClientHub, creates `PolicyEnforcer`
+1. **Gear init** (`gear.rs`): resolves `dyn AuthZResolverClient` from ClientHub, creates `PolicyEnforcer`
 2. **GroupService** (`group_service.rs`): receives `PolicyEnforcer`; all CRUD methods (`list_groups`, `get_group`, `update_group`, `delete_group`, `get_group_descendants`, `get_group_ancestors`) call `enforcer.access_scope(&ctx, &RG_GROUP_RESOURCE, action, resource_id)`
 3. **GroupRepository** (`group_repo.rs`): `list_groups`, `find_by_id`, `get_descendants`, `get_ancestors` accept `&AccessScope` and pass it to `SecureORM` via `.secure().scope_with(scope)`
 4. **Handlers** (`handlers/groups.rs`): pass `&ctx` to service methods (no longer `_ctx`)
@@ -170,7 +170,7 @@ Request → API Gateway (AuthN) → SecurityContext{tenant=T1}
 
 1. **Predicate types** (`authz-resolver-sdk/src/constraints.rs`): add `InGroupPredicate` (group_ids) and `InGroupSubtreePredicate` (ancestor_ids) to `Predicate` enum with serde support (`"op":"in_group"`, `"op":"in_group_subtree"`)
 
-2. **ScopeFilter variants** (`toolkit-security/src/access_scope.rs`): `InGroupScopeFilter`, `InGroupSubtreeScopeFilter` carry property + group/ancestor UUIDs. Well-known table constants in `rg_tables` module (`MEMBERSHIP_TABLE`, `CLOSURE_TABLE`, column names)
+2. **ScopeFilter variants** (`toolkit-security/src/access_scope.rs`): `InGroupScopeFilter`, `InGroupSubtreeScopeFilter` carry property + group/ancestor UUIDs. Well-known table constants in `rg_tables` gear (`MEMBERSHIP_TABLE`, `CLOSURE_TABLE`, column names)
 
 3. **PEP compiler** (`authz-resolver-sdk/src/pep/compiler.rs`): compiles `InGroup`/`InGroupSubtree` predicates into corresponding `ScopeFilter` variants via `json_to_scope_value`
 
@@ -203,7 +203,7 @@ WHERE owner_tenant_id IN ('T1')
 ### What remains for production use
 
 - **RG-aware AuthZ plugin**: static-authz-plugin currently only returns tenant predicates. A real plugin needs to resolve user→group access from an external policy source and emit `InGroup`/`InGroupSubtree` predicates
-- **Domain entity integration**: consuming modules may project `resource_group` + `resource_group_closure` for hierarchy queries. `resource_group_membership` projection should only be added when profiling confirms the two-request pattern (RG Membership API → domain service) causes unacceptable latency — this table is 10×+ larger than other projections. In a monolith with a shared DB, no projections are needed at all. By default, domain services rely on PDP capability degradation: PDP resolves group memberships and returns explicit resource IDs via `in` predicates
+- **Domain entity integration**: consuming gears may project `resource_group` + `resource_group_closure` for hierarchy queries. `resource_group_membership` projection should only be added when profiling confirms the two-request pattern (RG Membership API → domain service) causes unacceptable latency — this table is 10×+ larger than other projections. In a monolith with a shared DB, no projections are needed at all. By default, domain services rely on PDP capability degradation: PDP resolves group memberships and returns explicit resource IDs via `in` predicates
 
 ---
 
@@ -253,7 +253,7 @@ openssl x509 -req -in plugin.csr -CA ca.pem -CAkey ca-key.pem -out plugin.pem -d
 #### 3.2 RG MTLS configuration
 
 ```yaml
-modules:
+gears:
   resource-group:
     config:
       mtls:
@@ -268,7 +268,7 @@ modules:
 
 #### 3.3 API Gateway TLS termination
 
-Configure API Gateway to forward client certificate CN header to RG module for MTLS mode detection.
+Configure API Gateway to forward client certificate CN header to RG gear for MTLS mode detection.
 
 ### Test scenario
 
@@ -379,6 +379,6 @@ python3 scripts/ci.py e2e-local --config config/e2e-tr-authz.yaml -- -k "resourc
 
 - [RESOURCE_GROUP_MODEL.md](./RESOURCE_GROUP_MODEL.md) — How AuthZ uses RG data
 - [AUTHZ_USAGE_SCENARIOS.md](./AUTHZ_USAGE_SCENARIOS.md) — SQL-level scenarios (S14–S21 for groups)
-- [RG DESIGN](../../../gears/system/resource-group/docs/DESIGN.md) — RG module design, auth modes, init sequence
+- [RG DESIGN](../../../gears/system/resource-group/docs/DESIGN.md) — RG gear design, auth modes, init sequence
 - [AuthZ DESIGN](./DESIGN.md) — Core authorization design
 - [RG PRD](../../../gears/system/resource-group/docs/PRD.md) — Product requirements

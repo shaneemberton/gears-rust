@@ -1,4 +1,4 @@
-//! Error types for the `AuthZ` resolver module.
+//! Error types for the `AuthZ` resolver gear.
 
 use thiserror::Error;
 

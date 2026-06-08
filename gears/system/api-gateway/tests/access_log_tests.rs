@@ -14,7 +14,7 @@ use axum::{
 };
 use serde_json::json;
 use toolkit::{
-    Module, api::OperationBuilder, config::ConfigProvider, context::ModuleCtx,
+    Gear, api::OperationBuilder, config::ConfigProvider, context::GearCtx,
     contracts::ApiGatewayCapability,
 };
 use tower::util::ServiceExt;
@@ -305,8 +305,8 @@ struct TestConfigProvider {
 }
 
 impl ConfigProvider for TestConfigProvider {
-    fn get_module_config(&self, module: &str) -> Option<&serde_json::Value> {
-        self.config.get(module)
+    fn get_gear_config(&self, gear: &str) -> Option<&serde_json::Value> {
+        self.config.get(gear)
     }
 }
 
@@ -330,7 +330,7 @@ async fn e2e_full_middleware_stack_logs_remote_addr() -> anyhow::Result<()> {
     });
 
     let hub = Arc::new(toolkit::ClientHub::new());
-    let ctx = ModuleCtx::new(
+    let ctx = GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config: cfg }),

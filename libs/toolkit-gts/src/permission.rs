@@ -1,9 +1,9 @@
 //! Base GTS Type for Gears authorization permissions.
 //!
-//! Permissions are declared by modules as **well-known GTS Instances** of
-//! this base type and registered with `types-registry` during module init
+//! Permissions are declared by gears as **well-known GTS Instances** of
+//! this base type and registered with `types-registry` during gear init
 //! (preferably at compile time via the `gts_instance!` macro). The future
-//! `AuthZ` Management module / admin UI lists permissions by querying
+//! `AuthZ` Management gear / admin UI lists permissions by querying
 //! `types-registry` for Instances of `gts.cf.toolkit.authz.permission.v1~`.
 //!
 //! ## `resource_type` semantics
@@ -23,7 +23,7 @@
 //! gts.cf.toolkit.authz.permission.v1~<vendor>.<package>.<namespace>.<permission_name>.v1
 //! ```
 //!
-//! The right-hand segment encodes the declaring module's ownership
+//! The right-hand segment encodes the declaring gear's ownership
 //! (`<vendor>.<package>.<namespace>`) — use `_` as a placeholder when a slot
 //! has no meaningful value — and an internal handle for the permission
 //! (`<permission_name>`). Examples:
@@ -33,7 +33,7 @@
 //!
 //! ## Extending with per-permission metadata
 //!
-//! If a module needs ABAC-style per-permission attributes (audit category,
+//! If a gear needs ABAC-style per-permission attributes (audit category,
 //! MFA requirement, risk class, …), it declares a derived Type Schema with
 //! `#[toolkit_gts::gts_type_schema(base = AuthzPermissionV1, ...)]` and
 //! registers Instances against that derived Type Schema (the wrapper joins
@@ -46,7 +46,7 @@ use gts::GtsInstanceId;
 
 /// Base GTS Type for authorization permissions.
 ///
-/// Permissions are well-known GTS Instances of this type; declaring modules
+/// Permissions are well-known GTS Instances of this type; declaring gears
 /// register them via the `gts_instance!` macro (preferred, compile-time) or
 /// `TypesRegistryClient::register` (runtime).
 ///

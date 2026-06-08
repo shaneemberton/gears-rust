@@ -12,7 +12,7 @@
   - [2.1 Human Actors](#21-human-actors)
   - [2.2 System Actors](#22-system-actors)
 - [3. Operational Concept & Environment](#3-operational-concept--environment)
-  - [3.1 Module-Specific Environment Constraints](#31-module-specific-environment-constraints)
+  - [3.1 Gear-Specific Environment Constraints](#31-gear-specific-environment-constraints)
 - [4. Scope](#4-scope)
   - [4.1 In Scope](#41-in-scope)
   - [4.2 Out of Scope](#42-out-of-scope)
@@ -20,7 +20,7 @@
   - [5.1 Core Task Management](#51-core-task-management)
   - [5.2 Organization](#52-organization)
 - [6. Non-Functional Requirements](#6-non-functional-requirements)
-  - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
+  - [6.1 Gear-Specific NFRs](#61-gear-specific-nfrs)
 - [7. Public Library Interfaces](#7-public-library-interfaces)
   - [7.1 Public API Surface](#71-public-api-surface)
   - [7.2 External Integration Contracts](#72-external-integration-contracts)
@@ -60,7 +60,7 @@ The application is designed for individual use with cross-device synchronization
 
 ## 2. Actors
 
-> **Note**: Stakeholder needs are managed at the project/task level by the steering committee and are not duplicated in module specs. Focus on **actors** (users, systems) that directly interact with this module.
+> **Note**: Stakeholder needs are managed at the project/task level by the steering committee and are not duplicated in gear specs. Focus on **actors** (users, systems) that directly interact with this gear.
 
 ### 2.1 Human Actors
 
@@ -84,9 +84,9 @@ The application is designed for individual use with cross-device synchronization
 
 ## 3. Operational Concept & Environment
 
-> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and module integration patterns (Rust native + auto-generated gRPC/REST) are defined in root [PRD.md](../../PRD.md). Only document module-specific deviations or additional constraints here. **If this module has no special environment constraints, delete this entire section.**
+> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and gear integration patterns (Rust native + auto-generated gRPC/REST) are defined in root [PRD.md](../../PRD.md). Only document gear-specific deviations or additional constraints here. **If this gear has no special environment constraints, delete this entire section.**
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
 - Requires IndexedDB support for offline functionality (browser-only constraint)
 - WebSocket support required for real-time sync (fallback to polling if unavailable)
@@ -153,11 +153,11 @@ The system **MUST** allow users to filter tasks by status (all, active, complete
 
 ## 6. Non-Functional Requirements
 
-> **Default guidelines**: Project-wide NFR baselines (performance, security, reliability, scalability) are defined in root [PRD.md](../../PRD.md) and [docs/guidelines/](../../guidelines/). Only document module-specific NFRs here — either **exclusions** from defaults or **standalone** requirements unique to this module.
+> **Default guidelines**: Project-wide NFR baselines (performance, security, reliability, scalability) are defined in root [PRD.md](../../PRD.md) and [docs/guidelines/](../../guidelines/). Only document gear-specific NFRs here — either **exclusions** from defaults or **standalone** requirements unique to this gear.
 >
 > **Testing strategy**: NFRs are verified via automated benchmarks, security scans, and monitoring unless otherwise specified.
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Response Time
 
@@ -176,7 +176,7 @@ All user interactions **MUST** complete within 200ms at p95 under normal load (s
 User data **MUST** be persisted locally immediately and synced to cloud storage within 5 seconds of any change when online.
 
 **Threshold**: Local persistence: <50ms; cloud sync: <5s when online
-**Rationale**: Module-specific requirement (project default doesn't cover offline-first + sync pattern)
+**Rationale**: Gear-specific requirement (project default doesn't cover offline-first + sync pattern)
 **Architecture Allocation**: See DESIGN.md § NFR Allocation for how this is realized
 
 #### Offline Support

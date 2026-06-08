@@ -5,7 +5,7 @@
 //! SDK adapter that backs the production soft-delete ownership probe,
 //! the GTS Types Registry adapter that backs the tenant-type
 //! compatibility barrier, and the dev / test [`idp::NoopIdpProvider`]
-//! fallback that the module wires when no
+//! fallback that the gear wires when no
 //! [`account_management_sdk::IdpPluginClient`] plugin is
 //! registered in `ClientHub`.
 

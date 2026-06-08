@@ -15,7 +15,7 @@ The `llm_provider` component builds OpenAI API requests, parses SSE streams, and
 * Cancellation propagation complexity - streaming cancellation must reach the provider's outbound HTTP connection quickly (hard cancel requirement)
 * Operational overhead - services require independent deployment, health checks, scaling policies, and monitoring
 * Security surface - whether `llm_provider` needs its own authentication or network isolation
-* Future multi-consumer demand - whether other modules will need the same LLM abstraction
+* Future multi-consumer demand - whether other gears will need the same LLM abstraction
 
 ## Considered Options
 

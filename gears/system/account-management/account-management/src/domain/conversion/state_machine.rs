@@ -17,7 +17,7 @@
 //! already resolved still surfaces [`DomainError::AlreadyResolved`]
 //! rather than [`DomainError::InvalidActorForTransition`]. This ordering
 //! is required by `DoD` `Dual-Consent Actor Discipline` and exercised by
-//! the unit tests in this module.
+//! the unit tests in this gear.
 
 use crate::domain::conversion::model::{ConversionSide, ConversionStatus};
 use crate::domain::error::DomainError;

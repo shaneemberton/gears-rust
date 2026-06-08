@@ -1,13 +1,13 @@
-//! Module Orchestrator gRPC Layer
+//! Gear Orchestrator gRPC Layer
 //!
-//! This crate provides gRPC transport for the module orchestrator.
+//! This crate provides gRPC transport for the gear orchestrator.
 //! It includes generated protobuf types and client/server implementations.
 mod client;
 
 // Generated protobuf types for DirectoryService
 #[allow(clippy::all, clippy::pedantic, clippy::nursery, warnings)] // protoc problem
 pub mod directory {
-    tonic::include_proto!("module_orchestrator.v1.directory");
+    tonic::include_proto!("gear_orchestrator.v1.directory");
 }
 
 // Re-export common types for DirectoryService

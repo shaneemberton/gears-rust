@@ -15,7 +15,7 @@ dylint_linting::declare_late_lint! {
     /// ### Why is this bad?
     ///
     /// Consistent API structure ensures proper versioning and organization.
-    /// Service names help identify different microservices/modules, and versions
+    /// Service names help identify different microservices/gears, and versions
     /// allow for API evolution without breaking changes.
     ///
     /// ### Example

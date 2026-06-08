@@ -2,7 +2,7 @@
   "$id": "gts://gts.cf.core.am.tenant.v1~",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Account Management Tenant",
-  "description": "Account Management tenant resource type. Pins the structural contract (field shapes, length bounds, formats) for a tenant instance so AM-side validation does not duplicate the bounds at every call site. The tenant lifecycle / hierarchy semantics (status enum, parent_id chain, soft-delete) live in the AM module's domain model and are not part of this base schema.",
+  "description": "Account Management tenant resource type. Pins the structural contract (field shapes, length bounds, formats) for a tenant instance so AM-side validation does not duplicate the bounds at every call site. The tenant lifecycle / hierarchy semantics (status enum, parent_id chain, soft-delete) live in the AM gear's domain model and are not part of this base schema.",
   "type": "object",
   "additionalProperties": true,
   "required": ["id", "name"],

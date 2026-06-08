@@ -4,7 +4,7 @@
 //! the AM metric catalog (see [`crate::domain::metrics`]) and
 //! implements every port trait from
 //! [`crate::domain::ports::metrics`]. A single
-//! `Arc<AmMetricsMeter>` is constructed at module init and coerced
+//! `Arc<AmMetricsMeter>` is constructed at gear init and coerced
 //! into per-trait `Arc<dyn ...>` views by DI.
 //!
 //! The adapter also implements
@@ -447,7 +447,7 @@ impl MetricsFacadeBridge for AmMetricsMeter {
 /// every `am_*` metric family.
 pub const DEFAULT_PREFIX: &str = "am";
 
-/// Convenience constructor used at module init: builds an
+/// Convenience constructor used at gear init: builds an
 /// `Arc<AmMetricsMeter>` against the process-global OpenTelemetry
 /// meter provider, scoped to the AM instrumentation library.
 #[must_use]

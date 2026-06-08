@@ -38,7 +38,7 @@ The system needs a clear architectural stance on whether search is a universal r
 * Storage technologies differ: some backends can natively support search, others cannot
 * The platform must support heterogeneous backends coexisting at the same time
 * The system must remain portable across deployments (edge/cloud/enterprise)
-* The main module should not require indexing assumptions about payloads (payload is opaque at the SRR contract level)
+* The main gear should not require indexing assumptions about payloads (payload is opaque at the SRR contract level)
 
 ## Considered Options
 
@@ -50,7 +50,7 @@ The system needs a clear architectural stance on whether search is a universal r
 
 Chosen option: "Make search a backend capability, enabled or disabled per resource type via routing", because it preserves multi-backend flexibility and allows search-heavy resource types to be routed to a search-capable backend while keeping other types on simpler backends.
 
-Search is therefore **not universally available**. It is available only when the resolved backend for a resource type declares `search_support` capability. The main module may expose a search API that returns 501 Not Implemented when the selected backend does not support search.
+Search is therefore **not universally available**. It is available only when the resolved backend for a resource type declares `search_support` capability. The main gear may expose a search API that returns 501 Not Implemented when the selected backend does not support search.
 
 ### Consequences
 

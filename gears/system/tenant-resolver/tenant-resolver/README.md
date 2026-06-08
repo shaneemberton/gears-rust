@@ -1,22 +1,22 @@
 # Tenant Resolver
 
-Main module for tenant resolution in Gears. Discovers plugins via GTS types-registry and routes tenant operations to the selected plugin.
+Main gear for tenant resolution in Gears. Discovers plugins via GTS types-registry and routes tenant operations to the selected plugin.
 
 ## Overview
 
-The `cf-gears-tenant-resolver` module provides:
+The `cf-gears-tenant-resolver` gear provides:
 
 - **Plugin discovery** — Finds tenant-resolver plugins via GTS types-registry
 - **Vendor-based selection** — Selects plugin by vendor and priority
 - **Self-access enforcement** — Source == target tenant is always allowed
-- **ClientHub integration** — Registers `TenantResolverClient` for inter-module use
+- **ClientHub integration** — Registers `TenantResolverClient` for inter-gear use
 
-This is a **main module** — it contains no tenant data itself. All operations are delegated to the active plugin (e.g., `cf-gears-static-tr-plugin`, `cf-single-tenant-tr-plugin`, or a custom implementation).
+This is a **main gear** — it contains no tenant data itself. All operations are delegated to the active plugin (e.g., `cf-gears-static-tr-plugin`, `cf-single-tenant-tr-plugin`, or a custom implementation).
 
 ## Architecture
 
 ```
-Consumer Module
+Consumer Gear
     │
     ▼
 TenantResolverClient  (SDK trait, registered in ClientHub)
@@ -56,7 +56,7 @@ let is_anc = resolver.is_ancestor(&ctx, parent_id, child_id, &IsAncestorOptions:
 
 ## Configuration
 
-The module is configured via the server's YAML config. Plugin selection is automatic based on GTS registration.
+The gear is configured via the server's YAML config. Plugin selection is automatic based on GTS registration.
 
 ## Writing a Plugin
 

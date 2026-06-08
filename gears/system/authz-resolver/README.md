@@ -11,11 +11,11 @@ The decision to use AuthZEN 1.0 with constraint extensions is documented in
 [ADR-0001](../../../docs/arch/authorization/adr/0001-pdp-pep-authorization-model.md) and
 the split from authentication in [ADR-0002](../../../docs/arch/authorization/adr/0002-split-authn-and-authz-resolvers.md).
 
-The **authz_resolver** module is an integration point for authorization policy evaluation. It discovers and delegates to a vendor-specific plugin via the types-registry — the plugin acts as the **Policy Decision Point (PDP)**, evaluating Subject + Action + Resource requests and returning a decision with optional row-level constraints.
+The **authz_resolver** gear is an integration point for authorization policy evaluation. It discovers and delegates to a vendor-specific plugin via the types-registry — the plugin acts as the **Policy Decision Point (PDP)**, evaluating Subject + Action + Resource requests and returning a decision with optional row-level constraints.
 
 ## Public API
 
-The module registers [`AuthZResolverClient`](authz-resolver-sdk/src/api.rs) in ClientHub:
+The gear registers [`AuthZResolverClient`](authz-resolver-sdk/src/api.rs) in ClientHub:
 
 - `evaluate(request)` — Evaluate an authorization request and return a decision with constraints
 
@@ -111,12 +111,12 @@ Gears include one plugin out of the box:
 
 ## Configuration
 
-### AuthZ Resolver Module
+### AuthZ Resolver Gear
 
 See [`config.rs`](authz-resolver/src/config.rs)
 
 ```yaml
-modules:
+gears:
   authz_resolver:
     vendor: "constructorfabric"  # Selects plugin by matching vendor
 ```
@@ -126,7 +126,7 @@ modules:
 See [`config.rs`](plugins/static-authz-plugin/src/config.rs)
 
 ```yaml
-modules:
+gears:
   static_authz_plugin:
     vendor: "constructorfabric"
     priority: 100
@@ -134,7 +134,7 @@ modules:
 
 ## Usage
 
-Most modules should use `PolicyEnforcer` (see PEP section above) rather than calling `evaluate` directly:
+Most gears should use `PolicyEnforcer` (see PEP section above) rather than calling `evaluate` directly:
 
 ```rust
 // Direct evaluation (low-level)
@@ -143,7 +143,7 @@ let authz = hub.get::<dyn AuthZResolverClient>()?;
 let response = authz.evaluate(EvaluationRequest {
     subject: Subject { id: ctx.subject_id, ..Default::default() },
     action: Action { name: "list".into() },
-    resource: Resource { resource_type: "my_module.entity".into(), ..Default::default() },
+    resource: Resource { resource_type: "my_gear.entity".into(), ..Default::default() },
     context: EvaluationRequestContext::default(),
 }).await?;
 ```

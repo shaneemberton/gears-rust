@@ -283,7 +283,7 @@ impl TenantTypeChecker for GtsTenantTypeChecker {
 ///
 /// `TypesRegistryError` Display is forwarded into the detail unredacted
 /// (no `redact_provider_detail` here). This is intentional: the GTS
-/// Types Registry is a CF-internal sibling module whose error surface
+/// Types Registry is a CF-internal sibling gear whose error surface
 /// is curated and safe to expose to the caller, in contrast to the `IdP`
 /// plugin path (`account_management_sdk::idp`) where the error text comes
 /// from third-party vendor SDKs and must be redacted before crossing

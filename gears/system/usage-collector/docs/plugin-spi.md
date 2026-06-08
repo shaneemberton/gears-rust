@@ -49,7 +49,7 @@
 - [Exclusions/Non-goals](#exclusionsnon-goals)
   - [SDK-trait-only exclusions](#sdk-trait-only-exclusions)
   - [REST-only exclusions](#rest-only-exclusions)
-  - [Module non-goals reaffirmed on the Plugin SPI](#module-non-goals-reaffirmed-on-the-plugin-spi)
+  - [Gear non-goals reaffirmed on the Plugin SPI](#gear-non-goals-reaffirmed-on-the-plugin-spi)
 - [Traceability](#traceability)
   - [Surface identifier and consumer contract](#surface-identifier-and-consumer-contract)
   - [Capabilities exposed by the Plugin SPI](#capabilities-exposed-by-the-plugin-spi)
@@ -67,7 +67,7 @@
 
 The Usage Collector Plugin SPI is the in-process async Rust service
 provider interface (SPI) that storage-backend authors implement so the
-Usage Collector module can persist, query, deactivate, and read usage
+Usage Collector gear can persist, query, deactivate, and read usage
 data without binding to any specific backend technology. The SPI is
 the canonical realization of `cpt-cf-usage-collector-interface-plugin`
 and the `cpt-cf-usage-collector-contract-storage-plugin` contract, and
@@ -168,7 +168,7 @@ Vec<String>` (the closed, declared list of allowed metadata key
 The Plugin SPI does NOT expose a plugin-side readiness probe or
 flush hook. Plugin availability is detected structurally by the
 Plugin Host via `ClientHub::try_get_scoped` (an empty scoped slot
-means the plugin module has not yet registered or is gone); there
+means the plugin gear has not yet registered or is gone); there
 is no trait method that asks the plugin "are you ready?" and no
 trait method that asks the plugin to drain. Graceful shutdown is
 handled by the Plugin Host's process-level lifecycle, not by an SPI
@@ -195,9 +195,9 @@ per `cpt-cf-usage-collector-principle-pdp-centric-authorization` and
 
 The SPI does not own REST wire shapes, OpenAPI generation, RFC-9457
 `Problem` mapping, CORS, TLS termination, or output encoding; those
-are platform API gateway and module-REST-handler responsibilities.
+are platform API gateway and gear-REST-handler responsibilities.
 The SPI also does not declare per-tenant access tables, role
-matrices, or PDP-decision caching — module-side caching of PDP
+matrices, or PDP-decision caching — gear-side caching of PDP
 decisions is forbidden by `cpt-cf-usage-collector-principle-pdp-centric-authorization`.
 
 Sources: DESIGN §3.2 "Plugin Host (ClientHub-bound)" Responsibility
@@ -211,8 +211,8 @@ Architecture; §3.11.1 Performance Patterns / Caching.
 The Plugin SPI trait belongs in the Usage Collector's single
 `usage-collector-sdk` crate alongside the consumer SDK trait, the
 GTS spec for plugin discovery, the domain models, and the public
-error enum, following the platform-standard `<module>` +
-`<module>-sdk` two-crate layout documented in DESIGN §3.12.9 Package
+error enum, following the platform-standard `<gear>` +
+`<gear>-sdk` two-crate layout documented in DESIGN §3.12.9 Package
 and Namespace Conventions. There is no separate `-contracts` crate
 and no separate `-plugin-api` crate. Required files under
 `usage-collector-sdk/src/`, all transport-agnostic:
@@ -238,7 +238,7 @@ the host `usage-collector` crate, and is owned by the plugin's
 authoring team.
 
 Sources: DESIGN §3.12.9 "Cargo crate naming" two-crate layout;
-§3.12.9 "Cross-module imports" plugin-direction rule.
+§3.12.9 "Cross-gear imports" plugin-direction rule.
 
 ### Trait declaration shape
 
@@ -247,9 +247,9 @@ Sources: DESIGN §3.12.9 "Cargo crate naming" two-crate layout;
   object.
 - The canonical trait name is `UsageCollectorPluginV1`, mirroring the
   `UsageCollectorClientV1` naming used by the SDK trait per DESIGN
-  §3.12.9 and the ToolKit naming convention that places the module
+  §3.12.9 and the ToolKit naming convention that places the gear
   name and capability before the `V1` suffix. The `V1` suffix encodes
-  the Plugin SPI's major version and aligns with the module's
+  the Plugin SPI's major version and aligns with the gear's
   major-version stability contract per
   `cpt-cf-usage-collector-adr-contract-stability` and
   `cpt-cf-usage-collector-nfr-plugin-contract-stability`.
@@ -258,7 +258,7 @@ Sources: DESIGN §3.12.9 "Cargo crate naming" two-crate layout;
   §"Trace context propagation" for the ambient-context model). Tracing
   is propagated via the ambient `tracing::Span` / OpenTelemetry context
   — no explicit `TraceContext` parameter is required (mirrors the
-  reference plugin traits in `modules/credstore/credstore-sdk/src/plugin_api.rs:12-19`,
+  reference plugin traits in `gears/credstore/credstore-sdk/src/plugin_api.rs:12-19`,
   `gears/system/authn-resolver/authn-resolver-sdk/src/plugin_api.rs:31-55`,
   and `gears/system/authz-resolver/authz-resolver-sdk/src/plugin_api.rs:19-22`,
   none of which carry a `TraceContext` parameter).
@@ -274,7 +274,7 @@ Sources: DESIGN §3.12.9 "Cargo crate naming" two-crate layout;
   enums, in `usage-collector-sdk/src/plugin_api.rs`.
 - The trait is registered into ClientHub with **GTS instance scope**
   by each `usage-collector-plugin-<backend>` crate's own
-  `#[toolkit::module]` `init()` (the host
+  `#[toolkit::gear]` `init()` (the host
   `cpt-cf-usage-collector-component-plugin-host` does not register
   scoped plugin clients itself). The Plugin Host resolves the bound
   instance lazily on the first dispatch call after the
@@ -288,14 +288,14 @@ Sources: DESIGN §3.12.9 "Cargo crate naming" two-crate layout;
   `cpt-cf-usage-collector-contract-gts-registry` and
   `cpt-cf-usage-collector-fr-pluggable-storage`. The
   `[usage_collector].vendor` value itself is read once in
-  `Module::init` via `ctx.config_or_default()?` and is never re-read
-  at runtime (mirrors `modules/credstore/credstore/src/module.rs:44-47`
-  and `modules/credstore/credstore/src/domain/service.rs:53-75`);
-  changing the binding requires a module restart.
+  `Gear::init` via `ctx.config_or_default()?` and is never re-read
+  at runtime (mirrors `gears/credstore/credstore/src/gear.rs:44-47`
+  and `gears/credstore/credstore/src/domain/service.rs:53-75`);
+  changing the binding requires a gear restart.
 
 Sources: DESIGN §3.3 "Plugin SPI" technology row ("Async Rust SPI
 trait registered in ClientHub with GTS instance scope"); §3.12.9
-"Rust module path stems" and "Type and trait naming"; §3.4 Internal
+"Rust gear path stems" and "Type and trait naming"; §3.4 Internal
 Dependencies (`gts-registry`); §3.2 "Plugin Host" Responsibility scope.
 
 ### Two-trait split
@@ -303,7 +303,7 @@ Dependencies (`gts-registry`); §3.2 "Plugin Host" Responsibility scope.
 The public Plugin SPI trait, `UsageCollectorPluginV1`, is the
 storage-backend-facing trait. The Usage Collector's separate public
 SDK trait, `UsageCollectorClientV1`, is the consumer-facing trait
-used by source modules and downstream readers and is described in
+used by source gears and downstream readers and is described in
 `sdk-trait.md`. Both traits live side by side in the single
 `usage-collector-sdk` crate (`api.rs` for the consumer SDK trait,
 `plugin_api.rs` for the Plugin SPI trait) and share the same
@@ -356,7 +356,7 @@ registered with `types-registry`.
 
 ### Plugin-side `init()` flow
 
-Each `usage-collector-plugin-<backend>` crate's `#[toolkit::module]`
+Each `usage-collector-plugin-<backend>` crate's `#[toolkit::gear]`
 `init(...)` follows a four-step pattern: `build_registration` →
 publish to `types-registry` → register the scoped client in
 `ClientHub` → ready for dispatch.
@@ -418,7 +418,7 @@ per the foundation feature.
 
 Plugins are statically linked at the workspace level — every
 `usage-collector-plugin-<backend>` crate is compiled in as a Cargo
-workspace member and registered with ToolKit via `#[toolkit::module]`
+workspace member and registered with ToolKit via `#[toolkit::gear]`
 at startup. The host `usage-collector` crate has **no compile-time
 dependency** on any concrete `usage-collector-plugin-<backend>`
 crate; binding is purely a runtime concern resolved through
@@ -437,7 +437,7 @@ vendor (field on `usage-collector`'s `config.rs`, populated from the
 ties are broken by the lowest `PluginV1.priority` (lower number =
 higher priority, mirroring the `PluginV1<P>` contract documented at
 `libs/toolkit-gts/src/plugin.rs`). The resolved instance is cached
-for the `Service`'s lifetime; binding changes require a module
+for the `Service`'s lifetime; binding changes require a gear
 restart. There is no parallel cache and no retain-prior fallback —
 `ClientHub::register_scoped` is a plain `HashMap::insert` under a
 `parking_lot::RwLock` (see `libs/toolkit/src/client_hub.rs:155-165`),
@@ -451,7 +451,7 @@ DESIGN §3.5 "Plugin Resolution and Dispatch"; DESIGN §3.3
 "Startup-time plugin binding"; DESIGN §3.6 sequence diagrams (every
 plugin-dispatching sequence threads through
 `ClientHub::try_get_scoped`); DECOMPOSITION §4.3 "Plugin discovery
-and dispatch"; reference modules `credstore`, `authn-resolver`, and
+and dispatch"; reference gears `credstore`, `authn-resolver`, and
 `authz-resolver` for the canonical pattern; `libs/toolkit-gts/src/plugin.rs`
 for the `PluginV1<P>` base type and `build_registration` helper.
 
@@ -461,7 +461,7 @@ The Plugin SPI operates exclusively on the canonical Usage Collector
 domain types from `domain-model.md`. All domain types are declared in
 `usage-collector-sdk/src/models.rs` and remain transport-agnostic. Field
 names are snake_case; struct and enum names are UpperCamelCase.
-Identifiers (`tenant_id`, `resource_id`, `subject_id`, `source_module`,
+Identifiers (`tenant_id`, `resource_id`, `subject_id`, `source_gear`,
 `gts_id`) are opaque platform identifiers; the Usage Collector neither
 parses nor classifies them per `cpt-cf-usage-collector-constraint-pii-identity-layer`.
 All timestamps are UTC instants.
@@ -564,7 +564,7 @@ tables (`metric_catalog`, `usage_records`);
   named `Row` here to mark the SPI-internal nature of the type alias.
 - `UsageRecordFilterField`
   (`cpt-cf-usage-collector-entity-usage-record-filter-field`). The
-  module-owned Rust enum implementing `toolkit_odata::filter::FilterField`.
+  gear-owned Rust enum implementing `toolkit_odata::filter::FilterField`.
   Plugins receive the parsed `FilterNode<UsageRecordFilterField>`
   produced by the gateway after PDP-constraint composition; per-field
   operator allowances follow `domain-model.md` §2.10.
@@ -620,7 +620,7 @@ result; failures use error variants instead.
     the second write is never silently dropped.
     On a key collision the plugin compares the incoming record's
     canonical fields — `value`, `timestamp`, `resource_ref`,
-    `subject_ref`, `source_module`, and `metadata` — against the stored
+    `subject_ref`, `source_gear`, and `metadata` — against the stored
     record under the same `(tenant_id, gts_id, idempotency_key)`.
     The dedup-key tuple itself is excluded (it is the match key) and the
     server-owned fields (`id`, `status`) are excluded. ALL compared
@@ -703,12 +703,12 @@ on `(tenant_id, gts_id, idempotency_key)` and referential rule;
 - The Plugin Host opens the per-call span before dispatching to the
   trait method (the host's `Service::*` methods are annotated with
   `#[tracing::instrument(...)]` mirroring
-  `modules/credstore/credstore/src/domain/service.rs:109`); the SPI
+  `gears/credstore/credstore/src/domain/service.rs:109`); the SPI
   implementation runs inside that ambient span and MUST continue the
   span over its backend dispatch so end-to-end traces span gateway
   → core → plugin → backend.
 - The reference plugin traits in
-  `modules/credstore/credstore-sdk/src/plugin_api.rs:12-19`,
+  `gears/credstore/credstore-sdk/src/plugin_api.rs:12-19`,
   `gears/system/authn-resolver/authn-resolver-sdk/src/plugin_api.rs:31-55`,
   and `gears/system/authz-resolver/authz-resolver-sdk/src/plugin_api.rs:19-22`
   carry no `TraceContext` parameter; this SPI follows the same pattern
@@ -762,7 +762,7 @@ Authorization Architecture.
   ([`./ADR/0012-unified-plugin-catalog-and-gts-id-reference.md`](./ADR/0012-unified-plugin-catalog-and-gts-id-reference.md)).
   Both tables live in the same plugin backend so the FK rejection is
   atomic with the delete attempt — no cross-replica protocol, no
-  distributed coordination, no module-side `MetricCatalogRepo`. The
+  distributed coordination, no gear-side `MetricCatalogRepo`. The
   plugin attempts the delete via Method 9 (`delete_metric`) and
   lets the FK fire; on rejection the plugin returns a structured
   `MetricReferenced` error (see §"Error Taxonomy") that the gateway
@@ -980,7 +980,7 @@ Taxonomy".
      `cpt-cf-usage-collector-dbtable-usage-records`. On a key collision
      the plugin MUST compare the incoming record's caller-supplied
      canonical fields (`value`, `timestamp`, `resource_ref`,
-     `subject_ref`, `source_module`, `metadata`, `entry_type`,
+     `subject_ref`, `source_gear`, `metadata`, `entry_type`,
      `corrects_id`) against the stored record under the same dedup-key
      tuple (the tuple itself and the server-owned `id` / `status` are
      excluded from the comparison). ALL compared fields equal → the
@@ -1890,7 +1890,7 @@ and per-variant:
 
 `ContractViolation` lifts to `UsageCollectorError::Internal` (not
 `PluginFailure`) because the Plugin Host classifies it as a
-fail-closed module-internal error rather than a backend issue; the
+fail-closed gear-internal error rather than a backend issue; the
 `PluginFailure` slot is reserved for backend-classified failures
 matching the `BackendError` semantics (`sdk-trait.md` "Variant
 catalog"). The catalog-domain variants `MetricAlreadyExists`,
@@ -1947,7 +1947,7 @@ Variant catalog:
   support, or a Method 4 invocation that contradicts the canonical
   `(timestamp, id)` keyset). Maps to the `contract_violation` label
   on `usage_collector.plugin.accept_errors`. The Plugin Host
-  treats `ContractViolation` as a fail-closed module-internal error
+  treats `ContractViolation` as a fail-closed gear-internal error
   rather than a backend issue. Cursor decode failure, order
   mismatch, and filter mismatch on raw queries are NOT reported as
   `ContractViolation` — they are gateway-only failures surfaced as
@@ -2052,14 +2052,14 @@ parsing"); §3.11.7 `usage_collector.plugin.ready` and
 
 The Plugin SPI inherits Usage Collector's plugin-agnostic consistency
 floor and obliges every active plugin to publish its actual
-consistency profile. The floor is the module-level contract
+consistency profile. The floor is the gear-level contract
 documented in DESIGN §3.10.8 (Consistency contract) and
 `cpt-cf-usage-collector-adr-consistency-contract` (ADR-0011); this
 section restates the floor on the SPI side and adds the per-plugin
 deployment-guide obligation.
 
 **SPI floor (normative).** The Plugin SPI's consistency floor is
-identical to DESIGN §3.10.8's module-level floor; nothing in the SPI
+identical to DESIGN §3.10.8's gear-level floor; nothing in the SPI
 relaxes or strengthens it.
 
 - **Ingestion ack** — once `persist_usage_record` /
@@ -2131,7 +2131,7 @@ or by Usage Collector itself.
   cross-region read pools) and how that procedure interacts with the
   published profile.
 - **Consumer-coupling rule.** Consumers that depend on a tighter
-  bound than the module floor couple themselves to a specific
+  bound than the gear floor couple themselves to a specific
   plugin's published ceiling; that coupling is intentional and MUST
   be recorded in the consumer's own design document so a plugin
   substitution surfaces as a known impact rather than a latent
@@ -2191,7 +2191,7 @@ and deactivate cascade atomicity).
   before the major bump.
 - At most one prior major version is supported concurrently per
   surface, per `cpt-cf-usage-collector-nfr-plugin-contract-stability`.
-  A Usage Collector module instance MAY bind a `V1` plugin while
+  A Usage Collector gear instance MAY bind a `V1` plugin while
   another instance binds a `V2` plugin during a deprecation window;
   one Plugin Host instance binds exactly one plugin instance at a
   time per `cpt-cf-usage-collector-component-plugin-host`
@@ -2242,16 +2242,16 @@ The Plugin SPI does not expose REST-handling concerns:
 - The OpenAPI wire contract (`usage-collector-v1.yaml`),
   endpoint paths, and request/response schemas remain REST-side.
 - RFC-9457 `Problem` envelope conversion is performed by the
-  REST handler in the module crate.
+  REST handler in the gear crate.
 - CORS, TLS termination, output encoding, and HTTP-level rate
   limiting are platform API gateway responsibilities per DESIGN
   §3.9.3.
-- Platform liveness and readiness probes are handled by the ToolKit host above the module boundary; the collector exposes no module-local health endpoints. Operational telemetry is pushed via OTLP from ToolKit's global `SdkMeterProvider` (no in-module `/metrics` scrape endpoint exists). The SPI contributes no `ready` or `flush` operation; the structural readiness fact (selector cached AND `ClientHub::try_get_scoped` returns `Some`) is composed by the Plugin Host and surfaced via the `usage_collector.plugin.ready` gauge.
+- Platform liveness and readiness probes are handled by the ToolKit host above the gear boundary; the collector exposes no gear-local health endpoints. Operational telemetry is pushed via OTLP from ToolKit's global `SdkMeterProvider` (no in-gear `/metrics` scrape endpoint exists). The SPI contributes no `ready` or `flush` operation; the structural readiness fact (selector cached AND `ClientHub::try_get_scoped` returns `Some`) is composed by the Plugin Host and surfaced via the `usage_collector.plugin.ready` gauge.
 
 Sources: DESIGN §3.3 REST API row; §3.9.3 Security Boundaries;
 §3.11.5 Observability Architecture.
 
-### Module non-goals reaffirmed on the Plugin SPI
+### Gear non-goals reaffirmed on the Plugin SPI
 
 - A dedicated backfill capability (watermarks, late-data
   coordination, or a bulk-import method beyond `persist_usage_records`)
@@ -2269,11 +2269,11 @@ Sources: DESIGN §3.3 REST API row; §3.9.3 Security Boundaries;
 - Reactivation (`inactive → active`) is intentionally omitted; the
   SPI provides no transition for it per
   `cpt-cf-usage-collector-principle-monotonic-deactivation`.
-- Multi-region deployment is not a v1 capability of the module;
+- Multi-region deployment is not a v1 capability of the gear;
   cross-region durability, read locality, and conflict resolution
   remain plugin-deployment and platform-topology concerns per
   DESIGN §3.10.6.
-- Module-emitted audit events for operator-write paths are not the
+- Gear-emitted audit events for operator-write paths are not the
   SPI's responsibility; the v1 access trail is composed at the
   gateway and PDP decision points per DESIGN §3.9.5 and §4.
 - Pricing, rating, billing, invoice generation, and quota
@@ -2287,7 +2287,7 @@ Sources: DESIGN §3.3 REST API row; §3.9.3 Security Boundaries;
   not computing**. Per-record remaining-amount tracking, lot /
   FIFO-LIFO accounting, and negative-`SUM` detection / alerting are
   explicit non-goals.
-- Module-side caching of PDP decisions is forbidden per
+- Gear-side caching of PDP decisions is forbidden per
   `cpt-cf-usage-collector-principle-pdp-centric-authorization`; the
   SPI sees only post-authorization queries.
 - At-rest encryption, key management, masking, disposal, backup,
@@ -2420,7 +2420,7 @@ metadata_fields: HashSet<String>}>` with `kind` derived once on
   realized by `toolkit_odata::CursorV1` plus
   `validate_cursor_against`, per
   `cpt-cf-usage-collector-principle-cursor-gateway-ownership`. The
-  former module-owned `RawRecordPage` and `CursorToken` entities
+  former gear-owned `RawRecordPage` and `CursorToken` entities
   defined in earlier drafts of `domain-model.md` are no longer
   carried by this SPI (phase-01
   `out/phase-01-domain-contracts.md` §1).
@@ -2552,11 +2552,11 @@ the conservative default this reference adopts.
   via `GtsPluginSelector::get_or_init` (selector cached) AND
   `ClientHub::try_get_scoped::<dyn UsageCollectorPluginV1>` returns
   `Some` — these two structural facts are the only "is the plugin
-  live?" signal, matching the reference-module pattern in
+  live?" signal, matching the reference-gear pattern in
   `credstore`, `authn-resolver`, and `authz-resolver`. Liveness is
   the Plugin Host's process-level health, observed by the ToolKit
-  host outside the module surface (the collector exposes no
-  module-local liveness endpoint). Plugins MAY expose
+  host outside the gear surface (the collector exposes no
+  gear-local liveness endpoint). Plugins MAY expose
   backend-internal liveness through backend-specific metrics under
   their own `usage_collector_*` prefix per §3.11.7.
 - OQ-5 — Whether `flush` accepts a deadline parameter or relies on
@@ -2564,8 +2564,8 @@ the conservative default this reference adopts.
   flush)**: this reference exposes no plugin-side flush hook;
   graceful shutdown is the Plugin Host's process-level lifecycle
   responsibility, not an SPI call. Plugins that buffer writes
-  internally MUST drain on their own `Module::shutdown` via the
-  ToolKit module lifecycle.
+  internally MUST drain on their own `Gear::shutdown` via the
+  ToolKit gear lifecycle.
 - OQ-6 — Whether trace context is passed as an explicit parameter or
   carried by the ambient task-local span. **Resolved (ambient
   context)**: this reference carries trace context via the active

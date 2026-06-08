@@ -1,11 +1,11 @@
-mod registered_modules;
+mod registered_gears;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use mimalloc::MiMalloc;
 use toolkit::bootstrap::{
-    AppConfig, dump_effective_modules_config_json, dump_effective_modules_config_yaml,
-    list_module_names, run_migrate, run_server,
+    AppConfig, dump_effective_gears_config_json, dump_effective_gears_config_yaml, list_gear_names,
+    run_migrate, run_server,
 };
 
 use std::path::PathBuf;
@@ -32,17 +32,17 @@ struct Cli {
     #[arg(long)]
     print_config: bool,
 
-    /// List all configured module names and exit
+    /// List all configured gear names and exit
     #[arg(long)]
-    list_modules: bool,
+    list_gears: bool,
 
-    /// Dump effective per-module configuration (YAML) and exit
+    /// Dump effective per-gear configuration (YAML) and exit
     #[arg(long)]
-    dump_modules_config_yaml: bool,
+    dump_gears_config_yaml: bool,
 
-    /// Dump effective per-module configuration (JSON) and exit
+    /// Dump effective per-gear configuration (JSON) and exit
     #[arg(long)]
-    dump_modules_config_json: bool,
+    dump_gears_config_json: bool,
 
     /// Log verbosity level (-v debug, -vv trace)
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -82,26 +82,26 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // List all configured modules and exit if requested
-    if cli.list_modules {
-        let modules = list_module_names(&config);
-        println!("Configured modules ({}):", modules.len());
-        for module in modules {
-            println!("  - {module}");
+    // List all configured gears and exit if requested
+    if cli.list_gears {
+        let gears = list_gear_names(&config);
+        println!("Configured gears ({}):", gears.len());
+        for gear in gears {
+            println!("  - {gear}");
         }
         return Ok(());
     }
 
-    // Dump modules config in YAML format and exit if requested
-    if cli.dump_modules_config_yaml {
-        let yaml = dump_effective_modules_config_yaml(&config)?;
+    // Dump gears config in YAML format and exit if requested
+    if cli.dump_gears_config_yaml {
+        let yaml = dump_effective_gears_config_yaml(&config)?;
         println!("{yaml}");
         return Ok(());
     }
 
-    // Dump modules config in JSON format and exit if requested
-    if cli.dump_modules_config_json {
-        let json = dump_effective_modules_config_json(&config)?;
+    // Dump gears config in JSON format and exit if requested
+    if cli.dump_gears_config_json {
+        let json = dump_effective_gears_config_json(&config)?;
         println!("{json}");
         return Ok(());
     }

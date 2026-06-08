@@ -606,7 +606,7 @@ Before evaluating each checklist item, the expert MUST:
 **Severity**: MEDIUM
 **Ref**: ISO/IEC 25010:2011 §4.2.7 (Modularity, Modifiability)
 
-- [ ] Module structure implied
+- [ ] Gear structure implied
 - [ ] Separation of concerns evident
 - [ ] Single responsibility evident
 - [ ] Dependency injection opportunities identified

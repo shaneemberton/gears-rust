@@ -5,18 +5,18 @@
 ### 1.1 Purpose
 
 FileStorage is a universal file storage and management service for the Gears middleware. It provides upload,
-download, metadata management, access control, and sharing capabilities for any module or user within the platform.
+download, metadata management, access control, and sharing capabilities for any gear or user within the platform.
 
 The service supports pluggable storage backends, multiple access protocols (REST, S3-compatible, WebDAV), tenant-scoped
 access control with an ownership model, and policy-driven governance for file types, sizes, and sharing.
 
 ### 1.2 Background / Problem Statement
 
-Gears and platform users require file storage for various purposes: modules handle multimodal AI content
+Gears and platform users require file storage for various purposes: gears handle multimodal AI content
 (images, audio, video, documents), documents and artifacts, reporting outputs, and platform users need direct file
 access through standard protocols.
 
-Without a dedicated storage service, each module implements ad-hoc file handling, media gets inlined as base64 in API
+Without a dedicated storage service, each gear implements ad-hoc file handling, media gets inlined as base64 in API
 payloads (bloating requests and hitting size limits), provider-generated URLs expire leaving consumers with broken
 links, and there is no unified access control or policy enforcement across the platform.
 
@@ -27,7 +27,7 @@ Gears security and governance model.
 ### 1.3 Goals (Business Outcomes)
 
 - Unified file storage accessible by all Gears and platform users
-- Tenant-scoped and origin-module-scoped access control with tenant, user and module ownership model
+- Tenant-scoped and origin-gear-scoped access control with tenant, user and gear ownership model
 - Flexible sharing via public, tenant-scoped, and signed URLs
 - Policy-driven governance over file types, sizes, events, and sharing models
 - Audit trail for all write operations
@@ -37,11 +37,11 @@ Gears security and governance model.
 
 | Metric                                   | Baseline                                 | Target                                                           | Timeframe                      |
 |------------------------------------------|------------------------------------------|------------------------------------------------------------------|--------------------------------|
-| Module adoption rate                     | 0% (ad-hoc file handling)                | 90%+ of file-dependent modules use FileStorage SDK               | 6 months after GA              |
-| Base64-inlined media payloads            | Present in LLM Gateway and other modules | 0 base64 file payloads in modules that adopted FileStorage       | 3 months after module adoption |
+| Gear adoption rate                     | 0% (ad-hoc file handling)                | 90%+ of file-dependent gears use FileStorage SDK               | 6 months after GA              |
+| Base64-inlined media payloads            | Present in LLM Gateway and other gears | 0 base64 file payloads in gears that adopted FileStorage       | 3 months after gear adoption |
 | Broken/expired provider URLs             | Recurring in downstream workflows        | 0 broken URLs for files within retention period                  | Ongoing after GA               |
 | Audit coverage for file write operations | No centralized audit                     | 100% of write operations audited                                 | Phase 2                        |
-| Multi-backend deployment                 | Single ad-hoc storage per module         | At least 2 backend types validated (e.g., S3 + local filesystem) | At GA                          |
+| Multi-backend deployment                 | Single ad-hoc storage per gear         | At least 2 backend types validated (e.g., S3 + local filesystem) | At GA                          |
 
 ### 1.5 Glossary
 
@@ -59,7 +59,7 @@ Gears security and governance model.
 | Policy              | A set of rules (allowed file types, size limits, events, sharing models) that constrain file operations; applicable at the tenant level and the user level independently — when both apply, the most restrictive value per aspect wins                                                  |
 | File Version        | An immutable snapshot of file content created on each upload to the same logical path when versioning is enabled; identified by an opaque version identifier assigned by the storage backend                                                                                            |
 | Version Identifier  | An opaque string assigned by the storage backend that uniquely identifies a specific version of a file; format varies by backend and must not be parsed or assumed                                                                                                                      |
-| File Type (GTS)     | A GTS type identifier assigned to every file at upload time that classifies the file by domain, actor, and purpose (e.g., `gts.cf.fstorage.file.type.v1~x.genai.llm.autogenerated.v1~`); used by the Authorization Service to enforce per-type access control between actors and modules |
+| File Type (GTS)     | A GTS type identifier assigned to every file at upload time that classifies the file by domain, actor, and purpose (e.g., `gts.cf.fstorage.file.type.v1~x.genai.llm.autogenerated.v1~`); used by the Authorization Service to enforce per-type access control between actors and gears |
 | Backend Capability  | An optional feature that a storage backend may or may not support (e.g., presigned URLs, versioning, multipart upload); FileStorage discovers available capabilities per backend and adapts its behavior accordingly                                                                    |
 
 ## 2. Actors
@@ -77,14 +77,14 @@ Gears security and governance model.
 
 #### Gears
 
-**ID**: `cpt-cf-file-storage-actor-cf-modules`
+**ID**: `cpt-cf-file-storage-actor-cf-gears`
 
 **Role**: Any Gear requiring file upload, download, metadata retrieval, or link management (e.g., LLM
-Gateway for multimodal media, document management modules, reporting modules).
+Gateway for multimodal media, document management gears, reporting gears).
 
 ## 3. Operational Concept & Environment
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
 FileStorage operates within the standard Gears runtime environment. Authentication and identity management are
 fully delegated to the platform — FileStorage does not implement its own authentication layer. All incoming requests are
@@ -142,10 +142,10 @@ roles) from the platform authentication middleware.
 The system **MUST** accept file content with metadata and persist it, returning a persistent, accessible URL. File
 content is immutable after upload — to change content, a new file **MUST** be uploaded.
 
-**Rationale**: All platform modules and users need to store files — modules store generated content, documents, and
+**Rationale**: All platform gears and users need to store files — gears store generated content, documents, and
 artifacts, users upload files directly. Immutable content simplifies caching, integrity verification, and backend
 replication.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Download File
 
@@ -153,9 +153,9 @@ replication.
 
 The system **MUST** retrieve file content and metadata by URL for consumption by requesting actors.
 
-**Rationale**: All platform modules and users need to retrieve stored files — modules fetch media and documents, users
+**Rationale**: All platform gears and users need to retrieve stored files — gears fetch media and documents, users
 download files directly.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Delete File
 
@@ -171,7 +171,7 @@ requires passing its version identifier explicitly.
 prevent dangling references. Versioned files default to soft-delete to enable recovery from accidental deletions —
 shareable links are preserved so they can be restored alongside the file. Permanent removal is an explicit,
 version-targeted operation.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Get File Metadata
 
@@ -182,7 +182,7 @@ download availability, and custom metadata) without transferring file content.
 
 **Rationale**: Consumers validate file properties (size limits, type compatibility) and read custom metadata before
 initiating downloads, avoiding wasted bandwidth on incompatible files.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### List Files
 
@@ -198,9 +198,9 @@ The response **MUST** be paginated following the platform API guidelines (cursor
 configurable page size). The system **MUST** support optional additional filters (mime_type, date range, custom metadata
 keys).
 
-**Rationale**: Users and modules need to discover and browse files they own or have access to. Mandatory owner type
+**Rationale**: Users and gears need to discover and browse files they own or have access to. Mandatory owner type
 filtering prevents unbounded queries across all files and aligns with the ownership model.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Multipart Upload
 
@@ -222,7 +222,7 @@ clients must use single-part upload for backends without native multipart suppor
 memory constraints, and network reliability. Multipart upload enables reliable transfer of arbitrarily large files.
 Implementing multipart at the FileStorage layer without backend support would require full content buffering, negating
 the scalability benefits. Rejecting with a clear error lets clients adapt their upload strategy per backend.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Content-Type Validation
 
@@ -250,7 +250,7 @@ for S3) that far exceeds the longest magic-byte sequence (~12 bytes). Backends w
 multipart uploads entirely, so no fallback is needed. Post-assembly re-validation would require downloading the
 assembled file from the backend, negating the efficiency benefits of multipart upload. Direct uploads trade server-side
 content validation for transfer efficiency — consumers relying on strict type guarantees should use proxied uploads.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 ### 5.2 Ownership & Access Control
 
@@ -265,7 +265,7 @@ tenant at upload time. Ownership is immutable after creation except through expl
 **Rationale**: Ownership determines who can manage (delete, share, update metadata) a file and establishes the basis for
 access control decisions. Restricting ownership changes to explicit transfer operations simplifies the authorization
 model and prevents accidental privilege escalation.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Authorization Checks
 
@@ -278,7 +278,7 @@ the context of the requesting user. Authorization requests **MUST** include the 
 
 **Rationale**: All file access must be governed by the platform's centralized authorization model to enforce role-based,
 tenant-scoped, and type-scoped permissions.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Tenant Boundary Enforcement
 
@@ -291,7 +291,7 @@ read access is intentionally permitted via shareable links with tenant-hierarchy
 
 **Rationale**: Multi-tenant platforms require strict data isolation for write operations to prevent unauthorized
 cross-tenant modification, while supporting controlled read sharing across tenant hierarchies.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Data Classification
 
@@ -299,14 +299,14 @@ cross-tenant modification, while supporting controlled read sharing across tenan
 
 FileStorage treats all stored files as opaque binary blobs and does **NOT** inspect, classify, or label file content by
 sensitivity level. Data classification (public, internal, confidential, restricted) is the responsibility of consuming
-modules and policies. FileStorage enforces access control through its authorization model and tenant boundaries
+gears and policies. FileStorage enforces access control through its authorization model and tenant boundaries
 regardless of data sensitivity.
 
-**Rationale**: FileStorage is a general-purpose storage service that serves modules with diverse data sensitivity
+**Rationale**: FileStorage is a general-purpose storage service that serves gears with diverse data sensitivity
 requirements. Embedding classification logic in the storage layer would couple it to domain-specific semantics. Instead,
-consuming modules classify their own data and rely on FileStorage's authorization and tenant isolation to enforce access
+consuming gears classify their own data and rely on FileStorage's authorization and tenant isolation to enforce access
 boundaries appropriate to the sensitivity level.
-**Actors**: `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-cf-gears`
 
 #### File Type Classification
 
@@ -322,14 +322,14 @@ for LLM-generated files). The file type **MUST** be:
 - Validated — the system **MUST** verify that the provided type follows the GTS type format
 
 The system **MUST** be able to use the file type to make per-type access decisions, enabling isolation
-between actors and modules — a module **MUST** only be able to access files of types it is authorized for. File type
+between actors and gears — a gear **MUST** only be able to access files of types it is authorized for. File type
 authorization is enforced through the existing authorization model (`cpt-cf-file-storage-fr-authorization`).
 
-**Rationale**: Without file type classification, any module with general file access can read files created by any other
-module, breaking isolation between platform components. GTS types enable fine-grained, per-actor access control — e.g.,
-the LLM Gateway can only access LLM-generated files, the Feedback module can only access feedback-related files —
-without requiring separate storage namespaces or custom authorization logic per module.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Rationale**: Without file type classification, any gear with general file access can read files created by any other
+gear, breaking isolation between platform components. GTS types enable fine-grained, per-actor access control — e.g.,
+the LLM Gateway can only access LLM-generated files, the Feedback gear can only access feedback-related files —
+without requiring separate storage namespaces or custom authorization logic per gear.
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Ownership Transfer
 
@@ -362,7 +362,7 @@ be specifiable at file creation time and when creating additional links for exis
 **Rationale**: Different use cases require different visibility: public links for external sharing, tenant links for
 internal collaboration, hierarchy links for parent-child tenant structures. Routing through FileStorage enables
 scope-based access control, revocation, and audit logging on every access.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Signed Download URLs
 
@@ -400,7 +400,7 @@ embedding in emails, third-party integrations) while maintaining time-bounded ac
 the storage backend directly eliminates FileStorage as a bottleneck for shared content — following the pattern
 established by S3 presigned URLs, GCS signed URLs, and Azure SAS tokens. The non-revocable nature follows the same
 constraint inherent in S3 presigned URLs, GCS signed URLs, and Azure SAS tokens.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Link Expiration
 
@@ -414,7 +414,7 @@ backend validates the signature and rejects expired URLs independently of FileSt
 **Rationale**: Time-limited access prevents stale links from remaining accessible indefinitely, reducing the attack
 surface for shared files. Expiration enforcement follows the traffic path: FileStorage enforces for shareable links
 (which it serves), and the storage backend enforces for signed URLs (which bypass FileStorage).
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Manage Links
 
@@ -462,7 +462,7 @@ Clients must use standard (proxied) upload for backends without presigned URL su
 bottleneck and doubles bandwidth consumption. Direct-to-backend upload via presigned URLs eliminates this overhead for
 backends that declare the presigned URLs capability, following the pattern established by S3 presigned URLs, GCS signed
 URLs, and Azure SAS tokens — where the service with backend credentials signs on behalf of the client.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Garbage Collection for Unconfirmed Uploads
 
@@ -478,7 +478,7 @@ and confirm records whose corresponding backend object exists but was never ackn
 metadata records pointing to non-existent backend objects. The presigned URL expiration bounds the upload window but
 does not guarantee upload outcome, so garbage collection prevents stale metadata accumulation and
 ensures consistency between FileStorage records and backend state.
-**Actors**: `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-cf-gears`
 
 ### 5.5 Policies (Phase 2)
 
@@ -515,7 +515,7 @@ constraints.
 
 - [ ] `p2` - **ID**: `cpt-cf-file-storage-fr-file-events`
 
-The system **MUST** emit events to the EventBroker module on file write operations (upload, update, delete). Owner
+The system **MUST** emit events to the EventBroker gear on file write operations (upload, update, delete). Owner
 policy **MUST** define which event types are enabled.
 
 **Rationale**: Enables integration with downstream consumers for workflows such as antivirus scanning, content
@@ -548,7 +548,7 @@ asynchronous and **MUST NOT** block file operations if the Usage Collector is te
 transfers shift per-owner storage consumption without changing total platform storage — without debit/credit reporting,
 billing and quota data become stale after transfers. Asynchronous reporting ensures file operations are not degraded by
 usage collection availability.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Storage Quota Enforcement
 
@@ -561,7 +561,7 @@ rejected.
 **Rationale**: Without storage quotas, tenants can consume unbounded storage, increasing costs and risking resource
 exhaustion for the platform. Quota checks must cover all storage-consuming operations, not only initial uploads, to
 prevent quota bypass through versioned overwrites.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 ### 5.6 Metadata
 
@@ -588,7 +588,7 @@ alongside system-managed metadata in metadata queries.
 metadata enables consumers to attach domain-specific context (tags, categories, processing status, source identifiers)
 without schema changes — following the established pattern used by S3 object metadata, GCS custom metadata, and Azure
 Blob metadata.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Update Custom Metadata
 
@@ -599,9 +599,9 @@ an existing file. All other system-managed metadata (name, size, mime_type, GTS 
 date, owner) is **NOT** updatable by users — it is maintained by the system. Updating custom metadata or download
 availability **MUST** update the file's last modified date.
 
-**Rationale**: Custom metadata evolves as files are processed, categorized, or annotated by consuming modules. System
+**Rationale**: Custom metadata evolves as files are processed, categorized, or annotated by consuming gears. System
 metadata reflects the immutable physical properties of the file and must remain authoritative.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Custom Metadata Limits
 
@@ -613,7 +613,7 @@ limits **MUST** be rejected.
 
 **Rationale**: Without limits, custom metadata can be abused for general-purpose data storage, inflating metadata
 storage costs and degrading query performance.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 ### 5.7 File Retention & Lifecycle
 
@@ -626,8 +626,8 @@ automatically delete or expire file content based on age or inactivity. Shareabl
 configured expiration, but the underlying file content remains available.
 
 **Rationale**: In the absence of tenant-level retention policies (phase 2), indefinite retention is the safest default —
-it prevents accidental data loss and gives consuming modules predictable storage semantics.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+it prevents accidental data loss and gives consuming gears predictable storage semantics.
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Retention Policies
 
@@ -664,7 +664,7 @@ mark them as orphaned for manual resolution.
 blind deletion risks data loss, while indefinite retention risks compliance violations. Delegating disposition to
 Serverless Runtime workflows enables deployment-specific logic (legal holds, data migration, cascading cleanup) without
 embedding policy decisions in FileStorage.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### File Versioning
 
@@ -701,7 +701,7 @@ workflows that require historical access to file content, and aligns with capabi
 major storage backends (S3, GCS, Azure Blob, MinIO, Ceph, Backblaze B2). Logical delete markers (rather than physical
 removal) enable restoration and follow the established pattern of S3 versioned deletes, GCS soft-delete, and Azure Blob
 soft-delete. Counting soft-deleted content against quota prevents quota bypass through repeated soft-delete cycles.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### File Encryption
 
@@ -714,7 +714,7 @@ content at rest, configurable per backend and per policy.
 **Rationale**: Regulated environments and security-sensitive deployments require encryption at rest to meet compliance
 requirements (GDPR, HIPAA, SOC 2) and protect stored data against unauthorized physical or logical access to the
 storage backend.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 ### 5.8 Audit
 
@@ -727,7 +727,7 @@ link revocation). Audit records **MUST** include the operation type, actor ident
 outcome (success or failure).
 
 **Rationale**: Audit trails are required for security forensics, compliance reporting, and operational troubleshooting.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Read Audit Logging
 
@@ -741,7 +741,7 @@ presigned URL downloads, which bypass FileStorage and are served directly by the
 **Rationale**: Regulated environments and security-sensitive owners require visibility into who accessed their files and
 when. Making read audit optional per policy avoids the performance and storage overhead of logging every read
 across the platform, while enabling it where compliance demands it.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 ### 5.9 Pluggable Storage Backends
 
@@ -753,8 +753,8 @@ The system **MUST** abstract the storage layer behind a common interface, enabli
 S3, GCS, Azure Blob, NFS, FTP, SMB, WebDAV, local filesystem).
 
 **Rationale**: Different deployments and tenants have different storage infrastructure; a common interface allows
-backend selection without changing the module's core logic.
-**Actors**: `cpt-cf-file-storage-actor-cf-modules`
+backend selection without changing the gear's core logic.
+**Actors**: `cpt-cf-file-storage-actor-cf-gears`
 
 #### Backend Capabilities
 
@@ -786,7 +786,7 @@ behavior per backend, allows consumers to discover and handle feature availabili
 with a consistent, extensible pattern. Per-backend capability toggling allows administrators to disable features for
 security or operational reasons — e.g., disabling presigned URLs to force all traffic through FileStorage for audit
 visibility, even when the backend supports them.
-**Actors**: `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-cf-gears`
 
 #### Runtime Backend Configuration
 
@@ -808,7 +808,7 @@ or geographic requirements.
 The system **MUST** expose a REST API for all file operations (upload, download, delete, metadata, link management).
 
 **Rationale**: REST is the standard access interface for Gears and platform UI.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### S3-Compatible API
 
@@ -819,7 +819,7 @@ existing S3 tooling and SDKs.
 
 **Rationale**: S3 is the de facto standard for object storage APIs; compatibility enables direct integration with tools,
 libraries, and workflows that already support S3.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### WebDAV API
 
@@ -841,7 +841,7 @@ files, resumable downloads, and parallel download of file segments.
 
 **Rationale**: For large files (video, datasets), clients need partial access for seeking, preview generation, and
 resuming interrupted downloads without re-transferring the entire file.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 ### 5.11 Cache & Idempotency
 
@@ -865,7 +865,7 @@ storage backend.
 browsers and reverse proxies. Conditional updates prevent silent data loss when multiple clients modify file metadata
 concurrently. Both follow standard HTTP semantics (RFC 7232) understood by all HTTP clients. Since FileStorage manages
 file metadata for all backends, ETags are a FileStorage-level feature independent of backend capabilities.
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 #### Upload Idempotency
 
@@ -886,11 +886,11 @@ owner boundaries — a request **MUST NOT** be able to detect whether a differen
 idempotency, client retries create duplicate files. Idempotency keys enable safe retries for single-part and multipart
 uploads across unreliable networks. Owner-scoped key namespacing prevents cross-tenant information leaks and aligns with
 the platform's tenant boundary enforcement (`cpt-cf-file-storage-fr-tenant-boundary`).
-**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-modules`
+**Actors**: `cpt-cf-file-storage-actor-platform-user`, `cpt-cf-file-storage-actor-cf-gears`
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Metadata Query Latency
 
@@ -899,7 +899,7 @@ the platform's tenant boundary enforcement (`cpt-cf-file-storage-fr-tenant-bound
 File metadata queries **MUST** complete within 25ms at p95.
 
 **Threshold**: <25ms p95
-**Rationale**: Metadata queries are used for pre-fetch validation in latency-sensitive paths (e.g., a module checks file
+**Rationale**: Metadata queries are used for pre-fetch validation in latency-sensitive paths (e.g., a gear checks file
 size before processing).
 **Architecture Allocation**: See DESIGN.md § NFR Allocation for how this is realized
 
@@ -911,7 +911,7 @@ Content download latency **MUST** have no fixed overhead exceeding 50ms at p95; 
 file size.
 
 **Threshold**: <50ms + transfer time p95
-**Rationale**: FileStorage is called synchronously in request paths of consuming modules; excessive overhead compounds
+**Rationale**: FileStorage is called synchronously in request paths of consuming gears; excessive overhead compounds
 across requests with multiple files.
 **Architecture Allocation**: See DESIGN.md § NFR Allocation for how this is realized
 
@@ -967,21 +967,21 @@ requirements, the architecture may adopt patterns (global locks, shared mutable 
 
 ### 6.2 NFR Exclusions
 
-None — all project-default NFRs apply to this module.
+None — all project-default NFRs apply to this gear.
 
 ### 6.3 Applicability Notes
 
-The following NFR categories from the platform checklist are **not applicable** to this module:
+The following NFR categories from the platform checklist are **not applicable** to this gear:
 
 | Category                 | Rationale                                                                                                                                                                                                                                                                                               |
 |--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Safety**               | FileStorage is a data storage service with no physical actuators, safety-critical control loops, or human safety implications.                                                                                                                                                                          |
-| **UX**                   | FileStorage is a backend service consumed via SDK and APIs. It has no user-facing UI; UX concerns are the responsibility of consuming modules and platform UI.                                                                                                                                          |
+| **UX**                   | FileStorage is a backend service consumed via SDK and APIs. It has no user-facing UI; UX concerns are the responsibility of consuming gears and platform UI.                                                                                                                                          |
 | **Internationalization** | FileStorage stores and returns opaque binary content and metadata strings. It does not render, translate, or localize content. File names and metadata values are preserved as-is.                                                                                                                      |
-| **Privacy by Design**    | FileStorage treats all files as opaque blobs and does not inspect, index, or process file content. Privacy controls (data minimization, consent, right to erasure) are enforced at the platform and consuming-module level. Tenant isolation and access control are covered by functional requirements. |
-| **Compliance**           | FileStorage does not implement domain-specific compliance logic (GDPR, HIPAA, SOX). It provides the building blocks (audit trail, tenant isolation, retention policies, encryption) that enable consuming modules and platform operators to achieve compliance.                                         |
-| **Operations**           | Operational concerns (deployment, monitoring, alerting, runbooks) follow platform-wide standards and are not module-specific.                                                                                                                                                                           |
-| **Maintainability**      | Maintainability follows platform-wide coding standards, testing requirements, and CI/CD practices. No module-specific maintainability NFRs beyond the platform baseline.                                                                                                                                |
+| **Privacy by Design**    | FileStorage treats all files as opaque blobs and does not inspect, index, or process file content. Privacy controls (data minimization, consent, right to erasure) are enforced at the platform and consuming-gear level. Tenant isolation and access control are covered by functional requirements. |
+| **Compliance**           | FileStorage does not implement domain-specific compliance logic (GDPR, HIPAA, SOX). It provides the building blocks (audit trail, tenant isolation, retention policies, encryption) that enable consuming gears and platform operators to achieve compliance.                                         |
+| **Operations**           | Operational concerns (deployment, monitoring, alerting, runbooks) follow platform-wide standards and are not gear-specific.                                                                                                                                                                           |
+| **Maintainability**      | Maintainability follows platform-wide coding standards, testing requirements, and CI/CD practices. No gear-specific maintainability NFRs beyond the platform baseline.                                                                                                                                |
 
 ## 7. Public Library Interfaces
 
@@ -1010,11 +1010,11 @@ changes.
 
 #### Gear Contract
 
-- [ ] `p1` - **ID**: `cpt-cf-file-storage-contract-cf-modules`
+- [ ] `p1` - **ID**: `cpt-cf-file-storage-contract-cf-gears`
 
 **Direction**: provided by library (consumed by Gears)
 **Protocol/Format**: In-process Rust SDK trait via ClientHub
-**Compatibility**: Trait versioned with SDK crate; breaking changes require coordinated release with consuming modules.
+**Compatibility**: Trait versioned with SDK crate; breaking changes require coordinated release with consuming gears.
 
 #### Authorization Service Contract
 
@@ -1047,7 +1047,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 - [ ] `p2` - **ID**: `cpt-cf-file-storage-contract-eventbroker`
 
 **Direction**: bidirectional (publishes file events; consumes platform events such as owner deletion)
-**Protocol/Format**: Asynchronous event publishing and consumption via EventBroker module
+**Protocol/Format**: Asynchronous event publishing and consumption via EventBroker gear
 **Compatibility**: Contract follows platform event protocol; event schema changes require coordinated release.
 
 #### Serverless Runtime Contract
@@ -1095,11 +1095,11 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 - **Authorization denied**: FileStorage returns access-denied error
 - *(Phase 2)* **Policy violation**: FileStorage returns error indicating which policy was violated (type or size)
 
-### Fetch File for Module Processing
+### Fetch File for Gear Processing
 
 - [ ] `p1` - **ID**: `cpt-cf-file-storage-usecase-fetch-media`
 
-**Actor**: `cpt-cf-file-storage-actor-cf-modules`
+**Actor**: `cpt-cf-file-storage-actor-cf-gears`
 
 **Preconditions**:
 
@@ -1107,14 +1107,14 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 
 **Main Flow**:
 
-1. Module calls download with a file URL
+1. Gear calls download with a file URL
 2. FileStorage checks authorization for read on `gts.cf.fstorage.file.type.v1~` with the file's GTS type in resource context
 3. FileStorage retrieves file content from the storage backend
 4. FileStorage returns content with metadata (mime_type, size, GTS file type)
 
 **Postconditions**:
 
-- Content and metadata returned to the requesting module
+- Content and metadata returned to the requesting gear
 
 **Alternative Flows**:
 
@@ -1164,7 +1164,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 
 - [ ] `p1` - **ID**: `cpt-cf-file-storage-usecase-get-metadata`
 
-**Actor**: `cpt-cf-file-storage-actor-cf-modules`
+**Actor**: `cpt-cf-file-storage-actor-cf-gears`
 
 **Preconditions**:
 
@@ -1172,7 +1172,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 
 **Main Flow**:
 
-1. Module calls get_metadata with a file URL
+1. Gear calls get_metadata with a file URL
 2. FileStorage checks authorization for read on `gts.cf.fstorage.file.type.v1~` with the file's GTS type in resource context
 3. FileStorage returns metadata (name, size, mime_type, GTS file type, owner, availability) without transferring content
 
@@ -1332,7 +1332,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 
 - [ ] `p1` - **ID**: `cpt-cf-file-storage-usecase-backend-config`
 
-**Actor**: `cpt-cf-file-storage-actor-cf-modules`
+**Actor**: `cpt-cf-file-storage-actor-cf-gears`
 
 **Preconditions**:
 
@@ -1349,7 +1349,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 **Postconditions**:
 
 - All functional requirements are met identically across different backend configurations
-- Consuming modules require zero code changes when the backend changes
+- Consuming gears require zero code changes when the backend changes
 
 **Alternative Flows**:
 
@@ -1412,7 +1412,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 - [ ] Every file has a mandatory GTS file type assigned at upload time; uploads without a file type are rejected
 - [ ] GTS file type is immutable after creation
 - [ ] Authorization requests include the file's GTS type, enabling per-type access decisions
-- [ ] A module authorized only for type A cannot access files of type B
+- [ ] A gear authorized only for type A cannot access files of type B
 - [ ] FileStorage SDK and REST API behave identically regardless of configured storage backend
 - [ ] File listing returns metadata only, is paginated, and requires owner type filter
 - [ ] Multipart upload assembles parts into a complete file with correct metadata
@@ -1466,7 +1466,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 
 | Dependency            | Description                                                        | Criticality |
 |-----------------------|--------------------------------------------------------------------|-------------|
-| ToolKit Framework      | Module lifecycle, ClientHub for service registration               | p1          |
+| ToolKit Framework      | Gear lifecycle, ClientHub for service registration               | p1          |
 | Authorization Service | Access decisions for `gts.cf.fstorage.file.type.v1~` resources     | p1          |
 | Audit Infrastructure  | Platform audit event sink                                          | p2          |
 | Usage Collector       | Receives storage usage reports for metering and billing            | p2          |
@@ -1487,7 +1487,7 @@ debits/credits per `cpt-cf-file-storage-fr-usage-reporting`)
 | Risk                                                                | Impact                                                         | Mitigation                                                                                                                                              |
 |---------------------------------------------------------------------|----------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Storage service unavailability blocks all file-dependent operations | High — multimodal AI, document workflows disrupted             | Design for graceful degradation; clear error propagation to consumers                                                                                   |
-| Large file sizes increase request latency for consuming modules     | Medium — slow responses for multimodal and document operations | Metadata pre-fetch enables size validation; streaming support for large files                                                                           |
+| Large file sizes increase request latency for consuming gears     | Medium — slow responses for multimodal and document operations | Metadata pre-fetch enables size validation; streaming support for large files                                                                           |
 | Signed URL key compromise enables unauthorized file access          | High — data exposure                                           | Key rotation is a backend configuration concern (credentials updated in backend config); short default expiration; shareable links for revocable access |
 | Policy misconfiguration blocks legitimate uploads                   | Medium — user frustration                                      | Policy validation on save; clear error messages identifying which policy was violated                                                                   |
 

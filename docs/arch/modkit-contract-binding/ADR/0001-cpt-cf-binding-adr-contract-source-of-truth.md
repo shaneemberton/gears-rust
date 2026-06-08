@@ -9,7 +9,7 @@ date: 2026-04-10
 
 ## Context and Problem Statement
 
-The contract-binding system needs a single source of truth for module contracts. The source of truth determines how contracts are authored, how clients are produced, how OpenAPI specs are generated, and how the system evolves. The choice affects every module author, every plugin implementer, and every third-party integrator.
+The contract-binding system needs a single source of truth for gear contracts. The source of truth determines how contracts are authored, how clients are produced, how OpenAPI specs are generated, and how the system evolves. The choice affects every gear author, every plugin implementer, and every third-party integrator.
 
 Four realistic approaches are available, ranging from "trait-first with code generation" to "IDL-first with generated Rust types." Each has tradeoffs for compile-time safety, boilerplate, multi-language support, developer ergonomics, and evolution cost.
 
@@ -41,7 +41,7 @@ This option was chosen because it is the only one that satisfies all decision dr
 
 ### Consequences
 
-* All module SDK crates define contracts as plain Rust traits with zero transport annotations
+* All gear SDK crates define contracts as plain Rust traits with zero transport annotations
 * Protocol projections are separate traits annotated with `#[toolkit_rest_contract]` that extend the base via `: Base`
 * The `cf-toolkit-contract-macros` crate owns the proc macros and must be maintained for the platform's lifetime
 * The `cf-toolkit-contract-runtime` crate provides `ProblemDetails`, `ClientConfig`, SSE parser, retry helper — all dependencies of generated clients
@@ -97,7 +97,7 @@ Rust trait defines the contract; every REST client is hand-written. No procedura
 * Every SDK reinvents the same boilerplate (HTTP client setup, error reconstruction, retry with backoff, SSE parsing), producing substantial duplication.
 * No automatic OpenAPI specification generation — authors must hand-write YAML and keep it synchronized with the trait, which will inevitably drift.
 * Third-party integrators have no language-neutral contract to target.
-* Error mapping across module boundaries is inconsistent — each SDK implements `ContractError` differently.
+* Error mapping across gear boundaries is inconsistent — each SDK implements `ContractError` differently.
 * This is effectively the current state of the platform, which is the problem this change exists to resolve.
 
 ### Option C: OpenAPI-First — OpenAPI YAML as Source, Generate Rust Types
@@ -151,4 +151,4 @@ The contract is authored in an external IDL (protobuf, Smithy, TypeSpec, or simi
 * ADR-0002 — OpenAPI spec generation limits: [`./0002-cpt-cf-binding-adr-openapi-spec-limits.md`](./0002-cpt-cf-binding-adr-openapi-spec-limits.md)
 * Evidence report on IDL unification: [rest-grpc-unification-evidence.html](https://github.com/striped-zebra-dev/toolkit-binding-poc/blob/main/docs/research/rest-grpc-unification-evidence.html)
 * PoC repository: [striped-zebra-dev/toolkit-binding-poc](https://github.com/striped-zebra-dev/toolkit-binding-poc)
-* Module/plugin declaration and resolution: [PR #1380](https://github.com/constructorfabric/gears-rust/pull/1380) (complementary, not alternative)
+* Gear/plugin declaration and resolution: [PR #1380](https://github.com/constructorfabric/gears-rust/pull/1380) (complementary, not alternative)

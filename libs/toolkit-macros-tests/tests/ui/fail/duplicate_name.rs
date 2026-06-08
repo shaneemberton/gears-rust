@@ -1,6 +1,6 @@
-use toolkit_macros::module;
+use toolkit_macros::gear;
 
-#[module(name="a", name="b", capabilities=[stateful])]
+#[gear(name="a", name="b", capabilities=[stateful])]
 pub struct X;
 
 fn main() {}

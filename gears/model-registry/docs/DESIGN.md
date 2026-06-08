@@ -197,7 +197,7 @@ graph TB
         ERRORS[Errors]
     end
 
-    subgraph Module["model-registry"]
+    subgraph Gear["model-registry"]
         subgraph API["api/rest"]
             HANDLERS[handlers.rs]
             ROUTES[routes.rs]
@@ -309,7 +309,7 @@ SeaORM-based repository implementation. Handles CRUD operations, tenant-scoped q
 
 ### 3.4 Internal Dependencies
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear    | Interface Used | Purpose |
 |-------------------|----------------|---------|
 | `tenant-resolver` | SDK client via ClientHub | Resolve tenant hierarchy (parent chain) |
 | `approval-service` | SDK client via ClientHub | Manage approval workflow, query status |
@@ -317,7 +317,7 @@ SeaORM-based repository implementation. Handles CRUD operations, tenant-scoped q
 
 **Dependency Rules**:
 - No circular dependencies
-- Always use SDK modules for inter-module communication
+- Always use SDK modules for inter-gear communication
 - `SecurityContext` must be propagated across all in-process calls
 
 ### 3.5 External Dependencies

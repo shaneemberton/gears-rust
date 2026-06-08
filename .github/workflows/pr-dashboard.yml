@@ -56,7 +56,7 @@ jobs:
             } = process.env;
 
             const blockedMentions = new Set([
-              "modules"
+              "gears"
             ]);
 
             let allowedUsers = new Set();

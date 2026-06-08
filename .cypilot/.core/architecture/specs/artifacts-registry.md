@@ -785,8 +785,8 @@ else:
 # version and project_root are in core.toml
 
 [[ignore]]
-reason = "Third-party module"
-patterns = ["gears/my_module/*"]
+reason = "Third-party gear"
+patterns = ["gears/my_gear/*"]
 
 # ── Root system ──────────────────────────────────────────────
 
@@ -920,7 +920,7 @@ kind = "FEATURE"
 traceability = "FULL"
 
 [[systems.children.codebase]]
-name = "Auth Module"
+name = "Auth Gear"
 path = "src/gears/auth"
 extensions = [".ts"]
 ```

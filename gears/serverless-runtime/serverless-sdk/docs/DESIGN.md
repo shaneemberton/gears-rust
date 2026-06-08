@@ -74,7 +74,7 @@ DESIGN LANGUAGE:
 
 ### 1.1 Architectural Vision
 
-`serverless-runtime-sdk` is the engine-agnostic contract crate of the serverless-runtime module. It exposes traits and value types used by the host and by runtime plugins. It has no runtime state, no I/O, and no engine-specific dependencies.
+`serverless-runtime-sdk` is the engine-agnostic contract crate of the serverless-runtime gear. It exposes traits and value types used by the host and by runtime plugins. It has no runtime state, no I/O, and no engine-specific dependencies.
 
 The invocation flow through this crate's types:
 
@@ -97,17 +97,17 @@ flowchart LR
 | `ServerlessRuntimeClient` | host | plugin (to emit index-update events) |
 | `FunctionHandler<I, O>` / `WorkflowHandler<I, O>` | runtime plugin (wraps the function author's authoring asset) | plugin |
 
-> **Note on "who implements `FunctionHandler`".** The `impl FunctionHandler<I, O> for …` lives inside the runtime plugin — the plugin provides a Rust type that wraps a **function author's authoring asset** (a Starlark script, a Rust activity fn, a compiled WASM module, a deployed Lambda function, …). Inside `call`, the plugin executes that asset. Function authors never implement SDK traits directly; they author in the plugin's own authoring model and the plugin bridges that into a `FunctionHandler`. A plugin could choose to expose `FunctionHandler` as its own authoring model for power users, but that's a minority case.
+> **Note on "who implements `FunctionHandler`".** The `impl FunctionHandler<I, O> for …` lives inside the runtime plugin — the plugin provides a Rust type that wraps a **function author's authoring asset** (a Starlark script, a Rust activity fn, a compiled WASM gear, a deployed Lambda function, …). Inside `call`, the plugin executes that asset. Function authors never implement SDK traits directly; they author in the plugin's own authoring model and the plugin bridges that into a `FunctionHandler`. A plugin could choose to expose `FunctionHandler` as its own authoring model for power users, but that's a minority case.
 
 **Shared domain** (used across all three parties): `InvocationRecord`, `CompensationContext`, `RuntimeErrorCategory`, `RuntimeErrorPayload`, `RetryPolicy`, `TimelineEventType`.
 
 **Handler-author projections** (ergonomic views of the shared domain that appear in the `FunctionHandler::call` signature): `Context` (from `InvocationRecord`), `CompensationInput` (from `CompensationContext`), `ServerlessSdkError` (maps to `RuntimeErrorCategory`).
 
-**Other modules**: `environment` (`Environment` trait + `CredStoreEnvironment` impl for synchronous config/secret access), `trace` (plugin-only helper that emits `TimelineEventType` events around handler calls).
+**Other gears**: `environment` (`Environment` trait + `CredStoreEnvironment` impl for synchronous config/secret access), `trace` (plugin-only helper that emits `TimelineEventType` events around handler calls).
 
 The `async-trait` crate is used for `RuntimeAdapter`, `FunctionHandler`, and `WorkflowHandler`, making them ergonomic to implement and ensuring the returned `Future` is `+ Send` without callers annotating anything.
 
-For the module-wide decomposition (how host, plugins, and this SDK fit together) see [`modules/serverless-runtime/docs/DESIGN.md`](../../docs/DESIGN.md).
+For the gear-wide decomposition (how host, plugins, and this SDK fit together) see [`gears/serverless-runtime/docs/DESIGN.md`](../../docs/DESIGN.md).
 
 ### 1.2 Architecture Drivers
 
@@ -123,15 +123,15 @@ For the module-wide decomposition (how host, plugins, and this SDK fit together)
 | `cpt-cf-serverless-runtime-sdk-fr-deadline-helpers` | `is_deadline_exceeded()` and `remaining_time()` on `Context` |
 | `cpt-cf-serverless-runtime-sdk-fr-environment-trait` | Sync `Environment` trait with `CredStoreEnvironment` impl in `environment.rs` |
 | `cpt-cf-serverless-runtime-sdk-fr-error-model` | `#[non_exhaustive]` `ServerlessSdkError` with `thiserror` in `error.rs` |
-| `cpt-cf-serverless-runtime-sdk-fr-trace-module` | `trace.rs` with `call_instrumented` and `compensate_instrumented` |
+| `cpt-cf-serverless-runtime-sdk-fr-trace-gear` | `trace.rs` with `call_instrumented` and `compensate_instrumented` |
 | `cpt-cf-serverless-runtime-sdk-fr-no-consumer-tracing` | `tracing` calls contained entirely within `trace.rs` |
 
 #### NFR Allocation
 
 | NFR ID | NFR Summary | Allocated To | Design Response | Verification Approach |
 |--------|-------------|--------------|-----------------|----------------------|
-| `cpt-cf-serverless-runtime-sdk-nfr-no-engine-deps` | No engine-specific deps | All modules | Dep list restricted to `serde`, `serde_json`, `thiserror`, `async-trait`, `tracing` | `cargo deny` in CI |
-| `cpt-cf-serverless-runtime-sdk-nfr-no-unsafe` | Zero `unsafe` blocks | All modules | Workspace `unsafe_code = "forbid"` lint; no pointer manipulation | Lint enforced at compile time |
+| `cpt-cf-serverless-runtime-sdk-nfr-no-engine-deps` | No engine-specific deps | All gears | Dep list restricted to `serde`, `serde_json`, `thiserror`, `async-trait`, `tracing` | `cargo deny` in CI |
+| `cpt-cf-serverless-runtime-sdk-nfr-no-unsafe` | Zero `unsafe` blocks | All gears | Workspace `unsafe_code = "forbid"` lint; no pointer manipulation | Lint enforced at compile time |
 | `cpt-cf-serverless-runtime-sdk-nfr-low-overhead` | No blocking I/O or extra heap allocs on hot path | `trace.rs`, `handler.rs` | `call_instrumented` introduces one `Box<dyn Future>` (async-trait) and one `tracing` span; no additional heap allocations on the hot path | Code review on PRs touching `trace.rs` or `handler.rs` |
 | `cpt-cf-serverless-runtime-sdk-nfr-api-docs` | Zero missing-doc warnings; `#![deny(missing_docs)]` | All public items | All public types, traits, and functions documented with purpose, usage, and invariants | `cargo doc --no-deps` in CI |
 | `cpt-cf-serverless-runtime-sdk-nfr-authoring-ergonomics` | Plain `async fn` syntax; no lifetime annotations on handler impls | `handler.rs`, `workflow.rs` | `async-trait` expands `async fn` to `Pin<Box<dyn Future + Send>>` internally, keeping the `impl` surface annotation-free | SDK examples and integration tests compile with `async fn` syntax; CI fails on any explicit `impl Future` or lifetime annotation on method signatures |
@@ -149,7 +149,7 @@ For the module-wide decomposition (how host, plugins, and this SDK fit together)
 
 ### 1.3 Architecture Layers
 
-The serverless-runtime module has a thin host and fat runtime plugins. This SDK is the single contract crate that sits between them: the host invokes plugins through the `RuntimeAdapter` trait, and plugins invoke user code through the handler traits.
+The serverless-runtime gear has a thin host and fat runtime plugins. This SDK is the single contract crate that sits between them: the host invokes plugins through the `RuntimeAdapter` trait, and plugins invoke user code through the handler traits.
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
@@ -189,7 +189,7 @@ The serverless-runtime module has a thin host and fat runtime plugins. This SDK 
 ║  │                           calls)                       │   ║
 ║  └────────────────────────────────────────────────────────┘   ║
 ║                                                               ║
-║  Handler-author surface (user-facing modules)                 ║
+║  Handler-author surface (user-facing gears)                 ║
 ║  ┌──────────┐ ┌───────────┐ ┌───────┐ ┌──────────┐           ║
 ║  │ handler  │ │ workflow  │ │ error │ │ context  │           ║
 ║  └──────────┘ └───────────┘ └───────┘ └──────────┘           ║
@@ -434,7 +434,7 @@ graph TD
     trc --> wfl
 ```
 
-**Dependency direction**: handler-author modules (`context`, `error`, `workflow`) depend on the shared domain where a projection exists (e.g., `Context` projects from `InvocationRecord`; `ServerlessSdkError` maps to `RuntimeErrorCategory`). `RuntimeAdapter` and `ServerlessRuntimeClient` do not depend on handler traits — the host can consume this crate through `RuntimeAdapter` + domain types alone without pulling in `FunctionHandler` definitions it never uses (though in practice `lib.rs` re-exports everything).
+**Dependency direction**: handler-author gears (`context`, `error`, `workflow`) depend on the shared domain where a projection exists (e.g., `Context` projects from `InvocationRecord`; `ServerlessSdkError` maps to `RuntimeErrorCategory`). `RuntimeAdapter` and `ServerlessRuntimeClient` do not depend on handler traits — the host can consume this crate through `RuntimeAdapter` + domain types alone without pulling in `FunctionHandler` definitions it never uses (though in practice `lib.rs` re-exports everything).
 
 #### context.rs — Context
 
@@ -532,7 +532,7 @@ is valid for single-owner dispatch but insufficient for shared registry storage.
 
 ##### Responsibility boundaries
 
-Does not own: span emission (trace module concern). Input deserialisation from raw JSON
+Does not own: span emission (trace gear concern). Input deserialisation from raw JSON
 and output serialisation are performed by the plugin before/after calling the handler
 through `trace::call_instrumented`.
 
@@ -694,8 +694,8 @@ WorkflowHandler<I, O>: FunctionHandler<I, O>
 
 **Dependency Rules**:
 - No circular dependencies (this is a leaf library).
-- No cross-module type imports except through `lib.rs` re-exports.
-- `trace.rs` may import from all other modules but no other module imports from `trace.rs`.
+- No cross-gear type imports except through `lib.rs` re-exports.
+- `trace.rs` may import from all other gears but no other gear imports from `trace.rs`.
 
 ### 3.5 External Dependencies
 
@@ -792,7 +792,7 @@ infrastructure.
 | `Context` | Fully constructible in tests; set `deadline` to a past `Instant` to test expired-deadline paths | No runtime infrastructure |
 | `trace.rs` | Any `tracing::Subscriber` (e.g., `tracing-subscriber` with test collector) | No SDK-specific subscriber |
 
-**Test isolation approach:** Each module (`context.rs`, `environment.rs`, `error.rs`,
+**Test isolation approach:** Each gear (`context.rs`, `environment.rs`, `error.rs`,
 `handler.rs`, `workflow.rs`, `trace.rs`) is independently testable; no shared mutable
 state across invocations. All SDK types are `Send + Sync`, compatible with parallel test runners.
 
@@ -800,7 +800,7 @@ state across invocations. All SDK types are `Send + Sync`, compatible with paral
 
 | Level | Approach | Scope |
 |-------|----------|-------|
-| Unit | Per-module tests with HashMap-backed `Environment` mock and minimal `Context` | Trait compilation, error variant mapping, deadline helper behavior |
+| Unit | Per-gear tests with HashMap-backed `Environment` mock and minimal `Context` | Trait compilation, error variant mapping, deadline helper behavior |
 | Integration | Compile-only test: `impl FunctionHandler` + `impl WorkflowHandler` without any adapter crate | Verifies API contract compiles on stable 1.92.0 |
 | Performance | Code review: verify `call_instrumented` introduces no blocking I/O or extra heap allocations | Verifies `nfr-low-overhead` threshold (one `Box<dyn Future>` + one span) |
 
@@ -808,7 +808,7 @@ state across invocations. All SDK types are `Send + Sync`, compatible with paral
 
 **Not applicable.** This crate is a pure Rust library with no database, no persistence layer,
 and no schema definitions. There are no SQL or NoSQL schemas, no ORM entities, and no
-migration files owned by this module. All data structures are in-memory Rust types
+migration files owned by this gear. All data structures are in-memory Rust types
 defined in §3.1 (Domain Model).
 
 ### 3.8 Capacity, Cost, and Deployment Exclusions
@@ -828,7 +828,7 @@ explicitly excluded:
 
 ### Relationship to the Serverless Runtime Design
 
-This crate is the single shared SDK of the serverless-runtime module. It owns both:
+This crate is the single shared SDK of the serverless-runtime gear. It owns both:
 
 - **Shared domain types** (`InvocationRecord`, `CompensationContext`, `RuntimeErrorCategory`,
   `RuntimeErrorPayload`, `RetryPolicy`, `TimelineEventType`): these types live in this SDK
@@ -836,7 +836,7 @@ This crate is the single shared SDK of the serverless-runtime module. It owns bo
   depending on any plugin crate. `RetryPolicy` is platform-defined (max attempts, backoff,
   non-retryable error classification) and exported from this crate so every plugin honours
   it consistently; plugins *apply* it using their backend's engine-native retry mechanism.
-  See the module-level [DESIGN.md](../../docs/DESIGN.md) for how these types are consumed
+  See the gear-level [DESIGN.md](../../docs/DESIGN.md) for how these types are consumed
   by the host (registry, lightweight invocation index, etc.).
 - **Projections used by handler code**:
   - `Context` is a projection of `InvocationRecord`.
@@ -897,7 +897,7 @@ instrumentation point.
 
 | Artifact | Value |
 |----------|-------|
-| Directory | `modules/serverless-runtime/serverless-sdk/` (a rename to `serverless-runtime-sdk/` for consistency with the crate/package name is deferred) |
+| Directory | `gears/serverless-runtime/serverless-sdk/` (a rename to `serverless-runtime-sdk/` for consistency with the crate/package name is deferred) |
 | Package name | `serverless-runtime-sdk` |
 | Lib name | `serverless_runtime_sdk` |
 | Import | `use serverless_runtime_sdk::...` |
@@ -939,5 +939,5 @@ in these areas is deliberate, not an omission.
 
 - **PRD**: [PRD.md](./PRD.md)
 - **Source**: [serverless-runtime-sdk/src/](../src/)
-- **Serverless Runtime DESIGN**: [modules/serverless-runtime/docs/DESIGN.md](../../docs/DESIGN.md)
-- **Serverless Runtime Rust Types**: [modules/serverless-runtime/docs/DESIGN_RUST_TYPES.md](../../docs/DESIGN_RUST_TYPES.md)
+- **Serverless Runtime DESIGN**: [gears/serverless-runtime/docs/DESIGN.md](../../docs/DESIGN.md)
+- **Serverless Runtime Rust Types**: [gears/serverless-runtime/docs/DESIGN_RUST_TYPES.md](../../docs/DESIGN_RUST_TYPES.md)

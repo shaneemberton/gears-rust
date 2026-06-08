@@ -179,7 +179,7 @@ impl EarlyLintPass for De0706NoDirectSqlx {
             return;
         }
 
-        // Skip contract/ modules - they may need sqlx types for test fixtures
+        // Skip contract/ gears - they may need sqlx types for test fixtures
         if is_in_contract_module_ast(cx, item) {
             return;
         }

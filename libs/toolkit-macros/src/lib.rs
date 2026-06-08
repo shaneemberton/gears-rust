@@ -15,14 +15,14 @@ mod expand_vars;
 mod grpc_client;
 mod utils;
 
-/// Configuration parsed from #[module(...)] attribute
-struct ModuleConfig {
+/// Configuration parsed from #[gear(...)] attribute
+struct GearConfig {
     name: String,
     deps: Vec<String>,
     caps: Vec<Capability>,
-    ctor: Option<Expr>,             // arbitrary constructor expression
-    client: Option<Path>,           // trait path for client DX helpers
-    lifecycle: Option<LcModuleCfg>, // optional lifecycle config (on type)
+    ctor: Option<Expr>,           // arbitrary constructor expression
+    client: Option<Path>,         // trait path for client DX helpers
+    lifecycle: Option<LcGearCfg>, // optional lifecycle config (on type)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -117,7 +117,7 @@ impl Capability {
     }
 }
 
-/// Validates that a module name follows kebab-case naming convention.
+/// Validates that a gear name follows kebab-case naming convention.
 ///
 /// # Rules
 /// - Must contain only lowercase letters (a-z), digits (0-9), and hyphens (-)
@@ -131,14 +131,14 @@ impl Capability {
 /// Invalid: "`file_parser`" (underscores), "`FileParser`" (uppercase), "-parser" (starts with hyphen)
 fn validate_kebab_case(name: &str) -> Result<(), String> {
     if name.is_empty() {
-        return Err("module name cannot be empty".to_owned());
+        return Err("gear name cannot be empty".to_owned());
     }
 
     // Check for underscores (common mistake)
     if name.contains('_') {
         let suggested = name.replace('_', "-");
         return Err(format!(
-            "module name must use kebab-case, not snake_case\n       = help: use '{suggested}' instead of '{name}'"
+            "gear name must use kebab-case, not snake_case\n       = help: use '{suggested}' instead of '{name}'"
         ));
     }
 
@@ -146,17 +146,17 @@ fn validate_kebab_case(name: &str) -> Result<(), String> {
     if let Some(first_char) = name.chars().next() {
         if !first_char.is_ascii_lowercase() {
             return Err(format!(
-                "module name must start with a lowercase letter, found '{first_char}'"
+                "gear name must start with a lowercase letter, found '{first_char}'"
             ));
         }
     } else {
         // This should never happen due to the empty check above
-        return Err("module name cannot be empty".to_owned());
+        return Err("gear name cannot be empty".to_owned());
     }
 
     // Must not end with hyphen
     if name.ends_with('-') {
-        return Err("module name must not end with a hyphen".to_owned());
+        return Err("gear name must not end with a hyphen".to_owned());
     }
 
     // Check for invalid characters and consecutive hyphens
@@ -164,14 +164,14 @@ fn validate_kebab_case(name: &str) -> Result<(), String> {
     for ch in name.chars() {
         if ch == '-' {
             if prev_was_hyphen {
-                return Err("module name must not contain consecutive hyphens".to_owned());
+                return Err("gear name must not contain consecutive hyphens".to_owned());
             }
             prev_was_hyphen = true;
         } else if ch.is_ascii_lowercase() || ch.is_ascii_digit() {
             prev_was_hyphen = false;
         } else {
             return Err(format!(
-                "module name must contain only lowercase letters, digits, and hyphens, found '{ch}'"
+                "gear name must contain only lowercase letters, digits, and hyphens, found '{ch}'"
             ));
         }
     }
@@ -180,13 +180,13 @@ fn validate_kebab_case(name: &str) -> Result<(), String> {
 }
 
 #[derive(Debug, Clone)]
-struct LcModuleCfg {
+struct LcGearCfg {
     entry: String,        // entry method name (e.g., "serve")
     stop_timeout: String, // human duration (e.g., "30s")
     await_ready: bool,    // require ReadySignal gating
 }
 
-impl Default for LcModuleCfg {
+impl Default for LcGearCfg {
     fn default() -> Self {
         Self {
             entry: "serve".to_owned(),
@@ -196,14 +196,14 @@ impl Default for LcModuleCfg {
     }
 }
 
-impl Parse for ModuleConfig {
+impl Parse for GearConfig {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut name: Option<String> = None;
         let mut deps: Vec<String> = Vec::new();
         let mut caps: Vec<Capability> = Vec::new();
         let mut ctor: Option<Expr> = None;
         let mut client: Option<Path> = None;
-        let mut lifecycle: Option<LcModuleCfg> = None;
+        let mut lifecycle: Option<LcGearCfg> = None;
 
         let mut seen_name = false;
         let mut seen_deps = false;
@@ -229,17 +229,17 @@ impl Parse for ModuleConfig {
                         Expr::Lit(syn::ExprLit {
                             lit: Lit::Str(s), ..
                         }) => {
-                            let module_name = s.value();
+                            let gear_name = s.value();
                             // Validate kebab-case format
-                            if let Err(err) = validate_kebab_case(&module_name) {
+                            if let Err(err) = validate_kebab_case(&gear_name) {
                                 return Err(syn::Error::new_spanned(s, err));
                             }
-                            name = Some(module_name);
+                            name = Some(gear_name);
                         }
                         other => {
                             return Err(syn::Error::new_spanned(
                                 other,
-                                "name must be a string literal, e.g. name = \"my-module\"",
+                                "name must be a string literal, e.g. name = \"my-gear\"",
                             ));
                         }
                     }
@@ -371,7 +371,7 @@ impl Parse for ModuleConfig {
                         }
                     }
                 }
-                // Accept `lifecycle(...)` and also namespaced like `toolkit::module::lifecycle(...)`
+                // Accept `lifecycle(...)` and also namespaced like `toolkit::gear::lifecycle(...)`
                 Meta::List(list) if path_last_is(&list.path, "lifecycle") => {
                     if seen_lifecycle {
                         return Err(syn::Error::new_spanned(
@@ -394,11 +394,11 @@ impl Parse for ModuleConfig {
         let name = name.ok_or_else(|| {
             syn::Error::new(
                 Span::call_site(),
-                "name parameter is required, e.g. #[module(name = \"my-module\", ...)]",
+                "name parameter is required, e.g. #[gear(name = \"my-gear\", ...)]",
             )
         })?;
 
-        Ok(ModuleConfig {
+        Ok(GearConfig {
             name,
             deps,
             caps,
@@ -409,8 +409,8 @@ impl Parse for ModuleConfig {
     }
 }
 
-fn parse_lifecycle_list(list: &MetaList) -> syn::Result<LcModuleCfg> {
-    let mut cfg = LcModuleCfg::default();
+fn parse_lifecycle_list(list: &MetaList) -> syn::Result<LcGearCfg> {
+    let mut cfg = LcGearCfg::default();
 
     let inner: Punctuated<Meta, Token![,]> =
         list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
@@ -472,14 +472,14 @@ fn parse_lifecycle_list(list: &MetaList) -> syn::Result<LcModuleCfg> {
     Ok(cfg)
 }
 
-/// Main #[module] attribute macro
+/// Main #[gear] attribute macro
 ///
-/// `ctor` must be a Rust expression that evaluates to the module instance,
-/// e.g. `ctor = MyModule::new()` or `ctor = Default::default()`.
+/// `ctor` must be a Rust expression that evaluates to the gear instance,
+/// e.g. `ctor = MyGear::new()` or `ctor = Default::default()`.
 #[proc_macro_attribute]
 #[allow(clippy::too_many_lines)]
-pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let config = parse_macro_input!(attr as ModuleConfig);
+pub fn gear(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let config = parse_macro_input!(attr as GearConfig);
     let input = parse_macro_input!(item as DeriveInput);
 
     // --- Clone all needed pieces early to avoid use-after-move issues ---
@@ -493,7 +493,7 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
     let caps_for_regs: Vec<Capability> = config.caps.clone();
     let ctor_expr_opt: Option<Expr> = config.ctor.clone();
     let client_trait_opt: Option<Path> = config.client.clone();
-    let lifecycle_cfg_opt: Option<LcModuleCfg> = config.lifecycle;
+    let lifecycle_cfg_opt: Option<LcGearCfg> = config.lifecycle;
 
     // Prepare string literals for name/deps
     let name_lit = LitStr::new(&name_owned, Span::call_site());
@@ -513,13 +513,13 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Compile-time capability assertions (no calls in consts)
     let mut cap_asserts = Vec::new();
 
-    // Always assert Module is implemented
+    // Always assert Gear is implemented
     cap_asserts.push(quote! {
         const _: () = {
             #[allow(dead_code)]
-            fn __toolkit_require_Module_impl()
+            fn __toolkit_require_Gear_impl()
             where
-                #struct_ident #ty_generics: ::toolkit::contracts::Module,
+                #struct_ident #ty_generics: ::toolkit::contracts::Gear,
             {}
         };
     });
@@ -635,11 +635,11 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             });
 
-            // Convenience `into_module()` API.
+            // Convenience `into_gear()` API.
             extra_top_level.extend(quote! {
                 impl #impl_generics #struct_ident #ty_generics #where_clause {
-                    /// Wrap this instance into a stateful module with lifecycle configuration.
-                    pub fn into_module(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
+                    /// Wrap this instance into a stateful gear with lifecycle configuration.
+                    pub fn into_gear(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
                         ::toolkit::lifecycle::WithLifecycle::new_with_name(self, #name_lit)
                             .with_stop_timeout(#timeout_ts)
                             .with_ready_mode(true, true, Some(#ready_shim_ident))
@@ -657,8 +657,8 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
 
                 impl #impl_generics #struct_ident #ty_generics #where_clause {
-                    /// Wrap this instance into a stateful module with lifecycle configuration.
-                    pub fn into_module(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
+                    /// Wrap this instance into a stateful gear with lifecycle configuration.
+                    pub fn into_gear(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
                         ::toolkit::lifecycle::WithLifecycle::new_with_name(self, #name_lit)
                             .with_stop_timeout(#timeout_ts)
                             .with_ready_mode(false, false, None)
@@ -673,15 +673,15 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
         match cap {
             Capability::Db => quote! {
                 b.register_db_with_meta(#name_lit,
-                    module.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::DatabaseCapability>);
+                    gear.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::DatabaseCapability>);
             },
             Capability::Rest => quote! {
                 b.register_rest_with_meta(#name_lit,
-                    module.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::RestApiCapability>);
+                    gear.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::RestApiCapability>);
             },
             Capability::RestHost => quote! {
                 b.register_rest_host_with_meta(#name_lit,
-                    module.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::ApiGatewayCapability>);
+                    gear.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::ApiGatewayCapability>);
             },
             Capability::Stateful => {
                 if let Some(lc) = &lifecycle_cfg_opt {
@@ -694,7 +694,7 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
                     if await_ready_bool {
                         quote! {
                             let wl = ::toolkit::lifecycle::WithLifecycle::from_arc_with_name(
-                                    module.clone(),
+                                    gear.clone(),
                                     #name_lit,
                                 )
                                 .with_stop_timeout(#timeout_ts)
@@ -708,7 +708,7 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
                     } else {
                         quote! {
                             let wl = ::toolkit::lifecycle::WithLifecycle::from_arc_with_name(
-                                    module.clone(),
+                                    gear.clone(),
                                     #name_lit,
                                 )
                                 .with_stop_timeout(#timeout_ts)
@@ -724,21 +724,21 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
                     // Alternative path: the type itself must implement RunnableCapability
                     quote! {
                         b.register_stateful_with_meta(#name_lit,
-                            module.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::RunnableCapability>);
+                            gear.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::RunnableCapability>);
                     }
                 }
             },
             Capability::System => quote! {
                 b.register_system_with_meta(#name_lit,
-                    module.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::SystemCapability>);
+                    gear.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::SystemCapability>);
             },
             Capability::GrpcHub => quote! {
                 b.register_grpc_hub_with_meta(#name_lit,
-                    module.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::GrpcHubCapability>);
+                    gear.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::GrpcHubCapability>);
             },
             Capability::Grpc => quote! {
                 b.register_grpc_service_with_meta(#name_lit,
-                    module.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::GrpcServiceCapability>);
+                    gear.clone() as ::std::sync::Arc<dyn ::toolkit::contracts::GrpcServiceCapability>);
             },
         }
     });
@@ -780,13 +780,13 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
         fn #registrator_name(b: &mut ::toolkit::registry::RegistryBuilder) {
             use ::std::sync::Arc;
 
-            let module: Arc<#struct_ident #ty_generics> = Arc::new(#constructor);
+            let gear: Arc<#struct_ident #ty_generics> = Arc::new(#constructor);
 
             // register core with metadata (name + deps)
             b.register_core_with_meta(
                 #name_lit,
                 &[#(#deps_lits),*],
-                module.clone() as Arc<dyn ::toolkit::contracts::Module>
+                gear.clone() as Arc<dyn ::toolkit::contracts::Gear>
             );
 
             // capabilities
@@ -799,7 +799,7 @@ pub fn module(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #client_code
 
-        // Top-level extras for lifecycle-enabled types (impl Runnable, ready shim, into_module)
+        // Top-level extras for lifecycle-enabled types (impl Runnable, ready shim, into_gear)
         #extra_top_level
     };
 
@@ -946,8 +946,8 @@ pub fn lifecycle(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             impl #ty {
-                /// Converts this value into a stateful module wrapper with configured stop-timeout.
-                pub fn into_module(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
+                /// Converts this value into a stateful gear wrapper with configured stop-timeout.
+                pub fn into_gear(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
                     ::toolkit::lifecycle::WithLifecycle::new(self)
                         .with_stop_timeout(#timeout_ts)
                         .with_ready_mode(#await_ready_bool, true, Some(#ready_shim_ident))
@@ -964,8 +964,8 @@ pub fn lifecycle(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             impl #ty {
-                /// Converts this value into a stateful module wrapper with configured stop-timeout.
-                pub fn into_module(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
+                /// Converts this value into a stateful gear wrapper with configured stop-timeout.
+                pub fn into_gear(self) -> ::toolkit::lifecycle::WithLifecycle<Self> {
                     ::toolkit::lifecycle::WithLifecycle::new(self)
                         .with_stop_timeout(#timeout_ts)
                         .with_ready_mode(#await_ready_bool, false, None)
@@ -1119,7 +1119,7 @@ fn path_last_is(path: &syn::Path, want: &str) -> bool {
 /// - Validation that the client implements the API trait
 ///
 /// Note: The actual trait implementation must be provided manually, as procedural
-/// macros cannot introspect trait methods from external modules at compile time.
+/// macros cannot introspect trait methods from external gears at compile time.
 /// Each method should convert requests/responses using `.into()`.
 #[proc_macro_attribute]
 pub fn grpc_client(attr: TokenStream, item: TokenStream) -> TokenStream {

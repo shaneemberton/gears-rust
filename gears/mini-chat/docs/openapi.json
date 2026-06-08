@@ -3,7 +3,7 @@
   "info": {
     "title": "Mini Chat API",
     "version": "1.0.0",
-    "description": "Multi-tenant AI chat module. Provides conversational AI with streaming responses, document and image upload, file search, per-user quota enforcement, and audit event emission. All endpoints require authentication and tenant license verification (ai_chat feature)."
+    "description": "Multi-tenant AI chat gear. Provides conversational AI with streaming responses, document and image upload, file search, per-user quota enforcement, and audit event emission. All endpoints require authentication and tenant license verification (ai_chat feature)."
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "servers": [],

@@ -82,7 +82,7 @@ The plugin relies exclusively on B-tree indexes for query performance. No databa
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-rdb-principle-opaque-payload`
 
-The JSON payload column is treated as an opaque blob. The plugin does not index, query, or validate payload contents — that responsibility belongs to the main module's domain layer (schema validation) and to search-capable backends (payload querying).
+The JSON payload column is treated as an opaque blob. The plugin does not index, query, or validate payload contents — that responsibility belongs to the main gear's domain layer (schema validation) and to search-capable backends (payload querying).
 
 ### 2.2 Constraints
 
@@ -108,7 +108,7 @@ The plugin **MUST NOT** execute DDL operations (CREATE TABLE, ALTER TABLE) at ru
 
 **Technology**: SeaORM entities, Rust structs
 
-The plugin maps the logical `Resource` entity (defined in the main module's domain layer) to a SeaORM entity backed by the `simple_resources` table.
+The plugin maps the logical `Resource` entity (defined in the main gear's domain layer) to a SeaORM entity backed by the `simple_resources` table.
 
 **SeaORM Entity** (conceptual):
 
@@ -134,7 +134,7 @@ pub struct Model {
 
 ```mermaid
 graph TB
-    SRR[Simple Resource Registry Main Module] --> Plugin[SRR RDB Plugin]
+    SRR[Simple Resource Registry Main Gear] --> Plugin[SRR RDB Plugin]
     Plugin --> OData[OData → SeaORM Translator]
     Plugin --> Idem[Idempotency Handler]
     Plugin --> SecORM[SecureORM]
@@ -157,7 +157,7 @@ graph TB
 
 ### 3.3 API Contracts
 
-This plugin has no external API — it implements the `ResourceStoragePluginClient` trait defined in the parent module's SDK crate. See the parent module's [DESIGN.md §3.2](../../../docs/DESIGN.md) for the trait definition.
+This plugin has no external API — it implements the `ResourceStoragePluginClient` trait defined in the parent gear's SDK crate. See the parent gear's [DESIGN.md §3.2](../../../docs/DESIGN.md) for the trait definition.
 
 ### 3.4 Interactions & Sequences
 
@@ -167,7 +167,7 @@ This plugin has no external API — it implements the `ResourceStoragePluginClie
 
 ```mermaid
 sequenceDiagram
-    participant SRR as ResourceService (Main Module)
+    participant SRR as ResourceService (Main Gear)
     participant Plugin as RDB Plugin
     participant DB as Database
 
@@ -192,7 +192,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant SRR as ResourceService (Main Module)
+    participant SRR as ResourceService (Main Gear)
     participant Plugin as RDB Plugin
     participant OData as OData Translator
     participant DB as Database
@@ -212,7 +212,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Job as Retention Purge Job (Main Module)
+    participant Job as Retention Purge Job (Main Gear)
     participant Plugin as RDB Plugin
     participant DB as Database
 
@@ -295,7 +295,7 @@ sequenceDiagram
 
 **ID**: `cpt-cf-srr-rdb-dbtable-idempotency-keys`
 
-**Purpose**: Deduplication store for POST create operations. `idempotency_key` is required on every create request; the plugin atomically checks this table and inserts the resource + idempotency record in one transaction. If a matching `(tenant_id, owner_id, idempotency_key)` row exists and is within the retention window, the plugin returns `CreateOutcome::Duplicate` and the main module returns 409 with the `resource_id` of the previously created resource. For per-owner resource types (`is_per_owner_resource=true`), `owner_id` is set from `SecurityContext.subject_id`; for non-per-owner types, a nil UUID (`00000000-0000-0000-0000-000000000000`) is used so the constraint effectively reduces to `(tenant_id, idempotency_key)`. If a concurrent create races past the initial check and causes a unique-key constraint violation on `(tenant_id, owner_id, idempotency_key)`, the plugin MUST catch that constraint error, re-read the existing row from `idempotency_keys` (and look up the associated `resource_id`), and return `CreateOutcome::Duplicate(existing_resource_id)` — making the concurrent-collision behavior identical to the sequential-duplicate case and deterministic across all DB backends.
+**Purpose**: Deduplication store for POST create operations. `idempotency_key` is required on every create request; the plugin atomically checks this table and inserts the resource + idempotency record in one transaction. If a matching `(tenant_id, owner_id, idempotency_key)` row exists and is within the retention window, the plugin returns `CreateOutcome::Duplicate` and the main gear returns 409 with the `resource_id` of the previously created resource. For per-owner resource types (`is_per_owner_resource=true`), `owner_id` is set from `SecurityContext.subject_id`; for non-per-owner types, a nil UUID (`00000000-0000-0000-0000-000000000000`) is used so the constraint effectively reduces to `(tenant_id, idempotency_key)`. If a concurrent create races past the initial check and causes a unique-key constraint violation on `(tenant_id, owner_id, idempotency_key)`, the plugin MUST catch that constraint error, re-read the existing row from `idempotency_keys` (and look up the associated `resource_id`), and return `CreateOutcome::Duplicate(existing_resource_id)` — making the concurrent-collision behavior identical to the sequential-duplicate case and deterministic across all DB backends.
 
 **Schema**:
 
@@ -345,15 +345,15 @@ See [ADR-0001: Storage Optimization](./ADR/0001-cpt-cf-srr-rdb-adr-storage-optim
 
 2. **SQLite concurrency**: SQLite uses file-level locking, which limits concurrent write throughput. The 100 writes/s target may not be achievable on SQLite under high concurrency. SQLite is intended for edge/dev environments with lower concurrency requirements; production deployments should use PostgreSQL.
 
-3. **Single-table contention**: Under extreme write loads, the single `simple_resources` table may experience lock contention. This is mitigated by the row-level locking available in PostgreSQL and MariaDB. If contention becomes an issue, the main module's storage routing can redirect high-write types to a dedicated backend.
+3. **Single-table contention**: Under extreme write loads, the single `simple_resources` table may experience lock contention. This is mitigated by the row-level locking available in PostgreSQL and MariaDB. If contention becomes an issue, the main gear's storage routing can redirect high-write types to a dedicated backend.
 
 4. **Idempotency key expiration**: Expired idempotency records are purged by a background job. Between expiration and purge, the record still occupies space but is no longer enforced (the deduplication check uses `WHERE expires_at > now()`).
 
-5. **Idempotency coupling**: Each storage plugin independently implements idempotency deduplication. This risks inconsistent semantics across backends (TTL handling, collision strategy, retry behavior). Mitigated by: (a) a strict SDK trait contract defining key scope, dedup window, atomicity, and response behavior (see parent DESIGN §3.2); (b) a mandatory conformance test suite that every plugin must pass. If this coupling proves problematic, a future evolution could extract idempotency into a domain-layer capability owned by the main module, with plugins providing only raw create + unique-constraint-based duplicate detection.
+5. **Idempotency coupling**: Each storage plugin independently implements idempotency deduplication. This risks inconsistent semantics across backends (TTL handling, collision strategy, retry behavior). Mitigated by: (a) a strict SDK trait contract defining key scope, dedup window, atomicity, and response behavior (see parent DESIGN §3.2); (b) a mandatory conformance test suite that every plugin must pass. If this coupling proves problematic, a future evolution could extract idempotency into a domain-layer capability owned by the main gear, with plugins providing only raw create + unique-constraint-based duplicate detection.
 
 ## 5. Traceability
 
-- **Parent Module PRD**: [../../../docs/PRD.md](../../../docs/PRD.md)
-- **Parent Module DESIGN**: [../../../docs/DESIGN.md](../../../docs/DESIGN.md)
+- **Parent Gear PRD**: [../../../docs/PRD.md](../../../docs/PRD.md)
+- **Parent Gear DESIGN**: [../../../docs/DESIGN.md](../../../docs/DESIGN.md)
 - **Plugin PRD**: [PRD.md](./PRD.md)
 - **ADRs**: [ADR/](./ADR/)

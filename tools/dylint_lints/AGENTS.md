@@ -247,12 +247,12 @@ error: aborting due to 1 previous error
 ## Shared Utilities
 
 ### lint_utils Crate
-- `is_in_contract_module_ast()`: Check if AST item is in contract/ directory
+- `is_in_contract_gear_ast()`: Check if AST item is in contract/ directory
 - Add new helpers as needed for common patterns
 
 ## Checklist
 
-- [ ] Run `cargo dylint new <name>` 
+- [ ] Run `cargo dylint new <name>`
 - [ ] Update `Cargo.toml` with dependencies
 - [ ] Add example targets for each test case
 - [ ] Implement lint with appropriate pass type
@@ -266,7 +266,7 @@ error: aborting due to 1 previous error
 ## Common Pitfalls
 
 1. **Wrong lint pass**: Pre-expansion for derives, late for types
-2. **Module detection**: Must handle both `mod contract {}` and `contract/` directories
+2. **Gear detection**: Must handle both `mod contract {}` and `contract/` directories
 3. **Line numbers**: `.stderr` files must match exact line numbers including `#[allow(dead_code)]`
 4. **Empty tests**: Include test case with no violations (empty `.stderr`)
 5. **Workspace**: Don't forget to add new crate to workspace members

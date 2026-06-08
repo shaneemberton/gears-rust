@@ -2,7 +2,7 @@
 //!
 //! AM has to reject soft-delete when the tenant still owns resource-group
 //! rows (DESIGN §3.5). The check itself is owned by the `resource-group`
-//! module, which exposes a typed client; AM holds a trait-object slot so
+//! gear, which exposes a typed client; AM holds a trait-object slot so
 //! the production wiring can plug in the real client without threading a
 //! third generic parameter through `TenantService<R, P>`.
 //!
@@ -42,7 +42,7 @@ pub trait ResourceOwnershipChecker: Send + Sync {
 
 /// No-op checker — always reports zero ownership. Reserved for unit
 /// tests; not bound in production. AM declares `resource-group` as a
-/// hard `deps` and the module entry-point fail-closes `init` when no
+/// hard `deps` and the gear entry-point fail-closes `init` when no
 /// `ResourceGroupClient` resolves from `ClientHub`, so the
 /// `RgResourceOwnershipChecker`-backed probe is always wired in
 /// production.

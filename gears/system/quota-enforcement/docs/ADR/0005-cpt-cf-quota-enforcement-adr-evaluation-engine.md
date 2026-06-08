@@ -82,7 +82,7 @@ prefer, or constrain a specific engine technology.
 
 The Engine plugin contract requires (full surface in DESIGN §3.3):
 
-- **Rust-native, in-process linkage** at module bootstrap (no out-of-process
+- **Rust-native, in-process linkage** at gear bootstrap (no out-of-process
   evaluation hot path; no FFI on the eval critical path in P1).
 - **Sandboxed**: no I/O, no nondeterminism beyond `EvaluationContext.time`. The
   sandbox is the absence of unsafe bindings — verifiable by code review.
@@ -157,7 +157,7 @@ This mapping is contract-level and applies to every engine plugin uniformly.
 
 ### Consequences
 
-- Adding an engine = link a new crate, register at module bootstrap (per
+- Adding an engine = link a new crate, register at gear bootstrap (per
   `cpt-cf-quota-enforcement-fr-quota-resolution-engine` fail-fast bootstrap rule),
   no QE-core or sibling-ADR change required.
 - Engine config validation is engine-internal (delegated via `validate_config()` at

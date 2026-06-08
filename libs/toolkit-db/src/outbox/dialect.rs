@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 
 use sea_orm::{ConnectionTrait, DbBackend, DbErr, Statement};
 
-/// Backend-specific SQL dialect for the outbox module.
+/// Backend-specific SQL dialect for the outbox gear.
 ///
 /// Centralizes all DML differences between `Postgres`, `SQLite`, and `MySQL`
 /// so that `core.rs` and `sequencer.rs` contain zero `match backend` blocks.

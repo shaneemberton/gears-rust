@@ -46,7 +46,7 @@
 
 ### 1.1 Architectural Vision
 
-RG is a generic hierarchy and membership module.
+RG is a generic hierarchy and membership gear.
 
 It provides:
 
@@ -54,7 +54,7 @@ It provides:
 - strict forest entity topology
 - closure-table hierarchy read model
 - membership links between groups and resources
-- read interfaces consumable by external modules/plugins
+- read interfaces consumable by external gears/plugins
 
 RG is intentionally policy-agnostic:
 
@@ -65,7 +65,7 @@ RG is intentionally policy-agnostic:
 The architecture consists of:
 
 - **RG Resolver SDK** — read and write trait contracts (`ResourceGroupClient`, `ResourceGroupReadHierarchy`)
-- **RG Module (Gateway)** — routes requests to built-in or vendor-specific provider
+- **RG Gear (Gateway)** — routes requests to built-in or vendor-specific provider
 - **RG Plugin** — full service with database, REST API, seeding, and domain logic
 
 Deployments use either: (RG Plugin + RG Service) or (Vendor RG Plugin + Vendor RG Service) — both behind the same SDK contracts.
@@ -242,7 +242,7 @@ RG cannot generate SQL fragments or access-scope objects.
 
 - [x] `p1` - **ID**: `cpt-cf-resource-group-constraint-db-agnostic`
 
-RG persistence layer uses SeaORM abstractions and standard SQL. The module **MUST NOT** depend on vendor-specific SQL extensions or features of a particular RDBMS. Any SQL-compatible database supported by SeaORM can be used as the storage backend.
+RG persistence layer uses SeaORM abstractions and standard SQL. The gear **MUST NOT** depend on vendor-specific SQL extensions or features of a particular RDBMS. Any SQL-compatible database supported by SeaORM can be used as the storage backend.
 
 **Implementation note**: the reference DDL (`migration.sql`) uses a PostgreSQL-specific `CREATE DOMAIN gts_type_path` with regex validation. The SeaORM migration code must provide a database-agnostic equivalent — GTS type path format validation (`^gts\.[a-z_]...~$`) is enforced at the application layer (service/domain code) as fallback for non-PostgreSQL backends. The `DOMAIN` in the reference DDL serves as defense-in-depth for PostgreSQL deployments only.
 
@@ -277,9 +277,9 @@ Reducing enabled `max_depth`/`max_width` cannot rewrite existing rows. Writes th
 
 #### Non-Applicable Constraint Categories
 
-- **Regulatory constraints**: Not applicable at module level — RG does not handle PII directly. Regulatory requirements are platform-level (see PRD section 6.6).
+- **Regulatory constraints**: Not applicable at gear level — RG does not handle PII directly. Regulatory requirements are platform-level (see PRD section 6.6).
 - **Vendor/licensing constraints**: SeaORM is Apache-2.0 licensed. No vendor lock-in — database is pluggable via `cpt-cf-resource-group-constraint-db-agnostic`.
-- **Data residency constraints**: Not applicable at module level — data residency is a deployment-specific concern handled by infrastructure (database placement, region selection).
+- **Data residency constraints**: Not applicable at gear level — data residency is a deployment-specific concern handled by infrastructure (database placement, region selection).
 - **Resource constraints**: Not applicable — resource constraints (budget, team, timeline) are project-level and tracked in project management tools.
 
 ## 3. Technical Architecture
@@ -322,7 +322,7 @@ Reducing enabled `max_depth`/`max_width` cannot rewrite existing rows. Writes th
 graph TD
     A[Domain Client / General Consumer] --> B[ResourceGroupClient]
     X[AuthZ Plugin] --> Z[ResourceGroupReadHierarchy]
-    B --> D[RG Module]
+    B --> D[RG Gear]
     Z --> D
     D --> E[Type Service]
     D --> F[Entity Service]
@@ -339,9 +339,9 @@ AuthZ plugin depends only on the narrow `ResourceGroupReadHierarchy` trait (hier
 
 
 
-#### RG Module (Gateway)
+#### RG Gear (Gateway)
 
-- [x] `p1` - **ID**: `cpt-cf-resource-group-component-module`
+- [x] `p1` - **ID**: `cpt-cf-resource-group-component-gear`
 
 Responsibilities:
 
@@ -542,7 +542,7 @@ Integration read trait hierarchy (defined in `resource-group-sdk/src/api.rs`):
 | `ResourceGroupReadHierarchy` | — | `get_group_descendants`, `get_group_ancestors`, `list_groups`, `get_group`, `list_memberships` (all unscoped / PEP-bypassing) | AuthZ resolver plugin, tenant-resolver RG plugin, in-process AuthZ PDP |
 | `ResourceGroupClient` | — | full CRUD (types, groups, memberships, hierarchy) | General consumers |
 
-> The previously planned two-tier split — a separate `ResourceGroupReadPluginClient` extending `ResourceGroupReadHierarchy` with `list_memberships` — was collapsed. `list_memberships` and `get_group` now live directly on `ResourceGroupReadHierarchy`, and the vendor-specific plugin gateway resolves `dyn ResourceGroupReadHierarchy`. A vendor backend replaces the registered `ResourceGroupReadHierarchy` implementation at module init rather than implementing a distinct plugin trait.
+> The previously planned two-tier split — a separate `ResourceGroupReadPluginClient` extending `ResourceGroupReadHierarchy` with `list_memberships` — was collapsed. `list_memberships` and `get_group` now live directly on `ResourceGroupReadHierarchy`, and the vendor-specific plugin gateway resolves `dyn ResourceGroupReadHierarchy`. A vendor backend replaces the registered `ResourceGroupReadHierarchy` implementation at gear init rather than implementing a distinct plugin trait.
 
 ClientHub registration: single implementation (`RgService`), registered as both `dyn ResourceGroupClient` and `dyn ResourceGroupReadHierarchy`. AuthZ plugin resolves `dyn ResourceGroupReadHierarchy`, general consumers resolve `dyn ResourceGroupClient`.
 
@@ -551,9 +551,9 @@ Plugin gateway routing notes:
 - `ResourceGroupClient` is the full read+write contract for type/entity/membership lifecycle and hierarchy queries (used by domain clients and general consumers)
 - `ResourceGroupReadHierarchy` is the narrow read-only contract for in-process plugin consumers (AuthZ resolver plugin, tenant-resolver RG plugin, in-process AuthZ PDP); its reads are resolved unscoped (bypass `PolicyEnforcer`)
 - both are registered in ClientHub backed by the same implementation
-- module service resolves configured provider:
+- gear service resolves configured provider:
   - built-in provider: serve reads from local RG persistence path
-  - vendor-specific provider: resolve plugin instance by configured vendor; the vendor's `dyn ResourceGroupReadHierarchy` implementation replaces the registered one at module init (there is no separate plugin trait)
+  - vendor-specific provider: resolve plugin instance by configured vendor; the vendor's `dyn ResourceGroupReadHierarchy` implementation replaces the registered one at gear init (there is no separate plugin trait)
 - plugin registration is scoped (GTS instance ID), same pattern as tenant-resolver/authz-resolver gateways
 - `SecurityContext` is forwarded without policy interpretation in gateway layer (including plugin path)
 
@@ -650,7 +650,7 @@ Client initialization: AuthZ plugin resolves `dyn ResourceGroupReadHierarchy` fr
 | Dependency           | Purpose                                     |
 | -------------------- | ------------------------------------------- |
 | `resource-group-sdk` | contracts/models/errors                     |
-| `toolkit/client_hub`  | inter-module client registration and lookup |
+| `toolkit/client_hub`  | inter-gear client registration and lookup |
 
 
 ### 3.5 External Dependencies
@@ -660,7 +660,7 @@ Client initialization: AuthZ plugin resolves `dyn ResourceGroupReadHierarchy` fr
 | ------------------------------------- | ------------------------------- | ------------------------------------------------------------- |
 | SQL database                          | SeaORM repositories             | durable canonical + closure storage                           |
 | AuthZ Resolver SDK                    | `PolicyEnforcer` / `AuthZResolverClient` | AuthZ evaluation for JWT-authenticated RG API requests (write + read) |
-| Vendor-specific RG backend (optional) | `ResourceGroupReadHierarchy`    | alternative hierarchy/membership source for integration reads (vendor impl replaces the registered `ResourceGroupReadHierarchy` at module init) |
+| Vendor-specific RG backend (optional) | `ResourceGroupReadHierarchy`    | alternative hierarchy/membership source for integration reads (vendor impl replaces the registered `ResourceGroupReadHierarchy` at gear init) |
 | AuthZ plugin consumer (optional)      | `ResourceGroupReadHierarchy`    | read group context in PDP logic (narrow reads: hierarchy + listing + single-group + memberships, resolved unscoped; in-process via `ClientHub` — `p1`; MTLS transport — `p2`, deferred / not implemented yet) |
 | General consumers (optional)          | `ResourceGroupClient`           | full read+write access to types/entities/memberships/hierarchy |
 
@@ -762,7 +762,7 @@ This is the fixed boundary:
 - AuthZ plugin creates constraints.
 - PEP/compiler creates SQL.
 
-#### Module Initialization Order
+#### gear initialization Order
 
 **ID**: `cpt-cf-resource-group-seq-init-order`
 
@@ -770,7 +770,7 @@ RG Management API depends on AuthZ SDK; AuthZ plugin depends on RG Access API SD
 
 ```
 Phase 1 (SystemCapability):
-  1. RG Module init
+  1. RG gear init
      → registers ResourceGroupClient in ClientHub
      → registers ResourceGroupReadHierarchy in ClientHub
      → REST/gRPC endpoints NOT yet accepting traffic
@@ -780,7 +780,7 @@ Phase 1 (SystemCapability):
      → plugin discovery is lazy (first evaluate() call)
 
 Phase 2 (ready):
-  3. RG Module starts accepting REST/gRPC traffic
+  3. RG Gear starts accepting REST/gRPC traffic
      → write operations call PolicyEnforcer → AuthZResolverClient (available since step 2)
      → seed operations run as pre-deployment step with system SecurityContext (bypass AuthZ)
 
@@ -867,7 +867,7 @@ Key separation of concerns:
 
 **ID**: `cpt-cf-resource-group-seq-auth-modes`
 
-RG Module exposes its REST/gRPC API with **two authentication modes**. The mode determines whether the request passes through AuthZ evaluation.
+RG Gear exposes its REST/gRPC API with **two authentication modes**. The mode determines whether the request passes through AuthZ evaluation.
 
 ##### Mode 1: JWT (public API — all endpoints) — implemented (`p1`)
 
@@ -1036,7 +1036,7 @@ MTLS authentication will be configured at the RG gateway level and includes two 
 4. Only after identity verification, the endpoint is checked against `allowed_endpoints`. If the endpoint is not in the allowlist, `403 Forbidden` is returned.
 
 ```yaml
-modules:
+gears:
   resource_group:
     mtls:
       enabled: true
@@ -1232,8 +1232,8 @@ Ownership-graph tenant enforcement:
 
 ### Non-Applicable Design Domains
 
-- **Usability (UX)**: Not applicable — RG is a backend infrastructure module; no frontend architecture or user-facing UI.
-- **Compliance (COMPL)**: Not applicable — compliance controls are platform-level; RG does not own regulated data directly. Consuming modules and AuthZ are responsible for compliance architecture.
+- **Usability (UX)**: Not applicable — RG is a backend infrastructure gear; no frontend architecture or user-facing UI.
+- **Compliance (COMPL)**: Not applicable — compliance controls are platform-level; RG does not own regulated data directly. Consuming gears and AuthZ are responsible for compliance architecture.
 - **Operations (OPS)**: RG follows standard Gears deployment, logging, and monitoring patterns. No RG-specific deployment topology, observability, or SLO architecture beyond platform defaults.
 - **Event Architecture (INT-003)**: Not applicable in v1 — RG does not publish domain events. Consumers read current state via SDK traits. Domain events (group lifecycle, membership changes) are a candidate for future versions if consumer demand arises.
 
@@ -1260,7 +1260,7 @@ RG relies on database-level performance rather than application-level caching:
 ### Security Architecture
 
 - **Data protection**: encryption at rest and in transit is handled at platform infrastructure level (database encryption, TLS termination at API gateway). RG does not implement its own encryption.
-- **Data classification**: RG stores organizational hierarchy structure and opaque resource identifiers. Resource IDs may reference PII-containing entities in consuming modules, but RG treats them as opaque strings. See PRD section 6.6.
+- **Data classification**: RG stores organizational hierarchy structure and opaque resource identifiers. Resource IDs may reference PII-containing entities in consuming gears, but RG treats them as opaque strings. See PRD section 6.6.
 - **Threat model**:
 
 | Threat | Attack Vector | Impact | Mitigation |
@@ -1305,11 +1305,11 @@ RG is a stateless service layer backed by a PostgreSQL database:
 
 - **Fault tolerance**: HA, failover, and backup are handled at the platform database infrastructure level. RG does not implement its own circuit breakers or redundancy beyond transaction retry for serialization conflicts (see Concurrency Testing section).
 - **AuthZ dependency resilience**: Circuit breaking for the AuthZ Resolver dependency (PolicyEnforcer calls on JWT path) is handled at the platform PolicyEnforcer/SDK level. If the AuthZ Resolver becomes unavailable, JWT-authenticated RG requests will fail with **503 Service Unavailable** errors. RG does not implement its own circuit breaker for this dependency.
-- **Recovery**: RPO/RTO follow platform defaults for stateful services with PostgreSQL persistence. No module-specific recovery architecture.
+- **Recovery**: RPO/RTO follow platform defaults for stateful services with PostgreSQL persistence. No gear-specific recovery architecture.
 
 ### Data Governance
 
-- **Data ownership**: RG module owns all data in `gts_type`, `gts_type_allowed_parent`, `gts_type_allowed_membership`, `resource_group`, `resource_group_membership`, and `resource_group_closure` tables.
+- **Data ownership**: RG gear owns all data in `gts_type`, `gts_type_allowed_parent`, `gts_type_allowed_membership`, `resource_group`, `resource_group_membership`, and `resource_group_closure` tables.
 - **Data lineage**: RG data is produced by RG API consumers (Instance/Tenant Admins, Apps) and consumed by AuthZ plugin via `ResourceGroupReadHierarchy` for tenant hierarchy resolution.
 - **Data dictionary**: field definitions are documented in Database Schemas section (3.7).
 
@@ -1329,16 +1329,16 @@ RG follows standard Gears observability patterns:
 
 ### Architecture Evolution: RG as Persistent Storage for Types Registry
 
-**Phase 1 (current, pre-this-commit)**: Types Registry uses in-memory storage (`gts-rust`). RG types endpoints are served under `/api/resource-group/v1/types*` — types managed exclusively within the RG module with its own DB persistence (`gts_type` + junction tables). Types Registry and RG operate independently with no shared storage.
+**Phase 1 (current, pre-this-commit)**: Types Registry uses in-memory storage (`gts-rust`). RG types endpoints are served under `/api/resource-group/v1/types*` — types managed exclusively within the RG gear with its own DB persistence (`gts_type` + junction tables). Types Registry and RG operate independently with no shared storage.
 
-**Phase 2 (this commit)**: Types endpoints move to `/api/types-registry/v1/types*` URL namespace. RG module implements the types CRUD with DB persistence, but the URL aligns with Types Registry as the conceptual owner of GTS type operations. This is a URL-only change — no storage or runtime integration between modules yet.
+**Phase 2 (this commit)**: Types endpoints move to `/api/types-registry/v1/types*` URL namespace. RG gear implements the types CRUD with DB persistence, but the URL aligns with Types Registry as the conceptual owner of GTS type operations. This is a URL-only change — no storage or runtime integration between gears yet.
 
-**Phase 3 (planned)**: GTS types migrate to their own persistent storage within the Types Registry module. Types Registry becomes the **single source of truth** for all GTS type definitions with its own DB-backed store, replacing the current in-memory `gts-rust` engine. RG and Types Registry coordinate via a **saga pattern**: type registration flows through Types Registry (schema validation, GTS catalog) and RG (hierarchy rules, junction tables for `allowed_parents`/`allowed_memberships`). Each module owns its domain-specific slice of the type data, and the saga ensures cross-module consistency.
+**Phase 3 (planned)**: GTS types migrate to their own persistent storage within the Types Registry gear. Types Registry becomes the **single source of truth** for all GTS type definitions with its own DB-backed store, replacing the current in-memory `gts-rust` engine. RG and Types Registry coordinate via a **saga pattern**: type registration flows through Types Registry (schema validation, GTS catalog) and RG (hierarchy rules, junction tables for `allowed_parents`/`allowed_memberships`). Each gear owns its domain-specific slice of the type data, and the saga ensures cross-gear consistency.
 
 Rationale:
 - Phase 2 aligns the URL namespace early to avoid breaking changes for API consumers when storage migration occurs in Phase 3
 - Phase 3 separates concerns: Types Registry owns GTS schema catalog and validation, RG owns hierarchy topology rules — neither duplicates the other's domain
-- Saga between TR and RG enables each module to evolve its storage independently while maintaining cross-module referential integrity
+- Saga between TR and RG enables each gear to evolve its storage independently while maintaining cross-gear referential integrity
 
 ### Known Technical Debt
 
@@ -1347,7 +1347,7 @@ Rationale:
 | ETag-based optimistic concurrency for `PUT /groups/{id}` | Concurrent update conflicts observed in production | Low |
 | `resource_group_membership` partitioning (455M rows projected) | Table size >50 GB or query latency degradation | Medium |
 | Domain events for group/membership lifecycle | Consumer demand for real-time notifications or cache invalidation | Medium |
-| GTS validation for `resource_type` in membership operations | Cross-module type reuse creates governance need | Low |
+| GTS validation for `resource_type` in membership operations | Cross-gear type reuse creates governance need | Low |
 | Parallel seeding for types and memberships via `JoinSet` | Large seed configurations with many independent items | Low |
 
 ### Open Questions
@@ -1358,10 +1358,10 @@ See [PRD §13 Open Questions](./PRD.md#13-open-questions) for active design ques
 - `resource_group_membership` partitioning strategy — resolve before production
 - GTS validation for type `code` and `resource_type` — deferred; `resource_type` validation is the stronger candidate
 
-- AuthN/AuthZ module contracts remain unchanged.
+- AuthN/AuthZ gear contracts remain unchanged.
 - AuthZ can operate without RG — RG is an optional data source.
 - AuthZ extensibility is implemented through plugin behavior that consumes RG read contracts.
-- RG provider is swappable by configuration (built-in module or vendor-specific provider) without changing consumer contracts.
+- RG provider is swappable by configuration (built-in gear or vendor-specific provider) without changing consumer contracts.
 - SQL conversion remains in existing PEP flow (`PolicyEnforcer` + compiler), consistent with approved architecture.
 
 ### 4.1 Database Size Analysis & Production Projections
@@ -1430,7 +1430,7 @@ Unit tests verify domain invariants and service logic in isolation from the data
 
 **Infrastructure**: none (in-process only).
 
-**Test support module** (`src/domain/test_support.rs`), following the pattern established by `oagw` and `credstore`:
+**Test support gear** (`src/domain/test_support.rs`), following the pattern established by `oagw` and `credstore`:
 
 | Mock | Purpose | Pattern |
 |------|---------|---------|
@@ -1468,7 +1468,7 @@ Integration tests verify SQL correctness, closure table integrity, transactional
 
 **Rationale for SQLite**: functional domain logic (closure table operations, seeding idempotency, tenant scoping, OData filtering) is identical across SQL dialects. PostgreSQL-specific behaviors — FK enforcement order, SERIALIZABLE isolation semantics, `gts_type_path` DOMAIN validation, `gen_random_uuid()` — are covered by Level 4 E2E tests that run against real PostgreSQL.
 
-**Schema setup**: module migrations are applied against the in-memory SQLite DB. Migrations are defined in `src/infra/storage/migrations/mod.rs` using the `SQLITE_UP` constants; the `POSTGRES_UP` variants are used at Level 4.
+**Schema setup**: gear migrations are applied against the in-memory SQLite DB. Migrations are defined in `src/infra/storage/migrations/mod.rs` using the `SQLITE_UP` constants; the `POSTGRES_UP` variants are used at Level 4.
 
 **Isolation strategy**: each test function creates its own `:memory:` DB instance. No shared state across tests; no transaction rollback needed.
 

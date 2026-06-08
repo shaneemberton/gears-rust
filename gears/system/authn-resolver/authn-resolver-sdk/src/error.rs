@@ -1,4 +1,4 @@
-//! Error types for the `AuthN` resolver module.
+//! Error types for the `AuthN` resolver gear
 
 use thiserror::Error;
 

@@ -1,4 +1,4 @@
-//! Configuration for the Account Management module.
+//! Configuration for the Account Management gear.
 //!
 //! Operator-facing knobs consumed by
 //! [`crate::domain::tenant::service::TenantService`]. The schema is
@@ -16,7 +16,7 @@ use serde::Deserialize;
 use crate::domain::bootstrap::BootstrapConfig;
 use crate::domain::integrity_check::IntegrityCheckConfig;
 
-/// Module configuration for `cf-gears-account-management`.
+/// Gear configuration for `cf-gears-account-management`.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AccountManagementConfig {
@@ -126,7 +126,7 @@ pub struct RetentionConfig {
 
     /// Max parallel hard-delete tasks within one retention tick.
     /// Default `4`. `0` is **rejected by
-    /// [`AccountManagementConfig::validate`]** at module init so a
+    /// [`AccountManagementConfig::validate`]** at gear init so a
     /// misconfigured deployment fails loud rather than silently
     /// single-flighting; the call site in
     /// `domain::tenant::service::retention` additionally clamps
@@ -199,7 +199,7 @@ impl Default for ReaperConfig {
 /// `cleanup_interval_secs`. Defaults and bounds are pinned in
 /// `cpt-cf-account-management-adr-conversion-approval` (ADR-0003) and
 /// PRD §5.4 — see [`ConversionConfig::validate`] for the per-field
-/// bounds enforced by `AccountManagementModule::init`.
+/// bounds enforced by `AccountManagementGear::init`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConversionConfig {
@@ -417,7 +417,7 @@ impl Default for TrPluginConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct IdpConfig {
-    /// When `true`, module init fails closed if no
+    /// When `true`, gear init fails closed if no
     /// `IdpPluginClient` is registered in `ClientHub`.
     /// When `false` (default), AM falls back to the no-op
     /// `NoopIdpProvider`, in which case `create_tenant` returns
@@ -431,7 +431,7 @@ pub struct IdpConfig {
     pub required: bool,
 
     /// Plugin vendor used to select the `IdpPluginClient` instance
-    /// from the types-registry catalogue at module init. AM enumerates
+    /// from the types-registry catalogue at gear init. AM enumerates
     /// every registered `PluginV1<IdpPluginSpecV1>` instance, filters
     /// by `vendor`, and tie-breaks by `priority` (lower wins — see
     /// `toolkit::plugins::choose_plugin_instance` for the canonical
@@ -476,7 +476,7 @@ impl AccountManagementConfig {
     pub(crate) const MAX_DEPTH_THRESHOLD: u32 = 1_000_000;
 
     /// Reject configurations that would panic the lifecycle tasks or
-    /// produce undefined runtime behavior. Called by the module's
+    /// produce undefined runtime behavior. Called by the gear's
     /// `init` lifecycle hook before `serve` spawns the retention +
     /// reaper background tasks.
     ///
@@ -581,14 +581,14 @@ impl AccountManagementConfig {
         // saga's `BootstrapConfig::strict` field is the
         // operator-facing knob that selects whether a malformed
         // `[bootstrap]` block is init-fatal or warn-and-skip:
-        // `AccountManagementModule::init` runs `boot_cfg.validate()`
+        // `AccountManagementGear::init` runs `boot_cfg.validate()`
         // explicitly and routes the result via `strict`. Folding
         // bootstrap validation into the global config check would
         // make `strict = false` (best-effort posture for dev / CI /
         // multi-region splits where the root tenant is bootstrapped
         // out of band) unreachable — a malformed block would abort
         // init before the strict-vs-non-strict branch in `init`
-        // could see the error. See `module.rs::Module::init`.
+        // could see the error. See `gear.rs::Gear::init`.
         if bad.is_empty() && conversion_err.is_none() && integrity_err.is_none() {
             Ok(())
         } else {

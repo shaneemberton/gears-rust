@@ -51,8 +51,8 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate module naming conventions
-        run: python3 tools/scripts/validate_module_names.py
+      - name: Validate gear naming conventions
+        run: python3 tools/scripts/validate_gear_names.py
 
       - name: Install Go (required for aws-lc-fips-sys FIPS build)
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0

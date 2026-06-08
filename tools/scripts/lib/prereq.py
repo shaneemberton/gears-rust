@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Prerequisite checking module for Gears testing environment.
+Prerequisite checking gear for Gears testing environment.
 
-This module provides classes to check various prerequisites needed for testing,
+This gear provide classes to check various prerequisites needed for testing,
 including services, tools, and dependencies.
 """
 

@@ -1,4 +1,4 @@
-# PRD — {Module/Feature Name}
+# PRD — {Gear/Feature Name}
 
 <!--
 =============================================================================
@@ -9,7 +9,7 @@ functional capabilities, and quality attributes.
 
 SCOPE:
   ✓ Business goals and success criteria
-  ✓ Actors (users, systems) that interact with this module
+  ✓ Actors (users, systems) that interact with this gear
   ✓ Functional requirements (WHAT, not HOW)
   ✓ Non-functional requirements (quality attributes, SLOs)
   ✓ Scope boundaries (in/out of scope)
@@ -40,7 +40,7 @@ REQUIREMENT LANGUAGE:
 
 ### 1.1 Purpose
 
-{1-2 paragraphs: What is this system/module and what problem does it solve? What are the key features?}
+{1-2 paragraphs: What is this system/gear and what problem does it solve? What are the key features?}
 
 ### 1.2 Background / Problem Statement
 
@@ -59,7 +59,7 @@ REQUIREMENT LANGUAGE:
 
 ## 2. Actors
 
-> **Note**: Stakeholder needs are managed at project/task level by steering committee. Document **actors** (users, systems) that interact with this module.
+> **Note**: Stakeholder needs are managed at project/task level by steering committee. Document **actors** (users, systems) that interact with this gear.
 
 ### 2.1 Human Actors
 
@@ -80,11 +80,11 @@ REQUIREMENT LANGUAGE:
 
 ## 3. Operational Concept & Environment
 
-> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and integration patterns defined in root PRD. Document only module-specific deviations here. **Delete this section if no special constraints.**
+> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and integration patterns defined in root PRD. Document only gear-specific deviations here. **Delete this section if no special constraints.**
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
-{Only if this module has constraints beyond project defaults:}
+{Only if this gear has constraints beyond project defaults:}
 
 - {Constraint 1, e.g., "Requires GPU acceleration for X"}
 - {Constraint 2, e.g., "Incompatible with async runtime due to Y"}
@@ -118,17 +118,17 @@ The system **MUST** {do something specific and verifiable}.
 
 - **Rationale**: {Why this requirement exists — business value or stakeholder need.}
 - **Actors**: `cpt-{system}-actor-{slug}`
-- **Covers**: `cpt-{system}-upreq-{slug}`, `cpt-{system}-upreq-{slug}` — upstream requirements satisfied by this FR. Required when an UPSTREAM_REQS document exists for the module (BIZ-PRD-003): every UPSTREAM_REQS ID must be covered by at least one FR or NFR.
+- **Covers**: `cpt-{system}-upreq-{slug}`, `cpt-{system}-upreq-{slug}` — upstream requirements satisfied by this FR. Required when an UPSTREAM_REQS document exists for the gear (BIZ-PRD-003): every UPSTREAM_REQS ID must be covered by at least one FR or NFR.
 - **Verification Method** (optional): {Only if non-standard: analysis | inspection | demonstration | specialized test approach}
 - **Acceptance Evidence** (optional): {Only if non-obvious: specific test suite path, analysis report, review checklist}
 
 ## 6. Non-Functional Requirements
 
-> **Global baselines**: Project-wide NFRs (performance, security, reliability, scalability) defined in root PRD and [guidelines/](../guidelines/). Document only module-specific NFRs here: **exclusions** from defaults or **standalone** requirements.
+> **Global baselines**: Project-wide NFRs (performance, security, reliability, scalability) defined in root PRD and [guidelines/](../guidelines/). Document only gear-specific NFRs here: **exclusions** from defaults or **standalone** requirements.
 >
 > **Testing strategy**: NFRs verified via automated benchmarks, security scans, and monitoring unless otherwise specified.
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 {Only include this section if there are NFRs that deviate from or extend project defaults.}
 
@@ -139,14 +139,14 @@ The system **MUST** {do something specific and verifiable}.
 The system **MUST** {measurable NFR with specific thresholds, e.g., "respond within 50ms at p95" (stricter than project default)}.
 
 - **Threshold**: {Quantitative target with units and conditions}
-- **Rationale**: {Why this module needs different/additional NFR}
-- **Covers**: `cpt-{system}-upreq-{slug}` — upstream requirements satisfied by this NFR. Required when an UPSTREAM_REQS document exists for the module (BIZ-PRD-003): every UPSTREAM_REQS ID must be covered by at least one FR or NFR.
+- **Rationale**: {Why this gear needs different/additional NFR}
+- **Covers**: `cpt-{system}-upreq-{slug}` — upstream requirements satisfied by this NFR. Required when an UPSTREAM_REQS document exists for the gear (BIZ-PRD-003): every UPSTREAM_REQS ID must be covered by at least one FR or NFR.
 - **Verification Method** (optional): {Only if non-standard approach needed}
 - **Architecture Allocation**: See DESIGN.md § NFR Allocation for how this is realized
 
 ### 6.2 NFR Exclusions
 
-{Document any project-default NFRs that do NOT apply to this module}
+{Document any project-default NFRs that do NOT apply to this gear}
 
 - {Default NFR name}: {Reason for exclusion}
 
@@ -160,7 +160,7 @@ Define the public API surface, versioning/compatibility guarantees, and integrat
 
 - [ ] `p1` - **ID**: `cpt-{system}-interface-{slug}`
 
-- **Type**: {Rust module/trait/struct | REST API | CLI | Protocol | Data format}
+- **Type**: {Rust gear/trait/struct | REST API | CLI | Protocol | Data format}
 - **Stability**: {stable | unstable | experimental}
 - **Description**: {What this interface provides}
 - **Breaking Change Policy**: {e.g., Major version bump required}

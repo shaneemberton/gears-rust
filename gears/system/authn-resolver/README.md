@@ -9,11 +9,11 @@ The decision to split authentication and authorization into separate resolvers i
 [ADR-0002](../../../docs/arch/authorization/adr/0002-split-authn-and-authz-resolvers.md) and
 the minimalist interface choice in [ADR-0003](../../../docs/arch/authorization/adr/0003-authn-resolver-minimalist-interface.md).
 
-The **authn_resolver** module provides a single responsibility: convert a bearer token into a validated identity (`SecurityContext`). The resolver is a integration point — it discovers and delegates to a vendor-specific plugin via the types-registry. The actual token validation logic lives in the plugin.
+The **authn_resolver** gear provides a single responsibility: convert a bearer token into a validated identity (`SecurityContext`). The resolver is a integration point — it discovers and delegates to a vendor-specific plugin via the types-registry. The actual token validation logic lives in the plugin.
 
 ## Public API
 
-The module registers [`AuthNResolverClient`](authn-resolver-sdk/src/api.rs) in ClientHub:
+The gear registers [`AuthNResolverClient`](authn-resolver-sdk/src/api.rs) in ClientHub:
 
 - `authenticate(bearer_token)` — Validate bearer token and return `AuthenticationResult`
 
@@ -39,12 +39,12 @@ Gears include one plugin out of the box:
 
 ## Configuration
 
-### AuthN Resolver Module
+### AuthN Resolver Gear
 
 See [`config.rs`](authn-resolver/src/config.rs)
 
 ```yaml
-modules:
+gears:
   authn_resolver:
     vendor: "constructorfabric"  # Selects plugin by matching vendor
 ```
@@ -54,7 +54,7 @@ modules:
 See [`config.rs`](plugins/static-authn-plugin/src/config.rs)
 
 ```yaml
-modules:
+gears:
   static_authn_plugin:
     vendor: "constructorfabric"
     priority: 100

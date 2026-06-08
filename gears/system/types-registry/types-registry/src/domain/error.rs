@@ -1,4 +1,4 @@
-//! Domain error types for the Types Registry module.
+//! Domain error types for the Types Registry gear.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -42,7 +42,7 @@ impl std::fmt::Display for ValidationError {
     }
 }
 
-/// Domain-level errors for the Types Registry module.
+/// Domain-level errors for the Types Registry gear.
 ///
 /// This enum is intentionally **kind-agnostic** — the storage layer doesn't
 /// know whether a string identifies a type-schema or an instance, it just

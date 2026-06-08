@@ -4,9 +4,9 @@
 
 ### 1.1 Purpose
 
-The SRR Relational Database Plugin (`srr-rdb-plugin`) is the default storage backend for the Simple Resource Registry module.
+The SRR Relational Database Plugin (`srr-rdb-plugin`) is the default storage backend for the Simple Resource Registry gear.
 
-This PRD specifies **only plugin-specific requirements** for the relational database backend. All system-level requirements (API semantics, security model, tenant/owner/GTS access control behavior, payload validation behavior, batch semantics, error model, etc.) are defined in the main module PRD and are **inherited** by this plugin:
+This PRD specifies **only plugin-specific requirements** for the relational database backend. All system-level requirements (API semantics, security model, tenant/owner/GTS access control behavior, payload validation behavior, batch semantics, error model, etc.) are defined in the main gear PRD and are **inherited** by this plugin:
 
 - **Parent PRD (authoritative)**: [../../../docs/PRD.md](../../../docs/PRD.md)
 
@@ -21,14 +21,14 @@ The plugin is intentionally kept simple: it uses a single shared table for all r
 ### 1.3 Goals (Business Outcomes)
 
 - Provide a zero-configuration default storage backend that works on PostgreSQL, MariaDB, and SQLite
-- Meet the parent module's scalability targets through proper indexing (`cpt-cf-srr-nfr-scalability`)
+- Meet the parent gear's scalability targets through proper indexing (`cpt-cf-srr-nfr-scalability`)
 - Keep the implementation simple and maintainable — no database-specific features (partitioning, materialized views, etc.)
 
 All other business and product goals are defined by the parent Simple Resource Registry PRD.
 
 ### 1.4 Glossary
 
-This PRD uses the parent module glossary as the primary source of truth. The terms below are plugin-specific.
+This PRD uses the parent gear glossary as the primary source of truth. The terms below are plugin-specific.
 
 | Term | Definition |
 |------|------------|
@@ -41,19 +41,19 @@ This PRD uses the parent module glossary as the primary source of truth. The ter
 
 ### 2.1 Human Actors
 
-This plugin has no direct human actors. It is consumed exclusively by the Simple Resource Registry main module.
+This plugin has no direct human actors. It is consumed exclusively by the Simple Resource Registry main gear.
 
 ### 2.2 System Actors
 
-#### Simple Resource Registry Main Module
+#### Simple Resource Registry Main Gear
 
 **ID**: `cpt-cf-srr-rdb-actor-srr-main`
 
-**Role**: The main module invokes this plugin via the `ResourceStoragePluginClient` trait for all resource persistence and query operations. The main module handles authentication, authorization, GTS type resolution, event/audit emission, and request routing — the plugin only handles storage.
+**Role**: The main gear invokes this plugin via the `ResourceStoragePluginClient` trait for all resource persistence and query operations. The main gear handles authentication, authorization, GTS type resolution, event/audit emission, and request routing — the plugin only handles storage.
 
 ## 3. Operational Concept & Environment
 
-The plugin operates within the standard Gears ToolKit lifecycle. It registers itself as a scoped client in ClientHub with a GTS plugin instance ID, enabling the main module's Storage Router to discover and invoke it. The plugin uses the platform's shared database connection pool managed by toolkit-db.
+The plugin operates within the standard Gears ToolKit lifecycle. It registers itself as a scoped client in ClientHub with a GTS plugin instance ID, enabling the main gear's Storage Router to discover and invoke it. The plugin uses the platform's shared database connection pool managed by toolkit-db.
 
 ## 4. Scope
 
@@ -78,7 +78,7 @@ The plugin operates within the standard Gears ToolKit lifecycle. It registers it
 - Per-resource-type dedicated tables (requires DDL at runtime; see ADR)
 - Full-text search within payload content (use a search-capable backend)
 - Payload-level indexing or querying
-- Caching layers (Redis, in-memory) — caching is a main module concern
+- Caching layers (Redis, in-memory) — caching is a main gear concern
 - Database migration management beyond initial schema creation
 
 ## 5. Functional Requirements
@@ -91,16 +91,16 @@ The plugin operates within the standard Gears ToolKit lifecycle. It registers it
 
 The plugin **MUST** implement the `ResourceStoragePluginClient` trait using SecureORM (SeaORM with SecurityContext-based tenant scoping). Schema fields **MUST** be stored as dedicated database columns. The payload **MUST** be stored as a TEXT column containing serialized JSON. The plugin **MUST** declare `odata_support: true` and `search_support: false` in its `PluginCapabilities`.
 
-**Rationale**: Core plugin functionality — implements the storage contract defined by the main module.
+**Rationale**: Core plugin functionality — implements the storage contract defined by the main gear.
 **Actors**: `cpt-cf-srr-rdb-actor-srr-main`
 
 #### OData Query Translation
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-rdb-fr-odata-translation`
 
-The plugin **MUST** translate OData $filter and $orderby parameters to SeaORM query conditions on schema fields (id, tenant_id, owner_id, type, created_at, updated_at, deleted_at). The plugin **MUST** support cursor-based pagination (limit, cursor). Invalid OData expressions **MUST** result in an error returned to the main module.
+The plugin **MUST** translate OData $filter and $orderby parameters to SeaORM query conditions on schema fields (id, tenant_id, owner_id, type, created_at, updated_at, deleted_at). The plugin **MUST** support cursor-based pagination (limit, cursor). Invalid OData expressions **MUST** result in an error returned to the main gear.
 
-**Rationale**: Enables the main module's OData query support on schema fields.
+**Rationale**: Enables the main gear's OData query support on schema fields.
 **Actors**: `cpt-cf-srr-rdb-actor-srr-main`
 
 #### GTS Wildcard Type Matching
@@ -109,7 +109,7 @@ The plugin **MUST** translate OData $filter and $orderby parameters to SeaORM qu
 
 The plugin **MUST** support GTS wildcard filtering on the `type` column. A trailing wildcard (`*`) in the type filter **MUST** be translated to a SQL `LIKE` prefix match (e.g., `type LIKE 'gts.cf.core.srr.resource.v1~acme.%'`). The wildcard is greedy and matches through the `~` chain separator.
 
-**Rationale**: Enables the main module's GTS wildcard filtering requirement.
+**Rationale**: Enables the main gear's GTS wildcard filtering requirement.
 **Actors**: `cpt-cf-srr-rdb-actor-srr-main`
 
 #### Atomic Idempotent Creation
@@ -127,14 +127,14 @@ The plugin **MUST** atomically check for an existing `(tenant_id, idempotency_ke
 
 The plugin **MUST** implement soft-delete by setting `deleted_at = now()` on the resource row. The plugin **MUST** implement immediate hard-delete via `hard_delete()` by permanently removing the resource row. Soft-deleted resources **MUST** be excluded from list queries by default (WHERE `deleted_at IS NULL`).
 
-**Rationale**: Supports the main module's soft-delete + configurable retention model.
+**Rationale**: Supports the main gear's soft-delete + configurable retention model.
 **Actors**: `cpt-cf-srr-rdb-actor-srr-main`
 
 #### Retention Purge
 
 - [ ] `p3` - **ID**: `cpt-cf-srr-rdb-fr-retention-purge`
 
-The plugin **MUST** implement `purge_deleted_before(type, cutoff, batch_size)` to permanently delete resources where `type` matches and `deleted_at < cutoff`, limited to `batch_size` rows per invocation. This operation is called by the main module's retention purge job.
+The plugin **MUST** implement `purge_deleted_before(type, cutoff, batch_size)` to permanently delete resources where `type` matches and `deleted_at < cutoff`, limited to `batch_size` rows per invocation. This operation is called by the main gear's retention purge job.
 
 **Rationale**: Enables automatic cleanup of soft-deleted resources past their retention period.
 **Actors**: `cpt-cf-srr-rdb-actor-srr-main`
@@ -145,7 +145,7 @@ The plugin **MUST** implement `purge_deleted_before(type, cutoff, batch_size)` t
 
 The plugin **MUST** store resource group membership data in a dedicated junction table. The plugin **MUST** support listing all resources in a group within a tenant, and listing all groups a resource belongs to.
 
-**Rationale**: Supports the main module's resource groups feature.
+**Rationale**: Supports the main gear's resource groups feature.
 **Actors**: `cpt-cf-srr-rdb-actor-srr-main`
 
 ### 5.2 Database Compatibility
@@ -161,16 +161,16 @@ The plugin **MUST** work on PostgreSQL, MariaDB, and SQLite without requiring da
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Scalability
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-rdb-nfr-scalability`
 
-The plugin **MUST** meet the parent module's scalability targets: 100 million total resources, 100 write operations per second, and 1000 single-resource fetch-by-ID operations per second. These targets **MUST** be achieved through proper B-tree indexing on schema fields, without requiring table partitioning or database-specific optimizations.
+The plugin **MUST** meet the parent gear's scalability targets: 100 million total resources, 100 write operations per second, and 1000 single-resource fetch-by-ID operations per second. These targets **MUST** be achieved through proper B-tree indexing on schema fields, without requiring table partitioning or database-specific optimizations.
 
 **Threshold**: 100M total resources; 100 writes/s; 1000 reads-by-ID/s
-**Rationale**: The default backend must handle the full scalability envelope defined by the parent module.
+**Rationale**: The default backend must handle the full scalability envelope defined by the parent gear.
 **Architecture Allocation**: See DESIGN.md section "Indexing Strategy"
 
 #### Single-Resource Read Latency
@@ -180,7 +180,7 @@ The plugin **MUST** meet the parent module's scalability targets: 100 million to
 Single-resource fetch-by-ID **MUST** complete within 50ms at p95 under normal load. This is achieved via primary key lookup with no joins.
 
 **Threshold**: 50ms p95 for single-resource reads
-**Rationale**: Inherited from parent module NFR `cpt-cf-srr-nfr-read-latency`.
+**Rationale**: Inherited from parent gear NFR `cpt-cf-srr-nfr-read-latency`.
 
 ### 6.2 NFR Exclusions
 
@@ -197,11 +197,11 @@ Single-resource fetch-by-ID **MUST** complete within 50ms at p95 under normal lo
 **Type**: Rust trait implementation (async)
 **Stability**: stable
 **Description**: Implements `ResourceStoragePluginClient` from the `simple-resource-registry-sdk` crate. Registered as a scoped client in ClientHub with a GTS plugin instance ID.
-**Breaking Change Policy**: Follows the parent module's plugin interface versioning — trait changes are coordinated via the SDK crate.
+**Breaking Change Policy**: Follows the parent gear's plugin interface versioning — trait changes are coordinated via the SDK crate.
 
 ## 8. Use Cases
 
-### Standard CRUD via Main Module
+### Standard CRUD via Main Gear
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-rdb-usecase-crud`
 
@@ -212,10 +212,10 @@ Single-resource fetch-by-ID **MUST** complete within 50ms at p95 under normal lo
 - Database schema (tables + indexes) is deployed
 
 **Main Flow**:
-1. Main module's Storage Router resolves this plugin for the target resource type
-2. Main module calls plugin's `create`/`get`/`list`/`update`/`delete` method with SecurityContext
+1. Main gear's Storage Router resolves this plugin for the target resource type
+2. Main gear calls plugin's `create`/`get`/`list`/`update`/`delete` method with SecurityContext
 3. Plugin executes the operation against the relational database via SecureORM
-4. Plugin returns the result to the main module
+4. Plugin returns the result to the main gear
 
 **Postconditions**:
 - Resource state is persisted in the database
@@ -247,25 +247,25 @@ Single-resource fetch-by-ID **MUST** complete within 50ms at p95 under normal lo
 
 ## 11. Assumptions
 
-- The database connection pool is managed by toolkit-db and shared with other modules
+- The database connection pool is managed by toolkit-db and shared with other gears
 - Database migrations for this plugin's tables are deployed before the plugin starts
-- The main module handles all authentication, authorization, and GTS type resolution before calling the plugin
+- The main gear handles all authentication, authorization, and GTS type resolution before calling the plugin
 
 ## 12. Risks
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Single-table design hits performance ceiling before 100M resources on underpowered hardware | Query latency exceeds NFR thresholds | Proper composite indexes; main module's storage routing can redirect high-volume types to alternative backends |
+| Single-table design hits performance ceiling before 100M resources on underpowered hardware | Query latency exceeds NFR thresholds | Proper composite indexes; main gear's storage routing can redirect high-volume types to alternative backends |
 | SQLite lacks concurrent write support under load | Write throughput may not reach 100 writes/s on SQLite | SQLite is intended for edge/dev environments with lower concurrency; production deployments use PostgreSQL |
 | TEXT payload storage limits payload-specific DB optimization | Payload extraction/indexing is not available in this plugin | Payload is opaque by design — no payload-level queries are supported; use a search-capable backend when payload querying is required |
 
 ## 13. Open Questions
 
-None — this plugin's requirements are fully derived from the parent module's storage backend contract.
+None — this plugin's requirements are fully derived from the parent gear's storage backend contract.
 
 ## 14. Traceability
 
-- **Parent Module PRD**: [../../../docs/PRD.md](../../../docs/PRD.md)
-- **Parent Module DESIGN**: [../../../docs/DESIGN.md](../../../docs/DESIGN.md)
+- **Parent Gear PRD**: [../../../docs/PRD.md](../../../docs/PRD.md)
+- **Parent Gear DESIGN**: [../../../docs/DESIGN.md](../../../docs/DESIGN.md)
 - **Design**: [DESIGN.md](./DESIGN.md)
 - **ADRs**: [ADR/](./ADR/)

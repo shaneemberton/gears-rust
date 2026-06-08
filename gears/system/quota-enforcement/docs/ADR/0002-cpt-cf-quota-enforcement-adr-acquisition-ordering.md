@@ -55,7 +55,7 @@ schema evolution, and yields a one-line deadlock-freedom proof that applies unif
 - Every mutation primitive in the storage plugin sorts the applicable Quota set ascending by `quota_id` before issuing
   `SELECT ... FOR UPDATE`.
 - **`quota_id` MUST be UUIDv7** (`Uuid::now_v7()` per the Rust `uuid` crate), consistent with the platform convention
-  for production domain-entity IDs in Postgres-backed modules (`mini-chat` `message_id` / `attachment_id` /
+  for production domain-entity IDs in Postgres-backed gears (`mini-chat` `message_id` / `attachment_id` /
   `reaction_id`, `file-parser` IR entity IDs, chat-engine ADR-0012). v7 gives time-ordered lex-comparison, which
   converts the deterministic acquisition ordering into near-monotonic creation ordering and yields better B-tree index
   locality on hot-path lookups (`quotas` PK, `quotas_subject_metric_active`). Deadlock-freedom is preserved regardless

@@ -2,7 +2,7 @@
 //!
 //! Every toolkit plugin registers a well-known GTS Instance of this Type Schema
 //! in `types-registry` so consumers can discover and resolve plugins at runtime.
-//! Module-specific plugin specs (e.g. `AuthZResolverPluginSpecV1`,
+//! Gear-specific plugin specs (e.g. `AuthZResolverPluginSpecV1`,
 //! `TenantResolverPluginSpecV1`) derive from this base type via the upstream
 //! `#[gts_macros::struct_to_gts_schema(base = PluginV1, ...)]` pattern.
 //!
@@ -56,7 +56,7 @@ impl<P: gts::GtsSchema + gts::GtsSerialize + Default> PluginV1<P> {
     /// must `#[derive(Default)]` so the caller only specifies the type
     /// once — in the turbofish.
     ///
-    /// Typical usage in a plugin module's `init()`:
+    /// Typical usage in a plugin gear's `init()`:
     ///
     /// ```ignore
     /// let (instance_id, payload) = PluginV1::<MyPluginSpecV1>::build_registration(

@@ -2,7 +2,7 @@
 //!
 //! ## Architecture
 //!
-//! This module implements the domain service pattern with per-resource submodules:
+//! This gear implements the domain service pattern with per-resource submodules:
 //! - `users` - User CRUD and business rules (email/display name validation)
 //! - `cities` - City CRUD operations
 //! - `addresses` - Address management (1-to-1 with users)

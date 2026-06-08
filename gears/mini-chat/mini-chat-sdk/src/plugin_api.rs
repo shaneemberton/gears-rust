@@ -10,7 +10,7 @@ use crate::models::{PolicySnapshot, PolicyVersionInfo, UsageEvent, UserLicenseSt
 /// Plugin API trait for mini-chat model policy implementations.
 ///
 /// Plugins implement this trait to provide model catalog and policy data.
-/// The mini-chat module discovers plugins via GTS types-registry and
+/// The mini-chat gear discovers plugins via GTS types-registry and
 /// delegates policy queries to the selected plugin.
 ///
 /// Cancellation is handled by the framework: in-flight futures are dropped
@@ -63,7 +63,7 @@ pub trait MiniChatModelPolicyPluginClientV1: Send + Sync {
 /// Plugin API trait for mini-chat audit event publishing.
 ///
 /// Plugins implement this trait to receive audit events from the mini-chat
-/// module. The mini-chat module discovers plugins via GTS types-registry and
+/// gear. The mini-chat gear discovers plugins via GTS types-registry and
 /// dispatches audit events to all registered implementations.
 ///
 /// # Caller contract

@@ -4,7 +4,7 @@
 //! INSERT into `integrity_check_runs`. The PK is a synthetic singleton
 //! (`id = 1`, enforced by a CHECK constraint) so the table holds at
 //! most one row at a time: a second worker attempting to insert
-//! receives a unique-violation, which this module maps to
+//! receives a unique-violation, which this gear maps to
 //! [`DomainError::IntegrityCheckInProgress`]. The `Postgres`
 //! `pg_try_advisory_xact_lock` path used by the legacy raw-SQL
 //! integrity check is intentionally not reintroduced — uniform

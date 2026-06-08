@@ -1,6 +1,6 @@
 //! Hidden database runner capability.
 //!
-//! This module intentionally does **not** expose any raw `SeaORM` connection/transaction types
+//! This gear intentionally does **not** expose any raw `SeaORM` connection/transaction types
 //! to downstream crates. It exists solely to allow secure query wrappers to execute queries
 //! against either a normal connection (`DbConn`) or an in-flight transaction (`DbTx`).
 //!

@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/contract/
+// simulated_dir=/cf-gears/gears/some_gear/contract/
 use serde::{Deserialize, Serialize};
 
 #[allow(dead_code)]

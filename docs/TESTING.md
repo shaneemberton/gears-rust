@@ -9,7 +9,7 @@ Gears.  It is the single source of truth for "what must be tested and how."
 
 | Layer | Scope | Tooling | Feature gate | Runs in CI |
 |-------|-------|---------|--------------|------------|
-| **Unit** | Single function / struct / module in isolation | `cargo test --workspace` | none (always compiled) | Every PR (`ci.yml` — `test` job, all OS) |
+| **Unit** | Single function / struct / gear in isolation | `cargo test --workspace` | none (always compiled) | Every PR (`ci.yml` — `test` job, all OS) |
 | **Integration** | Cross-crate or DB-backed logic (SQLite, Postgres, MySQL) | `cargo test -p <pkg> --features integration` | `#[cfg(feature = "integration")]` | Every PR (`ci.yml` — `integration` job, Ubuntu) |
 | **E2E** | Full HTTP request → response through a running server | pytest + httpx against `cf-gears-server` | n/a (Python tests) | PRs to `main`, nightly schedule (`e2e.yml`) |
 | **Fuzz** | Parser / validator robustness against arbitrary input | `cargo-fuzz` (libFuzzer) | nightly toolchain | PRs + nightly (`clusterfuzzlite.yml`) |
@@ -27,7 +27,7 @@ make test-sqlite           # integration — SQLite
 make test-pg               # integration — PostgreSQL
 make test-mysql            # integration — MySQL
 make test-db               # all DB integration tests
-make test-users-info-pg    # users-info module integration (Postgres)
+make test-users-info-pg    # users-info gear integration (Postgres)
 make e2e-docker            # E2E — Docker environment
 make e2e-docker-smoke      # E2E — Docker environment (smoke subset only)
 make e2e-local             # E2E — local server (builds + starts automatically)
@@ -44,7 +44,7 @@ make all                   # full pipeline (build + check + test-sqlite + e2e-lo
 ### 2.1 Threshold
 
 The project-wide **line-coverage threshold is 80 %**.  The threshold is enforced in
-`scripts/coverage.py` (`COVERAGE_THRESHOLD`) and printed as a warning when any module
+`scripts/coverage.py` (`COVERAGE_THRESHOLD`) and printed as a warning when any gear
 or library falls below it.
 
 ### 2.2 Coverage modes
@@ -76,7 +76,7 @@ Local coverage commands produce four report formats under `coverage/<mode>/`:
 | `summary.txt` | Text summary |
 | `lcov.info` | LCOV (for IDE plugins and CI upload) |
 | `coverage.json` | JSON (machine-readable, used by the custom report) |
-| `coverage_report.txt` | Custom per-module/per-library table |
+| `coverage_report.txt` | Custom per-gear/per-library table |
 
 ---
 

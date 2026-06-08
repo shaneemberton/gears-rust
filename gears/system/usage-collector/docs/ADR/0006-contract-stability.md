@@ -26,7 +26,7 @@ date: 2026-05-24
 
 ## Context and Problem Statement
 
-The Usage Collector exposes three public surfaces — the REST API for remote callers, the in-process SDK trait for platform modules, and the Plugin SPI for storage backends — and each surface has a different ecosystem of authors and release schedules. The question is how these surfaces should version: a single coupled version across all three, fully independent versioning, or a coordinated release train. The decision affects how plugin authors, in-process consumers, and remote callers experience compatibility, how breaking changes are introduced, and how long an ecosystem participant has to migrate across a major-version step.
+The Usage Collector exposes three public surfaces — the REST API for remote callers, the in-process SDK trait for platform gears, and the Plugin SPI for storage backends — and each surface has a different ecosystem of authors and release schedules. The question is how these surfaces should version: a single coupled version across all three, fully independent versioning, or a coordinated release train. The decision affects how plugin authors, in-process consumers, and remote callers experience compatibility, how breaking changes are introduced, and how long an ecosystem participant has to migrate across a major-version step.
 
 ## Decision Drivers
 

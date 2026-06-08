@@ -42,7 +42,7 @@
 
 ### 1.1 Architectural Vision
 
-Cluster is a platform-level system module that provides cluster coordination and shared-state primitives to all Gears. It exposes four independent primitives — distributed cache (KV with TTL, version-based CAS, watch notifications), leader election, distributed locks with TTL-bounded mutual exclusion, and service discovery — each as a versioned public-API facade struct (`ClusterCacheV1`, `LeaderElectionV1`, `DistributedLockV1`, `ServiceDiscoveryV1`) wrapping a plugin-implemented backend trait (`ClusterCacheBackend`, `LeaderElectionBackend`, `DistributedLockBackend`, `ServiceDiscoveryBackend`). Plugins register their backend implementations in ClientHub per profile per primitive; consumers resolve via per-primitive fluent resolvers.
+Cluster is a platform-level system gear that provides cluster coordination and shared-state primitives to all Gears. It exposes four independent primitives — distributed cache (KV with TTL, version-based CAS, watch notifications), leader election, distributed locks with TTL-bounded mutual exclusion, and service discovery — each as a versioned public-API facade struct (`ClusterCacheV1`, `LeaderElectionV1`, `DistributedLockV1`, `ServiceDiscoveryV1`) wrapping a plugin-implemented backend trait (`ClusterCacheBackend`, `LeaderElectionBackend`, `DistributedLockBackend`, `ServiceDiscoveryBackend`). Plugins register their backend implementations in ClientHub per profile per primitive; consumers resolve via per-primitive fluent resolvers.
 
 The architecture follows the ToolKit Gateway + Plugins pattern (same as authn-resolver, authz-resolver, credstore, tenant-resolver). An SDK crate (`cf-cluster-sdk`) defines the facade structs, backend traits, and resolver builders. A wiring crate (`cf-cluster`, planned follow-up change) handles ClientHub registration and plugin orchestration via the outbox-style builder/handle pattern. Backend-specific implementations ship as plugin crates (also follow-up changes) under `plugins/`.
 
@@ -50,9 +50,9 @@ The key architectural differentiator is **per-primitive backend routing as opera
 
 The SDK also ships **default backend implementations** of leader election, distributed lock, and service discovery built entirely on `ClusterCacheBackend` CAS operations. This means a minimal plugin only needs to implement the cache backend trait — the SDK builds the other three on top. Native plugin backends override the defaults when a backend excels (e.g., K8s Lease for elections). Operators opt into SDK defaults by **omitting** the primitive in YAML; explicit binding always wins.
 
-Lifecycle is owned by a parent host module via the **outbox-style builder/handle pattern**. The wiring crate is NOT registered as its own `RunnableCapability` — it's a library exposing `ClusterWiring::builder(...).build_and_start() -> ClusterHandle`. The parent host module's `RunnableCapability::start` calls `build_and_start()`; its `RunnableCapability::stop` calls `handle.stop()`. Plugins are nested builder/handle pairs owned by the cluster handle, NOT separate `RunnableCapability` implementors. Code-flow ordering inside the parent module's `start` removes the need for a framework-level dependency mechanism between wiring and plugin lifecycles.
+Lifecycle is owned by a parent host gear via the **outbox-style builder/handle pattern**. The wiring crate is NOT registered as its own `RunnableCapability` — it's a library exposing `ClusterWiring::builder(...).build_and_start() -> ClusterHandle`. The parent host gear's `RunnableCapability::start` calls `build_and_start()`; its `RunnableCapability::stop` calls `handle.stop()`. Plugins are nested builder/handle pairs owned by the cluster handle, NOT separate `RunnableCapability` implementors. Code-flow ordering inside the parent gear's `start` removes the need for a framework-level dependency mechanism between wiring and plugin lifecycles.
 
-Explicit pub/sub messaging is excluded. The event broker module provides reliable pub/sub with delivery guarantees, consumer groups, offsets, and replay. The cluster provides reactive cache notifications (watch by key or prefix) for data-change observation — "this data changed" vs "deliver this message reliably".
+Explicit pub/sub messaging is excluded. The event broker gear provides reliable pub/sub with delivery guarantees, consumer groups, offsets, and replay. The cluster provides reactive cache notifications (watch by key or prefix) for data-change observation — "this data changed" vs "deliver this message reliably".
 
 ### 1.2 Architecture Drivers
 
@@ -60,10 +60,10 @@ Explicit pub/sub messaging is excluded. The event broker module provides reliabl
 
 | Requirement | Design Response |
 |-------------|-----------------|
-| Cluster-wide shared state for modules | `ClusterCacheV1` with version-based CAS, TTL, and watch notifications |
+| Cluster-wide shared state for gears | `ClusterCacheV1` with version-based CAS, TTL, and watch notifications |
 | Worker pool coordination (event broker, schedulers) | `LeaderElectionV1` with watch-based status model and automatic renewal |
 | Distributed rate limiting (OAGW) | `DistributedLockV1` with TTL and explicit async release |
-| OOP module-to-module routing with dynamic shard ownership | `ServiceDiscoveryV1` with state-filtered and metadata-filtered instance listing (e.g., dispatcher → delivery instance by `topic-shard`) and topology watches |
+| OoP gear-ot-gear routing with dynamic shard ownership | `ServiceDiscoveryV1` with state-filtered and metadata-filtered instance listing (e.g., dispatcher → delivery instance by `topic-shard`) and topology watches |
 | Multiple infrastructure backends per profile | Per-primitive backend routing as operator config; per-primitive ClientHub registration; no runtime compositor |
 | Zero-infrastructure dev/test | SDK ships with in-process stub backends for smoke tests; production standalone plugin is a follow-up change |
 
@@ -76,9 +76,9 @@ Explicit pub/sub messaging is excluded. The event broker module provides reliabl
 | `cpt-cf-clst-adr-watch-event-lifecycle-contract` (ADR-003) | Watch event lifecycle contract for all three watches — union-type `*WatchEvent { value-variant, Lagged, Reset, Closed }` instead of `Result`-based signaling, applied to cache, leader, and service-discovery watches; lightweight key-only cache events as the contract twin of `Lagged`/`Reset` |
 | `cpt-cf-clst-adr-observability-contract` (ADR-004) | Observability as a versioned naming contract — spans, metrics, log events are part of the SDK contract; cardinality rule forbids keys/names as metric labels |
 | `cpt-cf-clst-adr-facade-backend-pattern` (ADR-005) | Per-primitive facade-plus-backend-trait pattern, per-primitive `*V1` versioning, no root `Cluster` trait |
-| `cpt-cf-clst-adr-builder-handle-lifecycle` (ADR-006) | Outbox-style builder/handle lifecycle owned by parent host module, no two-tier `RunnableCapability` ordering |
+| `cpt-cf-clst-adr-builder-handle-lifecycle` (ADR-006) | Outbox-style builder/handle lifecycle owned by parent host gear, no two-tier `RunnableCapability` ordering |
 | `cpt-cf-clst-adr-capability-typing-and-profile-resolution` (ADR-007) | Per-primitive capability typing — `*Capability` enums replace bundled `CapabilityClass`; consequences: `ClusterProfile` typed marker, fluent resolver, capability-mismatch fails startup |
-| `cpt-cf-clst-adr-sd-state-is-intent-not-health` (ADR-008) | Service discovery: `state` is module-declared serving intent (`Enabled`/`Disabled`), NOT a health observation; cluster does not own liveness probing |
+| `cpt-cf-clst-adr-sd-state-is-intent-not-health` (ADR-008) | Service discovery: `state` is gear-declared serving intent (`Enabled`/`Disabled`), NOT a health observation; cluster does not own liveness probing |
 | `cpt-cf-clst-adr-leader-election-backend-safety` (ADR-009) | Per-backend correctness analysis for SDK-default leader election (and lock) under failure; constructor pair `new` (rejects `EventuallyConsistent`) + `new_allow_weak_consistency` (opt-in with warning); promotes the r2 deep-dive to decision-of-record |
 
 #### NFR Allocation
@@ -95,11 +95,11 @@ Explicit pub/sub messaging is excluded. The event broker module provides reliabl
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│            Consumers (Event Broker, OAGW, modules)              │
+│            Consumers (Event Broker, OAGW, gears)                │
 │  Hold ClusterCacheV1 / LeaderElectionV1 / DistributedLockV1 /   │
 │  ServiceDiscoveryV1 facades. Define ClusterProfile markers.     │
 ├─────────────────────────────────────────────────────────────────┤
-│  Parent host module (this change: out of scope; future)         │
+│  Parent host gear (this change: out of scope; future)           │
 │  Owns ClusterHandle from RunnableCapability::start/stop.        │
 ├─────────────────────────────────────────────────────────────────┤
 │  cf-cluster-sdk (THIS CHANGE)                                   │
@@ -127,7 +127,7 @@ Explicit pub/sub messaging is excluded. The event broker module provides reliabl
 | Layer | Responsibility | Technology |
 |-------|---------------|------------|
 | SDK | Public-API facade structs (`*V1`), backend traits (`*Backend`), per-primitive resolver builders, `ClusterProfile` marker trait, `*Capability` requirement enums, `*Features` characteristic structs, shared types, SDK default backend implementations, per-primitive `scoped()` helpers, `PollingPrefixWatch` polyfill, `register_*_backend` / `deregister_*_backend` helpers | Rust crate (`cf-cluster-sdk`) |
-| Wiring (follow-up) | Operator YAML parsing, plugin orchestration, per-primitive ClientHub registration, builder/handle exposed to parent host module | Rust crate (`cf-cluster`) |
+| Wiring (follow-up) | Operator YAML parsing, plugin orchestration, per-primitive ClientHub registration, builder/handle exposed to parent host gear | Rust crate (`cf-cluster`) |
 | Plugins (follow-up) | Backend-specific primitive implementations exposed as builder/handle pairs | Rust crates per backend |
 | External | Persistence, coordination, cluster state | PostgreSQL, K8s API server, Redis, NATS, etcd |
 
@@ -227,7 +227,7 @@ All four backend traits MUST be dyn-compatible. The SDK includes compile-time as
 | `LockGuard` | Lock handle. `async fn extend(additional_ttl)`, `async fn release(self)`. `Drop` is a no-op (TTL is the safety net; no I/O in `Drop`). |
 | `ServiceRegistration` | `{ name: String, instance_id: Option<String>, address: String, metadata: HashMap<String, String> }`. |
 | `ServiceInstance` | Discovered instance: `{ instance_id, address, metadata, state: InstanceState, registered_at }`. |
-| `InstanceState` | `enum { Enabled, Disabled }`. Module-declared serving intent. NOT a health observation — liveness comes from heartbeat/TTL renewal. |
+| `InstanceState` | `enum { Enabled, Disabled }`. Gear-declared serving intent. NOT a health observation — liveness comes from heartbeat/TTL renewal. |
 | `ServiceHandle` | Registration handle: `async fn deregister(self)`, `async fn update_metadata(...)`, `async fn set_enabled(bool)`. `Drop` is a no-op (no I/O in `Drop`). |
 | `MetaMatch` | `#[non_exhaustive] enum { Equals(String), OneOf(Vec<String>) }`. Per-key metadata predicate. |
 | `DiscoveryFilter` | `#[non_exhaustive] struct { state: StateFilter, metadata: Vec<(String, MetaMatch)>, ... }`. AND-conjunction across metadata entries. |
@@ -242,7 +242,7 @@ All four backend traits MUST be dyn-compatible. The SDK includes compile-time as
 | `ScopedCacheBackend` (and three siblings) | Internal SDK wrapper struct implementing the corresponding `*Backend` trait by delegating to an inner `Arc<dyn _Backend>` with prefix translation. Returned by `*V1::scoped(prefix)`. |
 | `PollingPrefixWatch` | SDK polyfill: synthesizes `watch_prefix` behavior on backends declaring `features().prefix_watch == false` by periodically listing the prefix and emitting `CacheWatchEvent::Event` diffs (Changed/Deleted). Explicit opt-in; doc comments describe the cost (N gets per interval). |
 | `ClusterWiring` (follow-up) | Wiring crate's builder entry point. `ClusterWiring::builder(config, hub).build_and_start() -> ClusterHandle`. |
-| `ClusterHandle` (follow-up) | Wiring crate's lifecycle handle. `handle.stop() -> ()` deregisters all backends and stops nested plugin handles. Owned by the parent host module. |
+| `ClusterHandle` (follow-up) | Wiring crate's lifecycle handle. `handle.stop() -> ()` deregisters all backends and stops nested plugin handles. Owned by the parent host gear. |
 
 **Relationships**:
 - A `CacheEntry` belongs to exactly one key. Each `put` increments the version.
@@ -283,7 +283,7 @@ All four backend traits MUST be dyn-compatible. The SDK includes compile-time as
 │  starts each plugin's builder; registers each backend in ClientHub │
 └────────────────────────────────────────────────────────────────────┘
                                    ▲
-                                   │ owned by parent host module's RunnableCapability::start
+                                   │ owned by parent host gear's RunnableCapability::start
                                    │
 ┌────────────────────────────────────────────────────────────────────┐
 │             Plugin crates (each follow-up change)                  │
@@ -303,7 +303,7 @@ Per-primitive public-API facade structs, plugin-facing backend traits, resolver 
 
 - [ ] `p1` - **ID**: `cpt-cf-clst-component-wiring`
 
-Wiring library. Implements no `RunnableCapability` itself. Exposes `ClusterWiring::builder(config, hub).build_and_start() -> ClusterHandle`. The handle's `stop()` is the single shutdown entry point. A parent host module owns the handle from inside its own `RunnableCapability::start`/`stop`.
+Wiring library. Implements no `RunnableCapability` itself. Exposes `ClusterWiring::builder(config, hub).build_and_start() -> ClusterHandle`. The handle's `stop()` is the single shutdown entry point. A parent host gear owns the handle from inside its own `RunnableCapability::start`/`stop`.
 
 #### Plugin crates (follow-up changes)
 
@@ -378,7 +378,7 @@ Three consumer patterns are available, ordered by tolerance for transient dual-l
 | `watch` | `async fn watch(&self, name: &str) -> Result<ServiceWatch, ClusterError>` | Yields `ServiceWatchEvent` (`Change(TopologyChange)` / `Lagged` / `Reset` / `Closed`). Watch is unfiltered — consumers apply filters client-side to each `Change` event. |
 | `ServiceHandle::deregister` | `async fn deregister(self) -> Result<(), ClusterError>` | Instance removed; watchers receive `Change(Left)`. |
 | `ServiceHandle::update_metadata` | `async fn update_metadata(&self, m: HashMap<String, String>) -> Result<(), ClusterError>` | Updates metadata; watchers receive `Change(Updated)`. |
-| `ServiceHandle::set_enabled` | `async fn set_enabled(&self, enabled: bool) -> Result<(), ClusterError>` | Flip module-declared serving intent. Watchers receive `Change(Updated)`. NOT a health observation — liveness is signaled by heartbeat/TTL renewal. |
+| `ServiceHandle::set_enabled` | `async fn set_enabled(&self, enabled: bool) -> Result<(), ClusterError>` | Flip gear-declared serving intent. Watchers receive `Change(Updated)`. NOT a health observation — liveness is signaled by heartbeat/TTL renewal. |
 
 ### 3.4 Internal Dependencies
 
@@ -464,7 +464,7 @@ impl<'a> CacheResolverBuilder<'a> {
 
 **Resolution flow**:
 1. Consumer crate defines a `ClusterProfile` marker once. The `NAME` const is the only place the profile string appears on the consumer side.
-2. Module calls `*V1::resolver(hub).profile(P).require(Cap...).resolve()`.
+2. Gear calls `*V1::resolver(hub).profile(P).require(Cap...).resolve()`.
 3. The wiring crate's `ClusterWiring::builder(...).build_and_start()` had previously registered the corresponding `Arc<dyn _Backend>` in ClientHub under `profile_scope(P::NAME)`.
 4. The resolver looks up the registered backend, validates declared `*Capability` requirements against the backend's actual `features()` (and `consistency()` for cache), and returns the wrapped facade. Mismatch → `CapabilityNotMet { primitive, capability, provider }` at startup.
 
@@ -474,11 +474,11 @@ Multiple resolutions of the same primitive on the same profile are cheap (`Arc`-
 
 ### 3.7 Lifecycle Pattern (Builder/Handle)
 
-The cluster wiring crate (`cf-cluster`, follow-up change) is **not** registered as its own `RunnableCapability` in ToolKit. It's a library exposing a builder/handle pair following the outbox pattern. A parent host module (registered as a `RunnableCapability`) owns the cluster handle inside its own `start`/`stop`.
+The cluster wiring crate (`cf-cluster`, follow-up change) is **not** registered as its own `RunnableCapability` in ToolKit. It's a library exposing a builder/handle pair following the outbox pattern. A parent host gear (registered as a `RunnableCapability`) owns the cluster handle inside its own `start`/`stop`.
 
 ```rust
-// In the parent host module's RunnableCapability impl (follow-up):
-impl RunnableCapability for HostModule {
+// In the parent host gear's RunnableCapability impl (follow-up):
+impl RunnableCapability for HostGear {
     async fn start(&self, cancel: CancellationToken) -> anyhow::Result<()> {
         let cluster_handle = ClusterWiring::builder(&self.config.cluster, &self.hub)
             .build_and_start()
@@ -506,7 +506,7 @@ impl RunnableCapability for HostModule {
 
 **Why this shape**:
 - Outbox is the codebase's production-mature long-running background-task pattern (`cluster/libs/toolkit-db/src/outbox/manager.rs:455–596`). Mini-chat owns its outbox via `Outbox::builder(...).start()` from inside its own `RunnableCapability::start`.
-- Ordering is by code flow inside the parent module's `start`, NOT framework declarations. The parent module is registered as a `RunnableCapability` dependency of consumer modules (via existing toolkit module-dependency mechanism), so consumers can't try to resolve before cluster is up.
+- Ordering is by code flow inside the parent gear's `start`, NOT framework declarations. The parent gear is registered as a `RunnableCapability` dependency of consumer gears (via existing ToolKit gear-dependency mechanism), so consumers can't try to resolve before cluster is up.
 - Plugins are NOT separate `RunnableCapability` implementors. They expose builder/handle types like outbox does. The cluster wiring's builder calls each plugin's builder; the cluster handle owns each plugin's handle and stops them in reverse-start order.
 
 **Post-shutdown behavior (narrowed best-effort `Ok`)**:
@@ -705,7 +705,7 @@ Periodically lists keys under the prefix, diffs against the previous list, and e
 - [ ] `p1` - **ID**: `cpt-cf-clst-seq-per-primitive-resolution`
 
 ```
-  Consumer Module                    SDK                         ClientHub
+  Consumer Gear                    SDK                         ClientHub
        │                              │                              │
        │  ClusterCacheV1::resolver(&hub)                              │
        │   .profile(EventBrokerProfile)                              │
@@ -725,12 +725,12 @@ Periodically lists keys under the prefix, diffs against the previous list, and e
        │ <────────────────────────────│                              │
 ```
 
-#### Lifecycle: Parent host module → Cluster wiring → Plugins
+#### Lifecycle: Parent host gear → Cluster wiring → Plugins
 
 - [ ] `p1` - **ID**: `cpt-cf-clst-seq-lifecycle-startup`
 
 ```
-  Module Host         Parent Module               Cluster Wiring          Plugins
+  Gear Host         Parent Gear               Cluster Wiring          Plugins
        │                   │                          │                      │
        │ start(cancel)     │                          │                      │
        │ ─────────────────>│                          │                      │
@@ -759,7 +759,7 @@ Periodically lists keys under the prefix, diffs against the previous list, and e
        │ Ok                │                          │                      │
        │ <─────────────────│                          │                      │
 
-  Consumer modules now resolve via *V1::resolver(...).profile(P).resolve()
+  Consumer gears now resolve via *V1::resolver(...).profile(P).resolve()
 ```
 
 #### Shutdown Sequence
@@ -767,7 +767,7 @@ Periodically lists keys under the prefix, diffs against the previous list, and e
 - [ ] `p1` - **ID**: `cpt-cf-clst-seq-shutdown`
 
 ```
-  Module Host       Parent Module        Cluster Handle         Active Watches
+  Gear Host       Parent Gear        Cluster Handle         Active Watches
        │                 │                    │                        │
        │ stop(cancel)    │                    │                        │
        │ ───────────────>│                    │                        │
@@ -800,9 +800,9 @@ Per-backend storage layout (e.g., the Postgres plugin's `cluster_cache` and `clu
 
 ### 3.15 Deployment Topology
 
-Cluster is an in-process Rust library SDK; it has no deployment topology of its own. The SDK is consumed by other modules in the same process; the `ClusterHandle` lifecycle is owned by a parent host module's `RunnableCapability::start`/`stop` (see §3.7).
+Cluster is an in-process Rust library SDK; it has no deployment topology of its own. The SDK is consumed by other gears in the same process; the `ClusterHandle` lifecycle is owned by a parent host gear's `RunnableCapability::start`/`stop` (see §3.7).
 
-The deployment shape that matters operationally is the **profile × backend** matrix mapped onto the parent host module's deployment. §4.2 Recommended Deployment Combinations enumerates the supported shapes (single-instance dev/test, multi-instance non-K8s, K8s-low-throughput, K8s + Redis production, Redis-only). Each shape is realized by the parent host module's deployment (Kubernetes pod, systemd unit, Docker container) plus the per-primitive backend bindings declared in operator YAML and instantiated by the wiring crate (`cf-cluster`, follow-up).
+The deployment shape that matters operationally is the **profile × backend** matrix mapped onto the parent host gear's deployment. §4.2 Recommended Deployment Combinations enumerates the supported shapes (single-instance dev/test, multi-instance non-K8s, K8s-low-throughput, K8s + Redis production, Redis-only). Each shape is realized by the parent host gear's deployment (Kubernetes pod, systemd unit, Docker container) plus the per-primitive backend bindings declared in operator YAML and instantiated by the wiring crate (`cf-cluster`, follow-up).
 
 Cross-cluster / geo-distributed coordination is out of scope (§4.2 Out of Scope in PRD).
 
@@ -849,7 +849,7 @@ The following existing code overlaps with cluster capabilities and will be migra
 | Existing Code | Location | Overlap | Migration Plan |
 |------|----------|---------|---|
 | `LeaderElector` trait + `K8sLeaseElector` | `mini-chat/src/infra/leader/` | Leader election (production-quality K8s Lease impl) | Extract into `cf-k8s-cluster-plugin`; mini-chat consumes via `LeaderElectionV1::resolver(&hub).profile(MiniChatProfile).resolve()` |
-| File-based advisory locks | `libs/toolkit-db/src/advisory_locks.rs` | Distributed lock (single-host only, no fencing) | Not reusable — cluster provides true distributed locks via `DistributedLockV1`. Modules migrate on adoption. |
+| File-based advisory locks | `libs/toolkit-db/src/advisory_locks.rs` | Distributed lock (single-host only, no fencing) | Not reusable — cluster provides true distributed locks via `DistributedLockV1`. Gears migrate on adoption. |
 | In-memory `NodesRegistry` | `gears/system/nodes-registry/` | Service discovery (node-specific, in-memory) | nodes-registry may become a consumer of `ServiceDiscoveryV1` for cross-instance routing |
 
 ## 5. Traceability
@@ -897,4 +897,4 @@ DESIGN realizes the requirements stated in [PRD.md](./PRD.md) §5 (Functional Re
 | Question | Owner | Target Resolution |
 |----------|-------|-------------------|
 | Backend authentication and credential wiring | Platform OOP deployment design | Resolved as part of the broader OOP design |
-| Whether ADR-003 (cache watch backpressure) broadens to cover all three watches, or a new ADR captures the generalization | Cluster module owner | Resolved during ADR audit — recommendation: broaden ADR-003 with a "Generalization to all three watches" section |
+| Whether ADR-003 (cache watch backpressure) broadens to cover all three watches, or a new ADR captures the generalization | Cluster gear owner | Resolved during ADR audit — recommendation: broaden ADR-003 with a "Generalization to all three watches" section |

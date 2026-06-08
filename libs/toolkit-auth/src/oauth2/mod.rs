@@ -1,6 +1,6 @@
 //! Outbound `OAuth2` client credentials flow.
 //!
-//! This module implements token acquisition, caching, and automatic injection
+//! This gear implements token acquisition, caching, and automatic injection
 //! for outbound HTTP requests to vendor services secured with `OAuth2`.
 
 pub mod auto_refresh;

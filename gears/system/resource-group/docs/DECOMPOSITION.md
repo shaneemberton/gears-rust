@@ -10,7 +10,7 @@
 
 - [1. Overview](#1-overview)
 - [2. Entries](#2-entries)
-  - [2.1 SDK Contracts, Error Types & Module Foundation &mdash; HIGH](#21-sdk-contracts-error-types--module-foundation-mdash-high)
+  - [2.1 SDK Contracts, Error Types & Gear Foundation &mdash; HIGH](#21-sdk-contracts-error-types--gear-foundation-mdash-high)
   - [2.2 GTS Type Management &mdash; HIGH](#22-gts-type-management-mdash-high)
   - [2.3 Group Entity & Hierarchy Engine &mdash; HIGH](#23-group-entity--hierarchy-engine-mdash-high)
   - [2.4 Membership Management &mdash; MEDIUM](#24-membership-management-mdash-medium)
@@ -21,11 +21,11 @@
 
 ## 1. Overview
 
-The Resource Group DESIGN is decomposed into seven features organized around the module's core domain boundaries: type management, group entity lifecycle with hierarchy, membership management, external integration with authentication modes, and test plans.
+The Resource Group DESIGN is decomposed into seven features organized around the gear's core domain boundaries: type management, group entity lifecycle with hierarchy, membership management, external integration with authentication modes, and test plans.
 
 **Decomposition Strategy**:
 - Features grouped by functional domain cohesion (one domain service per feature, foundation first)
-- Dependencies follow a strict layering: SDK/module foundation → type management → entity/hierarchy → membership → integration
+- Dependencies follow a strict layering: SDK/gear foundation → type management → entity/hierarchy → membership → integration
 - Each feature covers specific components, sequences, and requirement subsets from DESIGN
 - 100% coverage of all DESIGN elements verified (7 components, 8 sequences, 6 principles, 5 constraints)
 - 100% coverage of all PRD requirements verified (29 FR, 7 NFR, 2 interfaces)
@@ -33,28 +33,28 @@ The Resource Group DESIGN is decomposed into seven features organized around the
 
 ## 2. Entries
 
-### 2.1 SDK Contracts, Error Types & Module Foundation &mdash; HIGH
+### 2.1 SDK Contracts, Error Types & Gear Foundation &mdash; HIGH
 
-- [x] `p1` - **ID**: `cpt-cf-resource-group-feature-sdk-module-foundation`
+- [x] `p1` - **ID**: `cpt-cf-resource-group-feature-sdk-gear-foundation`
 
-- **Purpose**: Establish the SDK crate with trait contracts, domain models, and error taxonomy; scaffold the module with ClientHub registration, persistence adapter, DB migrations, REST/OData infrastructure, and the cross-cutting error mapping layer that all subsequent features depend on.
+- **Purpose**: Establish the SDK crate with trait contracts, domain models, and error taxonomy; scaffold the gear with ClientHub registration, persistence adapter, DB migrations, REST/OData infrastructure, and the cross-cutting error mapping layer that all subsequent features depend on.
 
 - **Depends On**: None
 
 - **Scope**:
   - SDK crate (`resource-group-sdk`): `models.rs` (ResourceGroupType, ResourceGroup, ResourceGroupWithDepth, ResourceGroupMembership, Page, PageInfo, GtsTypePath), `api.rs` (ResourceGroupClient, ResourceGroupReadHierarchy, ResourceGroupReadPluginClient traits), `error.rs` (ResourceGroupError taxonomy)
-  - Module scaffold: `#[toolkit::module]` annotated module, ClientHub registration for `dyn ResourceGroupClient` and `dyn ResourceGroupReadHierarchy`
+  - Gear scaffold: `#[toolkit::gear]` annotated gear, ClientHub registration for `dyn ResourceGroupClient` and `dyn ResourceGroupReadHierarchy`
   - Persistence adapter: SeaORM entity definitions for all 6 tables (gts_type, gts_type_allowed_parent, gts_type_allowed_membership, resource_group, resource_group_membership, resource_group_closure), DB migration scripts
   - Error mapping: DomainError to Problem (RFC-9457) mapping for all deterministic error categories (Validation, NotFound, TypeAlreadyExists, InvalidParentType, CycleDetected, ConflictActiveReferences, LimitViolation, TenantIncompatibility, ServiceUnavailable, Internal)
   - REST infrastructure: OperationBuilder wiring, OData `$filter` parsing, cursor-based pagination helpers
   - GtsTypePath value object with format validation (`^gts\.[a-z_]...~$`)
-  - Module initialization phasing (SystemCapability → ready) for circular dependency resolution with AuthZ
+  - gear initialization phasing (SystemCapability → ready) for circular dependency resolution with AuthZ
 
 - **Out of scope**:
   - Domain service logic (features 2-5)
   - Specific REST endpoint handlers (features 2-5)
   - Integration read service logic (feature 5)
-  - AuthZ policy evaluation (external module)
+  - AuthZ policy evaluation (external gear)
 
 - **Requirements Covered**:
 
@@ -91,11 +91,11 @@ The Resource Group DESIGN is decomposed into seven features organized around the
 
 - **Design Components**:
 
-  - [x] `p1` - `cpt-cf-resource-group-component-module`
+  - [x] `p1` - `cpt-cf-resource-group-component-gear`
   - [x] `p1` - `cpt-cf-resource-group-component-persistence-adapter`
 
 - **API**:
-  - Module initialization and ClientHub registration (no domain REST endpoints in this feature)
+  - gear initialization and ClientHub registration (no domain REST endpoints in this feature)
 
 - **Sequences**:
 
@@ -107,7 +107,7 @@ The Resource Group DESIGN is decomposed into seven features organized around the
 
 - **Purpose**: Implement the full type lifecycle (create, list, get, update, delete) with code format validation, uniqueness enforcement, hierarchy-safe updates, delete-if-unused policy, and idempotent type seeding for deployment bootstrapping.
 
-- **Depends On**: `cpt-cf-resource-group-feature-sdk-module-foundation`
+- **Depends On**: `cpt-cf-resource-group-feature-sdk-gear-foundation`
 
 - **Scope**:
   - Type service: create/list/get/update/delete type operations with domain validation
@@ -123,7 +123,7 @@ The Resource Group DESIGN is decomposed into seven features organized around the
 
 - **Out of scope**:
   - Group entity operations (feature 3)
-  - GTS schema catalog integration with Types Registry module (Phase 3 architecture evolution)
+  - GTS schema catalog integration with Types Registry gear (Phase 3 architecture evolution)
 
 - **Requirements Covered**:
 
@@ -245,7 +245,7 @@ The Resource Group DESIGN is decomposed into seven features organized around the
 
 - **Purpose**: Implement membership lifecycle (add, remove, list) with composite key semantics, deterministic lookups by group and by resource, tenant compatibility validation derived from the referenced group, and idempotent membership seeding.
 
-- **Depends On**: `cpt-cf-resource-group-feature-sdk-module-foundation`, `cpt-cf-resource-group-feature-entity-hierarchy`
+- **Depends On**: `cpt-cf-resource-group-feature-sdk-gear-foundation`, `cpt-cf-resource-group-feature-entity-hierarchy`
 
 - **Scope**:
   - Membership service: add/remove membership links with composite key `(group_id, resource_type, resource_id)`
@@ -315,9 +315,9 @@ The Resource Group DESIGN is decomposed into seven features organized around the
   - SecurityContext propagation: `ctx` passed through gateway to selected provider without policy interpretation
 
 - **Out of scope**:
-  - AuthZ policy evaluation logic (owned by AuthZ module)
+  - AuthZ policy evaluation logic (owned by AuthZ gear)
   - SQL filter generation and AccessScope compilation (owned by PEP/compiler)
-  - Tenant Resolver barrier enforcement (owned by TR module)
+  - Tenant Resolver barrier enforcement (owned by TR gear)
   - Custom barrier semantics (vendor-replaceable via TR/AuthZ plugins)
 
 - **Requirements Covered**:
@@ -361,7 +361,7 @@ The Resource Group DESIGN is decomposed into seven features organized around the
 ## 3. Feature Dependencies
 
 ```text
-cpt-cf-resource-group-feature-sdk-module-foundation
+cpt-cf-resource-group-feature-sdk-gear-foundation
     |
     +---> cpt-cf-resource-group-feature-type-management
     |         |
@@ -377,8 +377,8 @@ cpt-cf-resource-group-feature-sdk-module-foundation
 
 **Dependency Rationale**:
 
-- `cpt-cf-resource-group-feature-type-management` requires `cpt-cf-resource-group-feature-sdk-module-foundation`: type service depends on SDK trait contracts, persistence adapter, and error mapping infrastructure
+- `cpt-cf-resource-group-feature-type-management` requires `cpt-cf-resource-group-feature-sdk-gear-foundation`: type service depends on SDK trait contracts, persistence adapter, and error mapping infrastructure
 - `cpt-cf-resource-group-feature-entity-hierarchy` requires `cpt-cf-resource-group-feature-type-management`: entity create/move validates parent-child type compatibility against registered types; closure table engine depends on entity persistence
-- `cpt-cf-resource-group-feature-membership` requires `cpt-cf-resource-group-feature-sdk-module-foundation` and `cpt-cf-resource-group-feature-entity-hierarchy`: membership links reference existing group entities and use SDK contracts; membership tenant scope is derived from group data
+- `cpt-cf-resource-group-feature-membership` requires `cpt-cf-resource-group-feature-sdk-gear-foundation` and `cpt-cf-resource-group-feature-entity-hierarchy`: membership links reference existing group entities and use SDK contracts; membership tenant scope is derived from group data
 - `cpt-cf-resource-group-feature-integration-auth` requires `cpt-cf-resource-group-feature-entity-hierarchy` and `cpt-cf-resource-group-feature-membership`: integration read service exposes hierarchy and membership data to external consumers; dual auth modes route requests through existing entity/membership services
 - `cpt-cf-resource-group-feature-type-management` and `cpt-cf-resource-group-feature-entity-hierarchy` form a strict sequence (types before entities); `cpt-cf-resource-group-feature-membership` can start in parallel with `cpt-cf-resource-group-feature-integration-auth` once entity-hierarchy is complete, but integration-auth depends on both

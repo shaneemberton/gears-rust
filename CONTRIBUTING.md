@@ -4,7 +4,7 @@ Thank you for your interest in contributing to Constructor Fabric Gears! This do
 
 We welcome contributions in:
 
-- **New modules**: Add functionality to the platform
+- **New gears**: Add functionality to the platform
 - **Bug fixes**: Fix issues in existing code
 - **Documentation**: Improve guides and examples
 - **Testing**: Add test coverage and improve test quality
@@ -46,7 +46,7 @@ make test
 # Start the development server (SQLite quickstart)
 make quickstart
 
-# Start the development server with the example users_info module
+# Start the development server with the example users_info gear
 cargo run --bin cf-gears-example-server --features users-info-example -- --config config/quickstart.yaml run
 ```
 
@@ -66,16 +66,16 @@ Use descriptive branch names:
 
 As an alternative, you can fork the repository to your own GitHub account.
 
-### 2.2. New Modules Development
+### 2.2. New Gears Development
 
-Constructor Fabric Gears follows a spec-driven development (SDD) approach for large features. Module development starts with specifications that live alongside the code. When you add features, make design decisions, or introduce upstream requirements, you must use the following templates and keep them aligned with the implementation:
+Constructor Fabric Gears follows a spec-driven development (SDD) approach for large features. Gear development starts with specifications that live alongside the code. When you add features, make design decisions, or introduce upstream requirements, you must use the following templates and keep them aligned with the implementation:
 
 - **[Overview & Guide](./docs/spec-templates/README.md)** — Template system overview, governance, FDD ID conventions, and document placement rules
 - **[PRD.md](./docs/spec-templates/gears-sdlc/PRD/template.md)** — Product Requirements Document: vision, actors, capabilities, use cases, FR/NFR
 - **[DESIGN.md](./docs/spec-templates/gears-sdlc/DESIGN/template.md)** — Technical Design: architecture, principles, constraints, domain model, API contracts
 - **[ADR.md](./docs/spec-templates/gears-sdlc/ADR/template.md)** — Architecture Decision Record: decisions, options, trade-offs, consequences
 - **[FEATURE.md](./docs/spec-templates/gears-sdlc/FEATURE/template.md)** — Feature Specification: flows, algorithms, states, requirements
-- **[UPSTREAM_REQS.md](./docs/spec-templates/gears-sdlc/UPSTREAM_REQS/template.md)** — Upstream Requirements: technical requirements from other modules to this module
+- **[UPSTREAM_REQS.md](./docs/spec-templates/gears-sdlc/UPSTREAM_REQS/template.md)** — Upstream Requirements: technical requirements from other gears to this gear
 
 ### 2.3. Make Your Changes
 
@@ -83,11 +83,11 @@ Follow the coding standards and guidelines:
 
 1. See common [RUST.md](./guidelines/DNA/languages/RUST.md) guideline
 2. When develop new REST API use [API.md](./guidelines/DNA/REST/API.md), [STATUS_CODES](./guidelines/DNA/REST/STATUS_CODES.md)
-3. When develop new Module use [ToolKit Unified System](./docs/toolkit_unified_system/README.md)
+3. When develop new Gear use [ToolKit Unified System](./docs/toolkit_unified_system/README.md)
 4. Security policy [SECURITY.md](./SECURITY.md) and secure coding [guidelines/SECURITY.md](./guidelines/SECURITY.md)
 5. ToolKit architecture and invariants [docs/toolkit_unified_system/README.md](./docs/toolkit_unified_system/README.md)
 
-Module directories under `modules/` must use kebab-case (validated by `tools/scripts/validate_module_names.py` and enforced in CI).
+Gear directories under `gears/` must use kebab-case (validated by `tools/scripts/validate_gear_names.py` and enforced in CI).
 
 Always include unit tests when introducing new code.
 
@@ -109,7 +109,7 @@ Note: CI workflows may not run for PRs that only touch `*.md` files or `docs/**`
 
 Aim for high test coverage:
 - **Unit tests**: Test individual functions and methods
-- **Integration tests**: Test module interactions
+- **Integration tests**: Test gear interactions
 - **End-to-end tests**: Test complete request flows
 
 ```bash
@@ -177,11 +177,11 @@ git config --global format.signoff true
 Follow a structured commit message format:
 
 ```text
-<type>(<module>): <description>
+<type>(<gear>): <description>
 ```
 
 - `<type>`: change category (see table below)
-- `<module>` (optional): the area touched (e.g., api_gateway, toolkit, ecommerce)
+- `<gear>` (optional): the area touched (e.g., api_gateway, toolkit, ecommerce)
 - `<description>`: concise, imperative summary
 
 Accepted commit types:
@@ -318,7 +318,7 @@ This topic defines how Constructor Fabric Gears versions crates and handles brea
 ## Scope
 
 Applies to:
-- All Rust crates in this repository (libraries, modules, SDKs, macros).
+- All Rust crates in this repository (libraries, gears, SDKs, macros).
 - Public APIs and contracts exposed to downstream users (Rust API, REST, gRPC/proto, CLI).
 
 Non-goals:
@@ -416,7 +416,7 @@ We use per-crate versioning, controlled via Cargo manifests and release automati
 - Internal crates can still follow SemVer for sanity, but do not promise external stability.
 
 ### Version sources
-- Modules and SDKs keep explicit `version = "..."` in their `Cargo.toml`.
+- Gears and SDKs keep explicit `version = "..."` in their `Cargo.toml`.
 - ToolKit libs may use `version.workspace = true` (unified framework versioning).
 
 ## ToolKit Unified Release Rule
@@ -468,7 +468,7 @@ Before merging changes that affect public crates/contracts:
 - **GitHub Issues**: For bug reports and feature requests
 - **GitHub Discussions**: For questions and general discussion
 - **Documentation**: Check existing docs first
-- **Code Examples**: Look at existing modules for patterns
+- **Code Examples**: Look at existing gears for patterns
 
 ---
 

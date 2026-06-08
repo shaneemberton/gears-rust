@@ -35,7 +35,7 @@ The Gears platform uses a pluggable IdP integration model (see `cpt-cf-account-m
 ## Decision Drivers
 
 * **Single source of truth for identity**: User identity data (credentials, profile, authentication state) must have exactly one authoritative store to avoid split-brain inconsistencies between AM and the IdP.
-* **Data minimization (GDPR)**: AM acts as a data processor. Storing user PII locally increases the regulatory surface and requires additional data protection controls, retention policies, and right-to-erasure compliance at the module level.
+* **Data minimization (GDPR)**: AM acts as a data processor. Storing user PII locally increases the regulatory surface and requires additional data protection controls, retention policies, and right-to-erasure compliance at the gear level.
 * **IdP-agnostic architecture**: AM must work with any conforming IdP implementation. A local user table would create a second identity store that must be kept in sync with each IdP variant, coupling AM to provider-specific synchronization protocols (SCIM, webhooks, polling).
 * **Operational simplicity**: Synchronization between two identity stores introduces eventual consistency windows, conflict resolution logic, and a new failure mode class (sync lag, missed events, stale projections).
 * **Availability during IdP outages**: Without a local cache, user operations fail when the IdP is unreachable. The platform must accept this trade-off or add caching complexity.
@@ -57,8 +57,8 @@ AM references users exclusively by IdP-issued UUID user identifiers. It does not
 * AM has no `users` table and no user-related database entities. User-facing operations (provision, deprovision, list) are pure pass-through to the `IdpPluginClient` contract, reducing AM's schema surface and migration burden.
 * User operations are unavailable when the IdP is unreachable. The platform accepts this trade-off: tenant hierarchy reads and non-IdP-dependent admin operations (tenant CRUD, metadata resolution, children queries, status changes) continue to function during IdP outages.
 * No synchronization protocol is required between AM and the IdP. This eliminates eventual consistency windows, missed-event recovery, and provider-specific sync adapters — critical for maintaining IdP-agnostic portability.
-* GDPR data processor obligations at the AM module level are minimal: AM processes identity-linked payloads transiently during API calls but does not persist them. Right-to-erasure requests are handled entirely by the IdP.
-* Group membership links in Resource Group reference users by UUID identifier. If a user is deprovisioned from the IdP, the membership link becomes orphaned. Orphan detection requires future cross-module coordination (deferred from v1).
+* GDPR data processor obligations at the AM gear level are minimal: AM processes identity-linked payloads transiently during API calls but does not persist them. Right-to-erasure requests are handled entirely by the IdP.
+* Group membership links in Resource Group reference users by UUID identifier. If a user is deprovisioned from the IdP, the membership link becomes orphaned. Orphan detection requires future cross-gear coordination (deferred from v1).
 * Any future need for local user search or analytics (e.g., "find all users across all tenants matching a name pattern") must be satisfied by the IdP's query capabilities or by a separate reporting/analytics service — AM cannot provide these independently.
 
 ### Confirmation
@@ -73,7 +73,7 @@ AM references users exclusively by IdP-issued UUID user identifiers. It does not
 
 * Good, because it enforces a single authoritative store — no split-brain risk for user identity data.
 * Good, because it eliminates synchronization complexity across pluggable IdP implementations.
-* Good, because it minimizes persisted PII, satisfying GDPR data minimization and reducing the module-level regulatory surface.
+* Good, because it minimizes persisted PII, satisfying GDPR data minimization and reducing the gear-level regulatory surface.
 * Good, because it keeps AM's database schema focused on tenant hierarchy, reducing migration and maintenance burden.
 * Good, because it maintains IdP-agnostic portability — no provider-specific sync protocols required.
 * Bad, because user operations are unavailable during IdP outages (no graceful degradation for user queries).
@@ -85,7 +85,7 @@ AM references users exclusively by IdP-issued UUID user identifiers. It does not
 * Good, because it provides a local index for cross-referencing users with tenant hierarchy data.
 * Bad, because it introduces a synchronization protocol between AM and each IdP implementation, coupling AM to provider-specific event/polling mechanisms.
 * Bad, because eventual consistency windows mean the local table may contain stale data (deprovisioned users still appearing, new users missing).
-* Bad, because it increases the persisted PII surface, requiring additional GDPR controls (retention, erasure) at the module level.
+* Bad, because it increases the persisted PII surface, requiring additional GDPR controls (retention, erasure) at the gear level.
 * Bad, because conflict resolution between the local table and IdP (e.g., concurrent updates) adds operational complexity.
 
 ### Option 3: Local user table as primary store with IdP for authentication only
@@ -94,7 +94,7 @@ AM references users exclusively by IdP-issued UUID user identifiers. It does not
 * Good, because it eliminates reliance on IdP query capabilities.
 * Bad, because it makes AM an identity store, fundamentally changing its role from tenant hierarchy administrator to identity manager.
 * Bad, because it requires bidirectional synchronization with the IdP for credential management, creating tight coupling.
-* Bad, because it maximizes persisted PII and GDPR regulatory surface at the module level.
+* Bad, because it maximizes persisted PII and GDPR regulatory surface at the gear level.
 * Bad, because it duplicates identity management functionality that the IdP already provides, violating the platform's separation of concerns.
 
 ## More Information
@@ -116,4 +116,4 @@ This decision directly addresses the following requirements and design elements:
 * `cpt-cf-account-management-fr-idp-user-provision` — User provisioning operates as pure pass-through to IdP; no local record is created.
 * `cpt-cf-account-management-fr-idp-user-deprovision` — User deprovisioning delegates entirely to IdP; no local cleanup needed beyond orphaned group membership references.
 * `cpt-cf-account-management-fr-idp-user-query` — User queries are delegated to IdP at operation time; no local projection is available as a fallback.
-* `cpt-cf-account-management-constraint-data-handling` — Data minimization (no persisted user PII) directly supports GDPR processor obligations at the module level.
+* `cpt-cf-account-management-constraint-data-handling` — Data minimization (no persisted user PII) directly supports GDPR processor obligations at the gear level.

@@ -136,7 +136,7 @@ Included in `oagw` crate (`infra/plugin/`):
 
 ### External Plugins
 
-Separate ToolKit modules implementing plugin traits from `oagw-sdk`:
+Separate ToolKit gears implementing plugin traits from `oagw-sdk`:
 
 ```rust
 // cf-gears-oagw-plugin-oauth2-pkce/src/lib.rs

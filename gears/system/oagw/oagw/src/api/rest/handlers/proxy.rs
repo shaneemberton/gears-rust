@@ -14,7 +14,7 @@ use toolkit_security::SecurityContext;
 use tracing::Instrument;
 
 use crate::api::rest::error::error_response;
-use crate::module::AppState;
+use crate::gear::AppState;
 
 /// Proxy handler for `/oagw/v1/proxy/{alias}/{path:.*}`.
 ///

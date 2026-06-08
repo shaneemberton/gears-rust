@@ -8,7 +8,7 @@ use toolkit_security::SecurityContext;
 use users_info_sdk::odata::UserSchema;
 use users_info_sdk::{User, UsersInfoError, UsersStreamingClientV1};
 
-use crate::module::ConcreteAppServices;
+use crate::gear::ConcreteAppServices;
 
 #[domain_model]
 pub(crate) struct LocalUsersStreamingClient {

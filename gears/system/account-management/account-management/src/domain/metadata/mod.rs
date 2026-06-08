@@ -1,4 +1,4 @@
-//! Tenant-metadata domain module.
+//! Tenant-metadata domain gear.
 //!
 //! Implements FEATURE `tenant-metadata` (see
 //! `gears/system/account-management/docs/features/feature-tenant-metadata.md`).

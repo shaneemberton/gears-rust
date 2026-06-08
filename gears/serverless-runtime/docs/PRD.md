@@ -85,13 +85,13 @@ Provide a platform capability that enables tenants and their users to create, mo
 ### Background / Problem Statement
 
 <!-- cpt:paragraph:context -->
-The platform requires a unified way to automate long-running and multi-step business processes across modules and external systems. Today, automation capability is limited by release cycles and lacks durable, tenant-isolated execution with governance, controls, and observability. This PRD defines the business requirements for a Serverless Runtime capability that is deliberately implementation-agnostic — the requirements can be satisfied by embedded interpreters (e.g., Starlark, WASM), workflow orchestration engines (e.g., Temporal, Cadence), cloud-native FaaS platforms (e.g., AWS Lambda + Step Functions), or other serverless/workflow technologies. The system can optionally support domain-specific languages (DSLs) for workflow/function definition; DSL support is implementation-specific and not required to satisfy these business requirements.
+The platform requires a unified way to automate long-running and multi-step business processes across gears and external systems. Today, automation capability is limited by release cycles and lacks durable, tenant-isolated execution with governance, controls, and observability. This PRD defines the business requirements for a Serverless Runtime capability that is deliberately implementation-agnostic — the requirements can be satisfied by embedded interpreters (e.g., Starlark, WASM), workflow orchestration engines (e.g., Temporal, Cadence), cloud-native FaaS platforms (e.g., AWS Lambda + Step Functions), or other serverless/workflow technologies. The system can optionally support domain-specific languages (DSLs) for workflow/function definition; DSL support is implementation-specific and not required to satisfy these business requirements.
 <!-- cpt:paragraph:context -->
 
 **Key Problems Solved**:
 <!-- cpt:list:key-problems required="true" -->
 - Automation capability is limited by release cycles — tenants cannot deploy custom logic without platform rebuilds
-- No unified mechanism for durable, long-running, multi-step business process orchestration across modules and external systems
+- No unified mechanism for durable, long-running, multi-step business process orchestration across gears and external systems
 - Lack of tenant-isolated execution with governance controls, resource limits, and auditability
 - Insufficient operational visibility and debugging tools for distributed workflow executions
 <!-- cpt:list:key-problems -->
@@ -121,7 +121,7 @@ The platform requires a unified way to automate long-running and multi-step busi
 - Host-Worker isolation for secure multi-tenant execution environments
 - Rich operational tooling: execution visibility, debugging, audit trails, and observability
 - Built-in support for saga/compensation patterns and idempotency mechanisms
-- Infrastructure adapter integration with hot-plug registration and hot (re)loading of native modules
+- Infrastructure adapter integration with hot-plug registration and hot (re)loading of native gears
 - LLM agent integration via MCP (Model Context Protocol) with JSON-RPC 2.0 function invocation, elicitation for human-in-the-loop input, and sampling for LLM-completion-during-execution
 <!-- cpt:list:capabilities -->
 
@@ -299,9 +299,9 @@ The platform requires a unified way to automate long-running and multi-step busi
 
 ## Operational Concept & Environment
 
-The Serverless Runtime operates as a module within the Gears modular monolith. It is deployed alongside other platform modules and shares the platform's identity, authorization, event, and observability infrastructure. The runtime executes tenant-provided and adapter-provided functions and workflows within the platform's security boundary.
+The Serverless Runtime operates as a gear within the Gears modular monolith. It is deployed alongside other platform gears and shares the platform's identity, authorization, event, and observability infrastructure. The runtime executes tenant-provided and adapter-provided functions and workflows within the platform's security boundary.
 
-**Deployment context**: The runtime runs within the Gears server process. Executor implementations (e.g., Starlark) are embedded as native modules. Infrastructure Adapters connect externally and register definitions via hot-plug APIs.
+**Deployment context**: The runtime runs within the Gears server process. Executor implementations (e.g., Starlark) are embedded as native gears. Infrastructure Adapters connect externally and register definitions via hot-plug APIs.
 
 **Operational environment**: Multi-tenant SaaS platform with tenant isolation enforced at the execution, data, and governance layers. Each tenant has independent quotas, policies, and retention settings.
 
@@ -352,7 +352,7 @@ The system supports starting workflows/functions with typed input parameters and
 
 The system provides a common calling mechanism so that functions and workflows are invoked through a unified function surface, enabling consistent invocation semantics regardless of the underlying runtime implementation.
 
-The system is expected to support hot (re)loading of native modules so that executor implementations and runtime extensions can be updated without platform restart.
+The system is expected to support hot (re)loading of native gears so that executor implementations and runtime extensions can be updated without platform restart.
 <!-- cpt:free:fr-summary -->
 
 **Actors**:
@@ -452,7 +452,7 @@ Workflows and functions are able to invoke runtime-provided capabilities needed 
 
 The system supports runtime registration of workflow/function definitions from Infrastructure Adapters with the following characteristics (BR-035):
 
-- Hot-plug registration without requiring platform restart, including hot reloading of native executor modules
+- Hot-plug registration without requiring platform restart, including hot reloading of native executor gears
 - Per-tenant workflow definition registration; adapters connected to one tenant MUST NOT affect other tenants
 - Flexible infrastructure models: adapters can use either per-tenant infrastructure (dedicated resources) or shared infrastructure (multi-tenant resources) based on configuration
 - Tenant isolation enforcement: regardless of infrastructure model, tenant isolation MUST be enforced at the execution and data level
@@ -602,7 +602,7 @@ The platform provides mechanisms to implement idempotency for workflow/function 
 <!-- cpt:free:fr-summary -->
 The system supports configurable governance controls for workflow/function changes (such as review/approval and controlled activation) to reduce operational risk and support compliance (BR-122).
 
-The system supports sharing of workflow/function definitions beyond the default ownership scope, enabling authorized actors to grant discovery and execution access to other users, groups, or tenants. Sharing capabilities are extensible — concrete mechanisms (group-based sharing, cross-tenant federation, marketplace publishing) can be implemented as external modules or plugins. The system does not require a specific sharing implementation to be embedded in the core runtime (BR-123).
+The system supports sharing of workflow/function definitions beyond the default ownership scope, enabling authorized actors to grant discovery and execution access to other users, groups, or tenants. Sharing capabilities are extensible — concrete mechanisms (group-based sharing, cross-tenant federation, marketplace publishing) can be implemented as external gears or plugins. The system does not require a specific sharing implementation to be embedded in the core runtime (BR-123).
 
 The system supports notifying authorized users/operators about important workflow/function events, including failures, repeated retries, and abnormal execution duration, to reduce time-to-detection and time-to-recovery (BR-109).
 <!-- cpt:free:fr-summary -->

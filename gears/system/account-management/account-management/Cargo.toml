@@ -4,7 +4,7 @@ version = "0.1.1"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Account Management module — tenant hierarchy storage floor"
+description = "Account Management gear — tenant hierarchy storage floor"
 repository.workspace = true
 keywords = ["constructorfabric", "cf-gears"]
 categories = ["web-programming"]
@@ -83,7 +83,7 @@ postgres = []
 tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 types-registry-sdk = { workspace = true, features = ["test-util"] }
 # In-process `Router::oneshot` HTTP harness for the REST integration
-# suite (`tests/api_*_test.rs`). Mirrors the resource-group module's
+# suite (`tests/api_*_test.rs`). Mirrors the resource-group gear's
 # wiring.
 tower = { workspace = true }
 http-body-util = { workspace = true }

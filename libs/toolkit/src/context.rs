@@ -3,10 +3,10 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-// Import configuration types from the config module
+// Import configuration types from the config gear
 use crate::{
-    config::{ConfigError, ConfigProvider, module_config_or_default},
-    module_config_required,
+    config::{ConfigError, ConfigProvider, gear_config_or_default},
+    gear_config_required,
 };
 
 #[cfg(feature = "db")]
@@ -16,8 +16,8 @@ pub(crate) type DbProvider = toolkit_db::DBProvider<toolkit_db::DbError>;
 
 #[derive(Clone)]
 #[must_use]
-pub struct ModuleCtx {
-    module_name: Arc<str>,
+pub struct GearCtx {
+    gear_name: Arc<str>,
     instance_id: Uuid,
     config_provider: Arc<dyn ConfigProvider>,
     client_hub: Arc<crate::client_hub::ClientHub>,
@@ -26,21 +26,21 @@ pub struct ModuleCtx {
     db: Option<DbProvider>,
 }
 
-/// Builder for creating module-scoped contexts with resolved database handles.
+/// Builder for creating gear-scoped contexts with resolved database handles.
 ///
-/// Use [`ModuleContextBuilder::with_db_manager`] (feature `db`) to attach a
-/// `DbManager` so `for_module` can resolve a per-module `DbHandle`.
+/// Use [`GearContextBuilder::with_db_manager`] (feature `db`) to attach a
+/// `DbManager` so `for_gear` can resolve a per-gear `DbHandle`.
 #[must_use]
-pub struct ModuleContextBuilder {
+pub struct GearContextBuilder {
     instance_id: Uuid,
     config_provider: Arc<dyn ConfigProvider>,
     client_hub: Arc<crate::client_hub::ClientHub>,
     root_token: CancellationToken,
     #[cfg(feature = "db")]
-    db_manager: Option<Arc<DbManager>>, // internal only, never exposed to modules
+    db_manager: Option<Arc<DbManager>>, // internal only, never exposed to gears
 }
 
-impl ModuleContextBuilder {
+impl GearContextBuilder {
     pub fn new(
         instance_id: Uuid,
         config_provider: Arc<dyn ConfigProvider>,
@@ -57,8 +57,8 @@ impl ModuleContextBuilder {
         }
     }
 
-    /// Attach a `DbManager` used by [`for_module`](Self::for_module) to resolve
-    /// per-module database handles.
+    /// Attach a `DbManager` used by [`for_gear`](Self::for_gear) to resolve
+    /// per-gear database handles.
     #[cfg(feature = "db")]
     pub fn with_db_manager(mut self, db_manager: Arc<DbManager>) -> Self {
         self.db_manager = Some(db_manager);
@@ -71,8 +71,8 @@ impl ModuleContextBuilder {
         self.instance_id
     }
 
-    /// Build a module-scoped context, resolving the `DbHandle` for the given
-    /// module when the `db` feature is enabled.
+    /// Build a gear-scoped context, resolving the `DbHandle` for the given
+    /// gear when the `db` feature is enabled.
     ///
     /// Kept `async` in both configurations so callers don't need cfg branches
     /// around `.await`; under `not(feature = "db")` the future is ready on
@@ -81,9 +81,9 @@ impl ModuleContextBuilder {
     /// # Errors
     /// Returns an error if database resolution fails.
     #[cfg_attr(not(feature = "db"), allow(clippy::unused_async))]
-    pub async fn for_module(&self, module_name: &str) -> anyhow::Result<ModuleCtx> {
-        let ctx = ModuleCtx::new(
-            Arc::<str>::from(module_name),
+    pub async fn for_gear(&self, gear_name: &str) -> anyhow::Result<GearCtx> {
+        let ctx = GearCtx::new(
+            Arc::<str>::from(gear_name),
             self.instance_id,
             self.config_provider.clone(),
             self.client_hub.clone(),
@@ -91,7 +91,7 @@ impl ModuleContextBuilder {
         );
         #[cfg(feature = "db")]
         let ctx = if let Some(mgr) = &self.db_manager
-            && let Some(handle) = mgr.get(module_name).await?
+            && let Some(handle) = mgr.get(gear_name).await?
         {
             ctx.with_db(toolkit_db::DBProvider::new(handle))
         } else {
@@ -101,19 +101,19 @@ impl ModuleContextBuilder {
     }
 }
 
-impl ModuleCtx {
-    /// Create a new module-scoped context with all required fields.
+impl GearCtx {
+    /// Create a new gear-scoped context with all required fields.
     ///
     /// Attach a database entrypoint with [`with_db`](Self::with_db) (feature `db`).
     pub fn new(
-        module_name: impl Into<Arc<str>>,
+        gear_name: impl Into<Arc<str>>,
         instance_id: Uuid,
         config_provider: Arc<dyn ConfigProvider>,
         client_hub: Arc<crate::client_hub::ClientHub>,
         cancellation_token: CancellationToken,
     ) -> Self {
         Self {
-            module_name: module_name.into(),
+            gear_name: gear_name.into(),
             instance_id,
             config_provider,
             client_hub,
@@ -123,24 +123,24 @@ impl ModuleCtx {
         }
     }
 
-    /// Attach the per-module database entrypoint.
+    /// Attach the per-gear database entrypoint.
     #[cfg(feature = "db")]
     pub fn with_db(mut self, db: DbProvider) -> Self {
         self.db = Some(db);
         self
     }
 
-    // ---- public read-only API for modules ----
+    // ---- public read-only API for gears ----
 
     #[inline]
     #[must_use]
-    pub fn module_name(&self) -> &str {
-        &self.module_name
+    pub fn gear_name(&self) -> &str {
+        &self.gear_name
     }
 
     /// Returns the process-level instance ID.
     ///
-    /// This is a unique identifier for this process instance, shared by all modules
+    /// This is a unique identifier for this process instance, shared by all gears
     /// in the same process. It is generated once at bootstrap.
     #[inline]
     #[must_use]
@@ -167,9 +167,9 @@ impl ModuleCtx {
         &self.cancellation_token
     }
 
-    /// Get a module-scoped DB entrypoint for secure database operations.
+    /// Get a gear-scoped DB entrypoint for secure database operations.
     ///
-    /// Returns `None` if no database is configured for this module.
+    /// Returns `None` if no database is configured for this gear.
     ///
     /// # Security
     ///
@@ -194,11 +194,11 @@ impl ModuleCtx {
     /// Get a database handle, returning an error if not configured.
     ///
     /// This is a convenience method that combines `db()` with an error for
-    /// modules that require database access.
+    /// gears that require database access.
     ///
     /// # Errors
     ///
-    /// Returns an error if the database is not configured for this module.
+    /// Returns an error if the database is not configured for this gear.
     ///
     /// # Example
     ///
@@ -210,31 +210,28 @@ impl ModuleCtx {
     #[cfg(feature = "db")]
     pub fn db_required(&self) -> anyhow::Result<toolkit_db::DBProvider<toolkit_db::DbError>> {
         self.db().ok_or_else(|| {
-            anyhow::anyhow!(
-                "Database is not configured for module '{}'",
-                self.module_name
-            )
+            anyhow::anyhow!("Database is not configured for gear '{}'", self.gear_name)
         })
     }
 
-    /// Deserialize the module's config section into `T`.
+    /// Deserialize the gear's config section into `T`.
     ///
-    /// This reads the `modules.<name>.config` object for the current module and
+    /// This reads the `gears.<name>.config` object for the current gear and
     /// deserializes it into the requested type.
     ///
     /// # Errors
-    /// Returns `ConfigError` if the module config is missing or deserialization fails.
+    /// Returns `ConfigError` if the gear config is missing or deserialization fails.
     pub fn config<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        module_config_required(self.config_provider.as_ref(), &self.module_name)
+        gear_config_required(self.config_provider.as_ref(), &self.gear_name)
     }
 
-    /// Deserialize the module's config section into T, or use defaults if missing.
+    /// Deserialize the gear's config section into T, or use defaults if missing.
     ///
-    /// This method uses lenient configuration loading: if the module is not present in config,
-    /// has no config section, or the module entry is not an object, it returns `T::default()`.
-    /// This allows modules to exist without configuration sections in the main config file.
+    /// This method uses lenient configuration loading: if the gear is not present in config,
+    /// has no config section, or the gear entry is not an object, it returns `T::default()`.
+    /// This allows gears to exist without configuration sections in the main config file.
     ///
-    /// It extracts the 'config' field from: `modules.<name> = { database: ..., config: ... }`
+    /// It extracts the 'config' field from: `gears.<name> = { database: ..., config: ... }`
     ///
     /// # Example
     ///
@@ -251,14 +248,14 @@ impl ModuleCtx {
     /// # Errors
     /// Returns `ConfigError` if deserialization fails.
     pub fn config_or_default<T: DeserializeOwned + Default>(&self) -> Result<T, ConfigError> {
-        module_config_or_default(self.config_provider.as_ref(), &self.module_name)
+        gear_config_or_default(self.config_provider.as_ref(), &self.gear_name)
     }
 
     /// Like [`config()`](Self::config), but additionally expands `${VAR}` placeholders
     /// in fields marked with `#[expand_vars]`.
     ///
     /// # Errors
-    /// Returns `ConfigError` if the module config is missing, deserialization fails,
+    /// Returns `ConfigError` if the gear config is missing, deserialization fails,
     /// or environment variable expansion fails.
     pub fn config_expanded<T>(&self) -> Result<T, ConfigError>
     where
@@ -266,7 +263,7 @@ impl ModuleCtx {
     {
         let mut cfg: T = self.config()?;
         cfg.expand_vars().map_err(|e| ConfigError::VarExpand {
-            module: self.module_name.to_string(),
+            gear: self.gear_name.to_string(),
             source: e,
         })?;
         Ok(cfg)
@@ -277,7 +274,7 @@ impl ModuleCtx {
     /// in fields marked with `#[expand_vars]` (requires `#[derive(ExpandVars)]` on the config
     /// struct).
     ///
-    /// Modules that do not need environment variable expansion should use
+    /// Gears that do not need environment variable expansion should use
     /// [`config_or_default()`](Self::config_or_default).
     ///
     /// # Example
@@ -301,14 +298,14 @@ impl ModuleCtx {
     {
         let mut cfg: T = self.config_or_default()?;
         cfg.expand_vars().map_err(|e| ConfigError::VarExpand {
-            module: self.module_name.to_string(),
+            gear: self.gear_name.to_string(),
             source: e,
         })?;
         Ok(cfg)
     }
 
-    /// Get the raw JSON value of the module's config section.
-    /// Returns the 'config' field from: modules.<name> = { database: ..., config: ... }
+    /// Get the raw JSON value of the gear's config section.
+    /// Returns the 'config' field from: gears.<name> = { database: ..., config: ... }
     #[must_use]
     pub fn raw_config(&self) -> &serde_json::Value {
         use std::sync::LazyLock;
@@ -316,9 +313,9 @@ impl ModuleCtx {
         static EMPTY: LazyLock<serde_json::Value> =
             LazyLock::new(|| serde_json::Value::Object(serde_json::Map::new()));
 
-        if let Some(module_raw) = self.config_provider.get_module_config(&self.module_name) {
-            // Try new structure first: modules.<name> = { database: ..., config: ... }
-            if let Some(obj) = module_raw.as_object()
+        if let Some(gear_raw) = self.config_provider.get_gear_config(&self.gear_name) {
+            // Try new structure first: gears.<name> = { database: ..., config: ... }
+            if let Some(obj) = gear_raw.as_object()
                 && let Some(config_section) = obj.get("config")
             {
                 return config_section;
@@ -328,10 +325,10 @@ impl ModuleCtx {
     }
 
     /// Create a derivative context with the same references but no DB handle.
-    /// Useful for modules that don't require database access.
-    pub fn without_db(&self) -> ModuleCtx {
-        ModuleCtx {
-            module_name: self.module_name.clone(),
+    /// Useful for gears that don't require database access.
+    pub fn without_db(&self) -> GearCtx {
+        GearCtx {
+            gear_name: self.gear_name.clone(),
             instance_id: self.instance_id,
             config_provider: self.config_provider.clone(),
             client_hub: self.client_hub.clone(),
@@ -361,16 +358,16 @@ mod tests {
     }
 
     struct MockConfigProvider {
-        modules: HashMap<String, serde_json::Value>,
+        gears: HashMap<String, serde_json::Value>,
     }
 
     impl MockConfigProvider {
         fn new() -> Self {
-            let mut modules = HashMap::new();
+            let mut gears = HashMap::new();
 
-            // Valid module config
-            modules.insert(
-                "test_module".to_owned(),
+            // Valid gear config
+            gears.insert(
+                "test_gear".to_owned(),
                 json!({
                     "database": {
                         "url": "postgres://localhost/test"
@@ -383,21 +380,21 @@ mod tests {
                 }),
             );
 
-            Self { modules }
+            Self { gears }
         }
     }
 
     impl ConfigProvider for MockConfigProvider {
-        fn get_module_config(&self, module_name: &str) -> Option<&serde_json::Value> {
-            self.modules.get(module_name)
+        fn get_gear_config(&self, gear_name: &str) -> Option<&serde_json::Value> {
+            self.gears.get(gear_name)
         }
     }
 
     #[test]
-    fn test_module_ctx_config_with_valid_config() {
+    fn test_gear_ctx_config_with_valid_config() {
         let provider = Arc::new(MockConfigProvider::new());
-        let ctx = ModuleCtx::new(
-            "test_module",
+        let ctx = GearCtx::new(
+            "test_gear",
             Uuid::new_v4(),
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
@@ -414,10 +411,10 @@ mod tests {
     }
 
     #[test]
-    fn test_module_ctx_config_returns_error_for_missing_module() {
+    fn test_gear_ctx_config_returns_error_for_missing_gear() {
         let provider = Arc::new(MockConfigProvider::new());
-        let ctx = ModuleCtx::new(
-            "nonexistent_module",
+        let ctx = GearCtx::new(
+            "nonexistent_gear",
             Uuid::new_v4(),
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
@@ -427,15 +424,15 @@ mod tests {
         let result: Result<TestConfig, ConfigError> = ctx.config();
         assert!(matches!(
             result,
-            Err(ConfigError::ModuleNotFound { ref module }) if module == "nonexistent_module"
+            Err(ConfigError::GearNotFound { ref gear }) if gear == "nonexistent_gear"
         ));
     }
 
     #[test]
-    fn test_module_ctx_config_or_default_returns_default_for_missing_module() {
+    fn test_gear_ctx_config_or_default_returns_default_for_missing_gear() {
         let provider = Arc::new(MockConfigProvider::new());
-        let ctx = ModuleCtx::new(
-            "nonexistent_module",
+        let ctx = GearCtx::new(
+            "nonexistent_gear",
             Uuid::new_v4(),
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
@@ -450,11 +447,11 @@ mod tests {
     }
 
     #[test]
-    fn test_module_ctx_instance_id() {
+    fn test_gear_ctx_instance_id() {
         let provider = Arc::new(MockConfigProvider::new());
         let instance_id = Uuid::new_v4();
-        let ctx = ModuleCtx::new(
-            "test_module",
+        let ctx = GearCtx::new(
+            "test_gear",
             instance_id,
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
@@ -478,12 +475,12 @@ mod tests {
         retries: u32,
     }
 
-    fn make_ctx(module_name: &str, config_json: serde_json::Value) -> ModuleCtx {
-        let mut modules = HashMap::new();
-        modules.insert(module_name.to_owned(), config_json);
-        let provider = Arc::new(MockConfigProvider { modules });
-        ModuleCtx::new(
-            module_name,
+    fn make_ctx(gear_name: &str, config_json: serde_json::Value) -> GearCtx {
+        let mut gears = HashMap::new();
+        gears.insert(gear_name.to_owned(), config_json);
+        let provider = Arc::new(MockConfigProvider { gears });
+        GearCtx::new(
+            gear_name,
             Uuid::new_v4(),
             provider,
             Arc::new(crate::client_hub::ClientHub::default()),
@@ -532,7 +529,7 @@ mod tests {
         temp_env::with_vars([("TOOLKIT_TEST_MISSING_VAR_XYZ", None::<&str>)], || {
             let err = ctx.config_expanded::<ExpandableConfig>().unwrap_err();
             assert!(
-                matches!(err, ConfigError::VarExpand { ref module, .. } if module == "expand_mod"),
+                matches!(err, ConfigError::VarExpand { ref gear, .. } if gear == "expand_mod"),
                 "expected EnvExpand error, got: {err:?}"
             );
         });
@@ -562,7 +559,7 @@ mod tests {
         let err = ctx.config_expanded::<ExpandableConfig>().unwrap_err();
         assert!(matches!(
             err,
-            ConfigError::MissingConfigSection { ref module } if module == "missing_mod"
+            ConfigError::MissingConfigSection { ref gear } if gear == "missing_mod"
         ));
     }
 
@@ -671,7 +668,7 @@ mod tests {
         temp_env::with_vars([("TOOLKIT_NESTED_GONE", None::<&str>)], || {
             let err = ctx.config_expanded::<NestedConfig>().unwrap_err();
             assert!(
-                matches!(err, ConfigError::VarExpand { ref module, .. } if module == "nested_mod"),
+                matches!(err, ConfigError::VarExpand { ref gear, .. } if gear == "nested_mod"),
                 "expected EnvExpand, got: {err:?}"
             );
         });

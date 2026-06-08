@@ -1,4 +1,4 @@
-//! Error types for the tenant resolver module.
+//! Error types for the tenant resolver gear.
 
 use thiserror::Error;
 

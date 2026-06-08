@@ -1,6 +1,6 @@
 //! `CredStore` SDK
 //!
-//! This crate provides the public API for the `credstore` module:
+//! This crate provides the public API for the `credstore` gear:
 //!
 //! - [`CredStoreClientV1`] — Consumer API trait for storing/retrieving secrets
 //! - [`CredStorePluginClientV1`] — Plugin API trait for backend storage adapters

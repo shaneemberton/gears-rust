@@ -51,7 +51,7 @@ let validation_err = UserResourceError::invalid_argument()
     .create();
 ```
 
-**Resource-scoped errors** are a convenience layer for module-owned resources. The `#[resource_error]` attribute macro declares a resource type and generates constructors that auto-tag every error with the resource's GTS identity:
+**Resource-scoped errors** are a convenience layer for gear-owned resources. The `#[resource_error]` attribute macro declares a resource type and generates constructors that auto-tag every error with the resource's GTS identity:
 
 ```rust
 use toolkit_canonical_errors::resource_error;
@@ -128,7 +128,7 @@ See [§ 4. Category Reference](#4-category-reference) for full definitions inclu
 ### 1.4 Architecture Layers
 
 ```text
-      Module handler code
+      Gear handler code
                │
                │  CanonicalError::category(detail).create()
                │  or ResourceError::category(detail).with_resource(id).create()
@@ -161,7 +161,7 @@ See [§ 4. Category Reference](#4-category-reference) for full definitions inclu
 
 - [ ] `p1` - **ID**: `cpt-cf-errors-principle-single-error-gateway`
 
-There is no alternative path for returning errors. Every REST error response is produced from a `CanonicalError` via `From<CanonicalError> for Problem`. This eliminates inconsistent error formats across modules.
+There is no alternative path for returning errors. Every REST error response is produced from a `CanonicalError` via `From<CanonicalError> for Problem`. This eliminates inconsistent error formats across gears.
 
 **ADRs**: `cpt-cf-errors-adr-typed-enum-impl`
 
@@ -539,7 +539,7 @@ impl From<CanonicalError> for Problem {
 
 **Technology**: `TryFrom<Problem> for CanonicalError`
 
-SDK clients deserialize Problem responses back into `CanonicalError`, enabling transparent error propagation across module boundaries.
+SDK clients deserialize Problem responses back into `CanonicalError`, enabling transparent error propagation across gear boundaries.
 
 ```rust
 impl TryFrom<Problem> for CanonicalError {
@@ -949,7 +949,7 @@ All variants share the same structure: `{ ctx: ContextType, detail: String, reso
 - **Performance Architecture (PERF)**: Not applicable. Error construction is O(1) enum + struct allocation. No caching, pooling, or scaling concerns specific to the error system.
 - **Data Architecture (DATA)**: Not applicable. Errors are transient; no persistent storage.
 - **Operations (OPS)**: Not applicable. Error handling does not introduce deployment topology, infrastructure, or monitoring requirements beyond what the observability stack already provides.
-- **Compliance (COMPL)**: Flexible fields (`ResourceInfo.resource_name`, `FieldViolation.field`) may carry user-provided identifiers. Modules MUST apply data minimization when populating these fields. The `cpt-cf-errors-constraint-no-internal-details` constraint prevents stack traces and internal detail leakage in production, but does not address PII in context fields. PII handling in error responses follows the platform's data classification policy.
+- **Compliance (COMPL)**: Flexible fields (`ResourceInfo.resource_name`, `FieldViolation.field`) may carry user-provided identifiers. Gears MUST apply data minimization when populating these fields. The `cpt-cf-errors-constraint-no-internal-details` constraint prevents stack traces and internal detail leakage in production, but does not address PII in context fields. PII handling in error responses follows the platform's data classification policy.
 - **Usability (UX)**: Not applicable. This design covers the API error wire format, not user-facing error display.
 
 ## 6. Traceability

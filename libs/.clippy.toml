@@ -1,4 +1,4 @@
-# Gears Toolkit allowed to have more complex logic than modules
+# Gears Toolkit allowed to have more complex logic than gears
 cognitive-complexity-threshold = 55
 type-complexity-threshold = 220
 

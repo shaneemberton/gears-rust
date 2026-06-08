@@ -836,7 +836,7 @@ For quick reviews, use this condensed table format:
 
 When reviewing PRs that add or change Architecture Decision Records, additionally focus on:
 
-- [ ] Ensure the problem is module/system scoped, not generic and repeatable
+- [ ] Ensure the problem is gear/system scoped, not generic and repeatable
 - [ ] Compliance with `docs/spec-templates/gears-sdlc/ADR/template.md` template structure
 - [ ] Ensure the problem is not already solved by other existing ADRs in `docs/adrs/`
 - [ ] Alternatives are genuinely different approaches (not straw men)

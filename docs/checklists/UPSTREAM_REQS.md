@@ -36,7 +36,7 @@ Before starting the review, confirm:
 ## Severity Dictionary
 
 - **CRITICAL**: Blocks downstream PRD/DESIGN work or loses requirements.
-- **HIGH**: Major ambiguity; should be fixed before the module is designed.
+- **HIGH**: Major ambiguity; should be fixed before the gear is designed.
 - **MEDIUM**: Meaningful improvement; fix when feasible.
 - **LOW**: Minor improvement; optional.
 
@@ -48,25 +48,25 @@ Before starting the review, confirm:
 
 ## SOURCE Expertise (SRC)
 
-### SRC-UPREQ-001: Requesting Modules Identified
+### SRC-UPREQ-001: Requesting Gears Identified
 **Severity**: CRITICAL
 
-- [ ] At least one requesting module is listed
-- [ ] Each requesting module exists in the codebase
-- [ ] Each requesting module has a clear justification for why it needs this future module
+- [ ] At least one requesting gear is listed
+- [ ] Each requesting gear exists in the codebase
+- [ ] Each requesting gear has a clear justification for why it needs this future gear
 - [ ] No vague justifications (e.g., "might be useful" is insufficient)
 
 ### SRC-UPREQ-002: Source Traceability
 **Severity**: HIGH
 
-- [ ] Each requirement references its source module
-- [ ] Source module path is valid (`modules/{name}`)
-- [ ] Requirements can be traced back to concrete needs in the requesting module's code or documentation
+- [ ] Each requirement references its source gear
+- [ ] Source gear path is valid (`gears/{name}`)
+- [ ] Requirements can be traced back to concrete needs in the requesting gear's code or documentation
 
 ### SRC-UPREQ-003: Backward References
 **Severity**: HIGH
 
-- [ ] Each requesting module's documentation (PRD or DESIGN) references the `upreq` IDs it contributed
+- [ ] Each requesting gear's documentation (PRD or DESIGN) references the `upreq` IDs it contributed
 - [ ] References use the canonical `cpt-{system}-upreq-{slug}` format
 
 ---
@@ -84,9 +84,9 @@ Before starting the review, confirm:
 ### REQ-UPREQ-002: Requirements Completeness
 **Severity**: HIGH
 
-- [ ] All requesting modules have at least one requirement
-- [ ] Requirements cover the requesting module's actual needs (not a subset)
-- [ ] No duplicate requirements across requesting modules (consolidate shared needs)
+- [ ] All requesting gears have at least one requirement
+- [ ] Requirements cover the requesting gear's actual needs (not a subset)
+- [ ] No duplicate requirements across requesting gears (consolidate shared needs)
 
 ### REQ-UPREQ-003: ID Format and Uniqueness
 **Severity**: CRITICAL
@@ -139,11 +139,11 @@ UPSTREAM_REQS captures WHAT is needed, not HOW. The following must NOT appear:
 ### BIZ-UPREQ-NO-001: No Product Vision
 **Severity**: HIGH
 
-UPSTREAM_REQS captures specific module requirements, not business vision:
+UPSTREAM_REQS captures specific gear requirements, not business vision:
 
 - [ ] No business goals or success criteria (belongs in PRD)
 - [ ] No market analysis or competitive positioning (belongs in PRD)
-- [ ] No user personas beyond requesting modules (belongs in PRD)
+- [ ] No user personas beyond requesting gears (belongs in PRD)
 
 ---
 

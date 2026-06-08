@@ -83,7 +83,7 @@ pub struct TenantTypeTraits {
 /// Base tenant-type envelope (abstract). Carries no instance data — the
 /// `id` field exists only to satisfy the `gts-macros` base-struct
 /// contract (a base must declare an `id: GtsInstanceId` or `gts_type:
-/// GtsTypeId`) and is inert (see module docs).
+/// GtsTypeId`) and is inert (see gear docs).
 #[gts_type_schema(
     dir_path = "schemas",
     base = true,
@@ -159,7 +159,7 @@ mod sync_tests {
     //! `docs/schemas/<name>.v1.schema.json`. The macro additionally emits
     //! a data-type top-level shape (`id`/`properties`/`required`/
     //! `additionalProperties`) that the docs omit by design and that is
-    //! inert at runtime (see module docs), so only the trait subtrees are
+    //! inert at runtime (see gear docs), so only the trait subtrees are
     //! compared.
 
     use std::fs;

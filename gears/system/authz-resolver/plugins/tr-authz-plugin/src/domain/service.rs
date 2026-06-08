@@ -102,7 +102,7 @@ impl Service {
         // transport land, replace `SecurityContext::anonymous()` here with the
         // S2S-issued service context identifying this caller as
         // `tr-authz-plugin`. Anonymous is safe today (in-process trust boundary
-        // between toolkit modules) but unsafe over a network boundary — there
+        // between ToolKit gears) but unsafe over a network boundary — there
         // is no cryptographic identity on the wire.
         let ctx = SecurityContext::anonymous();
 

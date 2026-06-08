@@ -9,7 +9,7 @@ Implement `AttachmentCleanupHandler` to actually delete a single provider file w
 - Stub returns `HandlerResult::Retry` for every message.
 - `AttachmentCleanupEvent` already exists with `provider_file_id`, `storage_backend`, `attachment_kind`.
 - `RagHttpClient.delete()` is best-effort (404 = success, no status check).
-- Handler is registered in `module.rs` as `.decoupled(AttachmentCleanupHandler)`.
+- Handler is registered in `gear.rs` as `.decoupled(AttachmentCleanupHandler)`.
 
 ## Design Constraints (from DESIGN.md)
 
@@ -77,9 +77,9 @@ Options:
 
 Investigate how `UsageEventHandler` or other background code obtains credentials for outbound calls. The OAGW `proxy_request` may need specific auth headers.
 
-### 3.4 Wire dependencies in module.rs
+### 3.4 Wire dependencies in gear.rs
 
-File: `src/module.rs`
+File: `src/gear.rs`
 
 Change from:
 ```rust

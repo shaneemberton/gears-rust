@@ -11,7 +11,7 @@ use lint_utils::is_in_contract_module_ast;
 dylint_linting::declare_pre_expansion_lint! {
     /// ### What it does
     ///
-    /// Checks that structs and enums in contract modules do not use the `api_dto` attribute macro.
+    /// Checks that structs and enums in contract gears do not use the `api_dto` attribute macro.
     ///
     /// ### Why is this bad?
     ///

@@ -52,7 +52,7 @@ Use simple string constants like `"not_found"` as the error type identifier.
 * Good, because no external dependency on GTS
 * Bad, because no compile-time format validation — typos are runtime bugs
 * Bad, because no connection to the Types Registry — schemas must be maintained separately
-* Bad, because no namespace isolation — collision risk across modules
+* Bad, because no namespace isolation — collision risk across gears
 
 ### Option B: GTS Compound Type Identifiers
 

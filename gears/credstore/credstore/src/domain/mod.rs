@@ -1,4 +1,4 @@
-//! Domain layer for the credstore module.
+//! Domain layer for the credstore gear.
 
 pub mod error;
 pub mod local_client;

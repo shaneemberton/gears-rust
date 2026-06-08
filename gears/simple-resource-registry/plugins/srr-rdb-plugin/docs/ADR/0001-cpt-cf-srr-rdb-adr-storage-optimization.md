@@ -16,7 +16,7 @@ The SRR Relational Database Plugin must store up to 100M resources across potent
 * Must work on PostgreSQL, MariaDB, and SQLite without database-specific features (`cpt-cf-srr-rdb-fr-db-agnostic`)
 * Must not require DDL operations at runtime (no table creation when new resource types are registered)
 * Plugin must remain simple and maintainable — complexity belongs in specialized backends, not in the default plugin
-* Other storage backends (via main module's storage routing) can handle workloads that exceed this plugin's capacity
+* Other storage backends (via main gear's storage routing) can handle workloads that exceed this plugin's capacity
 
 ## Considered Options
 
@@ -26,7 +26,7 @@ The SRR Relational Database Plugin must store up to 100M resources across potent
 
 ## Decision Outcome
 
-Chosen option: "Single table with B-tree indexes", because 100M rows is well within the capacity of B-tree indexes on modern relational databases, the approach is fully portable across PostgreSQL/MariaDB/SQLite, it requires no runtime DDL, and it keeps the plugin implementation simple. Workloads that exceed 100M resources or require specialized storage features are served by alternative backends via the main module's per-resource-type storage routing.
+Chosen option: "Single table with B-tree indexes", because 100M rows is well within the capacity of B-tree indexes on modern relational databases, the approach is fully portable across PostgreSQL/MariaDB/SQLite, it requires no runtime DDL, and it keeps the plugin implementation simple. Workloads that exceed 100M resources or require specialized storage features are served by alternative backends via the main gear's per-resource-type storage routing.
 
 ### Consequences
 
@@ -34,7 +34,7 @@ Chosen option: "Single table with B-tree indexes", because 100M rows is well wit
 * Good, because no runtime DDL — all tables and indexes are created during migration
 * Good, because simple implementation — one SeaORM entity, one set of indexes, no type-aware branching
 * Good, because well-understood performance model — B-tree index lookups are O(log n), predictable at 100M rows
-* Good, because the main module's storage routing provides an escape hatch for types that outgrow this plugin
+* Good, because the main gear's storage routing provides an escape hatch for types that outgrow this plugin
 * Bad, because all resource types share index space — a type with millions of resources affects index size for all types
 * Bad, because no index locality by type — queries for a specific type scan a shared B-tree rather than a type-specific structure
 * Bad, because 100M row ceiling is a hard constraint — beyond this, alternative backends are required
@@ -106,7 +106,7 @@ The Simple Resource Registry's per-resource-type storage routing (`cpt-cf-srr-fr
 
 1. Deploy an alternative backend (e.g., a partitioned PostgreSQL plugin, an ElasticSearch plugin, or a vendor-provided store)
 2. Update the routing configuration to direct the high-volume type to the new backend
-3. Migrate existing resources (if needed) — the main module's API is unchanged
+3. Migrate existing resources (if needed) — the main gear's API is unchanged
 
 This means the default plugin does not need to solve every scalability problem — it needs to be good enough for the common case, with a clear path to specialization.
 
@@ -114,7 +114,7 @@ This means the default plugin does not need to solve every scalability problem �
 
 - **Plugin PRD**: [../PRD.md](../PRD.md)
 - **Plugin DESIGN**: [../DESIGN.md](../DESIGN.md)
-- **Parent Module PRD**: [../../../../docs/PRD.md](../../../../docs/PRD.md)
+- **Parent Gear PRD**: [../../../../docs/PRD.md](../../../../docs/PRD.md)
 
 This decision directly addresses the following requirements or design elements:
 

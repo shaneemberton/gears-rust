@@ -1,4 +1,4 @@
-//! Tenant hierarchy domain module.
+//! Tenant hierarchy domain gear.
 //!
 //! Owns the tenant entity's core model, repository contract, closure-table
 //! invariants, retention pipeline types, the `TenantService` saga

@@ -117,7 +117,7 @@ pub struct TenantModel {
 
 // `retention_window_secs` lives on the `tenants` entity (see
 // `src/infra/storage/entity/tenants.rs`) but stays off `TenantModel`:
-// it is an operator-set per-tenant override of the module-default
+// it is an operator-set per-tenant override of the gear-default
 // retention window, used by the sweep planner, and is surfaced
 // through the [`retention::TenantRetentionRow`] selection row rather
 // than the happy-path read shape.

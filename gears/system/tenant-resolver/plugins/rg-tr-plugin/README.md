@@ -1,6 +1,6 @@
 # RG Tenant Resolver Plugin
 
-Tenant resolver plugin that resolves tenant hierarchy via the Resource Group module. Production replacement for `static-tr-plugin`.
+Tenant resolver plugin that resolves tenant hierarchy via the Resource Group gear. Production replacement for `static-tr-plugin`.
 
 ## How It Works
 
@@ -28,7 +28,7 @@ Same as `static-tr-plugin`:
 ## Configuration
 
 ```yaml
-modules:
+gears:
   rg_tr_plugin:
     config:
       vendor: "constructorfabric"

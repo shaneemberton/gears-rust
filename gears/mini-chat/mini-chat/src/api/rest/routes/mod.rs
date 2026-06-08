@@ -12,7 +12,7 @@ use axum::Router;
 use toolkit::api::OpenApiRegistry;
 use toolkit::api::operation_builder::LicenseFeature;
 
-use crate::module::AppServices;
+use crate::gear::AppServices;
 
 /// License feature required by all mini-chat endpoints.
 ///

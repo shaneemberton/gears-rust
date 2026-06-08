@@ -14,8 +14,8 @@ async fn test_sqlite_relative_path_resolution() {
     let db_filename = format!("test_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": db_filename
@@ -26,12 +26,12 @@ async fn test_sqlite_relative_path_resolution() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
             // Verify the database file was created in the correct location
-            let expected_path = temp_dir.path().join("test_module").join(&db_filename);
+            let expected_path = temp_dir.path().join("test_gear").join(&db_filename);
             assert!(
                 expected_path.exists(),
                 "Database file should be created at {expected_path:?}"
@@ -51,8 +51,8 @@ async fn test_sqlite_absolute_path() {
     let db_path = temp_dir.path().join("absolute_test.db");
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "path": db_path
@@ -63,7 +63,7 @@ async fn test_sqlite_absolute_path() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
@@ -89,8 +89,8 @@ async fn test_pragma_precedence() {
         .join(format!("pragma_test_{}.db", std::process::id()));
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "dsn": format!("sqlite://{}?synchronous=OFF&journal_mode=DELETE", db_path.display()),
                     "params": {
@@ -105,7 +105,7 @@ async fn test_pragma_precedence() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
@@ -132,8 +132,8 @@ async fn test_invalid_pragma_values() {
     let db_filename = format!("invalid_pragma_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": db_filename,
@@ -147,7 +147,7 @@ async fn test_invalid_pragma_values() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::InvalidSqlitePragma { key, message }) = result {
@@ -166,8 +166,8 @@ async fn test_unknown_pragma_parameters() {
     let db_filename = format!("unknown_pragma_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": db_filename,
@@ -181,7 +181,7 @@ async fn test_unknown_pragma_parameters() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::UnknownSqlitePragma(key)) = result {
@@ -202,8 +202,8 @@ async fn test_auto_provision_creates_directories() {
         "database": {
             "auto_provision": true
         },
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "path": nested_path.join("test.db")
@@ -214,7 +214,7 @@ async fn test_auto_provision_creates_directories() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
@@ -242,8 +242,8 @@ async fn test_auto_provision_disabled() {
         "database": {
             "auto_provision": false
         },
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": "nested/directories/test.db"  // This requires creating nested dirs
@@ -255,7 +255,7 @@ async fn test_auto_provision_disabled() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     // Should fail because the nested directories don't exist and auto_provision is false
     assert!(result.is_err());
@@ -278,8 +278,8 @@ async fn test_auto_provision_disabled() {
 #[cfg(feature = "sqlite")]
 async fn test_sqlite_memory_database() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "dsn": "sqlite::memory:"
@@ -291,7 +291,7 @@ async fn test_sqlite_memory_database() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(Some(db)) => {
@@ -315,8 +315,8 @@ async fn test_sqlite_shared_memory_database() {
         .path()
         .join(format!("memdb_shared_{}", std::process::id()));
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "dsn": format!(
@@ -331,7 +331,7 @@ async fn test_sqlite_shared_memory_database() {
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
     {
-        let result = manager.get("test_module").await;
+        let result = manager.get("test_gear").await;
 
         match result {
             Ok(Some(_handle)) => {
@@ -358,8 +358,8 @@ async fn test_wal_pragma_validation() {
         let db_filename = format!("wal_test_{}_{}.db", wal_value, std::process::id());
 
         let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-            "modules": {
-                "test_module": {
+            "gears": {
+                "test_gear": {
                     "database": {
                         "engine": "sqlite",
                         "file": db_filename,
@@ -373,7 +373,7 @@ async fn test_wal_pragma_validation() {
 
         let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-        let result = manager.get("test_module").await;
+        let result = manager.get("test_gear").await;
 
         match result {
             Ok(_handle) => {
@@ -393,8 +393,8 @@ async fn test_wal_pragma_validation() {
     let db_filename = format!("wal_invalid_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": db_filename,
@@ -408,7 +408,7 @@ async fn test_wal_pragma_validation() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::InvalidSqlitePragma { key, message }) = result {
@@ -429,8 +429,8 @@ async fn test_busy_timeout_pragma_validation() {
         let db_filename = format!("timeout_test_{}_{}.db", timeout_value, std::process::id());
 
         let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-            "modules": {
-                "test_module": {
+            "gears": {
+                "test_gear": {
                     "database": {
                         "engine": "sqlite",
                         "file": db_filename,
@@ -444,7 +444,7 @@ async fn test_busy_timeout_pragma_validation() {
 
         let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-        let result = manager.get("test_module").await;
+        let result = manager.get("test_gear").await;
 
         match result {
             Ok(_handle) => {
@@ -464,8 +464,8 @@ async fn test_busy_timeout_pragma_validation() {
     let db_filename = format!("timeout_negative_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": db_filename,
@@ -479,7 +479,7 @@ async fn test_busy_timeout_pragma_validation() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::InvalidSqlitePragma { key, message }) = result {
@@ -494,8 +494,8 @@ async fn test_busy_timeout_pragma_validation() {
     let db_filename = format!("timeout_invalid_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": db_filename,
@@ -509,7 +509,7 @@ async fn test_busy_timeout_pragma_validation() {
 
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     assert!(result.is_err());
     if let Err(DbError::InvalidSqlitePragma { key, message }) = result {

@@ -4,17 +4,17 @@
 
 ### 1.1 Purpose
 
-A universal error architecture for the Gears middleware that replaces the current ad-hoc error system (`Problem::new()` / `ErrDef` / `declare_errors!` / `ErrorCode`) with a canonical error model providing consistent, structured error responses across all modules and transport protocols.
+A universal error architecture for the Gears middleware that replaces the current ad-hoc error system (`Problem::new()` / `ErrDef` / `declare_errors!` / `ErrorCode`) with a canonical error model providing consistent, structured error responses across all gears and transport protocols.
 
 ### 1.2 Background / Problem Statement
 
-Gears currently define errors independently using a mix of `Problem::new()`, `ErrDef`, `declare_errors!`, and raw `ErrorCode` enums. This leads to inconsistent error shapes across modules, making it difficult for API consumers to write reliable error-handling code. There is no compile-time enforcement of error contracts, no structured context beyond free-form strings, and no mechanism to detect accidental breaking changes to error responses.
+Gears currently define errors independently using a mix of `Problem::new()`, `ErrDef`, `declare_errors!`, and raw `ErrorCode` enums. This leads to inconsistent error shapes across gears, making it difficult for API consumers to write reliable error-handling code. There is no compile-time enforcement of error contracts, no structured context beyond free-form strings, and no mechanism to detect accidental breaking changes to error responses.
 
 SDK clients (credstore, tenant-resolver, authn-resolver, etc.) maintain their own ad-hoc error enums that are lossy, manual reconstructions of server responses. Each SDK reinvents error mapping independently.
 
 ### 1.3 Goals (Business Outcomes)
 
-- Consistent, predictable error responses across all modules and transports
+- Consistent, predictable error responses across all gears and transports
 - Simplified client-side error handling through a finite, well-documented error vocabulary
 - Automated detection of accidental error contract changes before merge
 
@@ -32,11 +32,11 @@ SDK clients (credstore, tenant-resolver, authn-resolver, etc.) maintain their ow
 
 ### 2.1 Human Actors
 
-#### Module Developer
+#### Gear Developer
 
-**ID**: `cpt-cf-errors-actor-module-developer`
+**ID**: `cpt-cf-errors-actor-gear-developer`
 
-- **Role**: Writes module handler code that constructs and returns errors.
+- **Role**: Writes gear handler code that constructs and returns errors.
 - **Needs**: A simple, type-safe API for constructing errors without consulting transport-specific documentation.
 
 #### API Consumer
@@ -44,7 +44,7 @@ SDK clients (credstore, tenant-resolver, authn-resolver, etc.) maintain their ow
 **ID**: `cpt-cf-errors-actor-api-consumer`
 
 - **Role**: Calls Gears APIs and handles error responses programmatically.
-- **Needs**: Consistent error structure across all modules to write reliable error-handling logic.
+- **Needs**: Consistent error structure across all gears to write reliable error-handling logic.
 
 ### 2.2 System Actors
 
@@ -63,7 +63,7 @@ SDK clients (credstore, tenant-resolver, authn-resolver, etc.) maintain their ow
 
 ## 3. Operational Concept & Environment
 
-No module-specific environment constraints. The canonical error system runs within the standard Gears runtime environment.
+No gear-specific environment constraints. The canonical error system runs within the standard Gears runtime environment.
 
 ## 4. Scope
 
@@ -77,7 +77,7 @@ No module-specific environment constraints. The canonical error system runs with
 - Automatic propagation of common library errors into canonical categories
 - Round-trip serialization/deserialization (server → wire → SDK)
 - Public vs private detail isolation (client-facing context vs server-side logging with trace_id)
-- Migration of all existing modules to the new error system
+- Migration of all existing gears to the new error system
 - Dylint-level rules enforcement
 
 ### 4.2 Out of Scope
@@ -86,7 +86,7 @@ No module-specific environment constraints. The canonical error system runs with
 - SSE error event format — future work
 - W3C trace ID extraction — separate workstream
 - Error middleware catch-all — depends on foundation phase
-- Error extensibility rules (custom module-specific error types beyond the 16 categories) — future work
+- Error extensibility rules (custom gear-specific error types beyond the 16 categories) — future work
 
 ## 5. Functional Requirements
 
@@ -98,17 +98,17 @@ No module-specific environment constraints. The canonical error system runs with
 
 The system MUST provide a single error type that is independent of any transport protocol (HTTP, gRPC, SSE). Transport-specific representations MUST be derived from this single type at the transport boundary.
 
-- **Rationale**: Modules must not embed transport details (HTTP status codes, gRPC status) in domain code. A unified internal model enables multi-transport support without per-module changes.
-- **Actors**: `cpt-cf-errors-actor-module-developer`
+- **Rationale**: Gears must not embed transport details (HTTP status codes, gRPC status) in domain code. A unified internal model enables multi-transport support without per-gear changes.
+- **Actors**: `cpt-cf-errors-actor-gear-developer`
 
 #### Finite Error Vocabulary
 
 - [ ] `p1` - **ID**: `cpt-cf-errors-fr-finite-vocabulary`
 
-The system MUST define a fixed set of canonical error categories. Every error produced by any module MUST belong to exactly one canonical category.
+The system MUST define a fixed set of canonical error categories. Every error produced by any gear MUST belong to exactly one canonical category.
 
 - **Rationale**: A finite vocabulary enables exhaustive client-side matching and prevents ad-hoc error types that break consumer expectations.
-- **Actors**: `cpt-cf-errors-actor-api-consumer`, `cpt-cf-errors-actor-module-developer`
+- **Actors**: `cpt-cf-errors-actor-api-consumer`, `cpt-cf-errors-actor-gear-developer`
 
 #### Structured Context per Category
 
@@ -125,8 +125,8 @@ Each canonical category MUST have exactly one associated context type with a fix
 
 Every error response MUST include a trace ID for request correlation.
 
-- **Rationale**: Trace IDs enable end-to-end debugging across modules and support integration.
-- **Actors**: `cpt-cf-errors-actor-api-consumer`, `cpt-cf-errors-actor-module-developer`
+- **Rationale**: Trace IDs enable end-to-end debugging across gears and support integration.
+- **Actors**: `cpt-cf-errors-actor-api-consumer`, `cpt-cf-errors-actor-gear-developer`
 
 #### Public vs Private Detail Isolation
 
@@ -135,7 +135,7 @@ Every error response MUST include a trace ID for request correlation.
 The system MUST separate client-facing error details (context, message) from internal diagnostic information (stack traces, query text). Internal details MUST NOT appear in error responses. Internal details MUST be logged server-side with the `trace_id` for correlation.
 
 - **Rationale**: Prevents information leakage in production while preserving debuggability.
-- **Actors**: `cpt-cf-errors-actor-module-developer`
+- **Actors**: `cpt-cf-errors-actor-gear-developer`
 
 ### 5.2 Construction & Ergonomics
 
@@ -146,16 +146,16 @@ The system MUST separate client-facing error details (context, message) from int
 A developer or LLM agent MUST be able to construct any canonical error in a single expression, without consulting transport documentation.
 
 - **Rationale**: Low ceremony reduces errors and makes the API LLM-friendly.
-- **Actors**: `cpt-cf-errors-actor-module-developer`, `cpt-cf-errors-actor-llm-agent`
+- **Actors**: `cpt-cf-errors-actor-gear-developer`, `cpt-cf-errors-actor-llm-agent`
 
 #### Resource-Scoped Error Construction
 
 - [ ] `p1` - **ID**: `cpt-cf-errors-fr-resource-scoped-construction`
 
-Module vendors MUST be able to declare a resource type once and get error constructors that automatically tag every error with the resource's GTS identity, plus any additional details specific to that error occurrence.
+Gear vendors MUST be able to declare a resource type once and get error constructors that automatically tag every error with the resource's GTS identity, plus any additional details specific to that error occurrence.
 
 - **Rationale**: Ensures resource identity is never forgotten and enables consumers to distinguish errors from different resource types.
-- **Actors**: `cpt-cf-errors-actor-module-developer`
+- **Actors**: `cpt-cf-errors-actor-gear-developer`
 
 #### Builder-Only Construction
 
@@ -164,7 +164,7 @@ Module vendors MUST be able to declare a resource type once and get error constr
 The system MUST enforce that `CanonicalError` instances can only be constructed through the provided builder API. Direct construction of enum variants or use of internal constructors from outside the canonical error crate MUST be prevented at compile time.
 
 - **Rationale**: Enforcing builder-only construction ensures all errors are properly initialized with correct defaults, required fields are set via typestate enforcement, and the construction API surface is clear and discoverable.
-- **Actors**: `cpt-cf-errors-actor-module-developer`, `cpt-cf-errors-actor-llm-agent`
+- **Actors**: `cpt-cf-errors-actor-gear-developer`, `cpt-cf-errors-actor-llm-agent`
 
 #### Library Error Propagation
 
@@ -173,7 +173,7 @@ The system MUST enforce that `CanonicalError` instances can only be constructed 
 Common library errors (database, serialization, IO) MUST propagate into canonical categories automatically without per-call-site mapping.
 
 - **Rationale**: Eliminates boilerplate and ensures infrastructure errors are consistently categorized.
-- **Actors**: `cpt-cf-errors-actor-module-developer`
+- **Actors**: `cpt-cf-errors-actor-gear-developer`
 
 ### 5.3 Contract Enforcement
 
@@ -184,7 +184,7 @@ Common library errors (database, serialization, IO) MUST propagate into canonica
 Using the wrong context type for a category, or forgetting to handle a category, MUST produce a compile error.
 
 - **Rationale**: Compile-time enforcement is the strongest guarantee against contract violations.
-- **Actors**: `cpt-cf-errors-actor-module-developer`, `cpt-cf-errors-actor-llm-agent`
+- **Actors**: `cpt-cf-errors-actor-gear-developer`, `cpt-cf-errors-actor-llm-agent`
 
 #### Schema Drift Prevention
 
@@ -217,7 +217,7 @@ The REST wire format MUST be based on an existing industry standard for error re
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Error Construction Performance
 
@@ -252,14 +252,14 @@ Error construction MUST be O(1) enum + struct allocation with no heap allocation
 
 ## 8. Use Cases
 
-#### Module Developer Constructs Resource Error
+#### Gear Developer Constructs Resource Error
 
 - [ ] `p2` - **ID**: `cpt-cf-errors-usecase-construct-resource-error`
 
-**Actor**: `cpt-cf-errors-actor-module-developer`
+**Actor**: `cpt-cf-errors-actor-gear-developer`
 
 **Preconditions**:
-- Module has declared a resource-scoped error type for its resource
+- Gear has declared a resource-scoped error type for its resource
 
 **Main Flow**:
 1. Developer constructs a resource-scoped error (e.g., not_found for a given resource ID)
@@ -310,7 +310,7 @@ Error construction MUST be O(1) enum + struct allocation with no heap allocation
 ## 11. Assumptions
 
 - API consumers parse error responses programmatically (not just display the `detail` string)
-- The 16 canonical categories cover all current error scenarios across all current and planned modules
+- The 16 canonical categories cover all current error scenarios across all current and planned gears
 - CI tooling can detect field-level changes in public error type definitions
 
 ## 12. Risks
@@ -323,7 +323,7 @@ Error construction MUST be O(1) enum + struct allocation with no heap allocation
 
 ## 13. Open Questions
 
-- How should modules define custom error types outside of the 16 canonical categories, if at all?
+- How should gears define custom error types outside of the 16 canonical categories, if at all?
 - Should error schema specialisation (inheritance) within the 16 canonical categories be supported, and if so, how?
 
 ## 14. Traceability

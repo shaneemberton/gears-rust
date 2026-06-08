@@ -391,7 +391,7 @@ The system **MUST** validate `secret_ref` accessibility via `cred_store` for the
 - **Reliability — Fault Tolerance (REL-FDESIGN-002)**: Partially addressed — `cred_store` unavailability is handled fail-closed (503 ServiceUnavailable) in the bind flow. Retry logic and circuit breaker patterns for `cred_store` calls are scoped to Feature 6 (Rate Limiting & Resilience). Tenant hierarchy resolution failures are a platform responsibility; OAGW receives the resolved ancestor chain as input.
 - **Security — Audit Trail (SEC-FDESIGN-005)**: Not applicable — audit logging for configuration changes is scoped to Feature 8 (Observability & Security Hardening).
 - **Data Privacy (DATA-FDESIGN-005)**: Not applicable — OAGW does not store PII. Secret material is never stored or logged per `cpt-cf-oagw-principle-cred-isolation`; credential management is delegated to `cred_store`.
-- **Compliance (COMPL)**: Not applicable — internal infrastructure module with no regulatory or privacy obligations.
+- **Compliance (COMPL)**: Not applicable — internal infrastructure gear with no regulatory or privacy obligations.
 - **Usability (UX)**: Not applicable — no user interface; all interaction is programmatic via REST API.
 - **Operations — Observability (OPS-FDESIGN-001)**: Not applicable — logging and metrics instrumentation scoped to Feature 8.
 - **Operations — Rollout (OPS-FDESIGN-004)**: Not applicable — sharing mode fields are additive schema changes; existing upstreams default to `private` (no behavioral change for current tenants).

@@ -1,2 +1,2 @@
-"""Helper modules for E2E tests."""
+"""Helper gears for E2E tests."""
 

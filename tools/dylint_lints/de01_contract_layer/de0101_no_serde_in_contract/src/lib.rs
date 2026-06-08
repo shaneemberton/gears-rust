@@ -11,7 +11,7 @@ use lint_utils::is_in_contract_path;
 dylint_linting::declare_pre_expansion_lint! {
     /// ### What it does
     ///
-    /// Checks that structs and enums in contract modules do not derive Serialize or Deserialize.
+    /// Checks that structs and enums in contract gears do not derive Serialize or Deserialize.
     ///
     /// ### Why is this bad?
     ///

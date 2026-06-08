@@ -32,7 +32,7 @@ date: 2026-04-27
 
 ## Context and Problem Statement
 
-A consumer module needs to declare what cluster guarantees it requires, and the SDK needs to verify those guarantees against the operator-bound backend at the right time. "The right time" is **startup, not runtime**. A consumer that requires a linearizable cache and is bound to an eventually-consistent Redis-Sentinel deployment must fail loudly at module boot, not silently corrupt state under partition six months later.
+A consumer gear needs to declare what cluster guarantees it requires, and the SDK needs to verify those guarantees against the operator-bound backend at the right time. "The right time" is **startup, not runtime**. A consumer that requires a linearizable cache and is bound to an eventually-consistent Redis-Sentinel deployment must fail loudly at gear boot, not silently corrupt state under partition six months later.
 
 This requires three things:
 
@@ -52,7 +52,7 @@ Both problems share a root cause: under-typed APIs leak structural decisions int
 - **Concrete characteristic checks**: every variant of every `*Capability` enum should map to an observable check against the backend's `consistency()` or `features()`. No fuzzy "tier" comparisons.
 - **Independent axes**: topology, persistence, and consistency are three different things, and a primitive may need any combination. Per-primitive enums let each primitive express its own axis.
 - **Single-source profile names**: a profile string should appear once per consumer crate, not at every resolver call site.
-- **Startup-time failure**: a misconfigured backend must fail the module's `RunnableCapability::start()` with a clear, actionable error. Runtime failures hours after start are unacceptable.
+- **Startup-time failure**: a misconfigured backend must fail the gear's `RunnableCapability::start()` with a clear, actionable error. Runtime failures hours after start are unacceptable.
 - **Composable with the facade pattern**: the resolver must produce per-primitive `*V1` facades (per ADR-005), not a bundled `Cluster` object.
 
 ## Considered Options
@@ -184,7 +184,7 @@ Equivalent builders exist for `LeaderElectionV1`, `DistributedLockV1`, `ServiceD
 
 `validate_*_capabilities` checks each requirement against the backend's declared characteristics. On mismatch, it returns `ClusterError::CapabilityNotMet { primitive, capability, provider }` where `provider` is `std::any::type_name_of_val(backend)` so operators see "the bound `RedisClusterCacheBackend` does not declare `Linearizable` consistency" rather than a generic message.
 
-The resolver call lives in the consumer's `RunnableCapability::start()` (or in a constructor invoked from there). Failure propagates as `Result<_, ClusterError>` → `anyhow::Error` → the framework's `start()` failure path. The module fails to start; the operator sees a clear error in logs identifying which consumer, which primitive, which capability, and which bound backend. Production traffic never sees the misconfiguration.
+The resolver call lives in the consumer's `RunnableCapability::start()` (or in a constructor invoked from there). Failure propagates as `Result<_, ClusterError>` → `anyhow::Error` → the framework's `start()` failure path. The gear fails to start; the operator sees a clear error in logs identifying which consumer, which primitive, which capability, and which bound backend. Production traffic never sees the misconfiguration.
 
 The error error-naming is deliberately precise — `ProfileNotSpecified` (you forgot to call `.profile(...)`), `ProfileNotBound { profile }` (operator config doesn't bind this profile), `CapabilityNotMet { primitive, capability, provider }` (backend exists but doesn't satisfy the requirement). Three distinct error states for three distinct misconfigurations.
 
@@ -241,7 +241,7 @@ Plugins declare their characteristics; consumers don't declare requirements. The
 
 - Good, because zero validation infrastructure.
 - Bad, because misconfiguration becomes a runtime failure or, worse, silent corruption. A `Linearizable`-needing consumer bound to `EventuallyConsistent` redis works most of the time and fails under partition.
-- Bad, because operators carry the mental burden of cross-referencing every consumer's documented requirements against their backend choice. Cluster consumes nine modules; the cross-reference is a maintenance nightmare.
+- Bad, because operators carry the mental burden of cross-referencing every consumer's documented requirements against their backend choice. Cluster consumes nine gears; the cross-reference is a maintenance nightmare.
 - Bad, because requirements drift silently as consumers evolve. A consumer that adds prefix-watch usage gets no signal that its previously-fine backend now lacks `PrefixWatch`.
 
 ### Option 4: String profile names

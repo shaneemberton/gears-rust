@@ -8,7 +8,7 @@ fn default_body_limit_bytes() -> usize {
     16 * 1024 * 1024
 }
 
-/// API gateway configuration - reused from `api_gateway` module
+/// API gateway configuration - reused from `api_gateway` gear
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 #[allow(clippy::struct_excessive_bools)]

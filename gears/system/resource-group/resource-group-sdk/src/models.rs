@@ -2,9 +2,9 @@
 // Updated: 2026-04-28 by Constructor Tech
 // @cpt-begin:cpt-cf-resource-group-dod-sdk-foundation-sdk-models:p1:inst-full
 // @cpt-dod:cpt-cf-resource-group-dod-sdk-foundation-sdk-models:p1
-//! SDK model types for the resource-group module.
+//! SDK model types for the resource-group gear.
 //!
-//! These types form the public contract between the resource-group module
+//! These types form the public contract between the resource-group gear
 //! and its consumers. They are transport-agnostic and use string-based
 //! GTS type paths (no surrogate SMALLINT IDs).
 

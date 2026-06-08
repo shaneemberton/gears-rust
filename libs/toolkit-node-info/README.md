@@ -137,9 +137,9 @@ for cap in syscap.capabilities {
 - `chrono` - Timestamps
 - `uuid` - Node IDs
 
-## Usage in Modules
+## Usage in Gears
 
-This library is designed to be used by the `nodes-registry` module and any other module that needs to collect information about the current execution environment.
+This library is designed to be used by the `nodes-registry` gear and any other gear that needs to collect information about the current execution environment.
 
 ```toml
 [dependencies]

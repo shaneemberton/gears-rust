@@ -1,10 +1,10 @@
 # CredStore SDK
 
-SDK crate for the CredStore module, providing public API contracts for credential storage in Gears.
+SDK crate for the CredStore gear, providing public API contracts for credential storage in Gears.
 
 ## Overview
 
-This crate defines the transport-agnostic interface for the CredStore module:
+This crate defines the transport-agnostic interface for the CredStore gear:
 
 - **`CredStoreClientV1`** — Async trait for consumers (get/put/delete secrets)
 - **`CredStorePluginClientV1`** — Async trait for backend storage plugin implementations

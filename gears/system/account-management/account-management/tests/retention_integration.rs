@@ -2,7 +2,7 @@
 //! database.
 //!
 //! These tests are **ignored by default** until the AM integration-test scaffold
-//! (real DB connection, migration runner, module initialisation) is in place.
+//! (real DB connection, migration runner, gear initialisation) is in place.
 //! See `feature-tenant-hierarchy-management.md` retention § for the test
 //! requirements and tracking issue for the scaffold.
 //!
@@ -25,7 +25,7 @@
 //!    sets (no double-processing).
 //!
 //! 4. **Default vs per-row retention window** — insert one row with
-//!    `retention_window_secs = NULL` (uses module default) and one with an
+//!    `retention_window_secs = NULL` (uses gear default) and one with an
 //!    explicit override. Assert each row becomes due at the correct wall-clock
 //!    time.
 //!

@@ -21,7 +21,7 @@
   - [5.2 Events and Audit](#52-events-and-audit)
   - [5.3 Multi-Backend Storage](#53-multi-backend-storage)
 - [6. Non-Functional Requirements](#6-non-functional-requirements)
-  - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
+  - [6.1 Gear-Specific NFRs](#61-gear-specific-nfrs)
   - [6.2 NFR Exclusions](#62-nfr-exclusions)
 - [7. Public Library Interfaces](#7-public-library-interfaces)
   - [7.1 Public API Surface](#71-public-api-surface)
@@ -45,23 +45,23 @@
 
 Simple Resource Registry is a universal, environment-agnostic CRUD storage layer for resource types that are too simple to justify their own Gear. It exposes a single, consistent API for creating, reading, updating, and deleting typed resources, using a fixed envelope (identity, ownership, timestamps) plus a flexible JSON payload validated against GTS type definitions. The registry is designed to run on any deployment target — edge devices (SQLite), cloud infrastructure (PostgreSQL, MariaDB), and enterprise on-premises environments — adapting its storage backend to the deployment constraints without changing the consumer-facing API.
 
-The module solves a recurring problem in modular SaaS platforms: many features need secure, schema-aware object storage with proper authorization (by tenant, owner/user, and resource type), but do not require the complexity of a full domain-specific service. Instead of building custom modules or relying on ad-hoc storage with inconsistent security and governance, one can use the Simple Resource Registry for cases such as simple objects storage, workflow-generated objects, projections of external system entities, partial models used for internal consistency, tenant-level configuration data, and auxiliary artifacts produced by agent execution.
+The gear solves a recurring problem in modular SaaS platforms: many features need secure, schema-aware object storage with proper authorization (by tenant, owner/user, and resource type), but do not require the complexity of a full domain-specific service. Instead of building custom gears or relying on ad-hoc storage with inconsistent security and governance, one can use the Simple Resource Registry for cases such as simple objects storage, workflow-generated objects, projections of external system entities, partial models used for internal consistency, tenant-level configuration data, and auxiliary artifacts produced by agent execution.
 
-This module is designed for lightweight structured data sets, on the order of up to ~1M items per resource type and ~100M total, and is not intended to serve as a general-purpose database for the entire platform.
+This gear is designed for lightweight structured data sets, on the order of up to ~1M items per resource type and ~100M total, and is not intended to serve as a general-purpose database for the entire platform.
 
 Optionally, the registry can emit lifecycle notification events (created, updated, deleted) for configured resource types, allowing these resources to participate directly in workflows and to act as workflow triggers.
 
 ### 1.2 Background / Problem Statement
 
-In a modular SaaS platform like Gears, first-class domain objects (chat messages, model definitions, events, settings, files) are managed by dedicated modules with rich APIs and domain-specific behavior. However, many resource types lack the complexity to justify a dedicated module — they need simple CRUD semantics with tenant isolation and standard governance hooks (audit, events).
+In a modular SaaS platform like Gears, first-class domain objects (chat messages, model definitions, events, settings, files) are managed by dedicated gears with rich APIs and domain-specific behavior. However, many resource types lack the complexity to justify a dedicated gear — they need simple CRUD semantics with tenant isolation and standard governance hooks (audit, events).
 
-Without a generic registry, teams face two poor choices: either build a new module for every simple resource type (high cost, code duplication) or store resources in ad-hoc locations (inconsistent APIs, missing security controls, no traceability). Simple Resource Registry eliminates this by providing a single, extensible storage layer that any module or workflow can use for structured data that conforms to a GTS-registered type.
+Without a generic registry, teams face two poor choices: either build a new gear for every simple resource type (high cost, code duplication) or store resources in ad-hoc locations (inconsistent APIs, missing security controls, no traceability). Simple Resource Registry eliminates this by providing a single, extensible storage layer that any gear or workflow can use for structured data that conforms to a GTS-registered type.
 
 The storage layer is abstracted behind a well-defined interface, allowing the same API to serve relational database-backed resources today and alternative backends (search engines, object stores) in the future, without changing consumers. Platform vendors can also implement their own storage backends to integrate with existing platform components that already store the appropriate resources, effectively using Simple Resource Registry as a unified API façade over heterogeneous storage systems. Multiple storage backends can coexist, with different resource types routed to different backends via configuration.
 
 ### 1.3 Goals (Business Outcomes)
 
-- Reduce time-to-ship for features that require simple resource storage from days to hours by eliminating the need for a dedicated module
+- Reduce time-to-ship for features that require simple resource storage from days to hours by eliminating the need for a dedicated gear
 - Provide a single, consistent CRUD API surface for generic resources across the platform
 - Validate resource payloads against GTS type definitions to ensure schema consistency and safe extensibility
 - Enforce tenant and owner isolation, authentication, and GTS-driven attribute-based access control (ABAC) uniformly for all registered resource types
@@ -104,15 +104,15 @@ The storage layer is abstracted behind a well-defined interface, allowing the sa
 
 ### 2.2 System Actors
 
-#### Consumer Module
+#### Consumer Gear
 
-**ID**: `cpt-cf-srr-actor-consumer-module`
+**ID**: `cpt-cf-srr-actor-consumer-gear`
 
 **Role**: Internal Gear that creates, reads, updates, or deletes resources via the SDK client (e.g., Workflows engine storing custom objects, Agent Runtime storing execution artifacts).
 
 ## 3. Operational Concept & Environment
 
-No module-specific environment constraints beyond project defaults. The module operates within the standard CF/Gears Toolkit lifecycle and uses the platform's shared database infrastructure.
+No gear-specific environment constraints beyond project defaults. The gear operates within the standard CF/Gears Toolkit lifecycle and uses the platform's shared database infrastructure.
 
 ## 4. Scope
 
@@ -127,8 +127,8 @@ No module-specific environment constraints beyond project defaults. The module o
 - GTS wildcard filtering on resource listing (trailing `*` per GTS spec)
 - Multi-backend storage architecture with interchangeable storage implementations; relational database as the default backend
 - Configurable per-resource-type event emission (created, updated, deleted) via Events Broker
-- Configurable per-resource-type audit event emission via Audit Module
-- SDK client for in-process consumption by other modules
+- Configurable per-resource-type audit event emission via Audit Gear
+- SDK client for in-process consumption by other gears
 - Soft-delete support via deleted_at timestamp
 - Configurable deleted resource retention with automatic purge of soft-deleted resources (default: 30 days, type-level override)
 - Dedicated search API with backend capability checks (`cpt-cf-srr-fr-search-api`)
@@ -150,7 +150,7 @@ No module-specific environment constraints beyond project defaults. The module o
 
 - Complex business logic or domain-specific validation beyond JSON Schema
 - Real-time streaming or SSE for resource changes (consumers use Events Broker for notifications)
-- File or binary attachment storage (use File Storage module)
+- File or binary attachment storage (use File Storage gear)
 - UI components or admin dashboards
 - Automatic resource soft-deletion based on TTL / auto-deletion retention (error-prone; must not be accidentally enabled)
 - OData `$select` field projection (not applicable — all schema fields and payload are always returned; the payload is an opaque JSON object whose structure varies by resource type)
@@ -169,24 +169,24 @@ The system **MUST** define a base GTS resource type schema with major-version-on
 - Behavioral traits: is_per_owner_resource, is_create_event_needed, is_delete_event_needed, is_update_event_needed, is_create_audit_event_needed, is_update_audit_event_needed, is_delete_audit_event_needed
 - Hard-delete retention configuration: deleted_resource_retention_days (integer or null; default 30 if null; 0 means immediate hard-delete on soft-delete)
 
-Platform users, API clients, and Gears can define derived types and register them using the Types Registry APIs. To access resources of a given type, the caller (module, user, or API client) must include the corresponding permissions for that type in its token claims.
+Platform users, API clients, and Gears can define derived types and register them using the Types Registry APIs. To access resources of a given type, the caller (gear, user, or API client) must include the corresponding permissions for that type in its token claims.
 
 **Rationale**: GTS type system ensures consistency, discoverability, and validation for all resource types. Embedding the deleted-resource retention policy in the type definition keeps it co-located with other behavioral configuration.
 
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-gear`
 
 #### Create Resource
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-fr-idempotent-resource-create`
 
-The system **MUST** allow authenticated users, modules, and API clients to create a new resource by specifying a resource `type` (a GTS type ID), a mandatory `idempotency_key` (UUID), and a JSON payload.
+The system **MUST** allow authenticated users, gears, and API clients to create a new resource by specifying a resource `type` (a GTS type ID), a mandatory `idempotency_key` (UUID), and a JSON payload.
 
 The storage plugin **MUST** atomically check for an existing `(tenant_id, owner_id, idempotency_key)` record and persist the resource + idempotency record in a single transaction. For per-owner resource types (`is_per_owner_resource=true`), `owner_id` is set from `SecurityContext.subject_id`; for non-per-owner types, a nil UUID is used so the effective scope reduces to `(tenant_id, idempotency_key)`. If a matching record exists and is within the retention window (default 24 h), the plugin returns `CreateOutcome::Duplicate` and the system **MUST** return 409 Conflict with the `id` of the previously created resource. Idempotency keys are scoped per tenant and owner — the same key used by different owners in the same tenant is independent for per-owner types. Idempotency deduplication is storage-backend-owned; callers must always supply a unique key (e.g., a UUID) per intended creation.
 
 Once the idempotency check passes, the system **MUST** assign a system-generated UUID (if not provided) as the resource `id`, set `tenant_id` from `SecurityContext.subject_tenant_id`, set `owner_id` from `SecurityContext.subject_id` (when `is_per_owner_resource=true`), and set `created_at` and `updated_at` timestamps. If the target resource type is per-owner (`is_per_owner_resource=true`) and `SecurityContext.subject_id` is absent, the system **MUST** return 422 Unprocessable Entity. The system **MUST** validate the payload against the derived GTS type's JSON Schema (using the `gts` crate) and return 422 Unprocessable Entity if validation fails.
 
 **Rationale**: Distributed consumers and workflow engines frequently retry failed HTTP requests. Without idempotency, retries after network failures create duplicate resources. The idempotency key lets callers safely retry POST requests without risk of double-creation.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-gear`
 
 #### Read Single Resource
 
@@ -195,7 +195,7 @@ Once the idempotency check passes, the system **MUST** assign a system-generated
 The system **MUST** allow authenticated users to retrieve a single resource by ID. All access checks — tenant scope, GTS type scope (from token claims), and owner_id scope (when `is_per_owner_resource=true`) — are applied as backend query filters. If the resource does not exist or is filtered out by any of these security filters, the system **MUST** return 404 Not Found. The caller cannot distinguish between "does not exist" and "not authorized" for individual resources.
 
 **Rationale**: Core functionality — consumers need to fetch individual resources.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-gear`
 
 #### List Resources
 
@@ -204,7 +204,7 @@ The system **MUST** allow authenticated users to retrieve a single resource by I
 The system **MUST** allow authenticated users to list resources filtered by resource `type` (a GTS type ID), with OData query support ($filter, $orderby) and cursor-based pagination (limit, cursor) on schema fields. All access checks — tenant scope, GTS type scope (from token claims), and owner_id scope (when `is_per_owner_resource=true`) — are applied as backend query filters. If the requested type filter does not intersect with the caller's permitted GTS types, the system **MUST** return 403 Forbidden. Otherwise, results are filtered at the backend level and an empty result set is a valid response (not an error).
 
 **Rationale**: Consumers need to discover and paginate through resources of a given type.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-gear`
 
 #### Update Resource
 
@@ -213,7 +213,7 @@ The system **MUST** allow authenticated users to list resources filtered by reso
 The system **MUST** allow authenticated users to update the payload of an existing resource. The system **MUST** update the updated_at timestamp. All access checks — tenant scope, GTS type scope (from token claims), and `owner_id` scope (when `is_per_owner_resource=true`) — are applied as backend query filters. If the resource does not exist or is filtered out by any of these security filters, the system **MUST** return 404 Not Found.
 
 **Rationale**: Core functionality — consumers need to modify resource data.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-gear`
 
 #### Delete Resource
 
@@ -222,7 +222,7 @@ The system **MUST** allow authenticated users to update the payload of an existi
 The system **MUST** allow authenticated users to soft-delete a resource by setting the deleted_at timestamp. All access checks — tenant scope, GTS type scope (from token claims), and `owner_id` scope (when `is_per_owner_resource=true`) — are applied as backend query filters. If the resource does not exist or is filtered out by any of these security filters, the system **MUST** return 404 Not Found. Soft-deleted resources **MUST** be excluded from list results by default.
 
 **Rationale**: Core functionality — consumers need to remove resources while maintaining audit trail.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-consumer-gear`
 
 #### Default Storage Backend
 
@@ -238,7 +238,7 @@ The system **MUST** ship with a default storage backend that uses a relational d
 
 The system **MUST** support OData $filter and $orderby operations, plus cursor-based pagination (limit, cursor) on schema fields (id, tenant_id, owner_id, type, created_at, updated_at, deleted_at). OData operations on payload fields are explicitly not supported. List responses **MUST** use the `items`/`page_info` envelope per DNA API guidelines.
 
-**Rationale**: Consumers need standard query capabilities for resource discovery and pagination without requiring module-specific code.
+**Rationale**: Consumers need standard query capabilities for resource discovery and pagination without requiring gear-specific code.
 **Actors**: `cpt-cf-srr-actor-api-client`, `cpt-cf-srr-actor-platform-user`
 
 #### GTS Type-Based Access Control
@@ -248,7 +248,7 @@ The system **MUST** support OData $filter and $orderby operations, plus cursor-b
 All CRUD operations (GET, POST, PUT, DELETE) **MUST** enforce GTS type-based access control using token `Permission` entries (`resource_pattern` + `action`, where action is `read`/`create`/`update`/`delete`). GTS wildcard matching rules apply: a permission with `resource_pattern` = `gts.cf.srr.resource.v1~acme.*` grants access to all derived types under the `acme` vendor namespace. For POST, if the requested resource `type` is not in scope, the system **MUST** return 403 Forbidden with error code `gts-type-not-in-scope`. For LIST, if the requested type filter has no intersection with the caller's permitted GTS types, the system **MUST** return 403 Forbidden with error code `gts-type-not-in-scope`. For individual resource operations (GET/PUT/DELETE), type scope is enforced via backend query filters (together with tenant and user filters), so out-of-scope resources are not returned and the API **MUST** return 404 Not Found.
 
 **Rationale**: Resources in the registry represent diverse data types with different sensitivity levels. GTS type-based access control ensures that API consumers can only operate on resource types explicitly granted in their token, preventing unauthorized access to resource families the consumer was not designed or approved to use.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-gear`
 
 #### GTS Wildcard Filtering on List
 
@@ -257,7 +257,7 @@ All CRUD operations (GET, POST, PUT, DELETE) **MUST** enforce GTS type-based acc
 The GET /resources list endpoint **MUST** support filtering by GTS type ID with trailing wildcard (`*`) per GTS spec section 10. The wildcard **MUST** appear only once, at the end of the pattern, and is greedy (matches through `~` chain separator). Example: `type eq 'gts.cf.srr.resource.v1~acme.*'` matches all derived types under the `acme` vendor. When a wildcard filter is used, the system **MUST** only return resources whose GTS types fall within the caller's permitted scope (intersection of wildcard query with token permissions).
 
 **Rationale**: Consumers often need to discover resources across a family of related types (e.g., all resources from a vendor namespace) without knowing every specific derived type.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-gear`
 
 #### GTS Type Existence Validation
 
@@ -266,7 +266,7 @@ The GET /resources list endpoint **MUST** support filtering by GTS type ID with 
 On POST (create) and any operation that references a resource `type` (a GTS type ID), the system **MUST** verify that the specified GTS type exists in the Types Registry. If the GTS type is not found, the system **MUST** return 400 Bad Request with appropriate error code and include the unresolved GTS type ID in the error response.
 
 **Rationale**: Prevents creation of orphaned resources with invalid type references and provides clear error feedback.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-gear`
 
 #### Deleted Resource Retention
 
@@ -275,7 +275,7 @@ On POST (create) and any operation that references a resource `type` (a GTS type
 The system **MUST** support configurable retention for soft-deleted resources. The default retention period is 30 days, but it must be configurable globally on service level. Individual resource types **MAY** override the default by specifying `deleted_resource_retention_days` in the GTS type definition. A value of 0 means immediate hard-delete upon soft-delete. A value of null inherits the system default (30 days). After the retention period expires, the system **MUST** permanently purge the resource from storage via a dedicated Jobs Manager job.
 
 **Rationale**: Soft-deleted resources accumulate storage over time. Configurable retention balances data recovery needs with storage efficiency while allowing type authors to define appropriate policies for their data.
-**Actors**: `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-consumer-gear`
 
 #### Batch Operations
 
@@ -288,7 +288,7 @@ The system **MUST** support batch CRUD operations on resources following the DNA
 All batch operations **MUST** return `207 Multi-Status` for partial success with per-item results (including `index`, HTTP `status`, `data` or RFC 9457 Problem Details `error`), per DNA BATCH.md conventions. Per-item `idempotency_key` **SHOULD** be supported for safe retries. All batch operations **MUST** enforce the same authentication, tenant scoping, GTS type-based access control, and behavioral flag evaluation as their single-resource counterparts. Batch size **MUST** be capped by a configurable limit (default: 100 items per request).
 
 **Rationale**: Consumers that manage related resources (workflow engines, data connectors, agent pipelines) frequently need to operate on multiple resources in a single logical operation. Batch endpoints reduce round-trip overhead and improve throughput for bulk workloads.
-**Actors**: `cpt-cf-srr-actor-consumer-module`, `cpt-cf-srr-actor-platform-user`
+**Actors**: `cpt-cf-srr-actor-consumer-gear`, `cpt-cf-srr-actor-platform-user`
 
 
 ### 5.2 Events and Audit
@@ -299,13 +299,13 @@ All batch operations **MUST** return `207 Multi-Status` for partial success with
 
 The system **MUST** emit domain events (resource.created, resource.updated, resource.deleted) to the Events Broker when the corresponding behavioral flags are enabled on the resource's GTS type definition. The event schema **MUST** include: `id` (event id), `type` (event type), `subject_type` (resource type), and `subject_id` (resource id). The event payload **MUST NOT** include the full resource payload to keep events lightweight.
 
-**Rationale**: Enables reactive integrations — other modules can respond to resource lifecycle changes without polling. Fixed event schema ensures consistent event handling across all resource types.
+**Rationale**: Enables reactive integrations — other gears can respond to resource lifecycle changes without polling. Fixed event schema ensures consistent event handling across all resource types.
 
 #### Audit Events
 
 - [ ] `p2` - **ID**: `cpt-cf-srr-fr-audit-events`
 
-The system **MUST** emit audit events for create, update, and delete operations to the Audit Module when the corresponding audit flags are enabled on the resource's GTS type definition or any of the parent GTS type. The audit event schema **MUST** be fixed and include: `id` (event id), `type` (event type), `subject_type` (resource type), `subject_id` (resource id), previous resource payload (null for create), and new resource payload (null for delete). This enables full audit trail reconstruction.
+The system **MUST** emit audit events for create, update, and delete operations to the Audit Gear when the corresponding audit flags are enabled on the resource's GTS type definition or any of the parent GTS type. The audit event schema **MUST** be fixed and include: `id` (event id), `type` (event type), `subject_type` (resource type), `subject_id` (resource id), previous resource payload (null for create), and new resource payload (null for delete). This enables full audit trail reconstruction.
 
 **Rationale**: Compliance and traceability requirements demand auditable resource operations with complete before/after state for change tracking.
 
@@ -336,7 +336,7 @@ The system **MUST** support configuration-level routing that maps GTS resource t
 The system **MUST** support logical grouping of resources into resource groups. A resource group is identified by a UUID and associated with a tenant. Resources **MAY** belong to zero, one or many resource groups. Resource groups enable batch operations (e.g., delete all resources in a group), lifecycle management (e.g., auto-delete a group when a parent workflow completes), and organizational queries (e.g., list all resources in a group).
 
 **Rationale**: Many use cases produce multiple related resources (workflow steps, agent execution artifacts) that share a lifecycle. Resource groups provide a first-class mechanism for managing these collections without requiring consumer-side tracking.
-**Actors**: `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-consumer-gear`
 
 #### Resource Search API
 
@@ -348,11 +348,11 @@ The system **MUST** provide a dedicated search API endpoint (POST /resources:sea
 - Pagination and result ranking
 
 **Rationale**: Full-text search within JSON payloads is not feasible with OData on relational databases. A dedicated search API enables consumers to leverage search-capable plugins (e.g., ElasticSearch) when available, while providing clear error feedback when the feature is unavailable for a given resource type.
-**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-module`
+**Actors**: `cpt-cf-srr-actor-platform-user`, `cpt-cf-srr-actor-consumer-gear`
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Single-Resource Read Latency
 
@@ -361,7 +361,7 @@ The system **MUST** provide a dedicated search API endpoint (POST /resources:sea
 Single-resource GET operations **MUST** respond within 50ms at p95 under normal load (stricter than project default due to registry being a frequently called building block).
 
 **Threshold**: 50ms p95 for single-resource reads
-**Rationale**: The registry serves as a data access primitive for other modules and workflows; high latency compounds across dependent operations.
+**Rationale**: The registry serves as a data access primitive for other gears and workflows; high latency compounds across dependent operations.
 **Architecture Allocation**: See DESIGN.md section "NFR Allocation"
 
 #### Payload Size Limit
@@ -386,7 +386,7 @@ The system **MUST** support storing up to 100 million total resources across all
 
 ### 6.2 NFR Exclusions
 
-- **Real-time streaming**: Not applicable because the module does not expose SSE or WebSocket endpoints; consumers use Events Broker for change notifications.
+- **Real-time streaming**: Not applicable because the gear does not expose SSE or WebSocket endpoints; consumers use Events Broker for change notifications.
 
 ## 7. Public Library Interfaces
 
@@ -430,7 +430,7 @@ The system **MUST** support storing up to 100 million total resources across all
 **Event Schema**: Fixed schema with `id`, `type` (event type), `subject_type` (resource type), `subject_id` (resource id)
 **Compatibility**: Event schema is stable; backward-compatible additions only
 
-#### Audit Module Contract
+#### Audit Gear Contract
 
 - [ ] `p2` - **ID**: `cpt-cf-srr-contract-audit`
 
@@ -445,7 +445,7 @@ The system **MUST** support storing up to 100 million total resources across all
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-usecase-reflect-external`
 
-**Actor**: `cpt-cf-srr-actor-consumer-module`
+**Actor**: `cpt-cf-srr-actor-consumer-gear`
 
 **Preconditions**:
 - Data connector has fetched metadata about an external resource
@@ -454,7 +454,7 @@ The system **MUST** support storing up to 100 million total resources across all
 **Main Flow**:
 1. Data connector creates a resource entry representing the external object
 2. System stores the partial representation with appropriate GTS type
-3. Other modules query the registry to discover available external resources
+3. Other gears query the registry to discover available external resources
 
 **Postconditions**:
 - External resource representation is queryable within the platform
@@ -481,7 +481,7 @@ The system **MUST** support storing up to 100 million total resources across all
 
 - [ ] `p2` - **ID**: `cpt-cf-srr-usecase-store-workflow-object`
 
-**Actor**: `cpt-cf-srr-actor-consumer-module`
+**Actor**: `cpt-cf-srr-actor-consumer-gear`
 
 **Preconditions**:
 - Workflow engine has a derived GTS resource type registered for its output objects
@@ -535,7 +535,7 @@ The system **MUST** support storing up to 100 million total resources across all
 |------------|-------------|-----------|
 | Types Registry | GTS type definitions for resource schemas and behavioral flags | `cpt-cf-srr-fr-gts-type-registration`, `cpt-cf-srr-fr-gts-type-validation` |
 | Events Broker | Domain event emission for resource lifecycle | `cpt-cf-srr-fr-notification-events` |
-| Audit Module | Audit event emission for compliance | `cpt-cf-srr-fr-audit-events` |
+| Audit Gear | Audit event emission for compliance | `cpt-cf-srr-fr-audit-events` |
 | gts-rust crate | GTS library for schema ID generation, validation, and wildcard matching (`GtsID`, `GtsWildcard`) | `cpt-cf-srr-fr-gts-type-registration`, `cpt-cf-srr-fr-gts-wildcard-filtering` |
 
 ## 11. Assumptions
@@ -551,7 +551,7 @@ The system **MUST** support storing up to 100 million total resources across all
 |------|--------|------------|
 | Default storage backend may not scale beyond 100M resources | Query performance degrades as resource count grows | Per-resource-type routing (`cpt-cf-srr-fr-storage-routing`) enables dedicated storage backends for high-volume types; storage optimization is a per-backend concern |
 | Uncontrolled payload sizes impact database performance | Storage costs and query latency increase | Enforce 64 KB payload limit; guide consumers toward File Storage for large data |
-| GTS type definition changes after resources exist | Existing resources may not validate against updated schema | Schema evolution and validation are enforced by the Types Registry module; the registry relies on Types Registry for schema validation at creation time |
+| GTS type definition changes after resources exist | Existing resources may not validate against updated schema | Schema evolution and validation are enforced by the Types Registry gear; the registry relies on Types Registry for schema validation at creation time |
 | Over-reliance on JSON payload queries despite explicit exclusion | Consumers may expect full-text or JSON path queries on payload | Clear documentation; search API (`cpt-cf-srr-fr-search-api`) with search-capable backends for search-heavy use cases |
 | Background purge process misses resources under high churn | Soft-deleted or TTL-expired resources accumulate beyond retention window | Purge process runs periodically with batch-size limits; alerting on purge backlog |
 | GTS type-based access control creates permission management overhead | Administrators must manage per-type permissions for each consumer | Support GTS wildcard patterns in permissions (e.g., `gts.cf.srr.resource.v1~acme.*`) to grant access to type families |

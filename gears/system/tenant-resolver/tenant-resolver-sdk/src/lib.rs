@@ -1,6 +1,6 @@
 //! Tenant Resolver SDK
 //!
-//! This crate provides the public API for the `tenant-resolver` module:
+//! This crate provides the public API for the `tenant-resolver` gear:
 //!
 //! - [`TenantResolverClient`] - Public API trait for consumers
 //! - [`TenantResolverPluginClient`] - Plugin API trait for implementations

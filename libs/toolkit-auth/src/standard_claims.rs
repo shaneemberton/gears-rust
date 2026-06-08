@@ -1,6 +1,6 @@
 //! Standard JWT claim names as defined in RFC 7519.
 //!
-//! This module provides type-safe constants for standard JWT claim names,
+//! This gear provides type-safe constants for standard JWT claim names,
 //! reducing the risk of typos and providing a central place for claim name definitions.
 //!
 //! # References

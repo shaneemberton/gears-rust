@@ -2,7 +2,7 @@
 
 **Source:** Consistency review of `DESIGN.md` against `PRD.md`
 **Date:** 2026-01-21
-**Updated:** 2026-05-14 (renumbered ADR-2–7 → ADR-3–8 after ADR-0002 JSON-RPC/MCP was written; then ADR-3–8 → ADR-5–10 after ADR-0003 Workflow DSL and ADR-0004 Temporal Workflow Engine were written; then ADR-5–10 → ADR-6–11 after ADR-0005 Thin Host Module, Fat Runtime Plugins was written)
+**Updated:** 2026-05-14 (renumbered ADR-2–7 → ADR-3–8 after ADR-0002 JSON-RPC/MCP was written; then ADR-3–8 → ADR-5–10 after ADR-0003 Workflow DSL and ADR-0004 Temporal Workflow Engine were written; then ADR-5–10 → ADR-6–11 after ADR-0005 Thin Host Gear, Fat Runtime Plugins was written)
 
 ---
 
@@ -69,7 +69,7 @@
 > **ADR-0002** (`0002-cpt-cf-serverless-runtime-adr-jsonrpc-mcp-protocol-surfaces-v1.md`) has been written and covers JSON-RPC 2.0 and MCP protocol surfaces (BR-209–212).
 > **ADR-0003** (`0003-cpt-cf-serverless-runtime-adr-workflow-dsl.md`) has been written and adopts the Serverless Workflow Specification as the workflow DSL.
 > **ADR-0004** (`0004-cpt-cf-serverless-runtime-adr-temporal-workflow-engine.md`) has been written and selects Temporal as the durable execution backend.
-> **ADR-0005** (`0005-cpt-cf-serverless-runtime-adr-thin-host.md`) has been written and commits to a thin host module with fat runtime plugins (rejecting the PR 1279 three-tier orchestrator boundary).
+> **ADR-0005** (`0005-cpt-cf-serverless-runtime-adr-thin-host.md`) has been written and commits to a thin host gear with fat runtime plugins (rejecting the PR 1279 three-tier orchestrator boundary).
 > The ADRs below are renumbered accordingly.
 
 ### ADR-2 (Completed): JSON-RPC/MCP Protocol Surfaces
@@ -84,7 +84,7 @@ See [ADR-0003](ADR/0003-cpt-cf-serverless-runtime-adr-workflow-dsl.md).
 
 See [ADR-0004](ADR/0004-cpt-cf-serverless-runtime-adr-temporal-workflow-engine.md).
 
-### ADR-5 (Completed): Thin Host Module, Fat Runtime Plugins
+### ADR-5 (Completed): Thin Host Gear, Fat Runtime Plugins
 
 See [ADR-0005](ADR/0005-cpt-cf-serverless-runtime-adr-thin-host.md).
 

@@ -71,7 +71,7 @@ See [PRD.md](./PRD.md) section 1 "Overview" — Key Problems Solved:
 | `cpt-cf-llm-gateway-fr-budget-enforcement-v1` | Quota Manager check_quota + Usage Tracker report_usage (AI credits) |
 | `cpt-cf-llm-gateway-fr-rate-limiting-v1` | Distributed rate limiter |
 | `cpt-cf-llm-gateway-fr-batch-processing-v1` | Provider batch API abstraction |
-| `cpt-cf-llm-gateway-fr-audit-events-v1` | Audit Module event emission |
+| `cpt-cf-llm-gateway-fr-audit-events-v1` | Audit Gear event emission |
 | `cpt-cf-llm-gateway-fr-request-traceability-v1` | Response `id` propagated as correlation ID; `provider_request_id` captured in usage/error events |
 
 #### NFR Allocation
@@ -81,7 +81,7 @@ See [PRD.md](./PRD.md) section 1 "Overview" — Key Problems Solved:
 | `cpt-cf-llm-gateway-nfr-scalability-v1` | Horizontal scaling without per-instance coordination | `cpt-cf-llm-gateway-component-application-layer` | Stateless request processing; async/batch job state in shared DB accessible by any instance | Load test: N instances serve concurrent requests; job polling works cross-instance after restart |
 | `cpt-cf-llm-gateway-nfr-data-retention-v1` | TTL-based lifecycle for job/batch records | `cpt-cf-llm-gateway-component-application-layer` (background purge task), `cpt-cf-llm-gateway-db-persistence` | `expires_at` column on `jobs` and `batches` tables; background purge task deletes rows where `expires_at < now()` | DB audit: no row older than max TTL after purge cycle; purge task execution observable via structured logs |
 | `cpt-cf-llm-gateway-nfr-recovery-v1` | Restart survivability for in-flight async jobs | `cpt-cf-llm-gateway-component-application-layer`, `cpt-cf-llm-gateway-db-persistence` | Native async: `provider_job_id` persisted before returning to consumer; polling resumes after restart (RPO: 0). Simulated async: marked `failed` on restart to prevent unauthorized token spending | Restart test: native jobs resume polling; simulated jobs returned as `failed` with appropriate error |
-| `cpt-cf-llm-gateway-nfr-compatibility-v1` | API backward compatibility within major version | `cpt-cf-llm-gateway-component-api-layer` | Additive-only changes within major version; inter-module communication via SDK traits only (no internal type coupling) | Regression test suite runs on each release; breaking changes require major version bump |
+| `cpt-cf-llm-gateway-nfr-compatibility-v1` | API backward compatibility within major version | `cpt-cf-llm-gateway-component-api-layer` | Additive-only changes within major version; inter-gear communication via SDK traits only (no internal type coupling) | Regression test suite runs on each release; breaking changes require major version bump |
 | `cpt-cf-llm-gateway-nfr-observability-v1` | OpenTelemetry operational metrics for request lifecycle | `cpt-cf-llm-gateway-component-application-layer` | Counters and histograms emitted at key processing points (request completion, fallback, stream abort, hook block, budget ops, schema validation, TTFT); labels bounded to enumerable dimensions | Metrics endpoint returns expected metric names; integration test triggers each metric and verifies counter increment / histogram observation |
 
 #### Key ADRs
@@ -107,7 +107,7 @@ graph LR
     GW -->|SDK| TR[Type Registry]
     GW -->|SDK| QM[Quota Manager]
     GW -->|SDK| UT[Usage Tracker SDK]
-    GW -->|SDK| AM[Audit Module]
+    GW -->|SDK| AM[Audit Gear]
 ```
 
 | Layer | Responsibility | Technology |
@@ -303,7 +303,7 @@ graph TB
     App --> HP[Hook Plugin]
     App --> QM[Quota Manager]
     App --> UT[Usage Tracker]
-    App --> AM[Audit Module]
+    App --> AM[Audit Gear]
     App --> Adapters[Provider Adapters]
     Adapters --> OB[Outbound API GW]
     OB --> Provider
@@ -331,8 +331,8 @@ graph TB
  - [ ] `p1` - **ID**: `cpt-cf-llm-gateway-component-usage-tracker`
    - Usage Tracker
    - AI credit consumption reporting (tokens converted to credits via Model Registry prices). Usage Tracker SDK handles guaranteed at-least-once delivery
- - [ ] `p4` - **ID**: `cpt-cf-llm-gateway-component-audit-module`
-   - Audit Module
+ - [ ] `p4` - **ID**: `cpt-cf-llm-gateway-component-audit-gear`
+   - Audit Gear
    - Compliance event logging
 
 **Interactions**:
@@ -588,7 +588,7 @@ The Hook Plugin interface is defined in `llm-gateway-sdk` as a plugin client tra
 
 **Plugin discovery and selection**:
 
-- LLM Gateway registers the GTS plugin schema (`gts.cf.toolkit.plugins.plugin.v1~cf.llmgw.hook_plugin.v1~`) during module `init()`.
+- LLM Gateway registers the GTS plugin schema (`gts.cf.toolkit.plugins.plugin.v1~cf.llmgw.hook_plugin.v1~`) during gear `init()`.
 - Each hook plugin registers a GTS instance and scoped client under a stable instance ID of the form `gts.cf.toolkit.plugins.plugin.v1~cf.llmgw.hook_plugin.v1~<vendor>.<pkg>.hook_plugin.v1`.
 - Gateway uses `choose_plugin_instance` to select the plugin matching the configured vendor with the lowest priority value.
 - Plugin unavailability (client not found after resolution) causes the request to fail with a `hook_unavailable` error — hooks are not bypassed silently.
@@ -598,7 +598,7 @@ The Hook Plugin interface is defined in `llm-gateway-sdk` as a plugin client tra
 - Both `pre_request` and `post_response` calls are subject to a configurable timeout enforced by the Gateway (not by the plugin itself).
 - `pre_request` timeout: the request fails with a `hook_timeout` error returned to the consumer. The timed-out plugin call is cancelled.
 - `post_response` timeout: a warning is logged but the response is not affected — `post_response` is observe-only, and the response has already been delivered to the consumer by the time `post_response` runs. The timed-out plugin call is cancelled.
-- The timeout value is configured per-module (not per-plugin) and applies uniformly to all hook plugin invocations.
+- The timeout value is configured per-gear (not per-plugin) and applies uniformly to all hook plugin invocations.
 
 ### 3.4 Interactions & Sequences
 
@@ -1357,7 +1357,7 @@ Stores batch job metadata and individual request results. Same retention policy 
 
 ### 3.6 Observability Metrics
 
-Gateway emits the following OpenTelemetry metrics (NFR `cpt-cf-llm-gateway-nfr-observability-v1`). All metrics use the `llm_gateway_` prefix and are registered via the platform's metrics infrastructure at module startup.
+Gateway emits the following OpenTelemetry metrics (NFR `cpt-cf-llm-gateway-nfr-observability-v1`). All metrics use the `llm_gateway_` prefix and are registered via the platform's metrics infrastructure at gear startup.
 
 #### Counters
 
@@ -1397,7 +1397,7 @@ Per `cpt-cf-llm-gateway-fr-request-traceability-v1`, the response `id` (gateway 
 
 - **Usage events** reported to Usage Tracker — enables correlation between gateway request and provider-side billing/logs
 - **Error events** — enables troubleshooting with the provider using their request ID
-- **Audit events** emitted via Audit Module — enables compliance tracing of the full request lifecycle
+- **Audit events** emitted via Audit Gear — enables compliance tracing of the full request lifecycle
 - **Structured logs** — all log entries within a request processing pipeline include the response `id`; `provider_request_id` is logged after provider response is received
 
 These identifiers are not used as metric labels (unbounded cardinality).
@@ -1406,7 +1406,7 @@ These identifiers are not used as metric labels (unbounded cardinality).
 
 ### 4.1 Quality Attribute Coverage
 
-The following quality attribute domains are addressed at the platform level or explicitly scoped out for this module.
+The following quality attribute domains are addressed at the platform level or explicitly scoped out for this gear.
 
 #### Performance
 
@@ -1426,15 +1426,15 @@ Gateway owns persistent database tables for async/batch job records (see section
 
 #### Integration
 
-Gateway integrates with external LLM providers exclusively through Outbound API Gateway (constraint `cpt-cf-llm-gateway-constraint-outbound-dependency`). Integration patterns are synchronous (REST) for standard requests, SSE for streaming, and WebSocket for realtime audio. Internal module communication uses ToolKit SDK traits via ClientHub (Model Registry, Type Registry, FileStorage, Quota Manager, Usage Tracker, Audit Module).
+Gateway integrates with external LLM providers exclusively through Outbound API Gateway (constraint `cpt-cf-llm-gateway-constraint-outbound-dependency`). Integration patterns are synchronous (REST) for standard requests, SSE for streaming, and WebSocket for realtime audio. Internal gear communication uses ToolKit SDK traits via ClientHub (Model Registry, Type Registry, FileStorage, Quota Manager, Usage Tracker, Audit Gear).
 
 #### Operations
 
-Infrastructure concerns (deployment, health checks, distributed tracing) are handled by the Gears middleware. Gateway defines module-level OpenTelemetry metrics (section 3.6) covering request lifecycle, provider interactions, fallback events, streaming state, hook actions, budget operations, schema validation outcomes, and time-to-first-token latency (NFR `cpt-cf-llm-gateway-nfr-observability-v1`). Structured audit events are emitted via the Audit Module (`cpt-cf-llm-gateway-fr-audit-events-v1`).
+Infrastructure concerns (deployment, health checks, distributed tracing) are handled by the Gears middleware. Gateway defines gear-level OpenTelemetry metrics (section 3.6) covering request lifecycle, provider interactions, fallback events, streaming state, hook actions, budget operations, schema validation outcomes, and time-to-first-token latency (NFR `cpt-cf-llm-gateway-nfr-observability-v1`). Structured audit events are emitted via the Audit Gear (`cpt-cf-llm-gateway-fr-audit-events-v1`).
 
 #### Maintainability
 
-Gateway follows the standard ToolKit module pattern (two-crate SDK pattern, DDD-light layers). Provider adapters are isolated behind a common trait, enabling addition of new providers without modifying core logic. Extension points: hook plugins for pre/post processing, tool type extensions via GTS Type Registry.
+Gateway follows the standard ToolKit gear pattern (two-crate SDK pattern, DDD-light layers). Provider adapters are isolated behind a common trait, enabling addition of new providers without modifying core logic. Extension points: hook plugins for pre/post processing, tool type extensions via GTS Type Registry.
 
 #### Testing
 

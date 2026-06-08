@@ -1,7 +1,7 @@
 //! Settings SDK
 //!
-//! This crate provides the public API for the settings module:
-//! - `SimpleUserSettingsClientV1` trait for inter-module communication
+//! This crate provides the public API for the settings gear:
+//! - `SimpleUserSettingsClientV1` trait for inter-gear communication
 //! - Model types (`SimpleUserSettings`, `SimpleUserSettingsPatch`)
 //!
 //! Trait methods return `Result<_, CanonicalError>` — this SDK is the

@@ -8,7 +8,7 @@
 //! ## Configuration
 //!
 //! ```yaml
-//! modules:
+//! gears:
 //!   static_authz_plugin:
 //!     config:
 //!       vendor: "constructorfabric"
@@ -18,6 +18,6 @@
 
 pub mod config;
 pub mod domain;
-pub mod module;
+pub mod gear;
 
-pub use module::StaticAuthZPlugin;
+pub use gear::StaticAuthZPlugin;

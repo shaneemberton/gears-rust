@@ -59,7 +59,7 @@
 
 ## Goal
 
-Use **GTS (Global Type System)** to define extensible, globally unique, and evolvable data structures — especially where runtime extension is required without database migrations, for example for plugins, API integrations, vendor-specific metadata, and cross-module contracts.
+Use **GTS (Global Type System)** to define extensible, globally unique, and evolvable data structures — especially where runtime extension is required without database migrations, for example for plugins, API integrations, vendor-specific metadata, and cross-gear contracts.
 
 ## Review Entry Points
 
@@ -84,11 +84,11 @@ GTS brings the following capabilities to Gears:
 9. **GTS Registry** — GTS Type Schemas and well-known Instances indexed by GTS Identifier for discovery, validation, compatibility checking, and plugin resolution
 10. **Types and well-known instances** — GTS distinguishes between type definitions (schemas that describe structure) and well-known instances (canonical, named objects of a given type); types end with `~`, instances do not — enabling a single naming system for both contracts and their predefined values. This is especially valuable for discriminator fields and former "const enum" style values: use well-known instances instead of raw strings when values need discoverability, descriptions, authorization semantics, or vendor extensibility.
 
-Gears that offer extension points define **base GTS types** with a stable core schema. Derived types specialize the base by adding context-specific fields — typically metadata, payload, params, or properties. At the database level, the module stores base-type fields in dedicated columns (indexed, queryable) and the extension field as a `JSONB` column. This pattern allows new data-type variants to appear at runtime or compile time **without changing the database schema or existing APIs**.
+Gears that offer extension points define **base GTS types** with a stable core schema. Derived types specialize the base by adding context-specific fields — typically metadata, payload, params, or properties. At the database level, the gear stores base-type fields in dedicated columns (indexed, queryable) and the extension field as a `JSONB` column. This pattern allows new data-type variants to appear at runtime or compile time **without changing the database schema or existing APIs**.
 
 Examples of extendable types: event schemas, resource types, plugin specifications, user settings categories, permission definitions, licenseable features, model lifecycle statuses, function/workflow contracts, and AI model provider types. All of these can be extended to carry meaningful additional metadata or payload.
 
-**Proper GTS naming is critical.** Because GTS identifiers are used in wildcard-based access-control policies, audit logs, and cross-module references, a well-structured naming hierarchy enables security rules like `gts.cf.core.events.type.v1~acme.*` — restricting vendor Acme to reading only their own events — while a broader `gts.cf.core.events.type.v1~*` policy grants platform clients and integrations access to all vendors' events. Poor naming collapses this hierarchy and forces explicit per-vendor lists, which are fragile and risk leaking one vendor's sensitive data to another.
+**Proper GTS naming is critical.** Because GTS identifiers are used in wildcard-based access-control policies, audit logs, and cross-gear references, a well-structured naming hierarchy enables security rules like `gts.cf.core.events.type.v1~acme.*` — restricting vendor Acme to reading only their own events — while a broader `gts.cf.core.events.type.v1~*` policy grants platform clients and integrations access to all vendors' events. Poor naming collapses this hierarchy and forces explicit per-vendor lists, which are fragile and risk leaking one vendor's sensitive data to another.
 
 ---
 
@@ -111,7 +111,7 @@ Use GTS when you identify:
 - Function/workflow definitions and error types
 - Configurable entity metadata
 - Credential store backend types
-- Any domain object that needs cross-module identity with schema validation
+- Any domain object that needs cross-gear identity with schema validation
 
 **Avoid GTS for:**
 - Fully stable, closed schemas that will never be extended
@@ -221,7 +221,7 @@ Anonymous instances are runtime-created objects (DB rows, events, messages) wher
 }
 ```
 
-Modules may support combined notation for anonymous instances by appending the UUID after the final `~`:
+Gears may support combined notation for anonymous instances by appending the UUID after the final `~`:
 
 ```text
 gts.cf.core.oagw.upstream.v1~7a1d2f34-5678-49ab-9012-abcdef123456
@@ -334,7 +334,7 @@ Use a **type** when you are defining a schema that objects conform to. Use a **w
 
 ## 5. Hybrid Storage Pattern — Base Fields + Extension Fields
 
-This is the core database pattern that GTS enables. A module stores base-type fields in dedicated, indexed columns and the extension field (driven by derived types) as a `JSONB` column. New derived types appear without DDL changes.
+This is the core database pattern that GTS enables. A gear stores base-type fields in dedicated, indexed columns and the extension field (driven by derived types) as a `JSONB` column. New derived types appear without DDL changes.
 
 ### 5.1 GTS Type Storage — UUID, Not Strings
 
@@ -347,7 +347,7 @@ let type_uuid = gts::GtsID::new("gts.cf.core.events.type.v1~")?.to_uuid();
 ```
 
 **Why UUIDs instead of strings:**
-- **Renaming/aliasing safety** — if a GTS identifier is aliased or renamed, the canonical UUID remains the foreign key; modules that store type references by UUID are unaffected
+- **Renaming/aliasing safety** — if a GTS identifier is aliased or renamed, the canonical UUID remains the foreign key; gears that store type references by UUID are unaffected
 - **Predictable, fixed storage** — UUID is always 16 bytes; GTS strings can be up to 1024 characters and vary in length, making index sizing unpredictable
 - **Efficient joins and indexes** — UUID comparisons are faster than variable-length text comparisons
 - **No LIKE-based queries** — type hierarchy queries use the GTS Registry (which resolves GTS relationships), not text pattern matching
@@ -537,7 +537,7 @@ Using `String` bypasses structural validation and makes the origin of the value 
 ### 6.2 Defining a Derived Type (Plugin Spec)
 
 ```rust
-// modules/credstore/credstore-sdk/src/gts.rs
+// gears/credstore/credstore-sdk/src/gts.rs
 use gts_macros::struct_to_gts_schema;
 use toolkit::gts::BaseToolkitPluginV1;
 
@@ -565,8 +565,8 @@ The `base = BaseToolkitPluginV1` links this derived type to its base. The `type_
 ### 6.3 Registering a Plugin Instance
 
 ```rust
-// In a plugin module's init() method
-async fn init(&self, ctx: &ModuleCtx) -> anyhow::Result<()> {
+// In a plugin gear's init() method
+async fn init(&self, ctx: &GearCtx) -> anyhow::Result<()> {
     // Generate the well-known instance ID
     let instance_id = CredStorePluginSpecV1::gts_make_instance_id(
         "cf.builtin.default_credstore.plugin.v1"
@@ -603,7 +603,7 @@ async fn init(&self, ctx: &ModuleCtx) -> anyhow::Result<()> {
 
 ### 6.4 Defining GTS Constants
 
-For well-known types and instances, define constants in a dedicated `gts_helpers` module:
+For well-known types and instances, define constants in a dedicated `gts_helpers` gear:
 
 ```rust
 // gears/system/oagw/oagw/src/domain/gts_helpers.rs
@@ -708,7 +708,7 @@ quota_check failed: enforcement=hard
 quota_check failed: enforcement=gts.cf.qe.quota.enforcement.v1~cf.qe.quota.enforcement.hard.v1
 ```
 
-Benefits: grep is unambiguous; RFC 9457 Problem bodies point directly to the registry entry; cross-service correlation uses the same URI without a field-name mapping table; two modules logging a field named `type` have no collision because the URI prefix carries the domain.
+Benefits: grep is unambiguous; RFC 9457 Problem bodies point directly to the registry entry; cross-service correlation uses the same URI without a field-name mapping table; two gears logging a field named `type` have no collision because the URI prefix carries the domain.
 
 **6. Vendor and plugin extensions without forking.**
 
@@ -1058,7 +1058,7 @@ Types that **must not be extended**. No derived types are allowed.
 ## 12. Gears GTS Conventions
 
 1. **Vendor prefix**: all Constructor Fabric- defined base types use `cf` as vendor (include the Gears types)
-2. **SDK placement**: GTS type definitions live in `<module>-sdk/src/gts.rs`
+2. **SDK placement**: GTS type definitions live in `<gear>-sdk/src/gts.rs`
 3. **Schema generation**: use `#[struct_to_gts_schema]` macro — do not maintain schemas by hand
 4. **Constants**: well-known GTS identifiers are defined as `const` strings in `domain/gts_helpers.rs` or `gts.rs`
 5. **Registration**: plugins register GTS instances in the GTS Registry during `init()`
@@ -1084,7 +1084,7 @@ When reviewing a PRD, focus on whether the product requirements create an extens
 - Whether the PRD distinguishes clearly between a **type definition** and a **runtime instance**
 - Whether new discriminator values, provider types, statuses, or policies are expected to appear without API or DB breaking changes
 - Whether authorization, routing, or business behavior depends on a value that is currently described as a raw string enum
-- Whether the requirement expects cross-module discoverability, auditability, or registry lookup
+- Whether the requirement expects cross-gear discoverability, auditability, or registry lookup
 
 **Strong PRD signals that GTS is needed:**
 - "Third parties can add new kinds"

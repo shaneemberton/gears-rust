@@ -22,7 +22,7 @@ use crate::infra::sdk_error_mapping::account_management_error_to_canonical;
 /// Run a `DomainError` through the production pipeline. For variants
 /// that travel via the SDK boundary this is the two-step
 /// `DomainError → AccountManagementError → CanonicalError`; for the
-/// `IntegrityCheckInProgress` bypass (not part of the inter-module
+/// `IntegrityCheckInProgress` bypass (not part of the inter-gear
 /// SDK contract) the `From<DomainError> for CanonicalError` impl
 /// short-circuits directly to the canonical envelope.
 fn round_trip(d: DomainError) -> CanonicalError {

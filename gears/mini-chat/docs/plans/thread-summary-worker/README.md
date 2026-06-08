@@ -19,7 +19,7 @@ The infrastructure stubs already exist:
    `(created_at ASC, id ASC)`. A migration is needed to add the `created_at` component.
 
 2. **`ThreadSummaryHandler`** — P1 stub at `src/infra/workers/thread_summary_worker.rs`
-   that returns `Retry` for all messages. Registered in `module.rs` on the
+   that returns `Retry` for all messages. Registered in `gear.rs` on the
    `mini-chat.thread_summary` queue with decoupled strategy.
 
 3. **`ThreadSummaryRepository`** — trait at `src/domain/repos/thread_summary_repo.rs` with
@@ -40,7 +40,7 @@ The infrastructure stubs already exist:
 
 ## Architecture Decisions
 
-- **Outbox-driven, no module-local polling** — per DESIGN.md MUST. Uses the shared
+- **Outbox-driven, no gear-local polling** — per DESIGN.md MUST. Uses the shared
   transactional outbox. No leader election, no second worker state machine.
 
 - **System task isolation** — thread summary is a `requester_type=system` task. It MUST NOT

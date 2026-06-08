@@ -7,7 +7,7 @@
 //! the eventual REST surface live on `account_management_sdk` and are
 //! not duplicated here.
 //!
-//! What stays in this module:
+//! What stays in this gear:
 //!
 //! * [`ConversionStatus`] — internal 5-variant lifecycle
 //!   (`pending`, `approved`, `cancelled`, `rejected`, `expired`).

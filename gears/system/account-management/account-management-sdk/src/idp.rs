@@ -211,7 +211,7 @@ impl IdpProvisionResult {
 
 /// Failure discriminant for `provision_tenant`.
 ///
-/// See module docs for compensation semantics.
+/// See gear docs for compensation semantics.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum IdpProvisionFailure {
@@ -397,13 +397,13 @@ impl core::error::Error for IdpDeprovisionFailure {}
 /// AM-internal system context minted by one of the per-site
 /// factories in `cf-gears-account-management::domain::system_actor`
 /// (`for_bootstrap` / `for_provisioning_reaper` / `for_retention_sweep`
-/// / `for_user_cleanup` / `for_user_groups_cascade` / `for_module_init`);
+/// / `for_user_cleanup` / `for_user_groups_cascade` / `for_gear_init`);
 /// the plugin sees `subject_type = "am.system"` and a fixed,
 /// hand-picked `subject_id` stable across processes, which it MAY use
 /// to switch
 /// to a system credstore path. This is an AM-local convention, not a
-/// platform-wide standard — other modules calling external services
-/// in background flows MAY adopt their own (`<module>_system_context`)
+/// platform-wide standard — other gears calling external services
+/// in background flows MAY adopt their own (`<gear>_system_context`)
 /// pending a `toolkit-security` canonical helper.
 ///
 /// # Retry, backoff, and rate-limiting are owned by the plugin
@@ -462,7 +462,7 @@ impl core::error::Error for IdpDeprovisionFailure {}
 /// # `ClientHub` registration
 ///
 /// Plugins register themselves in `ClientHub` as
-/// `Arc<dyn IdpPluginClient>`; AM's module entry-point
+/// `Arc<dyn IdpPluginClient>`; AM's gear entry-point
 /// resolves the plugin via
 /// `ctx.client_hub().get::<dyn IdpPluginClient>()` and
 /// falls back to a noop provisioner when no plugin is registered (dev

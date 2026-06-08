@@ -174,7 +174,7 @@ impl TypeSpec {
 /// Each step runs the full idempotent algorithm independently
 /// ([`register_one`]): `get_type` → classify-or-create → on
 /// `TypeAlreadyExists` race re-read and classify. A step that lands
-/// on `DivergentSchema` aborts the pair; the caller (`module init`)
+/// on `DivergentSchema` aborts the pair; the caller (`gear init`)
 /// surfaces the error and does NOT signal ready.
 ///
 /// # Self-parent rule patched as a follow-up `update_type`
@@ -192,8 +192,8 @@ impl TypeSpec {
 /// follow-up patch is idempotent: a prior init that already wrote
 /// the self-parent rule sees the rule re-set to the same values.
 ///
-/// Called during `AccountManagementModule::init`. On success the
-/// module may proceed to signal ready.
+/// Called during `AccountManagementGear::init`. On success the
+/// gear may proceed to signal ready.
 pub async fn register_user_group_types(
     client: &Arc<dyn ResourceGroupClient + Send + Sync>,
     ctx: &SecurityContext,

@@ -18,7 +18,7 @@ pub enum SecurityContextBuildError {
 /// `SecurityContext` encapsulates the security-related information for a request or operation.
 ///
 /// Built by the `AuthN` Resolver during authentication and passed through the request lifecycle.
-/// Modules use this context together with the `AuthZ` Resolver to obtain access scopes.
+/// Gears use this context together with the `AuthZ` Resolver to obtain access scopes.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecurityContext {
     /// Subject ID — the authenticated user, service, or system making the request.

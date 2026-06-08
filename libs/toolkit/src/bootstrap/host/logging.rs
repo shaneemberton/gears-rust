@@ -721,7 +721,7 @@ mod tests {
             router.resolve_for("cf-gears").is_some(),
             "exact target should match"
         );
-        // Submodule match
+        // Subgear match
         assert!(
             router.resolve_for("cf-gears::sub").is_some(),
             "submodule target should match"
@@ -751,7 +751,7 @@ mod tests {
 
         // Unknown target should fall back to default
         let mut handle = router
-            .resolve_for("unknown_crate::module")
+            .resolve_for("unknown_crate::gear")
             .expect("should fall back to default");
         handle.write_all(b"fallback\n").unwrap();
         handle.flush().unwrap();

@@ -6,7 +6,7 @@
 //! `oagw/src/domain/gts_helpers.rs`. Proc macros cannot resolve constants,
 //! so the impl-side `#[resource_error]` attribute must still pass the
 //! literal string. The `resource_type_strings_have_expected_shape` test in
-//! this module asserts the SDK constants stay well-formed; the round-trip
+//! this gear asserts the SDK constants stay well-formed; the round-trip
 //! tests in [`crate::error`] pin each constant to the wire by constructing
 //! a `CanonicalError` through it and asserting it lands in the `Problem`
 //! body unchanged.

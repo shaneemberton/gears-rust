@@ -125,11 +125,11 @@ async fn concurrent_stops_are_safe() {
 async fn external_cancellation_is_linked_through_withlifecycle() {
     // WithLifecycle should link external token to internal cancel
     let runnable = Arc::new(Tick);
-    let module = WithLifecycle::new(Arc::try_unwrap(runnable).ok().unwrap());
+    let gear = WithLifecycle::new(Arc::try_unwrap(runnable).ok().unwrap());
     let external = CancellationToken::new();
-    module.start(external.clone()).await.unwrap();
+    gear.start(external.clone()).await.unwrap();
     // Cancel externally and expect graceful stop
     external.cancel();
-    module.stop(CancellationToken::new()).await.unwrap();
-    assert_eq!(module.status(), Status::Stopped);
+    gear.stop(CancellationToken::new()).await.unwrap();
+    assert_eq!(gear.status(), Status::Stopped);
 }

@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use super::log_forwarder::{StreamKind, spawn_stream_forwarder};
-use super::{BackendKind, InstanceHandle, ModuleRuntimeBackend, OopModuleConfig};
+use super::{BackendKind, GearRuntimeBackend, InstanceHandle, OopGearConfig};
 
 /// Grace period before force-killing processes on shutdown
 const SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(5);
@@ -85,10 +85,10 @@ async fn stop_child_with_grace(
     let pid = child.id();
     let sent = send_terminate_signal(child);
 
-    // Log with module context if termination signal failed
+    // Log with gear context if termination signal failed
     if !sent && pid.is_some() {
         tracing::debug!(
-            module = %handle.module,
+            gear =  %handle.gear,
             instance_id = %handle.instance_id,
             pid = ?pid,
             "{context}: graceful termination not available, will force kill"
@@ -96,7 +96,7 @@ async fn stop_child_with_grace(
     }
 
     tracing::debug!(
-        module = %handle.module,
+        gear =  %handle.gear,
         instance_id = %handle.instance_id,
         pid = ?pid,
         graceful = sent,
@@ -106,7 +106,7 @@ async fn stop_child_with_grace(
     match tokio::time::timeout(grace, child.wait()).await {
         Ok(Ok(status)) => {
             tracing::debug!(
-                module = %handle.module,
+                gear =  %handle.gear,
                 instance_id = %handle.instance_id,
                 status = ?status,
                 "{context}: process exited gracefully"
@@ -114,7 +114,7 @@ async fn stop_child_with_grace(
         }
         Ok(Err(e)) => {
             tracing::warn!(
-                module = %handle.module,
+                gear =  %handle.gear,
                 instance_id = %handle.instance_id,
                 error = %e,
                 "{context}: failed to wait for process"
@@ -122,13 +122,13 @@ async fn stop_child_with_grace(
         }
         Err(_) => {
             tracing::debug!(
-                module = %handle.module,
+                gear =  %handle.gear,
                 instance_id = %handle.instance_id,
                 "{context}: grace period expired, force killing"
             );
             if let Err(e) = child.kill().await {
                 tracing::warn!(
-                    module = %handle.module,
+                    gear =  %handle.gear,
                     instance_id = %handle.instance_id,
                     error = %e,
                     "{context}: failed to force kill"
@@ -141,7 +141,7 @@ async fn stop_child_with_grace(
 /// Wait for a log forwarder task to finish with timeout.
 async fn wait_forwarder(
     handle: Option<JoinHandle<()>>,
-    module: &str,
+    gear: &str,
     instance_id: uuid::Uuid,
     stream: &str,
 ) {
@@ -150,14 +150,14 @@ async fn wait_forwarder(
         Ok(Ok(())) => {}
         Ok(Err(e)) => {
             if e.is_panic() {
-                tracing::warn!(module, %instance_id, stream, error = %e, "log forwarder task panicked");
+                tracing::warn!(gear, %instance_id, stream, error = %e, "log forwarder task panicked");
             } else {
-                tracing::warn!(module, %instance_id, stream, error = %e, "log forwarder task cancelled");
+                tracing::warn!(gear, %instance_id, stream, error = %e, "log forwarder task cancelled");
             }
         }
         Err(_) => {
             tracing::warn!(
-                module,
+                gear,
                 %instance_id,
                 stream,
                 timeout_ms = FORWARDER_DRAIN_TIMEOUT.as_millis(),
@@ -180,7 +180,7 @@ struct LocalInstance {
 /// Map key type for instances - uses Uuid directly
 type InstanceMap = HashMap<Uuid, LocalInstance>;
 
-/// Backend that spawns modules as local child processes and manages their lifecycle.
+/// Backend that spawns gears as local child processes and manages their lifecycle.
 ///
 /// When the cancellation token is triggered, the backend will:
 /// 1. Send termination signal to all processes (SIGTERM on Unix, `TerminateProcess` on Windows)
@@ -224,7 +224,7 @@ impl LocalProcessBackend {
             return;
         }
 
-        tracing::info!(count = all_instances.len(), "Stopping OoP module processes");
+        tracing::info!(count = all_instances.len(), "Stopping OoP gear processes");
 
         // Stop all processes with grace period
         for inst in &mut all_instances {
@@ -241,27 +241,27 @@ impl LocalProcessBackend {
         for inst in all_instances {
             wait_forwarder(
                 inst.stdout_forwarder,
-                &inst.handle.module,
+                &inst.handle.gear,
                 inst.handle.instance_id,
                 "stdout",
             )
             .await;
             wait_forwarder(
                 inst.stderr_forwarder,
-                &inst.handle.module,
+                &inst.handle.gear,
                 inst.handle.instance_id,
                 "stderr",
             )
             .await;
         }
 
-        tracing::info!("All OoP module processes stopped");
+        tracing::info!("All OoP gear processes stopped");
     }
 }
 
 #[async_trait]
-impl ModuleRuntimeBackend for LocalProcessBackend {
-    async fn spawn_instance(&self, cfg: &OopModuleConfig) -> Result<InstanceHandle> {
+impl GearRuntimeBackend for LocalProcessBackend {
+    async fn spawn_instance(&self, cfg: &OopGearConfig) -> Result<InstanceHandle> {
         // Verify backend kind
         if cfg.backend != BackendKind::LocalProcess {
             bail!(
@@ -295,7 +295,7 @@ impl ModuleRuntimeBackend for LocalProcessBackend {
                 cmd.current_dir(path);
             } else {
                 tracing::warn!(
-                    module = %cfg.name,
+                    gear =  %cfg.name,
                     working_dir = %working_dir,
                     "Working directory does not exist or is not a directory, using current dir"
                 );
@@ -311,12 +311,12 @@ impl ModuleRuntimeBackend for LocalProcessBackend {
         let pid = child.id();
 
         // Spawn log forwarder tasks for stdout/stderr with cancellation support
-        let module_name = cfg.name.clone();
+        let gear_name = cfg.name.clone();
         let cancel = self.cancel.clone();
         let stdout_forwarder = child.stdout.take().map(|stdout| {
             spawn_stream_forwarder(
                 stdout,
-                module_name.clone(),
+                gear_name.clone(),
                 instance_id,
                 cancel.clone(),
                 StreamKind::Stdout,
@@ -325,7 +325,7 @@ impl ModuleRuntimeBackend for LocalProcessBackend {
         let stderr_forwarder = child.stderr.take().map(|stderr| {
             spawn_stream_forwarder(
                 stderr,
-                module_name.clone(),
+                gear_name.clone(),
                 instance_id,
                 cancel.clone(),
                 StreamKind::Stderr,
@@ -333,15 +333,15 @@ impl ModuleRuntimeBackend for LocalProcessBackend {
         });
 
         tracing::info!(
-            module = %cfg.name,
+            gear =  %cfg.name,
             instance_id = %instance_id,
             pid = ?pid,
-            "Spawned OoP module with log forwarding"
+            "Spawned OoP gear with log forwarding"
         );
 
         // Create handle
         let handle = InstanceHandle {
-            module: cfg.name.clone(),
+            gear: cfg.name.clone(),
             instance_id,
             backend: BackendKind::LocalProcess,
             pid,
@@ -384,7 +384,7 @@ impl ModuleRuntimeBackend for LocalProcessBackend {
             // shutdown_all_instances handles draining for global shutdown
         } else {
             tracing::debug!(
-                module = %handle.module,
+                gear =  %handle.gear,
                 instance_id = %handle.instance_id,
                 "stop_instance called for unknown instance, ignoring"
             );
@@ -393,12 +393,12 @@ impl ModuleRuntimeBackend for LocalProcessBackend {
         Ok(())
     }
 
-    async fn list_instances(&self, module: &str) -> Result<Vec<InstanceHandle>> {
+    async fn list_instances(&self, gear: &str) -> Result<Vec<InstanceHandle>> {
         let instances = self.instances.read();
 
         let result = instances
             .values()
-            .filter(|inst| inst.handle.module == module)
+            .filter(|inst| inst.handle.gear == gear)
             .map(|inst| inst.handle.clone())
             .collect();
 
@@ -419,7 +419,7 @@ mod tests {
     #[tokio::test]
     async fn test_spawn_instance_requires_binary() {
         let backend = test_backend();
-        let cfg = OopModuleConfig::new("test_module", BackendKind::LocalProcess);
+        let cfg = OopGearConfig::new("test_gear", BackendKind::LocalProcess);
 
         let result = backend.spawn_instance(&cfg).await;
         assert!(result.is_err());
@@ -434,7 +434,7 @@ mod tests {
     #[tokio::test]
     async fn test_spawn_instance_requires_correct_backend() {
         let backend = test_backend();
-        let mut cfg = OopModuleConfig::new("test_module", BackendKind::K8s);
+        let mut cfg = OopGearConfig::new("test_gear", BackendKind::K8s);
         cfg.binary = Some(PathBuf::from("/bin/echo"));
 
         let result = backend.spawn_instance(&cfg).await;
@@ -452,7 +452,7 @@ mod tests {
         let backend = test_backend();
 
         // Create config with a valid binary that exists on most systems
-        let mut cfg = OopModuleConfig::new("test_module", BackendKind::LocalProcess);
+        let mut cfg = OopGearConfig::new("test_gear", BackendKind::LocalProcess);
 
         // Use a simple command that exists cross-platform
         #[cfg(windows)]
@@ -469,17 +469,17 @@ mod tests {
             .await
             .expect("should spawn instance");
 
-        assert_eq!(handle.module, "test_module");
+        assert_eq!(handle.gear, "test_gear");
         assert!(!handle.instance_id.is_nil());
         assert_eq!(handle.backend, BackendKind::LocalProcess);
 
         // List instances
         let instances = backend
-            .list_instances("test_module")
+            .list_instances("test_gear")
             .await
             .expect("should list instances");
         assert_eq!(instances.len(), 1);
-        assert_eq!(instances[0].module, "test_module");
+        assert_eq!(instances[0].gear, "test_gear");
         assert_eq!(instances[0].instance_id, handle.instance_id);
 
         // Stop instance
@@ -490,14 +490,14 @@ mod tests {
 
         // Verify it's removed
         let instances = backend
-            .list_instances("test_module")
+            .list_instances("test_gear")
             .await
             .expect("should list instances");
         assert_eq!(instances.len(), 0);
     }
 
     #[tokio::test]
-    async fn test_list_instances_filters_by_module() {
+    async fn test_list_instances_filters_by_gear() {
         let backend = test_backend();
 
         #[cfg(windows)]
@@ -505,41 +505,41 @@ mod tests {
         #[cfg(not(windows))]
         let binary = PathBuf::from("/bin/sleep");
 
-        // Spawn instance for module_a
-        let mut cfg_a = OopModuleConfig::new("module_a", BackendKind::LocalProcess);
+        // Spawn instance for gear_a
+        let mut cfg_a = OopGearConfig::new("gear_a", BackendKind::LocalProcess);
         cfg_a.binary = Some(binary.clone());
         cfg_a.args = vec!["10".to_owned()];
 
         let handle_a = backend
             .spawn_instance(&cfg_a)
             .await
-            .expect("should spawn module_a");
+            .expect("should spawn gear_a");
 
-        // Spawn instance for module_b
-        let mut cfg_b = OopModuleConfig::new("module_b", BackendKind::LocalProcess);
+        // Spawn instance for gear_b
+        let mut cfg_b = OopGearConfig::new("gear_b", BackendKind::LocalProcess);
         cfg_b.binary = Some(binary);
         cfg_b.args = vec!["10".to_owned()];
 
         let handle_b = backend
             .spawn_instance(&cfg_b)
             .await
-            .expect("should spawn module_b");
+            .expect("should spawn gear_b");
 
-        // List module_a instances
+        // List gear_a instances
         let instances_a = backend
-            .list_instances("module_a")
+            .list_instances("gear_a")
             .await
-            .expect("should list module_a");
+            .expect("should list gear_a");
         assert_eq!(instances_a.len(), 1);
-        assert_eq!(instances_a[0].module, "module_a");
+        assert_eq!(instances_a[0].gear, "gear_a");
 
-        // List module_b instances
+        // List gear_b instances
         let instances_b = backend
-            .list_instances("module_b")
+            .list_instances("gear_b")
             .await
-            .expect("should list module_b");
+            .expect("should list gear_b");
         assert_eq!(instances_b.len(), 1);
-        assert_eq!(instances_b[0].module, "module_b");
+        assert_eq!(instances_b[0].gear, "gear_b");
 
         // Clean up
         backend.stop_instance(&handle_a).await.ok();
@@ -550,7 +550,7 @@ mod tests {
     async fn test_stop_nonexistent_instance() {
         let backend = test_backend();
         let handle = InstanceHandle {
-            module: "test_module".to_owned(),
+            gear: "test_gear".to_owned(),
             instance_id: Uuid::new_v4(),
             backend: BackendKind::LocalProcess,
             pid: None,
@@ -566,7 +566,7 @@ mod tests {
     async fn test_list_instances_empty() {
         let backend = test_backend();
         let instances = backend
-            .list_instances("nonexistent_module")
+            .list_instances("nonexistent_gear")
             .await
             .expect("should list instances");
         assert_eq!(instances.len(), 0);

@@ -8,7 +8,7 @@ decision-makers: Constructor Fabric Steering Committee
 
 ## Context and Problem Statement
 
-ToolKit modules and core libraries (notably `toolkit-auth`) must call internal vendor services and identity endpoints (OAuth2 token endpoints, OIDC discovery, JWKS). The HTTP stack must support strict dependency hygiene (especially avoiding `reqwest` in security-critical or footprint-sensitive crates), consistent middleware composition (timeouts, retries, concurrency, OpenTelemetry), and predictable behavior across Windows/Linux/macOS and Kubernetes environments.
+ToolKit gears and core libraries (notably `toolkit-auth`) must call internal vendor services and identity endpoints (OAuth2 token endpoints, OIDC discovery, JWKS). The HTTP stack must support strict dependency hygiene (especially avoiding `reqwest` in security-critical or footprint-sensitive crates), consistent middleware composition (timeouts, retries, concurrency, OpenTelemetry), and predictable behavior across Windows/Linux/macOS and Kubernetes environments.
 
 The key question is: should ToolKit rely on a general-purpose client like `reqwest::Client`, expose a thin wrapper over `hyper::Client`, or ship a first-party HTTP client abstraction that is built on `hyper + tower` and tuned for ToolKit’s security and DX requirements?
 
@@ -40,7 +40,7 @@ Chosen option: "Build a first-party `toolkit-http` client based on `hyper + towe
 
 * Good, because `toolkit-auth` stays independent of `reqwest` and its transitive graph, while still having a production-grade HTTP stack.
 * Good, because tower layer composability makes it straightforward to add cross-cutting concerns (e.g., an OAuth token injection layer, OTel tracing, custom header propagation) directly into the service stack — something that requires external workarounds with `reqwest`.
-* Good, because we can standardize behavior across modules (timeouts, retries, concurrency limits, body limits, OTel) and review it once.
+* Good, because we can standardize behavior across gears (timeouts, retries, concurrency limits, body limits, OTel) and review it once.
 * Good, because the client can be made `Clone + Send + Sync` for ergonomic sharing, while internal mechanics handle tower's `&mut self` requirements.
 * Good, because the implementation already ships transparent response decompression (gzip, brotli, deflate) and secure redirect following with SSRF protection, covering the most needed "batteries" without pulling in `reqwest`.
 * Bad, because we assume ownership of HTTP client behavior, correctness, and long-term maintenance (even with a limited surface).
@@ -57,13 +57,13 @@ Chosen option: "Build a first-party `toolkit-http` client based on `hyper + towe
   * Retry policy behavior (only on retryable errors and configured methods)
   * JWKS fetch path uses the shared client and surfaces correct errors
 * Dependency checks confirm `toolkit-auth` has no `reqwest` dependency (direct/transitive).
-* Code review checklist verifies no module code introduces ad-hoc HTTP policies or raw hyper usage bypassing `toolkit-http`.
+* Code review checklist verifies no gears code introduces ad-hoc HTTP policies or raw hyper usage bypassing `toolkit-http`.
 
 ## Pros and Cons of the Options
 
 ### Build a first-party `toolkit-http` client (hyper + tower)
 
-A small, opinionated internal HTTP client crate used by ToolKit libraries and modules. Uses `hyper` for transport and `tower` for middleware. Exposes a constrained API (`get`, `post`, `post_form`, body readers, JSON parsing) and a builder for policy defaults. Designed to be `Clone + Send + Sync` by construction.
+A small, opinionated internal HTTP client crate used by ToolKit libraries and Gears. Uses `hyper` for transport and `tower` for middleware. Exposes a constrained API (`get`, `post`, `post_form`, body readers, JSON parsing) and a builder for policy defaults. Designed to be `Clone + Send + Sync` by construction.
 
 * Good, because it meets the reqwest exclusion constraint for `toolkit-auth`.
 * Good, because it composes naturally with tower layers used elsewhere (OTel, auth headers, retries, limits) — adding a new layer (e.g., OAuth token injection, request signing) is a standard `impl Layer<S>` without wrapping or forking the client.

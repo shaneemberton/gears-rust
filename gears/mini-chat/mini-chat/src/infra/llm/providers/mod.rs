@@ -69,7 +69,7 @@ pub fn create_provider(
 ///
 /// Lives next to [`create_provider`] so that adapter-specific wire-protocol
 /// requirements (e.g. the `anthropic-version` header) stay in the providers
-/// module. The OAGW provisioning layer applies the result generically and
+/// gear. The OAGW provisioning layer applies the result generically and
 /// never branches on `kind` itself.
 ///
 /// Returns `None` when the adapter has no protocol-level header requirements

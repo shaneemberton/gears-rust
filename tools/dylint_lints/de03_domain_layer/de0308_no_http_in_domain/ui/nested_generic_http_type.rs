@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/domain/service.rs
+// simulated_dir=/cf-gears/gears/some_gear/domain/service.rs
 #![feature(register_tool)]
 #![register_tool(dylint)]
 #![allow(dead_code)]

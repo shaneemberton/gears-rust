@@ -1,6 +1,6 @@
 //! `AuthZ` Resolver SDK
 //!
-//! This crate provides the public API for the `authz_resolver` module:
+//! This crate provides the public API for the `authz_resolver` gear:
 //!
 //! - [`AuthZResolverClient`] - Public API trait for consumers
 //! - [`AuthZResolverPluginClient`] - Plugin API trait for implementations

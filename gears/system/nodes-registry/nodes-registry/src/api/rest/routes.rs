@@ -9,7 +9,7 @@ use crate::domain::service::Service;
 
 const API_TAG: &str = "Nodes Registry";
 
-/// Register all REST routes for the nodes registry module
+/// Register all REST routes for the nodes registry gear
 pub fn register_routes(
     mut router: Router,
     openapi: &dyn OpenApiRegistry,

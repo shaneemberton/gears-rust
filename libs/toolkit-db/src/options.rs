@@ -249,7 +249,7 @@ pub mod sqlite_pragma {
 
 /// Build a database handle from configuration (internal).
 ///
-/// This is an internal entry point used by `DbManager` / runtime wiring. Module code must
+/// This is an internal entry point used by `DbManager` / runtime wiring. Gear code must
 /// never observe `DbHandle`; it should use `Db` or `DBProvider<E>` only.
 ///
 /// # Errors

@@ -1,7 +1,7 @@
-//! Public models for the `oagw` module.
+//! Public models for the `oagw` gear.
 //!
 //! These are transport-agnostic data structures that define the contract
-//! between the `oagw` module and its consumers. No serde derives —
+//! between the `oagw` gear and its consumers. No serde derives —
 //! serialization concerns belong to the REST layer.
 
 use std::collections::HashMap;

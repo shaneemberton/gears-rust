@@ -46,7 +46,7 @@ tracing = { workspace = true }
 # Secrets
 secrecy = { workspace = true }
 
-# Required by toolkit::module macro
+# Required by toolkit::gear macro
 inventory = { workspace = true }
 
 [dev-dependencies]

@@ -116,8 +116,8 @@ The choice depends on the application's tenant structure, resource organization,
 |----------------|-----------------|----------|--------------|--------------|
 | `tenant_hierarchy` | tenant_closure ✅ | **No** | `in_tenant_subtree` predicate | Domain services |
 | (none) | ❌ | **Yes** | `eq`/`in` or decision only | Domain services |
-| `group_hierarchy` _(Phase 2 — planned)_ | resource_group_closure + resource_group_membership ✅ | **No** | `in_group_subtree` predicate | RG module only |
-| `group_membership` _(Phase 2 — planned)_ | resource_group_membership ✅ | **No** | `in_group` predicate | RG module only |
+| `group_hierarchy` _(Phase 2 — planned)_ | resource_group_closure + resource_group_membership ✅ | **No** | `in_group_subtree` predicate | RG gear only |
+| `group_membership` _(Phase 2 — planned)_ | resource_group_membership ✅ | **No** | `in_group` predicate | RG gear only |
 | (none for groups) | ❌ | **Yes** | explicit resource IDs via `in` | Domain services |
 
 **Note:** `group_membership` and `group_hierarchy` capabilities require the `resource_group_membership` table. This table is expected to be 10×+ larger than other projections. By default, domain services operate in the "(none for groups)" row — PDP resolves group memberships into explicit resource IDs. See [below](#resource_group_membership--when-to-project) for guidance on when projection is warranted.
@@ -168,7 +168,7 @@ This works well for simple paginated listing. However, when the query includes f
 
 **For domain services (default):** PDP resolves group memberships and returns explicit resource IDs via `in` predicates (capability degradation). No local membership table is needed.
 
-**Within the RG module:** `in_group` and `in_group_subtree` predicates use membership natively for efficient SQL subqueries.
+**Within the RG gear:** `in_group` and `in_group_subtree` predicates use membership natively for efficient SQL subqueries.
 
 ### When to Use `resource_group_closure`
 
@@ -189,7 +189,7 @@ This works well for simple paginated listing. However, when the query includes f
 | Project-based SaaS (flat tenants + projects) | ❌ | ✅ | ❌ |
 | Complex SaaS (hierarchy + nested projects) | ✅ | ✅ | ✅ |
 
-> **Note:** Rows that use `group_membership` or `group_closure` describe RG-module / monolith reference deployments where the `resource_group_membership` table is co-located with the domain service. Domain services in separate deployments do **not** project `resource_group_membership` (too large at scale). For those cases, PDP resolves group memberships and returns explicit resource IDs via `in` predicates (capability degradation) — the domain service remains in the top row regardless of group usage.
+> **Note:** Rows that use `group_membership` or `group_closure` describe RG-gear / monolith reference deployments where the `resource_group_membership` table is co-located with the domain service. Domain services in separate deployments do **not** project `resource_group_membership` (too large at scale). For those cases, PDP resolves group memberships and returns explicit resource IDs via `in` predicates (capability degradation) — the domain service remains in the top row regardless of group usage.
 
 ---
 
@@ -1022,7 +1022,7 @@ WHERE id = 'task456-uuid'
 >
 > All group-based constraints also include a tenant predicate on the resource (typically `eq` on `owner_tenant_id`) as defense in depth, ensuring tenant isolation at the resource level.
 >
-> **Important — projection architecture:** `resource_group_membership` grows as `M_resources × N_groups_per_resource` and is expected to be 10×+ larger than hierarchy tables. Project it only when profiling confirms the two-request pattern is unacceptable (see [When to Project](#resource_group_membership--when-to-project)). `in_group`/`in_group_subtree` predicates require this table and are only executable when it is present in the PEP's database (RG module, monolith with shared DB, or an explicit projection). By default, domain services rely on PDP capability degradation — PDP resolves group memberships internally and returns degraded predicates: explicit resource IDs via `in`, or `eq` for point operations. Scenarios S14–S17 below are reference patterns (require membership table); S18–S19 are the standard domain service patterns.
+> **Important — projection architecture:** `resource_group_membership` grows as `M_resources × N_groups_per_resource` and is expected to be 10×+ larger than hierarchy tables. Project it only when profiling confirms the two-request pattern is unacceptable (see [When to Project](#resource_group_membership--when-to-project)). `in_group`/`in_group_subtree` predicates require this table and are only executable when it is present in the PEP's database (RG gear, monolith with shared DB, or an explicit projection). By default, domain services rely on PDP capability degradation — PDP resolves group memberships internally and returns degraded predicates: explicit resource IDs via `in`, or `eq` for point operations. Scenarios S14–S17 below are reference patterns (require membership table); S18–S19 are the standard domain service patterns.
 
 ---
 
@@ -1032,7 +1032,7 @@ WHERE id = 'task456-uuid'
 
 User has access to specific projects (flat group membership, no hierarchy).
 
-> **Reference pattern:** This scenario requires `resource_group_membership` in the PEP's database. Since membership projection is not recommended for domain services, this pattern typically applies within the RG module or in monolith deployments with a shared database. For the standard domain service pattern, see S19.
+> **Reference pattern:** This scenario requires `resource_group_membership` in the PEP's database. Since membership projection is not recommended for domain services, this pattern typically applies within the RG gear or in monolith deployments with a shared database. For the standard domain service pattern, see S19.
 
 **Request:**
 ```http
@@ -1108,7 +1108,7 @@ WHERE owner_tenant_id = 'T1-uuid'
 
 User has access to a project folder and all its subfolders.
 
-> **Reference pattern:** This scenario requires both `resource_group_closure` and `resource_group_membership` in the PEP's database. Since membership projection is not recommended for domain services, this pattern typically applies within the RG module or in monolith deployments with a shared database. For the standard domain service pattern, see S19.
+> **Reference pattern:** This scenario requires both `resource_group_closure` and `resource_group_membership` in the PEP's database. Since membership projection is not recommended for domain services, this pattern typically applies within the RG gear or in monolith deployments with a shared database. For the standard domain service pattern, see S19.
 
 **Request:**
 ```http
@@ -1668,7 +1668,7 @@ WHERE owner_tenant_id IN (
 **Projection tables used:**
 - `tenant_closure` — resolves tenant subtree (T1 and all descendants)
 
-**Note:** PDP resolves group hierarchy (via closure) and group membership internally. The domain service only receives degraded `in` predicates with explicit resource IDs. For the equivalent pattern within the RG module (using all three tables natively), see S15.
+**Note:** PDP resolves group hierarchy (via closure) and group membership internally. The domain service only receives degraded `in` predicates with explicit resource IDs. For the equivalent pattern within the RG gear (using all three tables natively), see S15.
 
 ---
 

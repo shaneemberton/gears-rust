@@ -1,4 +1,4 @@
-//! Unit tests for the `tr_plugin` module.
+//! Unit tests for the `tr_plugin` gear.
 //!
 //! Each test builds a fresh in-memory `FakePort` (a pure-Rust
 //! `TenantHierarchyReadPort` backed by two `HashMap`s) and exercises
@@ -1472,8 +1472,8 @@ async fn is_ancestor_not_affected_by_registry_failure() {
 
 // ── Tests: ClientHub wiring contract ─────────────────────────────────────
 
-/// Pins the in-process registration shape `Module::init` uses on the
-/// `tr_plugin.enabled = true` branch (see `module.rs` near
+/// Pins the in-process registration shape `Gear::init` uses on the
+/// `tr_plugin.enabled = true` branch (see `gear.rs` near
 /// "tenant-resolver plugin registered (in-process, AM-co-located)"):
 ///
 /// 1. The plugin is built as `Arc<PluginImpl>` and erased to
@@ -1501,7 +1501,7 @@ async fn client_hub_round_trip_resolves_registered_plugin() {
     let port = setup();
     let root = seed_root(&port, ACTIVE);
 
-    // Same instance-id derivation as `Module::init`; mirror the literal
+    // Same instance-id derivation as `Gear::init`; mirror the literal
     // so a rename of the AM-builtin segment trips this test instead of
     // silently flipping TR-gateway selection.
     let instance_id = TenantResolverPluginSpecV1::gts_make_instance_id(
@@ -1533,7 +1533,7 @@ async fn client_hub_round_trip_resolves_registered_plugin() {
 
 /// Negative twin: a fresh `ClientHub` with no registration must miss
 /// the same scoped lookup, surfacing `ScopedNotFound`. This pins that
-/// the `enabled = false` branch of `Module::init` -- which intentionally
+/// the `enabled = false` branch of `Gear::init` -- which intentionally
 /// skips both the types-registry advertise and the `register_scoped`
 /// call -- leaves the hub clean from the TR gateway's perspective, so
 /// AM does not accidentally win selection when an operator opts out.

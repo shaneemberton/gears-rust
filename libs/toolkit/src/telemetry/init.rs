@@ -1,6 +1,6 @@
 //! OpenTelemetry tracing initialization utilities
 //!
-//! This module sets up OpenTelemetry tracing and exports spans via OTLP
+//! This gear sets up OpenTelemetry tracing and exports spans via OTLP
 //! (gRPC or HTTP) to collectors such as Jaeger, Uptrace, or the `OTel` Collector.
 
 #[cfg(feature = "otel")]

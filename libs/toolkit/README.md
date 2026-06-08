@@ -1,22 +1,22 @@
 # ToolKit
 
-Declarative module system and common runtime utilities used across CF/Gears.
+Declarative gear system and common runtime utilities used across CF/Gears.
 
 ## Overview
 
 The `cf-gears-toolkit` crate provides:
 
-- Module registration and lifecycle (inventory-based discovery)
+- Gear registration and lifecycle (inventory-based discovery)
 - `ClientHub` for typed in-process clients
 - REST/OpenAPI helpers (`OperationBuilder`, `OpenApiRegistry`, RFC-9457 `Problem`)
-- Runtime helpers (module registry/manager, lifecycle helpers)
+- Runtime helpers (gear registry/manager, lifecycle helpers)
 
 ## Features
 
 - **`db` (default)**: Enables DB integration (depends on `cf-gears-toolkit-db`), including:
   - `DatabaseCapability` (migrations contract)
   - `DbOptions::Manager` (runtime DB manager support)
-  - DB handle resolution in `ModuleCtx` / `ModuleContextBuilder`
+  - DB handle resolution in `GearCtx` / `GearContextBuilder`
 
 ### Build without DB
 

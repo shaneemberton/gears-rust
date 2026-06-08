@@ -315,7 +315,7 @@ fn build_x963_from_sec1_with_curve(
 /// Fail-closed if `publicKey` is absent (RFC 5915 marks it OPTIONAL, but
 /// standard tooling always emits it; missing publicKey would force us
 /// to derive Q = d·G outside the FIPS boundary, which we refuse — see
-/// module docs and ADR 0004).
+/// gear docs and ADR 0004).
 fn assemble_x963(
     key: &EcPrivateKey<'_>,
     curve: EcCurve,

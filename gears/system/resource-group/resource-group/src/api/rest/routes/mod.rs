@@ -4,7 +4,7 @@
 //! REST API route definitions using `OperationBuilder`.
 
 use crate::api::rest::{dto, handlers};
-use crate::module::{ConcreteGroupService, ConcreteMembershipService, ConcreteTypeService};
+use crate::gear::{ConcreteGroupService, ConcreteMembershipService, ConcreteTypeService};
 use axum::Router;
 use std::sync::Arc;
 use toolkit::api::OpenApiRegistry;
@@ -13,7 +13,7 @@ mod groups;
 mod memberships;
 mod types;
 
-/// Register all routes for the resource-group module.
+/// Register all routes for the resource-group gear.
 #[allow(clippy::needless_pass_by_value)]
 pub fn register_routes(
     mut router: Router,

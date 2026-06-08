@@ -42,7 +42,7 @@
 **ID**: `fdd-user-settings-actor-consumer`
 
 <!-- fdd-id-content -->
-**Role**: Application module that stores/retrieves user settings on behalf of end users.
+**Role**: Application gear that stores/retrieves user settings on behalf of end users.
 <!-- fdd-id-content -->
 
 ## 3. Use Cases

@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!("\n=== Demo Complete ===");
     println!("Key features demonstrated:");
-    println!("• Module namespacing prevents conflicts between different modules");
+    println!("• Gear namespacing prevents conflicts between different gears");
     println!("• try_lock provides configurable retry/backoff policies");
     println!("• File-based locks for SQLite with automatic cleanup");
     println!("• All locks are automatically released on guard drop");

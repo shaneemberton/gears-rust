@@ -29,12 +29,12 @@ decision-makers: Constructor Fabric Steering Committee
 
 ## Context and Problem Statement
 
-AM currently owns tenant lifecycle, bootstrap, mode conversion, IdP orchestration, tenant-specific authorization semantics, and the source-of-truth `tenants` table consumed by downstream hierarchy readers. RG already provides a generic hierarchy engine for groups, with parent-child storage, type-driven placement, closure-table traversal, and barrier-as-data semantics for tenant-like nodes. We considered replacing the AM `tenants` table with RG as the canonical tenant hierarchy store in order to reduce duplicated tree machinery, but we needed to determine whether that produces a cleaner ownership model or only moves complexity across module boundaries.
+AM currently owns tenant lifecycle, bootstrap, mode conversion, IdP orchestration, tenant-specific authorization semantics, and the source-of-truth `tenants` table consumed by downstream hierarchy readers. RG already provides a generic hierarchy engine for groups, with parent-child storage, type-driven placement, closure-table traversal, and barrier-as-data semantics for tenant-like nodes. We considered replacing the AM `tenants` table with RG as the canonical tenant hierarchy store in order to reduce duplicated tree machinery, but we needed to determine whether that produces a cleaner ownership model or only moves complexity across gear boundaries.
 
 ## Decision Drivers
 
 * **Clean ownership boundary**: Tenant hierarchy, lifecycle, and public tenant API semantics should belong to one clear domain owner.
-* **Avoid cross-module invariants**: Deletion, bootstrap, conversion, and barrier updates should not require fragile AM↔RG coordination for every write.
+* **Avoid cross-gear invariants**: Deletion, bootstrap, conversion, and barrier updates should not require fragile AM↔RG coordination for every write.
 * **Authorization clarity**: Tenants must remain governed by AM tenant permissions, not become indistinguishable from generic RG groups.
 * **Lifecycle completeness**: Soft delete, hard delete ordering, root bootstrap, and subtree checks must stay coherent without introducing parallel state models.
 * **Consumer stability**: Tenant Resolver and other hierarchy readers should not absorb a large migration unless the new ownership model is demonstrably cleaner.
@@ -49,7 +49,7 @@ AM currently owns tenant lifecycle, bootstrap, mode conversion, IdP orchestratio
 
 ## Decision Outcome
 
-Chosen option: "Keep the dedicated AM `tenants` table and continue using RG only for user groups", because making RG the canonical tenant hierarchy store does not create a cleaner architecture. It splits one domain concept across two modules, forces tenant-specific lifecycle and permission semantics through a generic group subsystem, and introduces cross-module coordination on the critical path of every important tenant operation.
+Chosen option: "Keep the dedicated AM `tenants` table and continue using RG only for user groups", because making RG the canonical tenant hierarchy store does not create a cleaner architecture. It splits one domain concept across two gears, forces tenant-specific lifecycle and permission semantics through a generic group subsystem, and introduces cross-gear coordination on the critical path of every important tenant operation.
 
 The RG-backed hierarchy idea remains a prospective exploration only if the platform later decides to move tenant ownership into RG end-to-end. That would be a larger redesign where RG becomes the true tenant owner and AM becomes a thin facade or is reduced in scope. This ADR rejects the partial middle-ground design.
 
@@ -57,7 +57,7 @@ The RG-backed hierarchy idea remains a prospective exploration only if the platf
 
 * AM remains the canonical owner of tenant hierarchy structure, tenant lifecycle state, and the database contract exposed to downstream tenant-hierarchy consumers.
 * RG remains delegated to user groups and other generic group hierarchies; it does not become the persistence owner for AM tenants.
-* Tree-logic duplication is accepted for now as the lower-risk trade-off compared with cross-module ownership splitting.
+* Tree-logic duplication is accepted for now as the lower-risk trade-off compared with cross-gear ownership splitting.
 * Any future reuse effort should target extracted hierarchy primitives, shared libraries, or storage helpers rather than moving tenant source-of-truth ownership into RG.
 * The current AM PRD and DESIGN remain directionally correct and do not require a tenant-storage migration to RG.
 
@@ -77,11 +77,11 @@ Use RG as the authoritative store for tenant nodes, parent-child relationships, 
 * Good, because it would remove one dedicated hierarchy table from AM.
 * Bad, because one domain concept would have two owners: structure in RG, lifecycle and semantics in AM.
 * Bad, because soft delete would become awkward: RG has hierarchy data, while AM would still need tenant-only lifecycle state such as `status` and `deleted_at`.
-* Bad, because hard delete would require cross-module orchestration to verify subtree emptiness, retention eligibility, IdP cleanup, and physical RG-node deletion.
+* Bad, because hard delete would require cross-gear orchestration to verify subtree emptiness, retention eligibility, IdP cleanup, and physical RG-node deletion.
 * Bad, because bootstrap of the first tenant would invert ownership: AM would need to create and manage canonical RG state before AM itself is fully established.
 * Bad, because tenant-specific authorization would need tenant-only exceptions inside RG so that tenant groups are not editable like ordinary groups.
 * Bad, because direct RG CRUD for tenant-typed groups would need to be blocked or special-cased, which weakens RG's generic abstraction.
-* Bad, because barrier updates and mode-conversion semantics would span modules: AM decides, RG stores, Tenant Resolver consumes.
+* Bad, because barrier updates and mode-conversion semantics would span gears: AM decides, RG stores, Tenant Resolver consumes.
 * Bad, because recovery, auditing, and debugging become more complex when the canonical tenant write path crosses AM, RG, IdP, and downstream readers.
 * Bad, because downstream consumers currently built around the AM `tenants` contract would face a large migration without gaining a cleaner domain boundary.
 * Bad, because AM availability and correctness for tenant lifecycle would become operationally coupled to RG's persistence contract and write-path behavior.
@@ -102,7 +102,7 @@ Retain the current AM design where tenant hierarchy is AM-owned, while RG remain
 
 Factor reusable tree mechanics into shared libraries, helpers, or lower-level storage components, but keep tenant source-of-truth ownership in AM.
 
-* Good, because it targets the real duplication problem without splitting tenant ownership across modules.
+* Good, because it targets the real duplication problem without splitting tenant ownership across gears.
 * Good, because AM can reuse hierarchy mechanics while keeping tenant lifecycle, deletion, and bootstrap coherent.
 * Good, because RG remains generic and AM remains the tenant domain owner.
 * Bad, because it requires deliberate engineering work to identify and extract the right reusable substrate.
@@ -125,7 +125,7 @@ This ADR records a rejected prospective direction, not an adopted design. The re
 The specific design concerns that led to rejection were:
 
 * tenant hierarchy structure would move to RG while tenant lifecycle would remain in AM
-* soft delete and hard delete would become cross-module workflows instead of AM-local invariants
+* soft delete and hard delete would become cross-gear workflows instead of AM-local invariants
 * first-tenant bootstrap would require AM to initialize canonical RG state before its own domain is fully materialized
 * tenant permissions would need to remain AM-specific, forcing RG to special-case tenant-typed groups
 * generic RG CRUD would no longer be valid for tenant-typed nodes, which would make the RG abstraction less consistent

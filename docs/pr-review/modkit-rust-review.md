@@ -96,7 +96,7 @@ Assess the PR as a whole before examining any file. Read the title, body, full f
 
 Check that public APIs follow idiomatic Rust conventions.
 
-- Function, type, trait, and module names are clear and conventional
+- Function, type, trait, and gear names are clear and conventional
 - Types express meaning better than raw `bool`, `String`, or loosely structured maps
 - Arguments are hard to misuse
 - Builders are used where construction is complex
@@ -291,18 +291,18 @@ Check that public APIs follow idiomatic Rust conventions.
 
 ---
 
-## RUST-MOD-001: Module Boundaries and Code Organization Are Clean
+## RUST-MOD-001: Gear Boundaries and Code Organization Are Clean
 **Severity**: HIGH
 
 - Responsibilities are separated clearly
 - Business logic is not tangled with transport, persistence, or framework glue
 - Helpers are not used to hide poor structure
-- Modules are cohesive
+- Gears are cohesive
 - Visibility and dependency direction are intentional
 - The PR does not introduce avoidable architectural drift
 
 **Review guidance**:
-- Flag "god modules"
+- Flag "god gears"
 - Flag handlers/controllers doing domain work directly
 - Flag infrastructure details leaking into domain logic without need
 
@@ -384,7 +384,7 @@ Check that public APIs follow idiomatic Rust conventions.
 - Meaningful enums and newtypes
 - `Result` with preserved context
 - Narrow visibility
-- Clear module boundaries
+- Clear gear boundaries
 - Structured async flows
 - Bounded retries and timeouts
 - Tests for behavior and regressions

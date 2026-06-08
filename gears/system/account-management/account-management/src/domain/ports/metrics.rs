@@ -619,7 +619,7 @@ pub trait StorageMetricsPort: Send + Sync + 'static {
 
 /// No-op implementation of every port. Used:
 ///
-/// * As the safe pre-init default before [`crate::module`] constructs
+/// * As the safe pre-init default before [`crate::gear`] constructs
 ///   the real adapter.
 /// * As the in-test default for services whose unit tests do not
 ///   assert on metrics.

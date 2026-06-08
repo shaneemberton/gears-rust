@@ -120,7 +120,7 @@ LLM Gateway requires a centralized source of truth for model availability, capab
 | Root Tenant | Top-level tenant from which all other tenants inherit |
 | Canonical ID | Unique model identifier in format `{provider_slug}::{provider_model_id}` |
 | Provider Slug | Human-readable unique identifier for a provider instance (e.g., `azure-corp-global`) |
-| Provider Plugin | Module responsible for communication with specific LLM provider |
+| Provider Plugin | Gear responsible for communication with specific LLM provider |
 
 ## 2. Actors
 
@@ -1113,7 +1113,7 @@ Error responses follow RFC 9457 Problem Details standard.
 
 ## 10. Dependencies
 
-| Module | Role |
+| Gear   | Role |
 |--------|------|
 | Outbound API Gateway | Execute provider API calls (discovery) |
 | Tenant Resolver | Resolve tenant hierarchy (parent, children) |
@@ -1122,7 +1122,7 @@ Error responses follow RFC 9457 Problem Details standard.
 
 ## 11. Consumers
 
-| Module | Usage |
+| Gear   | Usage |
 |--------|-------|
 | LLM Gateway | Model resolution, availability checks, provider cost |
 | Chat Engine | Model selection for conversations |
@@ -1173,10 +1173,10 @@ Key interfaces:
 
 | Artifact | Link |
 |----------|------|
-| LLM Gateway PRD | `modules/llm_gateway/docs/PRD.md` |
-| ADR: Stateless Gateway | `modules/llm_gateway/docs/ADR/0001-fdd-llmgw-adr-stateless.md` |
-| ADR: Pass-through Content | `modules/llm_gateway/docs/ADR/0002-fdd-llmgw-adr-pass-through.md` |
-| ADR: Circuit Breaking | `modules/llm_gateway/docs/ADR/0004-fdd-llmgw-adr-circuit-breaking.md` |
+| LLM Gateway PRD | `gears/llm_gateway/docs/PRD.md` |
+| ADR: Stateless Gateway | `gears/llm_gateway/docs/ADR/0001-fdd-llmgw-adr-stateless.md` |
+| ADR: Pass-through Content | `gears/llm_gateway/docs/ADR/0002-fdd-llmgw-adr-pass-through.md` |
+| ADR: Circuit Breaking | `gears/llm_gateway/docs/ADR/0004-fdd-llmgw-adr-circuit-breaking.md` |
 | OData Pagination Standard | `docs/toolkit_unified_system/07_odata_pagination_select_filter.md` |
 | Error Handling Standard | `docs/toolkit_unified_system/05_errors_rfc9457.md` |
 | GTS Contracts | `gts/` (to be defined) |

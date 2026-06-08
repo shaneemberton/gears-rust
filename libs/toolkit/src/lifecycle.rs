@@ -90,7 +90,7 @@ impl ReadySignal {
 
 // ----- Runnable --------------------------------------------------------------
 
-/// Trait for modules that can run a long-running task.
+/// Trait for gears that can run a long-running task.
 /// Note: take `self` by `Arc` to make the spawned future `'static` and `Send`.
 #[async_trait]
 pub trait Runnable: Send + Sync + 'static {
@@ -301,18 +301,18 @@ impl Lifecycle {
         let status_on_finish = self.status.clone();
 
         // Spawn the actual task with descriptive logging
-        let module_name = self.name;
-        let task_id = format!("{module_name}-{self:p}");
+        let gear_name = self.name;
+        let task_id = format!("{gear_name}-{self:p}");
         let handle = tokio::spawn(async move {
-            tracing::debug!(task_id = %task_id, module = %module_name, "lifecycle task starting");
+            tracing::debug!(task_id = %task_id, gear =  %gear_name, "lifecycle task starting");
             let res = make(token, ready_mode.then(|| ReadySignal(ready_tx))).await;
             if let Err(e) = res {
-                tracing::error!(error=%e, task_id=%task_id, module = %module_name, "lifecycle task error");
+                tracing::error!(error=%e, task_id=%task_id, gear =  %gear_name, "lifecycle task error");
             }
             finished_flag.store(true, Ordering::Release);
             finished_notify.notify_waiters();
             status_on_finish.store(Status::Stopped.as_u8(), Ordering::Release);
-            tracing::debug!(task_id=%task_id, module = %module_name, "lifecycle task finished");
+            tracing::debug!(task_id=%task_id, gear =  %gear_name, "lifecycle task finished");
         });
 
         // store handle (bounded lock scope)
@@ -330,8 +330,8 @@ impl Lifecycle {
     /// Returns `LcError` if the stop operation fails.
     #[tracing::instrument(skip(self, timeout), level = "debug")]
     pub async fn stop(&self, timeout: Duration) -> LcResult<StopReason> {
-        let module_name = self.name;
-        let task_id = format!("{module_name}-{self:p}");
+        let gear_name = self.name;
+        let task_id = format!("{gear_name}-{self:p}");
         let st = self.load_status();
         if !matches!(st, Status::Starting | Status::Running | Status::Stopping) {
             // Not running => already finished.
@@ -377,10 +377,10 @@ impl Lifecycle {
 
             match handle.await {
                 Ok(()) => {
-                    tracing::debug!(task_id = %task_id, module = %module_name, "lifecycle task completed successfully");
+                    tracing::debug!(task_id = %task_id, gear =  %gear_name, "lifecycle task completed successfully");
                 }
                 Err(e) if e.is_cancelled() => {
-                    tracing::debug!(task_id = %task_id, module = %module_name, "lifecycle task was cancelled/aborted");
+                    tracing::debug!(task_id = %task_id, gear =  %gear_name, "lifecycle task was cancelled/aborted");
                 }
                 Err(e) if e.is_panic() => {
                     // Extract panic information if possible
@@ -395,7 +395,7 @@ impl Lifecycle {
 
                             tracing::error!(
                                 task_id = %task_id,
-                                module = %module_name,
+                                gear =  %gear_name,
                                 panic_message = %panic_msg,
                                 "lifecycle task panicked - this indicates a serious bug"
                             );
@@ -403,14 +403,14 @@ impl Lifecycle {
                         _ => {
                             tracing::error!(
                                 task_id = %task_id,
-                                module = %module_name,
+                                gear =  %gear_name,
                                 "lifecycle task panicked (could not extract panic message)"
                             );
                         }
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(task_id = %task_id, module = %module_name, error = %e, "lifecycle task join error");
+                    tracing::warn!(task_id = %task_id, gear =  %gear_name, error = %e, "lifecycle task join error");
                 }
             }
 
@@ -476,7 +476,7 @@ impl Drop for Lifecycle {
 
 // ----- WithLifecycle wrapper -------------------------------------------------
 
-/// Wrapper that implements `StatefulModule` for any `T: Runnable`.
+/// Wrapper that implements `StatefulGear` for any `T: Runnable`.
 #[must_use]
 pub struct WithLifecycle<T: Runnable> {
     inner: Arc<T>,
@@ -572,7 +572,7 @@ impl<T: Runnable> WithLifecycle<T> {
         self.inner.clone()
     }
 
-    /// Configure readiness behavior produced by proc-macros (`#[toolkit::module(..., lifecycle(...))]`).
+    /// Configure readiness behavior produced by proc-macros (`#[toolkit::gear(..., lifecycle(...))]`).
     pub fn with_ready_mode(
         mut self,
         await_ready: bool,

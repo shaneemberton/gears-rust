@@ -9,7 +9,7 @@ For security-scoped database access (`SecureConn`, `AccessScope`, `PolicyEnforce
 - **Rule**: No plain SQL in handlers/services/repos. Raw SQL is allowed only in migration infrastructure.
 - **Rule**: Repository methods accept `runner: &impl DBRunner`, not `&SecureConn`.
 - **Rule**: Use `in_transaction_mapped` for transactional work.
-- **Rule**: Each module gets its own isolated migration history table.
+- **Rule**: Each gear gets its own isolated migration history table.
 
 ## Executors: `DBRunner` and `SecureTx`
 
@@ -105,10 +105,10 @@ impl UserRepository {
 
 ## Database migrations
 
-Modules provide migration definitions that the runtime executes with a privileged connection:
+Gears provide migration definitions that the runtime executes with a privileged connection:
 
 ```rust
-impl DatabaseCapability for MyModule {
+impl DatabaseCapability for MyGear {
     fn migrations(&self) -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
         use sea_orm_migration::MigratorTrait;
         crate::infra::storage::migrations::Migrator::migrations()
@@ -116,7 +116,7 @@ impl DatabaseCapability for MyModule {
 }
 ```
 
-Each module gets its own migration history table (`toolkit_migrations__<prefix>__<hash8>`), ensuring isolation between modules.
+Each gear gets its own migration history table (`toolkit_migrations__<prefix>__<hash8>`), ensuring isolation between gears.
 
 ### Migrations use raw SQL
 
@@ -158,7 +158,7 @@ enum Users {
 }
 ```
 
-Raw SQL is **allowed only in migration infrastructure** (migration runner + migration definitions). Module code (handlers/services/repos) must use the Secure ORM.
+Raw SQL is **allowed only in migration infrastructure** (migration runner + migration definitions). Gear code (handlers/services/repos) must use the Secure ORM.
 
 ## Quick checklist
 

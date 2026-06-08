@@ -6,7 +6,7 @@ Analyze GTS (Global Type System) usage in a single Gear. Reports types defined h
 
 ```sh
 cargo run --release -p gts-analyze -- gears/system/resource-group
-cargo run --release -p gts-analyze -- modules/mini-chat --skip-docs --verbose
+cargo run --release -p gts-analyze -- gears/mini-chat --skip-docs --verbose
 cargo run --release -p gts-analyze -- gears/system/account-management --format json --out report.json
 ```
 
@@ -40,4 +40,4 @@ cargo run --release -p gts-analyze -- gears/system/account-management --format j
 
 ## Invocation via Claude
 
-A thin slash command is shipped in `.claude/skills/gts-analyze/SKILL.md` — typing `/gts-analyze <module-path>` from Claude invokes this binary. The skill is just a wrapper; the source of truth is here.
+A thin slash command is shipped in `.claude/skills/gts-analyze/SKILL.md` — typing `/gts-analyze <gear-path>` from Claude invokes this binary. The skill is just a wrapper; the source of truth is here.

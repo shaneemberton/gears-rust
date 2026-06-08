@@ -2,7 +2,7 @@
 
 ### What it does
 
-Checks that contract modules do not use HTTP-specific types such as `StatusCode`, `HeaderMap`, `Response`, `Request`, etc.
+Checks that contract gears do not use HTTP-specific types such as `StatusCode`, `HeaderMap`, `Response`, `Request`, etc.
 
 ### Why is this bad?
 
@@ -17,7 +17,7 @@ HTTP types belong in the API layer, not the contract layer.
 
 The lint detects usage of common HTTP types from popular Rust web frameworks:
 - `axum`: StatusCode, HeaderMap, Response, Request, Body
-- `hyper`: StatusCode, HeaderMap, Response, Request, Body  
+- `hyper`: StatusCode, HeaderMap, Response, Request, Body
 - `http`: StatusCode, HeaderMap, Response, Request
 - And other HTTP-related types
 
@@ -27,11 +27,11 @@ The lint detects usage of common HTTP types from popular Rust web frameworks:
 // ❌ Bad - contract uses HTTP types
 mod contract {
     use axum::http::StatusCode;
-    
+
     pub struct UserService {
         pub status: StatusCode,
     }
-    
+
     pub fn create_user() -> (StatusCode, String) {
         (StatusCode::OK, "user created".to_string())
     }
@@ -48,7 +48,7 @@ mod contract {
         AlreadyExists,
         ValidationError(String),
     }
-    
+
     pub fn create_user() -> UserCreationResult {
         UserCreationResult::Success("user-id-123".to_string())
     }
@@ -58,7 +58,7 @@ mod contract {
 mod api {
     use axum::http::StatusCode;
     use crate::contract;
-    
+
     pub async fn create_user_handler() -> (StatusCode, String) {
         match contract::create_user() {
             UserCreationResult::Success(id) => (StatusCode::CREATED, id),

@@ -1,56 +1,56 @@
-//! Effective module configuration dump support.
+//! Effective gear configuration dump support.
 //!
-//! This module provides utilities for inspecting and dumping the effective
-//! runtime configuration of modules, including resolved database DSNs and pool settings.
+//! This gear provides utilities for inspecting and dumping the effective
+//! runtime configuration of gears, including resolved database DSNs and pool settings.
 
-use super::{AppConfig, RuntimeKind, build_final_db_for_module, parse_module_config};
+use super::{AppConfig, RuntimeKind, build_final_db_for_gear, parse_gear_config};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 use url::Url;
 
-/// List all module names present in the configuration.
+/// List all gear names present in the configuration.
 ///
-/// Returns a sorted vector of module names that are configured in the `AppConfig`.
-/// This is useful for discovering available modules before dumping their configuration.
+/// Returns a sorted vector of gear names that are configured in the `AppConfig`.
+/// This is useful for discovering available gears before dumping their configuration.
 ///
 /// # Example
 /// ```no_run
 /// use toolkit::bootstrap::AppConfig;
 /// # fn example(config: &AppConfig) {
-/// let modules = toolkit::bootstrap::config::list_module_names(config);
-/// for module in modules {
-///     println!("Module: {}", module);
+/// let gears = toolkit::bootstrap::config::list_gear_names(config);
+/// for gear in gears {
+///     println!("Gear: {}", gear);
 /// }
 /// # }
 /// ```
 #[must_use]
-pub fn list_module_names(app: &AppConfig) -> Vec<String> {
-    let mut names: Vec<String> = app.modules.keys().cloned().collect();
+pub fn list_gear_names(app: &AppConfig) -> Vec<String> {
+    let mut names: Vec<String> = app.gears.keys().cloned().collect();
     names.sort();
     names
 }
 
-/// Render effective configuration for all loaded modules.
+/// Render effective configuration for all loaded gears.
 ///
 /// This function builds a complete view of the effective runtime configuration
-/// for each module that is successfully loaded in the `ModuleRegistry`.
+/// for each gear that is successfully loaded in the `GearRegistry`.
 ///
-/// For each module, it includes:
-/// - `runtime`: Module runtime type (local/oop) if configured
-/// - `config`: Module-specific configuration section (as-is from config file)
+/// For each gear, it includes:
+/// - `runtime`: Gear runtime type (local/oop) if configured
+/// - `config`: Gear-specific configuration section (as-is from config file)
 /// - `database`: Final resolved database configuration with redacted DSN (if applicable)
 ///
 /// This is a read-only inspection operation that does not create any directories
 /// or modify the filesystem.
 ///
-/// Modules with configuration errors are logged as warnings and skipped,
-/// allowing inspection of valid modules even when some are misconfigured.
+/// Gears with configuration errors are logged as warnings and skipped,
+/// allowing inspection of valid gears even when some are misconfigured.
 ///
 /// # Errors
-/// This function does not return errors in practice - all module-level failures
-/// are logged as warnings and the problematic modules are skipped. The `Result`
+/// This function does not return errors in practice - all gear-level failures
+/// are logged as warnings and the problematic gears are skipped. The `Result`
 /// return type is kept for API consistency with other dump functions.
-pub fn render_effective_modules_config(app: &AppConfig) -> Result<serde_json::Value> {
+pub fn render_effective_gears_config(app: &AppConfig) -> Result<serde_json::Value> {
     use serde_json::json;
 
     let home_dir = PathBuf::from(&app.server.home_dir);
@@ -61,20 +61,20 @@ pub fn render_effective_modules_config(app: &AppConfig) -> Result<serde_json::Va
     {
         return Err(anyhow::anyhow!("Invalid input: {}", home_dir.display()));
     }
-    let mut modules_config = serde_json::Map::new();
+    let mut gears_config = serde_json::Map::new();
 
-    // Iterate over all modules in the configuration
-    for module_name in app.modules.keys() {
-        let mut module_entry = serde_json::Map::new();
+    // Iterate over all gears in the configuration
+    for gear_name in app.gears.keys() {
+        let mut gear_entry = serde_json::Map::new();
 
-        // Parse module config once for efficiency
-        let parsed_config = match parse_module_config(app, module_name) {
+        // Parse gear config once for efficiency
+        let parsed_config = match parse_gear_config(app, gear_name) {
             Ok(config) => config,
             Err(e) => {
                 tracing::warn!(
-                    module = %module_name,
+                    gear =  %gear_name,
                     error = %e,
-                    "Failed to parse module config, skipping"
+                    "Failed to parse gear config, skipping"
                 );
                 continue;
             }
@@ -82,7 +82,7 @@ pub fn render_effective_modules_config(app: &AppConfig) -> Result<serde_json::Va
 
         // Get runtime configuration if present
         if let Some(runtime_config) = parsed_config.runtime {
-            module_entry.insert(
+            gear_entry.insert(
                 "runtime".to_owned(),
                 json!({
                     "type": match runtime_config.mod_type {
@@ -93,27 +93,27 @@ pub fn render_effective_modules_config(app: &AppConfig) -> Result<serde_json::Va
             );
         }
 
-        // Get module config section (the "config" field)
+        // Get gear config section (the "config" field)
         if !parsed_config.config.is_null() {
-            module_entry.insert("config".to_owned(), parsed_config.config);
+            gear_entry.insert("config".to_owned(), parsed_config.config);
         }
 
         // Get database configuration (resolved DSN + pool) - use dry_run=true
-        match build_final_db_for_module(app, module_name, &home_dir, true) {
+        match build_final_db_for_gear(app, gear_name, &home_dir, true) {
             Ok(Some((dsn, pool))) => {
-                // Redact password in DSN (warn and skip DB section if this fails, but keep module)
+                // Redact password in DSN (warn and skip DB section if this fails, but keep gear)
                 let redacted_dsn = match redact_dsn_password(&dsn) {
                     Ok(redacted) => redacted,
                     Err(e) => {
                         tracing::warn!(
-                            module = %module_name,
+                            gear =  %gear_name,
                             error = %e,
-                            "Failed to redact DSN password, skipping database config for this module"
+                            "Failed to redact DSN password, skipping database config for this gear"
                         );
-                        // Continue processing this module, just skip the DB section
-                        // Add module entry even without DB config
-                        if !module_entry.is_empty() {
-                            modules_config.insert(module_name.clone(), json!(module_entry));
+                        // Continue processing this gear, just skip the DB section
+                        // Add gear entry even without DB config
+                        if !gear_entry.is_empty() {
+                            gears_config.insert(gear_name.clone(), json!(gear_entry));
                         }
                         continue;
                     }
@@ -156,27 +156,27 @@ pub fn render_effective_modules_config(app: &AppConfig) -> Result<serde_json::Va
                     db_config.insert("pool".to_owned(), json!(pool_map));
                 }
 
-                module_entry.insert("database".to_owned(), json!(db_config));
+                gear_entry.insert("database".to_owned(), json!(db_config));
             }
             Ok(None) => {
-                // Module has no database config, skip
+                // Gear has no database config, skip
             }
             Err(e) => {
                 tracing::warn!(
-                    module = %module_name,
+                    gear =  %gear_name,
                     error = %e,
                     "Failed to build database config, skipping"
                 );
             }
         }
 
-        // Only add module to output if it has any configuration
-        if !module_entry.is_empty() {
-            modules_config.insert(module_name.clone(), json!(module_entry));
+        // Only add gear to output if it has any configuration
+        if !gear_entry.is_empty() {
+            gears_config.insert(gear_name.clone(), json!(gear_entry));
         }
     }
 
-    Ok(json!(modules_config))
+    Ok(json!(gears_config))
 }
 
 /// Redacts password from a DSN for safe logging.
@@ -198,27 +198,26 @@ pub fn redact_dsn_password(dsn: &str) -> Result<String> {
     }
 }
 
-/// Dump effective modules configuration as YAML string.
+/// Dump effective gears configuration as YAML string.
 ///
-/// This function renders the effective configuration for all modules and
+/// This function renders the effective configuration for all gears and
 /// serializes it to a human-readable YAML format.
 ///
 /// # Errors
 /// Returns an error if configuration rendering or YAML serialization fails.
-pub fn dump_effective_modules_config_yaml(app: &AppConfig) -> Result<String> {
-    let config = render_effective_modules_config(app)?;
-    serde_saphyr::to_string(&config).context("Failed to serialize modules configuration to YAML")
+pub fn dump_effective_gears_config_yaml(app: &AppConfig) -> Result<String> {
+    let config = render_effective_gears_config(app)?;
+    serde_saphyr::to_string(&config).context("Failed to serialize gears configuration to YAML")
 }
 
-/// Dump effective modules configuration as JSON string.
+/// Dump effective gears configuration as JSON string.
 ///
-/// This function renders the effective configuration for all modules and
+/// This function renders the effective configuration for all gears and
 /// serializes it to a pretty-printed JSON format.
 ///
 /// # Errors
 /// Returns an error if configuration rendering or JSON serialization fails.
-pub fn dump_effective_modules_config_json(app: &AppConfig) -> Result<String> {
-    let config = render_effective_modules_config(app)?;
-    serde_json::to_string_pretty(&config)
-        .context("Failed to serialize modules configuration to JSON")
+pub fn dump_effective_gears_config_json(app: &AppConfig) -> Result<String> {
+    let config = render_effective_gears_config(app)?;
+    serde_json::to_string_pretty(&config).context("Failed to serialize gears configuration to JSON")
 }

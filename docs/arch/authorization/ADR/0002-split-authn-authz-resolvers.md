@@ -18,7 +18,7 @@ These are conceptually separate responsibilities governed by different standards
 - **AuthN** — OpenID Connect Core 1.0, RFC 7519 (JWT), RFC 7662 (Token Introspection)
 - **AuthZ** — OpenID AuthZEN Authorization API 1.0, NIST SP 800-162 (PDP/PEP model)
 
-**Key architectural question:** Should Gears use a single unified resolver module (Auth Resolver) that handles both AuthN and AuthZ, or should these be split into two independent modules with plugins (AuthN Resolver and AuthZ Resolver)?
+**Key architectural question:** Should Gears use a single unified resolver gear (Auth Resolver) that handles both AuthN and AuthZ, or should these be split into two independent gears with plugins (AuthN Resolver and AuthZ Resolver)?
 
 This decision impacts deployment flexibility, vendor integration patterns, security boundaries, caching strategies, and component reusability.
 
@@ -36,8 +36,8 @@ This decision impacts deployment flexibility, vendor integration patterns, secur
 
 ## Considered Options
 
-- **Option A**: Unified Auth Resolver (single module for both AuthN and AuthZ)
-- **Option B**: Separate AuthN Resolver and AuthZ Resolver (two independent modules)
+- **Option A**: Unified Auth Resolver (single gear for both AuthN and AuthZ)
+- **Option B**: Separate AuthN Resolver and AuthZ Resolver (two independent gears)
 
 ## Decision Outcome
 
@@ -45,24 +45,24 @@ Chosen option: **Option B - Separate AuthN Resolver and AuthZ Resolver**, becaus
 
 **Implementation:**
 
-1. **AuthN Resolver** (module + plugin):
+1. **AuthN Resolver** (gear + plugin):
    - Responsibilities: token validation, JWT signature verification, JWKS management, token introspection (RFC 7662), claim extraction
    - Output: `SecurityContext` (subject_id, subject_type, subject_tenant_id, token_scopes, bearer_token)
-   - Used by: AuthN middleware in modules accepting requests (API Gateway module, Domain Module, gRPC Gateway module, WebSocket handlers, etc.)
+   - Used by: AuthN middleware in gears accepting requests (API Gateway gear, Domain Gear, gRPC Gateway gear, WebSocket handlers, etc.)
    - Standards: OpenID Connect Core 1.0, RFC 7519 (JWT), RFC 7662 (Token Introspection)
 
-2. **AuthZ Resolver** (module + plugin):
+2. **AuthZ Resolver** (gear + plugin):
    - Responsibilities: PDP functionality, policy evaluation, constraint generation
    - Input: `SecurityContext` + evaluation request (subject, action, resource, context)
    - Output: decision + constraints
-   - Used by: PEPs (domain modules)
+   - Used by: PEPs (domain gears)
    - Standards: OpenID AuthZEN Authorization API 1.0, NIST SP 800-162
 
 3. **Request Flow:**
 
    ```text
    Client -> API Gateway -> AuthN Resolver -> SecurityContext
-   API Gateway -> PEP (Domain Module) -> Request + SecurityContext
+   API Gateway -> PEP (Domain Gear) -> Request + SecurityContext
    PEP -> AuthZ Resolver -> Evaluation Request
    AuthZ Resolver -> PEP -> Decision + Constraints
    PEP -> Database -> Query with WHERE (constraints)
@@ -88,7 +88,7 @@ Chosen option: **Option B - Separate AuthN Resolver and AuthZ Resolver**, becaus
 
 **Bad:**
 
-- **Configuration complexity** — Two modules instead of one (mitigated by unified config section with subsections)
+- **Configuration complexity** — Two gears instead of one (mitigated by unified config section with subsections)
 - **Vendor coordination** — For vendors with unified AuthN+AuthZ API, requires either:
   - Unified plugin wrapper with shared state
   - Two separate plugins with cache coordination
@@ -104,11 +104,11 @@ Chosen option: **Option B - Separate AuthN Resolver and AuthZ Resolver**, becaus
 
 ### Option A: Unified Auth Resolver
 
-Single module (Auth Resolver) that handles both AuthN and AuthZ concerns.
+Single gear (Auth Resolver) that handles both AuthN and AuthZ concerns.
 
 **Pros:**
 
-- Simpler configuration (single module, single plugin)
+- Simpler configuration (single gear, single plugin)
 - Easier for vendors with tightly integrated AuthN+AuthZ APIs (single implementation)
 - No coordination needed between AuthN and AuthZ plugins
 - Fewer moving parts in simple in-process deployments
@@ -126,7 +126,7 @@ Single module (Auth Resolver) that handles both AuthN and AuthZ concerns.
 
 ### Option B: Separate AuthN Resolver and AuthZ Resolver
 
-Two independent modules with separate plugin interfaces.
+Two independent gears with separate plugin interfaces.
 
 **Pros:**
 
@@ -140,7 +140,7 @@ Two independent modules with separate plugin interfaces.
 
 **Cons:**
 
-- More complex configuration (two modules)
+- More complex configuration (two gears)
 - Vendors with unified API need unified plugin wrapper or cache coordination
 - Version coordination when vendor updates API
 

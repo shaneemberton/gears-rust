@@ -1,21 +1,21 @@
-# Nodes Registry Module
+# Nodes Registry Gear
 
 ## Overview
 
-The Nodes Registry module manages node information in the Gears deployment. A node represents a deployment unit (host, VM, container) where Constructor Fabric Gears are running.
+The Nodes Registry gear manages node information in the Gears deployment. A node represents a deployment unit (host, VM, container) where Constructor Fabric Gears are running.
 
 Each node contains:
 - **System Information (sysinfo)**: OS, CPU, memory, GPU, battery, host details with all IP addresses
 - **System Capabilities (syscap)**: Hardware and software capabilities with cache metadata
 - **Node Metadata**: Hardware-based UUID, hostname, IP address
-- **Custom Capabilities**: Software capabilities reported by modules (e.g., LM Studio)
+- **Custom Capabilities**: Software capabilities reported by gears (e.g., LM Studio)
 
 ## Features
 
 - **Multi-Node Support**: Store and manage multiple nodes in memory
 - **Hardware-Based UUID**: Permanent node identification using machine hardware
 - **Intelligent Caching**: Per-capability TTL with automatic refresh
-- **Custom Capabilities**: Modules can report software capabilities
+- **Custom Capabilities**: Gears can report software capabilities
 - **Cache Invalidation**: Force refresh endpoints for fresh data
 - **System + Custom Merging**: Automatic merging of system and custom capabilities
 - **REST API**: Clean endpoints with OpenAPI documentation
@@ -23,7 +23,7 @@ Each node contains:
 
 ## API Endpoints
 
-All endpoints are registered under `/nodes-registry/v1/nodes`. When the API gateway is configured with `prefix_path: "/cf"`, these endpoints are served under `/cf/nodes-registry/v1/nodes` instead. The prefix is configurable via `modules.api-gateway.config.prefix_path`.
+All endpoints are registered under `/nodes-registry/v1/nodes`. When the API gateway is configured with `prefix_path: "/cf"`, these endpoints are served under `/cf/nodes-registry/v1/nodes` instead. The prefix is configurable via `gears.api-gateway.config.prefix_path`.
 
 ### List Nodes
 ```bash
@@ -185,7 +185,7 @@ curl -X GET "http://localhost:8080/cf/nodes-registry/v1/nodes/{id}/syscap?force_
 | OS | 2 minutes | Rarely changes |
 | GPU | 10 seconds | Can change |
 | Battery | 3 seconds | Very dynamic |
-| Custom Software | 60 seconds | Module-defined |
+| Custom Software | 60 seconds | Gear-defined |
 
 ### Cache Refresh
 - **Automatic**: Expired capabilities refresh on request
@@ -194,7 +194,7 @@ curl -X GET "http://localhost:8080/cf/nodes-registry/v1/nodes/{id}/syscap?force_
 
 ## Custom Capabilities
 
-Modules can report custom software capabilities:
+Gears can report custom software capabilities:
 
 ```rust
 use nodes_registry::contract::client::NodesRegistryApi;
@@ -225,7 +225,7 @@ client.remove_custom_syscap(node_id, vec!["software:lm-studio".to_string()]).awa
 client.clear_custom_syscap(node_id).await?;
 ```
 
-## Usage from Other Modules
+## Usage from Other Gears
 
 ```rust
 use toolkit::ClientHub;
@@ -249,7 +249,7 @@ let syscap = client.get_node_syscap(node_id).await?;
 Add to your `config.yaml`:
 
 ```yaml
-modules:
+gears:
   nodes_registry:
     enabled: true
 ```
@@ -260,11 +260,11 @@ modules:
 
 2. **Intelligent Caching**: Per-capability TTL with automatic refresh when expired. Manual refresh available via `force_refresh=true`.
 
-3. **System + Custom Separation**: System-collected capabilities (from toolkit-node-info) are stored separately from custom capabilities (set by modules), then merged for API responses.
+3. **System + Custom Separation**: System-collected capabilities (from toolkit-node-info) are stored separately from custom capabilities (set by gears), then merged for API responses.
 
 4. **Hardware-Based UUID**: Uses permanent hardware identifiers with hybrid fallback for reliable node identification.
 
-5. **Centralized Collection**: System information collection is centralized in toolkit-node-info library for reuse across modules.
+5. **Centralized Collection**: System information collection is centralized in toolkit-node-info library for reuse across gears.
 
 6. **Cache-Aware API**: All endpoints support cache control with detailed OpenAPI documentation.
 
@@ -276,7 +276,7 @@ struct CachedNodeData {
     node: Node,
     sysinfo: Option<NodeSysInfo>,
     syscap_system: Option<NodeSysCap>,    // From toolkit-node-info
-    syscap_custom: HashMap<String, SysCap>, // From modules
+    syscap_custom: HashMap<String, SysCap>, // From gears
 }
 ```
 

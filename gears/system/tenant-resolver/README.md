@@ -6,18 +6,18 @@ Tenant hierarchy and information resolution for Gears' multi-tenancy layer.
 
 The tenant model that Gears operate on is described in [TENANT_MODEL.md](../../../docs/arch/authorization/TENANT_MODEL.md).
 
-The **tenant_resolver** module provides a hierarchical tenant model with:
+The **tenant_resolver** gear provides a hierarchical tenant model with:
 
 1. **Tenant information** — Retrieve tenant metadata (name, status, parent, type)
 2. **Hierarchy traversal** — Navigate parent chains (ancestors) and children subtrees (descendants)
 3. **Ancestry verification** — Check if one tenant is an ancestor of another
 
-The module supports **barrier semantics** where self-managed tenants act as boundaries that
+The gear supports **barrier semantics** where self-managed tenants act as boundaries that
 block hierarchy traversal from parent tenants (unless explicitly ignored).
 
 ## Public API
 
-The module registers [`TenantResolverClient`](tenant_resolver-sdk/src/api.rs) in ClientHub:
+The gear registers [`TenantResolverClient`](tenant_resolver-sdk/src/api.rs) in ClientHub:
 
 - `get_tenant(ctx, id)` — Retrieve single tenant by ID
 - `get_root_tenant(ctx)` — Retrieve the root tenant (the unique tenant with no parent)
@@ -177,12 +177,12 @@ Gears include two plugins out of the box:
 
 ## Configuration
 
-### Tenant Resolver Module
+### Tenant Resolver Gear
 
 See [`config.rs`](tenant_resolver/src/config.rs)
 
 ```yaml
-modules:
+gears:
   tenant_resolver:
     vendor: "constructorfabric"  # Selects plugin by matching vendor
 ```
@@ -192,7 +192,7 @@ modules:
 See [`config.rs`](plugins/static_tr_plugin/src/config.rs)
 
 ```yaml
-modules:
+gears:
   static_tr_plugin:
     vendor: "constructorfabric"
     priority: 100           # Lower = higher priority
@@ -240,9 +240,9 @@ let is_parent = resolver.is_ancestor(&ctx, parent_id, child_id, &IsAncestorOptio
 
 ## Technical Decisions
 
-### Tenant ResolverModule + Plugin Pattern
+### Tenant ResolverGear + Plugin Pattern
 
-Multiple backends are planned (config-based, DB-driven, external API). The Tenant Resolver module handles cross-cutting concerns consistently while plugins can be developed independently.
+Multiple backends are planned (config-based, DB-driven, external API). The Tenant Resolver gear handles cross-cutting concerns consistently while plugins can be developed independently.
 
 ### Barrier Semantics
 

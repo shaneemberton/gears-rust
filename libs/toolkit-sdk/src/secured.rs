@@ -1,6 +1,6 @@
 //! Security context scoping for clients
 //!
-//! This module provides a lightweight, zero-allocation wrapper that binds a `SecurityContext`
+//! This gear provides a lightweight, zero-allocation wrapper that binds a `SecurityContext`
 //! to any client type, enabling security-aware API calls without cloning or Arc overhead.
 //!
 //! # Example

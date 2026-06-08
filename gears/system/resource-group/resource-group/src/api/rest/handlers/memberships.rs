@@ -14,7 +14,7 @@ use tracing::field::Empty;
 use toolkit::api::canonical_prelude::*;
 
 use super::{MembershipDto, SecurityContext, debug, info};
-use crate::module::ConcreteMembershipService;
+use crate::gear::ConcreteMembershipService;
 
 /// Path parameters for membership add/remove endpoints.
 #[derive(Debug, serde::Deserialize)]

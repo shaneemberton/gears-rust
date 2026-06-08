@@ -221,7 +221,7 @@
 //! ### Example 6: Advanced composition (no raw escape hatch)
 //!
 //! If you need more advanced query composition, prefer extending the secure wrappers in `toolkit-db`
-//! (or using higher-level helpers like `OData` pagination). Module code should not unwrap raw `SeaORM`
+//! (or using higher-level helpers like `OData` pagination). Gear code should not unwrap raw `SeaORM`
 //! builders.
 //!
 //! ## Integration with Repository Pattern

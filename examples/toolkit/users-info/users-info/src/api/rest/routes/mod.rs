@@ -2,7 +2,7 @@
 //!
 //! ## Architecture
 //!
-//! This module defines REST routes with `OpenAPI` metadata organized by resource:
+//! This gear defines REST routes with `OpenAPI` metadata organized by resource:
 //! - `users` - User endpoints (5: list, get, create, update, delete)
 //! - `cities` - City endpoints (5: list, get, create, update, delete)
 //! - `addresses` - Address endpoints (3: get, upsert, delete)
@@ -24,7 +24,7 @@
 //! - Use `dto::*` types for request/response serialization
 
 use crate::api::rest::{dto, handlers};
-use crate::module::ConcreteAppServices;
+use crate::gear::ConcreteAppServices;
 use axum::Router;
 use std::sync::Arc;
 use toolkit::api::OpenApiRegistry;
@@ -45,7 +45,7 @@ impl AsRef<str> for License {
 
 impl LicenseFeature for License {}
 
-/// Register all routes for the `users_info` module
+/// Register all routes for the `users_info` gear
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn register_routes(
     mut router: Router,

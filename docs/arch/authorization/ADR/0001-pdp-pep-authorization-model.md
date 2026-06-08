@@ -14,7 +14,7 @@ Gears is a modular platform for building multi-tenant vendor platforms. Each ven
 
 1. **Performance at scale** — Authorization must be efficient for all operations, including mass-management scenarios in multi-tenant environments (bulk updates, cross-tenant queries, hierarchical access). Access check complexity varies by vendor and should not bottleneck Gears.
 
-2. **Simplicity for module developers** — Authorization enforcement must be hard to get wrong. Authorization logic in modules should be minimal — ideally just "ask PDP, apply response". Complex policy evaluation belongs in vendor's PDP, not in Gears code (even shared libraries are costly to update across deployments).
+2. **Simplicity for gear developers** — Authorization enforcement must be hard to get wrong. Authorization logic in gears should be minimal — ideally just "ask PDP, apply response". Complex policy evaluation belongs in vendor's PDP, not in Gears code (even shared libraries are costly to update across deployments).
 
 3. **Seamless vendor integration** — Gears must integrate into vendor's existing infrastructure without requiring significant changes on their side:
    - **No resource sync** — Resources stay in Gears' DB; vendors don't need to replicate millions of resources or all their relationships to their authorization service
@@ -25,15 +25,15 @@ Gears is a modular platform for building multi-tenant vendor platforms. Each ven
 
 Industry best practices (NIST SP 800-162, XACML, AuthZEN) recommend separating authorization into:
 
-- **PDP (Policy Decision Point)** — Evaluates policies and returns access decisions. In Gears, this is the vendor's authorization service accessed via AuthZ Resolver module.
-- **PEP (Policy Enforcement Point)** — Enforces PDP decisions at resource access points. In Gears, domain modules act as PEPs, with ToolKit providing shared enforcement infrastructure.
+- **PDP (Policy Decision Point)** — Evaluates policies and returns access decisions. In Gears, this is the vendor's authorization service accessed via AuthZ Resolver gear.
+- **PEP (Policy Enforcement Point)** — Enforces PDP decisions at resource access points. In Gears, domain gears act as PEPs, with ToolKit providing shared enforcement infrastructure.
 - **PAP (Policy Administration Point)** — Where policies are authored and managed. This is entirely vendor-controlled (their admin UI, policy DSL, etc.). Gears never see or stores policies.
 - **PIP (Policy Information Point)** — Provides additional attributes for decision-making (user roles, tenant hierarchy, resource metadata). In Gears, Tenant Resolver and Resource Group Resolver serve as PIPs.
 
 Benefits of PDP/PEP separation:
 
 - Centralized policy management and auditability
-- Consistent enforcement across all modules
+- Consistent enforcement across all gears
 - Separation of concerns (business logic vs authorization logic)
 - Easier security audits and compliance
 
@@ -42,7 +42,7 @@ CF/Gears act as PEPs; AuthZ Resolver integrates with vendor's PDP; Tenant/RG Res
 ## Decision Drivers
 
 - **Performance** — O(1) authorization overhead per query, not O(N) per resource
-- **Simplicity** — Module developers use shared ToolKit library, not manual authorization code
+- **Simplicity** — Gear developers use shared ToolKit library, not manual authorization code
 - **Vendor integration** — No resource sync, no policy format requirements, leverage existing infrastructure
 - **Vendor-neutral** — No assumption about policy model (RBAC/ABAC/ReBAC)
 - **Standards-based** — Build on industry standards where possible
@@ -50,7 +50,7 @@ CF/Gears act as PEPs; AuthZ Resolver integrates with vendor's PDP; Tenant/RG Res
 
 ## Considered Options
 
-- **Option A**: Module-level authorization (PEP = PDP)
+- **Option A**: Gear-level authorization (PEP = PDP)
 - **Option B**: Google Zanzibar / ReBAC
 - **Option C**: OpenID AuthZEN 1.0 (as-is)
 - **Option D**: OPA Partial Evaluation
@@ -90,16 +90,16 @@ Implementation:
 
 ## Pros and Cons of the Options
 
-### Option A: Module-level Authorization (PEP = PDP)
+### Option A: Gear-level Authorization (PEP = PDP)
 
-Each module implements its own authorization logic: extracts permissions/roles from token, calls PIPs (Tenant Resolver, Resource Group Resolver, vendor's Policy Manager API) as needed, and makes access decisions internally.
+Each gear implements its own authorization logic: extracts permissions/roles from token, calls PIPs (Tenant Resolver, Resource Group Resolver, vendor's Policy Manager API) as needed, and makes access decisions internally.
 
-- Good, because no single point of failure — modules are self-contained
-- Good, because flexible — each module can implement exactly the logic it needs
+- Good, because no single point of failure — gears are self-contained
+- Good, because flexible — each gear can implement exactly the logic it needs
 - Bad, because **violates PDP/PEP separation** recommended by NIST SP 800-162
-- Bad, because authorization logic scattered across modules — hard to audit, easy to make mistakes
-- Bad, because each module must understand and correctly implement policy evaluation
-- Bad, because inconsistent enforcement across modules, difficult compliance audits
+- Bad, because authorization logic scattered across gears — hard to audit, easy to make mistakes
+- Bad, because each gear must understand and correctly implement policy evaluation
+- Bad, because inconsistent enforcement across gears, difficult compliance audits
 - Bad, because complex authorization logic lives in Gears (even if in shared library — bugs, versioning, update rollout across deployments)
 
 ### Option B: Google Zanzibar / ReBAC
@@ -143,7 +143,7 @@ Extend [AuthZEN 1.0](https://openid.net/specs/authorization-api-1_0.html) (appro
 
 - Good, because standards-based foundation (AuthZEN 1.0) with targeted extension
 - Good, because purpose-built for SQL compilation, simpler PEP implementation
-- Good, because **shared ToolKit library handles enforcement** — module developers call one method, constraints automatically applied to queries
+- Good, because **shared ToolKit library handles enforcement** — gear developers call one method, constraints automatically applied to queries
 - Good, because **vendor-neutral at policy storage level** — we define only the response format:
   - Vendors can use any internal policy format (RBAC tables, ReBAC tuples, ABAC rules, custom DSL)
   - PDP translates from vendor's native format to constraints JSON at runtime
@@ -179,8 +179,8 @@ Option E provides a cleaner contract between PDP and PEP with less implementatio
 
 **References for Considered Options:**
 
-- **Option A** (Module-level Authorization):
-  - Common pattern, no specific reference — each module implements its own PDP logic
+- **Option A** (Gear-level Authorization):
+  - Common pattern, no specific reference — each gear implements its own PDP logic
 - **Option B** (Google Zanzibar / ReBAC):
   - Google Zanzibar paper: https://research.google/pubs/pub48190/
   - SpiceDB (OSS implementation): https://authzed.com/docs

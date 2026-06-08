@@ -25,7 +25,7 @@ const AUDIT_PLUGIN_TIMEOUT: Duration = Duration::from_secs(30);
 /// enqueuer to be constructed in `init()` (where services need it) while the
 /// outbox pipeline starts later in `start()` (after OAGW registration).
 /// Enqueue is never called before `start()` because HTTP traffic doesn't arrive
-/// until after all modules have started.
+/// until after all gears have started.
 pub struct InfraOutboxEnqueuer {
     outbox: std::sync::OnceLock<Arc<Outbox>>,
     usage_queue_name: String,

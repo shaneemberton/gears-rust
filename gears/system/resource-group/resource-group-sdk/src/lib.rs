@@ -1,8 +1,8 @@
 // Created: 2026-04-16 by Constructor Tech
-// @cpt-dod:cpt-cf-resource-group-dod-sdk-foundation-module-scaffold:p1
+// @cpt-dod:cpt-cf-resource-group-dod-sdk-foundation-gear-scaffold:p1
 //! Resource Group SDK
 //!
-//! This crate provides the public API for the `resource-group` module:
+//! This crate provides the public API for the `resource-group` gear:
 //! - `ResourceGroupClient` trait
 //! - Model types for GTS types, groups, memberships
 //! - Error type (`ResourceGroupError`)

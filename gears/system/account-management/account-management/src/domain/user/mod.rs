@@ -1,4 +1,4 @@
-//! IdpUser-operations domain module.
+//! IdpUser-operations domain gear.
 //!
 //! Implements FEATURE `idp-user-operations-contract` (see
 //! `gears/system/account-management/docs/features/feature-idp-user-operations-contract.md`).

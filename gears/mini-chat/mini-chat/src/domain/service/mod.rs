@@ -142,7 +142,7 @@ pub(crate) struct Repositories<
 
 /// DI container — aggregates all domain services.
 ///
-/// Created once during `Module::init` and shared with handlers via `Arc`.
+/// Created once during `Gear::init` and shared with handlers via `Arc`.
 /// Services acquire database connections internally via `DbProvider`;
 /// handlers call service methods with business parameters only.
 #[domain_model]

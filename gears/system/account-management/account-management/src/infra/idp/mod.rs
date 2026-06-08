@@ -3,7 +3,7 @@
 //!
 //! AM can boot without an `IdP` adapter present — dev deployments and
 //! tests do not need one. The services store the provisioner as
-//! `Arc<dyn IdpPluginClient>` directly; this module contributes
+//! `Arc<dyn IdpPluginClient>` directly; this gear contributes
 //! the [`NoopIdpProvider`] fallback wired in when no plugin resolves
 //! from `ClientHub`.
 //!

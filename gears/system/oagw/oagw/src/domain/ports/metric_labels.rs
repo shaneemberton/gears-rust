@@ -5,9 +5,9 @@
 //!
 //! Label keys follow OpenTelemetry HTTP semantic conventions where an
 //! analog exists in the inbound API Gateway (`http.request.method`,
-//! `http.route`, `http.response.status_code`) so the two modules share
+//! `http.route`, `http.response.status_code`) so the two gears share
 //! dashboard and alert templates. OAGW-specific concerns (upstream alias,
-//! pipeline phase, error variant) keep short module-local names.
+//! pipeline phase, error variant) keep short gear-local names.
 
 pub mod key {
     /// Upstream alias (stable, low-cardinality identifier of the destination service).
@@ -20,7 +20,7 @@ pub mod key {
     pub const METHOD: &str = "http.request.method";
     /// HTTP response status code (numeric, OTel HTTP semconv).
     /// Aligns with the inbound API Gateway's `http.server.request.duration`
-    /// instrument labels so the two modules share dashboards and alerts.
+    /// instrument labels so the two gears share dashboards and alerts.
     pub const STATUS_CODE: &str = "http.response.status_code";
     /// `DomainError` variant name.
     pub const ERROR_TYPE: &str = "error_type";

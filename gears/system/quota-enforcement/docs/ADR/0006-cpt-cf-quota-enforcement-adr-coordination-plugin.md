@@ -93,11 +93,11 @@ auto-release.
   consumed by sweepers / dispatcher through ClientHub.
 - The trait travels in `quota-enforcement-sdk` so plugin authors implement against a single dependency (parallel to
   `QuotaEnforcementStoragePluginV1`, `QuotaResolutionEngineV1`, `QuotaNotificationSinkV1`).
-- Bootstrap MUST run a `try_lock` + `release` reachability probe for each `LockScope::*` value before the module joins
+- Bootstrap MUST run a `try_lock` + `release` reachability probe for each `LockScope::*` value before the gear joins
   the platform readiness signal; failure aborts bootstrap fail-fast (DESIGN §3.7 bootstrap step).
 - Holders MUST `renew` on or before TTL/3 of cycle elapsed; missing the renew window surfaces `LockExpired` and forces
   follower-mode fallback.
-- Plugin contract is versioned with the module's major version per PRD §7.2 — the trait carries the matching `V<major>`
+- Plugin contract is versioned with the gear's major version per PRD §7.2 — the trait carries the matching `V<major>`
   suffix (`CoordinationPluginV1`).
 - The default impl shares the storage backend's failure domain: if the storage database is unreachable, the default
   coordination plugin also fails the `try_lock` + `release` bootstrap probe. Operators who need decorrelated failure
@@ -145,7 +145,7 @@ the survivor acquires the lock within ≤ 1 TTL (RTO ≤ 15 min per `cpt-cf-quot
 - Bad, because it imposes an external-orchestrator dependency on every deployment, including small / dev / edge ones;
   SQLite-backed single-process deployments would need a synthetic orchestrator.
 - Bad, because in-process awareness of leader / follower state (used for observability — per-`LockScope` sweeper state
-  surfacing in `module-status` / module readiness signal) becomes harder to plumb when there is no in-process
+  surfacing in `gear-status` / gear readiness signal) becomes harder to plumb when there is no in-process
   abstraction.
 - Bad, because the bootstrap probe (`try_lock` + `release` per `LockScope::*`, per DESIGN §3.7) cannot validate
   external-orchestrator readiness uniformly across deployment shapes.

@@ -364,7 +364,7 @@ All streaming connections are subject to the same auth and guard plugin chain as
 | `websocket_close_timeout_seconds` | system | 5 | Timeout for WebSocket Close frame handshake |
 | `protocol_version_cache_ttl_seconds` | system | 3600 (1 hour) | TTL for cached ALPN negotiation results per host |
 
-All parameters are read from upstream/route configuration at connection time. System-level defaults are set via module configuration (`OagwConfig`).
+All parameters are read from upstream/route configuration at connection time. System-level defaults are set via gear configuration (`OagwConfig`).
 
 ### Deliberate Omissions
 
@@ -373,5 +373,5 @@ All parameters are read from upstream/route configuration at connection time. Sy
 - **HTTP/3 (QUIC)**: Out of scope — QUIC-native WebTransport is future work. Current WebTransport support uses HTTP/2 extended CONNECT.
 - **Rate limiting during streaming**: Out of scope — rate limiting on streaming connections (e.g., per-event or per-message throttling) belongs to `cpt-cf-oagw-feature-rate-limiting`.
 - **Metrics and audit logging for streaming**: Out of scope — streaming-specific metrics (connection duration, message counts, bytes transferred) belong to `cpt-cf-oagw-feature-observability`.
-- **UX/Accessibility**: Not applicable — OAGW is a backend API module with no user interface.
+- **UX/Accessibility**: Not applicable — OAGW is a backend API gear with no user interface.
 - **Compliance/Privacy**: OAGW does not handle PII directly. Credential isolation via `cred_store` references covers data protection. No additional regulatory compliance beyond standard platform requirements.

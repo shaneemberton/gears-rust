@@ -12,7 +12,7 @@ use super::{DomainError, Service};
 
 /// Local client wrapping the service.
 ///
-/// Registered in `ClientHub` by the module during `init()`.
+/// Registered in `ClientHub` by the gear during `init()`.
 #[domain_model]
 pub struct AuthNResolverLocalClient {
     svc: Arc<Service>,

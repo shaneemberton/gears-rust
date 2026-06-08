@@ -39,7 +39,7 @@ pub fn expand_derive_odata_schema(input: &DeriveInput) -> TokenStream {
 
     let field_enum_name = Ident::new(&format!("{struct_name}Field"), struct_name.span());
     let schema_struct_name = Ident::new(&format!("{struct_name}Schema"), struct_name.span());
-    let module_name = Ident::new(&struct_name.to_string().to_snake_case(), struct_name.span());
+    let gear_name = Ident::new(&struct_name.to_string().to_snake_case(), struct_name.span());
 
     let field_enum = quote! {
         #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -80,8 +80,8 @@ pub fn expand_derive_odata_schema(input: &DeriveInput) -> TokenStream {
             }
         });
 
-    let constructor_module = quote! {
-        pub mod #module_name {
+    let constructor_gear = quote! {
+        pub mod #gear_name {
             #(#constructor_fns)*
         }
     };
@@ -89,7 +89,7 @@ pub fn expand_derive_odata_schema(input: &DeriveInput) -> TokenStream {
     quote! {
         #field_enum
         #schema_impl
-        #constructor_module
+        #constructor_gear
     }
 }
 

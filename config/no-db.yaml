@@ -15,8 +15,8 @@ logging:
     max_backups: 3
     max_size_mb: 1000
 
-# Per-module configurations using new structure
-modules:
+# Per-gear configurations using new structure
+gears:
   api-gateway:
     # No database configuration needed for api-gateway
     config:

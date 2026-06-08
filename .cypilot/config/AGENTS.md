@@ -22,9 +22,9 @@ Use `{cypilot_path}/config` as the base path for all relative Cypilot Adapter fi
 This repository is a **modular monolith** built on top of **CF/Gears**.
 
 - **CF/Gears base**: core apps/libraries live under `apps/`, `libs/`, etc.
-- **Subsystems / modules**: each subsystem is a module under `modules/<module_name>/`.
+- **Subsystems / modules**: each subsystem is a module under `gears/<gear_name>/`.
 - **Cypilot registry convention**: subsystems are registered as `children[]` of the root `cf-gears` system in `{cypilot_path}/config/artifacts.toml`.
-- **Docs convention**: each module keeps its artifacts under `modules/<module_name>/docs/`.
+- **Docs convention**: each module keeps its artifacts under `gears/<gear_name>/docs/`.
 - **Repository Playbook**: `docs/REPO_PLAYBOOK.md` — comprehensive map of all repository artifacts, standards, tooling, and planned gaps (with per-item status, phase, and ID).
 
 ---
@@ -43,13 +43,13 @@ ALWAYS open `docs/REPO_PLAYBOOK.md` WHEN looking for a map of repository artifac
 
 ---
 
-## Module Rules
+## Gear Rules
 
-ALWAYS register new modules under `modules/<module_name>/` as a `children[]` entry of the root `cf-gears` system in `artifacts.toml` WHEN adding a new module / subsystem
+ALWAYS register new gears under `gears/<gear_name>/` as a `children[]` entry of the root `cf-gears` system in `artifacts.toml` WHEN adding a new gear / subsystem
 
 ALWAYS open `docs/toolkit_unified_system/01_overview.md` WHEN onboarding to ToolKit, understanding core concepts, or reviewing the golden path for module development
 
-ALWAYS open `docs/toolkit_unified_system/02_module_layout_and_sdk_pattern.md` WHEN starting to define requirements, architecture design, or implement any module; creating new module directory structure; deciding where to place files; understanding SDK pattern; creating Cargo.toml; naming data types; implementing local client; registering module in cf-gears-example-server; or creating QUICKSTART.md
+ALWAYS open `docs/toolkit_unified_system/02_gear_layout_and_sdk_pattern.md` WHEN starting to define requirements, architecture design, or implement any module; creating new gear directory structure; deciding where to place files; understanding SDK pattern; creating Cargo.toml; naming data types; implementing local client; registering module in cf-gears-example-server; or creating QUICKSTART.md
 
 ALWAYS open `docs/toolkit_unified_system/03_clienthub_and_plugins.md` WHEN implementing inter-module communication via ClientHub, registering or resolving typed clients, implementing plugin architecture, creating main module with plugins, or registering scoped clients via GTS
 
@@ -65,9 +65,9 @@ ALWAYS open `docs/toolkit_unified_system/11_database_patterns.md` WHEN implement
 
 ALWAYS open `docs/toolkit_unified_system/07_odata_pagination_select_filter.md` WHEN adding OData filtering, pagination, $select, $orderby, implementing ODataFilterable derive, creating FieldToColumn/ODataFieldMapping, or using cursor-based pagination
 
-ALWAYS open `docs/toolkit_unified_system/08_lifecycle_stateful_tasks.md` WHEN using #[toolkit::module] macro, implementing Module trait, registering clients in ClientHub, configuring module lifecycle, or using WithLifecycle/CancellationToken for background tasks
+ALWAYS open `docs/toolkit_unified_system/08_lifecycle_stateful_tasks.md` WHEN using #[toolkit::gear] macro, implementing Gear trait, registering clients in ClientHub, configuring gear lifecycle, or using WithLifecycle/CancellationToken for background tasks
 
-ALWAYS open `docs/toolkit_unified_system/09_oop_grpc_sdk_pattern.md` WHEN creating out-of-process module, implementing gRPC service, setting up OoP binary, or wiring gRPC clients via DirectoryApi
+ALWAYS open `docs/toolkit_unified_system/09_oop_grpc_sdk_pattern.md` WHEN creating out-of-process gear, implementing gRPC service, setting up OoP binary, or wiring gRPC clients via DirectoryApi
 
 ALWAYS open `docs/toolkit_unified_system/10_checklists_and_templates.md` WHEN writing module tests, creating SecurityContext for tests, implementing integration tests, or looking for quick checklists and code templates
 

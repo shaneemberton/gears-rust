@@ -1,6 +1,6 @@
-//! Log forwarding for `OoP` module stdout/stderr
+//! Log forwarding for `OoP` gear stdout/stderr
 //!
-//! This module provides utilities for capturing stdout/stderr from child processes
+//! This gear provides utilities for capturing stdout/stderr from child processes
 //! and forwarding each line to the parent's tracing system with proper context.
 
 use serde_json::Value;
@@ -32,8 +32,8 @@ impl std::fmt::Display for StreamKind {
 ///
 /// 1. Plain text format (tracing-subscriber default):
 /// ```text
-/// 2025-12-08T00:10:18.2852399Z  INFO module_name: message
-/// 2025-12-08T00:10:18.2852399Z DEBUG module_name: message
+/// 2025-12-08T00:10:18.2852399Z  INFO gear_name: message
+/// 2025-12-08T00:10:18.2852399Z DEBUG gear_name: message
 /// ```
 ///
 /// 2. JSON format (tracing-subscriber with json layer):
@@ -90,13 +90,13 @@ fn detect_json_level(line: &str) -> Option<Level> {
 /// Forward a single line to tracing with the detected level.
 ///
 /// Uses dynamic dispatch via `tracing::event!` macro with appropriate level.
-fn forward_line(module: &str, instance_id: Uuid, stream: StreamKind, line: &str) {
+fn forward_line(gear: &str, instance_id: Uuid, stream: StreamKind, line: &str) {
     let level = detect_log_level(line);
 
     match level {
         Level::ERROR => {
             tracing::error!(
-                oop_module = %module,
+                oop_gear = %gear,
                 oop_instance_id = %instance_id,
                 stream = %stream,
                 "{line}"
@@ -104,7 +104,7 @@ fn forward_line(module: &str, instance_id: Uuid, stream: StreamKind, line: &str)
         }
         Level::WARN => {
             tracing::warn!(
-                oop_module = %module,
+                oop_gear = %gear,
                 oop_instance_id = %instance_id,
                 stream = %stream,
                 "{line}"
@@ -112,7 +112,7 @@ fn forward_line(module: &str, instance_id: Uuid, stream: StreamKind, line: &str)
         }
         Level::INFO => {
             tracing::info!(
-                oop_module = %module,
+                oop_gear = %gear,
                 oop_instance_id = %instance_id,
                 stream = %stream,
                 "{line}"
@@ -120,7 +120,7 @@ fn forward_line(module: &str, instance_id: Uuid, stream: StreamKind, line: &str)
         }
         Level::DEBUG => {
             tracing::debug!(
-                oop_module = %module,
+                oop_gear = %gear,
                 oop_instance_id = %instance_id,
                 stream = %stream,
                 "{line}"
@@ -128,7 +128,7 @@ fn forward_line(module: &str, instance_id: Uuid, stream: StreamKind, line: &str)
         }
         Level::TRACE => {
             tracing::trace!(
-                oop_module = %module,
+                oop_gear = %gear,
                 oop_instance_id = %instance_id,
                 stream = %stream,
                 "{line}"
@@ -144,7 +144,7 @@ fn forward_line(module: &str, instance_id: Uuid, stream: StreamKind, line: &str)
 /// - The cancellation token is triggered
 pub fn spawn_stream_forwarder<S>(
     stream: S,
-    module: String,
+    gear: String,
     instance_id: Uuid,
     cancel: CancellationToken,
     kind: StreamKind,
@@ -162,7 +162,7 @@ where
 
                 () = cancel.cancelled() => {
                     tracing::debug!(
-                        oop_module = %module,
+                        oop_gear = %gear,
                         oop_instance_id = %instance_id,
                         stream = ?kind,
                         "log forwarder cancelled"
@@ -173,11 +173,11 @@ where
                 result = lines.next_line() => {
                     match result {
                         Ok(Some(line)) => {
-                            forward_line(&module, instance_id, kind, &line);
+                            forward_line(&gear, instance_id, kind, &line);
                         }
                         Ok(None) => {
                             tracing::debug!(
-                                oop_module = %module,
+                                oop_gear = %gear,
                                 oop_instance_id = %instance_id,
                                 stream = ?kind,
                                 "log stream closed"
@@ -186,7 +186,7 @@ where
                         }
                         Err(e) => {
                             tracing::warn!(
-                                oop_module = %module,
+                                oop_gear = %gear,
                                 oop_instance_id = %instance_id,
                                 stream = ?kind,
                                 error = %e,
@@ -219,15 +219,15 @@ mod tests {
             Level::DEBUG
         );
         assert_eq!(
-            detect_log_level("2025-12-08T00:10:18.2852399Z  WARN some_module: warning message"),
+            detect_log_level("2025-12-08T00:10:18.2852399Z  WARN some_gear: warning message"),
             Level::WARN
         );
         assert_eq!(
-            detect_log_level("2025-12-08T00:10:18.2852399Z ERROR some_module: error message"),
+            detect_log_level("2025-12-08T00:10:18.2852399Z ERROR some_gear: error message"),
             Level::ERROR
         );
         assert_eq!(
-            detect_log_level("2025-12-08T00:10:18.2852399Z TRACE some_module: trace message"),
+            detect_log_level("2025-12-08T00:10:18.2852399Z TRACE some_gear: trace message"),
             Level::TRACE
         );
     }
@@ -262,31 +262,31 @@ mod tests {
         // JSON format with uppercase level
         assert_eq!(
             detect_log_level(
-                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"INFO","fields":{"message":"test"},"target":"module"}"#
+                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"INFO","fields":{"message":"test"},"target":"gear"}"#
             ),
             Level::INFO
         );
         assert_eq!(
             detect_log_level(
-                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"DEBUG","fields":{"message":"test"},"target":"module"}"#
+                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"DEBUG","fields":{"message":"test"},"target":"gear"}"#
             ),
             Level::DEBUG
         );
         assert_eq!(
             detect_log_level(
-                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"WARN","fields":{"message":"test"},"target":"module"}"#
+                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"WARN","fields":{"message":"test"},"target":"gear"}"#
             ),
             Level::WARN
         );
         assert_eq!(
             detect_log_level(
-                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"ERROR","fields":{"message":"test"},"target":"module"}"#
+                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"ERROR","fields":{"message":"test"},"target":"gear"}"#
             ),
             Level::ERROR
         );
         assert_eq!(
             detect_log_level(
-                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"TRACE","fields":{"message":"test"},"target":"module"}"#
+                r#"{"timestamp":"2025-12-09T21:09:40.0028859Z","level":"TRACE","fields":{"message":"test"},"target":"gear"}"#
             ),
             Level::TRACE
         );

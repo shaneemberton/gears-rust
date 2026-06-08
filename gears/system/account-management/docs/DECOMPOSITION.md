@@ -25,7 +25,7 @@
 - [ ] `p1` - **ID**: `cpt-cf-account-management-status-overall`
 ## 1. Overview
 
-This document decomposes the Account Management (AM) module — covering
+This document decomposes the Account Management (AM) gear — covering
 both the parent service (`gears/system/account-management/`) and the
 co-located Tenant Resolver Plugin (`gears/system/account-management/src/tr_plugin/`,
 specified under `docs/tr-plugin/`) — into a fixed set of **nine features**
@@ -44,17 +44,17 @@ The 9 features reflect three independent grouping pillars applied to the
 same inventory, yielding the same partition under all three lenses:
 
 1. **Service-aligned grouping** (DESIGN §3.2). AM's DESIGN defines five
-   in-service components — `AccountManagementModule`, `TenantService`,
+   in-service components — `AccountManagementGear`, `TenantService`,
    `ConversionService`, `MetadataService`, and `BootstrapService` — each
    with a coherent domain responsibility. Four of those map 1:1 to
-   features (`platform-bootstrap` owns `AccountManagementModule` +
+   features (`platform-bootstrap` owns `AccountManagementGear` +
    `BootstrapService`; `tenant-hierarchy-management` owns `TenantService`;
    `managed-self-managed-modes` owns `ConversionService`;
    `tenant-metadata` owns `MetadataService`). The remaining functional
    surfaces that do not crystallize into a DESIGN component —
    tenant-type enforcement (a pre-write barrier invoked by
    `TenantService`), IdP user operations (a pluggable contract, not a
-   component), user groups (delegated to the Resource Group module), and
+   component), user groups (delegated to the Resource Group gear), and
    errors/observability (cross-cutting taxonomy + metrics) — become
    features in their own right because each has a distinct PRD FR group,
    a distinct public surface (or explicit no-surface rationale), and a
@@ -106,9 +106,9 @@ below rather than as co-ownership. Notable placement decisions:
   tenant-creation control flow; the type-enforcement barrier and
   mode-selection sub-flow are consumed by it as dependencies, not as
   shared sequences.
-- `component-module` (`AccountManagementModule`) is owned by
+- `component-gear` (`AccountManagementGear`) is owned by
   `platform-bootstrap` because its sole runtime responsibility is
-  module lifecycle / bootstrap orchestration. Routes it registers
+  gear lifecycle / bootstrap orchestration. Routes it registers
   belong to other features and are owned there.
 - NFRs were redistributed from `errors-observability` to the
   functional features that own their enforcement primitives
@@ -144,7 +144,7 @@ upstream PRD/DESIGN definition, with no broken references.
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-feature-platform-bootstrap`
 
-- **Purpose**: One-time initialization of the Account Management module on first platform start — creates the canonical root tenant, invokes the IdP tenant-provisioning contract for that root, and guarantees that platform upgrades or service restarts detect the existing root and proceed as a no-op. Bootstrap is the gate that publishes `status=active` on the root so every downstream tenant-consuming feature (hierarchy, modes, metadata, user operations, tenant-resolver plugin) has a foundation to build on.
+- **Purpose**: One-time initialization of the Account Management gear on first platform start — creates the canonical root tenant, invokes the IdP tenant-provisioning contract for that root, and guarantees that platform upgrades or service restarts detect the existing root and proceed as a no-op. Bootstrap is the gate that publishes `status=active` on the root so every downstream tenant-consuming feature (hierarchy, modes, metadata, user operations, tenant-resolver plugin) has a foundation to build on.
 
 - **Depends On**: `cpt-cf-account-management-feature-errors-observability`
 
@@ -153,7 +153,7 @@ upstream PRD/DESIGN definition, with no broken references.
   - Invocation of the tenant-provisioning operation for the root tenant via the shared IdP integration contract, forwarding deployer-configured metadata so the IdP provider plugin can establish the tenant-to-IdP binding, and persisting any provisioning metadata the provider returns.
   - Idempotent behaviour across platform upgrade and AM restart: detect an existing root tenant and preserve it without duplication (bootstrap MUST be a no-op when the root already exists).
   - Ordering guarantee: wait for the IdP to be available before completing bootstrap, retry with backoff, and fail after a configurable timeout if the IdP is not ready.
-  - Module-lifecycle plumbing for bootstrap orchestration: `AccountManagementModule` owns the ToolKit `lifecycle(entry = ...)` entry point that invokes `BootstrapService` before the module signals ready; `BootstrapService` owns idempotent root creation and the IdP-wait loop.
+  - Gear-lifecycle plumbing for bootstrap orchestration: `AccountManagementGear` owns the ToolKit `lifecycle(entry = ...)` entry point that invokes `BootstrapService` before the gear signals ready; `BootstrapService` owns idempotent root creation and the IdP-wait loop.
 
 - **Out of scope**:
   - Creation of the initial Platform Administrator user identity — the Platform Admin is pre-provisioned in the IdP during infrastructure setup; AM does not create this user (covered by the `idp-user-operations-contract` feature for all other user operations).
@@ -185,11 +185,11 @@ upstream PRD/DESIGN definition, with no broken references.
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-cf-account-management-component-module`
+  - [ ] `p1` - `cpt-cf-account-management-component-gear`
   - [ ] `p1` - `cpt-cf-account-management-component-bootstrap-service`
 
 - **API**:
-  - Internal module-lifecycle entry point only — no public REST endpoints are registered by this feature. `AccountManagementModule::init` wires `BootstrapService`, and `AccountManagementModule::lifecycle(entry = ...)` invokes `BootstrapService::run` during startup before the module signals ready. Bootstrap configuration (root tenant type, IdP wait timeout/backoff, strict-mode flags) is supplied via deployment configuration, not via a runtime API or CLI command.
+  - Internal gear lifecycle entry point only — no public REST endpoints are registered by this feature. `AccountManagementGear::init` wires `BootstrapService`, and `AccountManagementGear::lifecycle(entry = ...)` invokes `BootstrapService::run` during startup before the gear signals ready. Bootstrap configuration (root tenant type, IdP wait timeout/backoff, strict-mode flags) is supplied via deployment configuration, not via a runtime API or CLI command.
 
 - **Sequences**:
 
@@ -419,7 +419,7 @@ upstream PRD/DESIGN definition, with no broken references.
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-feature-idp-user-operations-contract`
 
-- **Purpose**: Define the pluggable IdP user-operations contract that makes the configured IdP the source of truth for user identity and user-tenant binding, and expose that contract through Account Management's tenant-scoped user REST surface. The feature owns the `IdpPluginClient` trait for user provisioning, deprovisioning, and tenant-scoped user query, together with the provisioning saga and compensation reaper that keep AM intent and IdP state aligned without AM ever becoming the system of record for user profiles or credentials. Concrete IdP adapter crates (Keycloak, Zitadel, Dex, etc.) are intentionally excluded — they conform to this contract but ship outside this module.
+- **Purpose**: Define the pluggable IdP user-operations contract that makes the configured IdP the source of truth for user identity and user-tenant binding, and expose that contract through Account Management's tenant-scoped user REST surface. The feature owns the `IdpPluginClient` trait for user provisioning, deprovisioning, and tenant-scoped user query, together with the provisioning saga and compensation reaper that keep AM intent and IdP state aligned without AM ever becoming the system of record for user profiles or credentials. Concrete IdP adapter crates (Keycloak, Zitadel, Dex, etc.) are intentionally excluded — they conform to this contract but ship outside this gear.
 
 - **Depends On**: `cpt-cf-account-management-feature-tenant-hierarchy-management`, `cpt-cf-account-management-feature-errors-observability`
 
@@ -433,7 +433,7 @@ upstream PRD/DESIGN definition, with no broken references.
   - User-identity schema reference (`gts://gts.cf.core.am.user.v1~`) published for downstream consumers that need the user projection shape at tenant boundary.
 
 - **Out of scope**:
-  - Conforming IdP plugin implementations (e.g. Keycloak adapter, Zitadel adapter, Dex adapter) — these live in separate crates and are delivered outside this feature and this module.
+  - Conforming IdP plugin implementations (e.g. Keycloak adapter, Zitadel adapter, Dex adapter) — these live in separate crates and are delivered outside this feature and this gear.
   - Tenant-lifecycle IdP operations (tenant provisioning / deprovisioning and their failure contract) — those are side effects of tenant create/delete and are owned by `tenant-hierarchy-management`.
   - Token validation, session renewal, federation, credential policy, and MFA policy — inherited from the platform authorization architecture and the configured IdP provider, not owned here.
   - User-group orchestration, user-group membership, and nested user groups — owned by `user-groups` (which depends on this feature for user-existence checks).
@@ -484,18 +484,18 @@ upstream PRD/DESIGN definition, with no broken references.
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-feature-user-groups`
 
-- **Purpose**: Orchestrate user groups entirely through delegation to the Resource Group module. Account Management registers the chained user-group type schema `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~` during module initialization, triggers cascade cleanup of user groups during tenant hard-deletion, and exposes AM's user-query surface so callers can combine user existence checks with Resource Group's membership operations. Account Management deliberately does not proxy CRUD or membership calls and owns no user-group tables — all group hierarchy, membership storage, cycle detection, and tenant-scoped isolation are performed by Resource Group.
+- **Purpose**: Orchestrate user groups entirely through delegation to the Resource Group gear. Account Management registers the chained user-group type schema `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~` during gear initialization, triggers cascade cleanup of user groups during tenant hard-deletion, and exposes AM's user-query surface so callers can combine user existence checks with Resource Group's membership operations. Account Management deliberately does not proxy CRUD or membership calls and owns no user-group tables — all group hierarchy, membership storage, cycle detection, and tenant-scoped isolation are performed by Resource Group.
 
 - **Depends On**: `cpt-cf-account-management-feature-tenant-hierarchy-management`, `cpt-cf-account-management-feature-idp-user-operations-contract`, `cpt-cf-account-management-feature-errors-observability`
 
 - **Scope**:
-  - Chained RG type-schema registration during AM module init for `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~`, with `allowed_memberships = [gts.cf.core.am.user.v1~]` and `allowed_parents` permitting self-nesting for nested user groups.
+  - Chained RG type-schema registration during AM gear init for `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~`, with `allowed_memberships = [gts.cf.core.am.user.v1~]` and `allowed_parents` permitting self-nesting for nested user groups.
   - Account-Management-side cascade cleanup trigger during tenant hard-deletion so Resource Group can remove the tenant's user-group subtree before the tenant row is deleted.
   - Exposure of AM's tenant-scoped user-query capability (from feature 5) as the valid user set that callers combine with Resource Group membership operations.
   - Documented delegation contract: consumers call `ResourceGroupClient` directly for group and membership operations; AM does not proxy.
 
 - **Out of scope**:
-  - Resource Group storage: the `user_group_*` tables and any other user-group persistence are OWNED by the Resource Group module, not by account-management.
+  - Resource Group storage: the `user_group_*` tables and any other user-group persistence are OWNED by the Resource Group gear, not by account-management.
   - The Resource Group engine itself (generic RG CRUD, type registry machinery, RG cascade engine, forest invariants, cycle detection, tenant-scoped isolation enforcement) — account-management only DELEGATES to it.
   - REST endpoints for group create/update/delete, membership add/remove, or nested-group traversal — none live in the AM OpenAPI surface; callers use Resource Group's API directly.
   - User identity operations (provisioning, deprovisioning, existence checks) — owned by `idp-user-operations-contract`.
@@ -619,9 +619,9 @@ upstream PRD/DESIGN definition, with no broken references.
   - Authoritative HTTP mapping per DESIGN §3.8 — codes are properties of the canonical category, not AM-private. Fine-grained discriminators ride inside the envelope as `reason` tokens on field/precondition/quota violations: `INVALID_TENANT_TYPE`, `TYPE_NOT_ALLOWED`, `TENANT_DEPTH_EXCEEDED`, `TENANT_HAS_CHILDREN`, `TENANT_HAS_RESOURCES`, `ROOT_TENANT_CANNOT_DELETE`, `PENDING_EXISTS`, `INVALID_ACTOR_FOR_TRANSITION`, `ALREADY_RESOLVED`, `ROOT_TENANT_CANNOT_CONVERT`, `SERIALIZATION_CONFLICT`, `CROSS_TENANT_DENIED`. Resource-not-found cases use the `resource_type` / `resource_name` fields (`gts.cf.core.am.{tenant|tenant_metadata|conversion_request}.v1~`, exported as `account_management_sdk::gts::{TENANT_RESOURCE_TYPE, TENANT_METADATA_RESOURCE_TYPE, CONVERSION_REQUEST_RESOURCE_TYPE}`) instead of a dedicated reason token.
   - RFC 9457 Problem Details envelope: OpenAPI `Problem` schema defines the authoritative response shape consumed by every feature.
   - Observability metric families (8 required): dependency health, metadata resolution, bootstrap lifecycle, tenant-retention, conversion lifecycle, hierarchy-depth threshold exceedance, cross-tenant denials, `serializable_retry` (operational family added by `errors-observability` for `with_serializable_retry`'s exhausted-retry signal — see [feature-errors-observability §5.2](features/feature-errors-observability.md) catalog table).
-  - Platform-aligned metric naming and exposure conventions; boundary between platform-provided and module-internal metrics kept implementation-side.
+  - Platform-aligned metric naming and exposure conventions; boundary between platform-provided and gear-internal metrics kept implementation-side.
   - Ops-metrics treatment: dashboard / alerting integration policy covering which domain metrics back SLO/alert rules, naming alignment with the platform metric catalog, and the contract for on-call escalation paths sourced from this feature's metric families (see footnote [a]).
-  - Cross-cutting policy surfaces: audit-trail completeness (`actor=system` for bootstrap completion, conversion expiry, provisioning-reaper, hard-delete/tenant-deprovision cleanup), SecurityContext requirement at every entry point, no in-module AuthZ evaluation, path-based API versioning + SDK/IdP contract-stability discipline, data-classification baseline (Internal/Confidential for hierarchy/mode data; PII-adjacent for opaque identity refs; per-schema for metadata), platform reliability SLA (99.9% uptime, RPO ≤ 1h, RTO ≤ 15m; IdP-outage degradation rules), and vendor/licensing hygiene.
+  - Cross-cutting policy surfaces: audit-trail completeness (`actor=system` for bootstrap completion, conversion expiry, provisioning-reaper, hard-delete/tenant-deprovision cleanup), SecurityContext requirement at every entry point, no in-gear AuthZ evaluation, path-based API versioning + SDK/IdP contract-stability discipline, data-classification baseline (Internal/Confidential for hierarchy/mode data; PII-adjacent for opaque identity refs; per-schema for metadata), platform reliability SLA (99.9% uptime, RPO ≤ 1h, RTO ≤ 15m; IdP-outage degradation rules), and vendor/licensing hygiene.
 
 - **Out of scope**:
   - Feature-specific error emission — each owning feature maps its own failure modes onto the taxonomy defined here (e.g., tenant-hierarchy emits `CanonicalError::FailedPrecondition` with `reason=TENANT_HAS_CHILDREN`, modes emits `CanonicalError::FailedPrecondition` with `reason=PENDING_EXISTS`, metadata emits `CanonicalError::NotFound` for missing schemas).
@@ -683,7 +683,7 @@ upstream PRD/DESIGN definition, with no broken references.
 
 ### 2.9 Tenant Resolver Plugin — defined in sub-system DECOMPOSITION
 
-Feature `cpt-cf-tr-plugin-feature-tenant-resolver-plugin` is the sole feature of the `cf-tr-plugin` sub-system and is therefore **defined authoritatively** in the child [tr-plugin DECOMPOSITION](./tr-plugin/DECOMPOSITION.md), not here. This parent DECOMPOSITION references it only in §3 Feature Dependencies as a cross-system leaf on the `tenant-hierarchy-management` branch, preserving the whole-module dependency view.
+Feature `cpt-cf-tr-plugin-feature-tenant-resolver-plugin` is the sole feature of the `cf-tr-plugin` sub-system and is therefore **defined authoritatively** in the child [tr-plugin DECOMPOSITION](./tr-plugin/DECOMPOSITION.md), not here. This parent DECOMPOSITION references it only in §3 Feature Dependencies as a cross-system leaf on the `tenant-hierarchy-management` branch, preserving the whole-gear dependency view.
 
 **Why split**: the Cypilot registry (`.cypilot/config/artifacts.toml`) models `tr-plugin` as a distinct sub-system (`systems.autodetect.children` block under `cf`). Per registry semantics, feature IDs carrying the `cpt-cf-tr-plugin-*` prefix must be defined within the sub-system's own artifact tree to keep the parent system's autodetect scan consistent. Merging both namespaces in a single DECOMPOSITION file triggers a registry-level validation error ("Inconsistent systems in IDs"). The split satisfies the registry without losing the whole-system dependency view, which is re-assembled in §3 below.
 
@@ -725,7 +725,7 @@ cpt-cf-account-management-feature-tenant-hierarchy-management (deps: platform-bo
   **foundation**: it defines the RFC 9457 Problem Details envelope, the
   stable public error-code taxonomy, and the domain-specific metric
   catalog that every other feature emits into. It also carries the
-  cross-cutting SecurityContext-at-entry-point, no-in-module-AuthZ,
+  cross-cutting SecurityContext-at-entry-point, no-in-gear-AuthZ,
   versioning, audit, data-classification, reliability, and
   ops-metrics-treatment policies. No feature-level upstream — transitively
   depended on by all eight other features.
@@ -812,7 +812,7 @@ cpt-cf-account-management-feature-tenant-hierarchy-management (deps: platform-bo
   (meaning of the barrier column) and `errors-observability` (error and
   telemetry conventions), but those are not hard DAG edges in either this
   parent view or the child `tr-plugin/DECOMPOSITION.md`. The plugin is a
-  **leaf** in the DAG with no downstream consumers inside this module.
+  **leaf** in the DAG with no downstream consumers inside this gear.
 
 **Parallel-development opportunities** (siblings under the same parent
 with no cross-edges, derivable from the DAG):
@@ -835,7 +835,7 @@ with no cross-edges, derivable from the DAG):
 (`platform-bootstrap` depends on `errors-observability` per Phase 2 §4
 authoritative edge list.)
 
-**Leaf features (no downstream consumers inside this module)**:
+**Leaf features (no downstream consumers inside this gear)**:
 `user-groups`, `tenant-metadata`, `tenant-resolver-plugin`.
 
 **Cycle check**: no cycles — the DAG is acyclic by construction

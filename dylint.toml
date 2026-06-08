@@ -8,7 +8,7 @@ libraries = [
 ]
 
 # DE1101: Tests must be in separate files.
-# Remove entries as modules are migrated.
+# Remove entries as gears are migrated.
 [de1101_tests_in_separate_files]
 # Maximum number of inline test lines allowed before the lint enforces splitting
 # into a separate `*_tests.rs` file. Set to 0 to always require separation.
@@ -34,7 +34,7 @@ excluded_paths = [
     "libs/toolkit-utils",
     "libs/system-sdks",
 
-    # modules/
+    # gears/
     "gears/approval-service",
     "gears/file-parser",
     "gears/llm-gateway",
@@ -47,7 +47,7 @@ excluded_paths = [
     # gears/system/
     "gears/system/api-gateway",
     "gears/system/grpc-hub",
-    "gears/system/module-orchestrator",
+    "gears/system/gear-orchestrator",
     "gears/system/nodes-registry",
     "gears/system/oagw",
     "gears/system/types-registry",

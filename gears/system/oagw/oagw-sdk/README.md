@@ -1,10 +1,10 @@
 # OAGW SDK
 
-SDK crate for the Outbound API Gateway module, providing API traits, domain models, error types, and streaming utilities.
+SDK crate for the Outbound API Gateway gear, providing API traits, domain models, error types, and streaming utilities.
 
 ## Overview
 
-This crate defines the transport-agnostic interface for the OAGW module:
+This crate defines the transport-agnostic interface for the OAGW gear:
 
 - **`ServiceGatewayClientV1`** — Async trait for upstream/route management and request proxying
 - **`Upstream` / `Route`** — Core domain models with builder-based construction

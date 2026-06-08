@@ -1,6 +1,6 @@
 //! Lock-free router caching using arc-swap for read-mostly data
 //!
-//! This module provides atomic swapping of read-mostly structures like
+//! This gear provides atomic swapping of read-mostly structures like
 //! Axum routers to eliminate lock contention on hot paths.
 
 use arc_swap::ArcSwap;

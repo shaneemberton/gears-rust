@@ -39,7 +39,7 @@
   - [5.15 Notification Plugin Contract](#515-notification-plugin-contract)
   - [5.16 Operational Telemetry](#516-operational-telemetry)
 - [6. Non-Functional Requirements](#6-non-functional-requirements)
-  - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
+  - [6.1 Gear-Specific NFRs](#61-gear-specific-nfrs)
   - [6.2 Data Governance](#62-data-governance)
   - [6.3 NFR Exclusions](#63-nfr-exclusions)
 - [7. Public Library Interfaces](#7-public-library-interfaces)
@@ -59,7 +59,7 @@
 
 ### 1.1 Purpose
 
-The Quota Enforcement module is the platform's authoritative engine for declaring resource consumption limits ("quotas")
+The Quota Enforcement gear is the platform's authoritative engine for declaring resource consumption limits ("quotas")
 and evaluating whether individual operations are permitted under those limits. It supports debit, credit, rollback, and
 two-phase lease primitives and exposes a Subject Type Registry so that quotas can be enforced against any
 platform-recognized subject — tenants, individual users, cost centers, applications, or any other organizational unit —
@@ -89,7 +89,7 @@ Without a centralized quota engine, every consuming team duplicates the same cou
 idempotency-key, and quota-resolution code — at varying levels of correctness. Cross-service quota policies (a single "
 AI tokens per tenant" budget that spans multiple AI-using services) are impossible to express because each service holds
 its own counter. Operator workflows for raising or lowering caps require a per-service migration. The Quota Enforcement
-module addresses these problems by providing a single, shared, multi-tenant counter/ledger backend with explicit Quotas,
+gear addresses these problems by providing a single, shared, multi-tenant counter/ledger backend with explicit Quotas,
 idempotent operations, and a uniform evaluation contract.
 
 ### 1.3 Goals (Business Outcomes)
@@ -232,7 +232,7 @@ of scope for this PRD); Quota Manager translates their workflows into QE API cal
 
 **ID**: `cpt-cf-quota-enforcement-actor-types-registry`
 
-- **Role**: The platform `types-registry` module. Provides metric (usage type) registration, kind classification (
+- **Role**: The platform `types-registry` gear. Provides metric (usage type) registration, kind classification (
   counter/gauge), and enforcement-mode classification (`QuotaGated` / `Direct`); Quota Enforcement references registered
   metric names in Quotas.
 
@@ -320,7 +320,7 @@ This design has the following consequences that callers and operators must under
 
 | Phase | Subject Types Supported                                                                                      | Resolution Mechanism                                                                                                                                                     |
 | ----- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P1    | Built-in `tenant`, `user`                                                                                    | Direct SecurityContext field lookup; no traversal; seeded at module bootstrap, no operator-facing registration                                                           |
+| P1    | Built-in `tenant`, `user`                                                                                    | Direct SecurityContext field lookup; no traversal; seeded at gear bootstrap, no operator-facing registration                                                           |
 | P2    | Operator-registered subject types (e.g., `service-account`, `client-app`, `api-key`)                         | Declarative registration via the Subject Type Registry API; resolution rule references a single SecurityContext field; deterministic mapping per operation; no traversal |
 | P3    | Arbitrary hierarchical types via resource-group hierarchy (e.g., `cost-center`, `application`, `department`) | Resolution rule may declare a parent-traversal path against the resource-group ownership graph; Quota Enforcement walks the path to assemble the applicable-subjects set |
 
@@ -331,7 +331,7 @@ mechanism — only the resolution rule for the new subject types.
 ### 3.2 Metric Identity
 
 Metric names in Quota Enforcement are not internally minted. Every metric referenced by a Quota is the registered name
-of a usage type in the platform `types-registry` module. Metric instances follow the GTS URI form under base
+of a usage type in the platform `types-registry` gear. Metric instances follow the GTS URI form under base
 `gts.cf.qe.metric.type.v1~` — e.g., `gts.cf.qe.metric.type.v1~cf.qe.metric.ai_tokens_input.v1`,
 `gts.cf.qe.metric.type.v1~cf.qe.metric.vcpu_hours.v1`, `gts.cf.qe.metric.type.v1~cf.qe.metric.storage_bytes.v1`.
 
@@ -517,7 +517,7 @@ Quota records.
 - PDP-gated authorization on every operation
 - Pluggable storage backend (P1: `toolkit-db`-based plugin; alternative backends viable under the same plugin contract)
 - Notification plugin contract emitting the event catalog defined in `cpt-cf-quota-enforcement-fr-notification-plugin`
-- Operational telemetry (module-specific counters, histograms, and gauges; baseline observability via the platform
+- Operational telemetry (gear-specific counters, histograms, and gauges; baseline observability via the platform
   framework)
 - P1 ships a closed `source` enum on every Quota with values `licensing` (default; quotas materialized from the
   licensing layer) and `operator` (manual caps — incident response, compliance carve-outs, soft-launch placeholders).
@@ -548,7 +548,7 @@ The umbrella covers:
   existing Quota Enforcement update/credit primitives; Quota Enforcement does not introduce a "redistribute" verb.
 - **Quota increase-request workflow** — self-service raise + operator approval lifecycle, including the request entity,
   the approval state machine, the cap-bump audit trail, and the human-facing surfaces. Owned by Quota Manager (replaces
-  the earlier "deferred / wrapper component or workflow module" framing — see §13).
+  the earlier "deferred / wrapper component or workflow gear" framing — see §13).
 - **License purchase / renewal / expiry / revocation hooks** — translating commercial events into Quota lifecycle
   changes (create, update cap, deactivate, reactivate). Owned by Quota Manager; Quota Enforcement merely receives the
   resulting CRUD calls.
@@ -613,7 +613,7 @@ Each registered subject type **MUST** carry:
 - a flag indicating whether multiple distinct subjects of this type may apply to a single operation (P1: at most one per
   type).
 
-The registry **MUST** seed two built-in types at module bootstrap:
+The registry **MUST** seed two built-in types at gear bootstrap:
 `gts.cf.qe.subject.type.v1~cf.qe.subject.tenant.v1` (resolution: `SecurityContext.subject_tenant_id()`) and
 `gts.cf.qe.subject.type.v1~cf.qe.subject.user.v1` (resolution: `SecurityContext.subject_id()` when
 `SecurityContext.subject_type() == "gts.cf.qe.subject.type.v1~cf.qe.subject.user.v1"`). P1 ships **only** these two
@@ -1576,7 +1576,7 @@ for a given scope and supplies that Engine's config. The system **MUST** model t
 
 For each operation, the system **MUST** select the active Policy via most-specific-scope precedence: the `metric` Policy
 if one is defined for the operation's metric, else the `global` Policy. The system **MUST** seed a built-in `global`
-Policy at module bootstrap with `engine_id=most-restrictive-wins` and empty `engine_config`; this seeded Policy **MUST
+Policy at gear bootstrap with `engine_id=most-restrictive-wins` and empty `engine_config`; this seeded Policy **MUST
 NOT** be deletable but **MAY** be replaced by an operator with a different `global`-scoped Policy referencing any
 registered Engine.
 
@@ -1586,7 +1586,7 @@ config). Validation failures **MUST** be returned as actionable errors before pe
 guaranteed to carry a Engine-validated config.
 
 Operators **MAY** create, update, and delete narrow-scope Policies; the global Policy **MUST NOT** be deleted. A Policy
-referencing an `engine_id` that is not registered in the current module deployment **MUST** be rejected at create/update
+referencing an `engine_id` that is not registered in the current gear deployment **MUST** be rejected at create/update
 time.
 
 **Versioning.** Every Quota Resolution Policy is versioned per
@@ -1646,7 +1646,7 @@ first-class operation.
     next-most-specific scope per the precedence ladder in `cpt-cf-quota-enforcement-fr-quota-resolution-policy`.
 
 **Bootstrap.** The seeded built-in `global` Policy (per `cpt-cf-quota-enforcement-fr-quota-resolution-policy`)
-materializes at module bootstrap as
+materializes at gear bootstrap as
 `policy_id = global, policy_version = 1, version_state = active, engine_id = most-restrictive-wins, engine_config = {}`.
 Operator updates produce versions 2, 3, …. When narrower-scope Policies are deleted or rolled back, the seeded global
 remains the ultimate fallback — evaluation never enters a "no Policy applies" state.
@@ -1724,7 +1724,7 @@ telemetry-cardinality discipline.
 - [ ] `p1` - **ID**: `cpt-cf-quota-enforcement-fr-quota-resolution-engine`
 
 The system **MUST** define a **Quota Resolution Engine** plugin contract and **MUST** ship at least two built-in Engines
-registered at module bootstrap: `most-restrictive-wins` (hardcoded; no config; fastest path) and `cel` (sandboxed CEL
+registered at gear bootstrap: `most-restrictive-wins` (hardcoded; no config; fastest path) and `cel` (sandboxed CEL
 evaluator; customizable). Additional Engines (e.g., Starlark, Lua, Wasm-loaded operator engines) are P2-or-later
 candidates and **MUST** plug in via the same contract without changes to the multi-quota-evaluation core.
 
@@ -1786,22 +1786,22 @@ Engines **MUST** be deterministic given the EvaluationContext (the system relies
 Policy FR); on timeout, the system surfaces a canonical `DeadlineExceeded` error (fail-closed) and the Engine's partial
 Decision (if any) is discarded.
 
-Engine plugins are registered in-process at module bootstrap. Adding a new Engine to a deployment requires building a
-module binary that includes the Engine; runtime registration of arbitrary user-supplied Engines is out of scope.
+Engine plugins are registered in-process at gear bootstrap. Adding a new Engine to a deployment requires building a
+gear binary that includes the Engine; runtime registration of arbitrary user-supplied Engines is out of scope.
 
 **Bootstrap failure is fail-fast.** If any built-in Engine declared in the deployment manifest fails to register at
-module bootstrap (e.g., the `cel` evaluator throws during initialization, a future Wasm-loaded Engine fails to compile,
-the Engine binary version mismatches the QE core version), the module **MUST** fail readiness and **MUST** refuse to
+gear bootstrap (e.g., the `cel` evaluator throws during initialization, a future Wasm-loaded Engine fails to compile,
+the Engine binary version mismatches the QE core version), the gear **MUST** fail readiness and **MUST** refuse to
 serve requests. The system **MUST NOT** silently fall back to a different Engine for Policies that referenced the failed
 one — silent fallback is unsafe because operator Policies referencing the unavailable Engine would change behavior
 without operator awareness, potentially widening enforcement (a CEL Policy that denied is replaced by
 `most-restrictive-wins` that allows). Failed-bootstrap state **MUST** surface a structured log entry and a telemetry
 counter `engine_bootstrap_failures_total` so operators can diagnose without reading log files. Recovery requires fixing
-the registration failure and restarting the module.
+the registration failure and restarting the gear.
 
 ##### P1 Built-in Engines
 
-The system **MUST** ship the following two built-in Engines in P1; both **MUST** be registered automatically at module
+The system **MUST** ship the following two built-in Engines in P1; both **MUST** be registered automatically at gear
 bootstrap:
 
 (1) `most-restrictive-wins` — hardcoded for maximum throughput; rejects any non-empty `engine_config`. Behavior:
@@ -2145,8 +2145,8 @@ to support transactional debit, credit, rollback, reserve, commit, and release o
 a single tenant scope. P1 ships a single plugin implementation built on `toolkit-db`; alternative backends are viable
 under the same plugin contract. The operator selects the active plugin via configuration.
 
-The plugin contract **MUST** be versioned with the module's major version; plugins implementing previous contract
-versions are not supported in newer module versions.
+The plugin contract **MUST** be versioned with the gear's major version; plugins implementing previous contract
+versions are not supported in newer gear versions.
 
 - **Rationale**: Pluggability avoids storage lock-in and lets future deployments adopt different backends (e.g.,
   distributed key-value stores for higher throughput) without changing the Quota Enforcement gateway. P1 commitment to a
@@ -2204,13 +2204,13 @@ write operations.
 
 ### 5.16 Operational Telemetry
 
-#### Module-Specific Telemetry
+#### Gear-Specific Telemetry
 
 - [ ] `p1` - **ID**: `cpt-cf-quota-enforcement-fr-telemetry`
 
 The system **MUST** follow platform observability conventions for the baseline observability surface — HTTP request
 counts and latencies, health endpoints, OpenTelemetry traces — provided by `toolkit-observability` and the `api-gateway`
-framework. On top of that baseline, the system **MUST** expose the following module-specific counters, histograms, and
+framework. On top of that baseline, the system **MUST** expose the following gear-specific counters, histograms, and
 gauges that surface QE-internal policy decisions and guard-rail rejections invisible to the framework baseline:
 
 - **`denial_total`** — count of admission denials, by metric and reason kind.
@@ -2220,7 +2220,7 @@ gauges that surface QE-internal policy decisions and guard-rail rejections invis
   rejected ones).
 - **`lease_inflight_limit_exceeded_total`** — acquisitions rejected by the per-`(tenant, metric)` active-lease cap per
   `cpt-cf-quota-enforcement-fr-lease-timeout`.
-- **`engine_bootstrap_failures_total`** — Engine registration failures at module bootstrap per
+- **`engine_bootstrap_failures_total`** — Engine registration failures at gear bootstrap per
   `cpt-cf-quota-enforcement-fr-quota-resolution-engine`.
 - **`engine_evaluation_seconds`** — Engine evaluation latency.
 - **`debit_plan_invariant_violations_total`** — Decisions rejected for violating Debit-Plan invariants per
@@ -2239,7 +2239,7 @@ Labels **MUST NOT** include high-cardinality identifiers (`tenant_id`, `subject_
 from a closed enum.
 
 - **Rationale**: The framework baseline already covers HTTP-server-level observability and health endpoints uniformly
-  across modules; restating it here would duplicate convention. The instruments above expose policy-decision and
+  across gears; restating it here would duplicate convention. The instruments above expose policy-decision and
   guard-rail signals unique to QE and invisible to the framework — they are the difference between "gateway is up" and
   "quota arbitration is healthy". Bounding label cardinality at the PRD level prevents a 100M-subject deployment from
   creating per-tenant time series that exhaust the metrics backend.
@@ -2247,7 +2247,7 @@ from a closed enum.
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Evaluation Latency
 
@@ -2399,14 +2399,14 @@ such fields before forwarding (e.g., pass `session_id_hash` rather than `session
 
 | Data                                        | Owner                            | Custodian                                 |
 | ------------------------------------------- | -------------------------------- | ----------------------------------------- |
-| Quotas                                      | Tenant identified by `tenant_id` | Quota Enforcement module (storage plugin) |
-| Counters and ledger rows                    | Tenant identified by `tenant_id` | Quota Enforcement module (storage plugin) |
-| Leases                                      | Tenant identified by `tenant_id` | Quota Enforcement module (storage plugin) |
-| Quota Resolution Policies                   | Platform Operator                | Quota Enforcement module (storage plugin) |
-| Subject Type Registry                       | Platform Engineering             | `types-registry` module                   |
-| Idempotency records                         | Tenant identified by `tenant_id` | Quota Enforcement module (storage plugin) |
-| Notification dispatch records (best-effort) | Tenant identified by `tenant_id` | Quota Enforcement module (storage plugin) |
-| Metric (usage type) catalog                 | Platform Engineering             | `types-registry` module                   |
+| Quotas                                      | Tenant identified by `tenant_id` | Quota Enforcement gear (storage plugin) |
+| Counters and ledger rows                    | Tenant identified by `tenant_id` | Quota Enforcement gear (storage plugin) |
+| Leases                                      | Tenant identified by `tenant_id` | Quota Enforcement gear (storage plugin) |
+| Quota Resolution Policies                   | Platform Operator                | Quota Enforcement gear (storage plugin) |
+| Subject Type Registry                       | Platform Engineering             | `types-registry` gear                   |
+| Idempotency records                         | Tenant identified by `tenant_id` | Quota Enforcement gear (storage plugin) |
+| Notification dispatch records (best-effort) | Tenant identified by `tenant_id` | Quota Enforcement gear (storage plugin) |
+| Metric (usage type) catalog                 | Platform Engineering             | `types-registry` gear                   |
 
 **Retention**:
 
@@ -2424,19 +2424,19 @@ such fields before forwarding (e.g., pass `session_id_hash` rather than `session
 
 ### 6.3 NFR Exclusions
 
-The following commonly applicable NFR categories are not applicable to this module:
+The following commonly applicable NFR categories are not applicable to this gear:
 
 - **Safety (ISO/IEC 25010:2023 §4.2.9)**: Not applicable — Quota Enforcement is a server-side data API with no physical
   interaction, no safety-critical operations, and no ability to cause harm to people, property, or the environment.
 - **Accessibility and Usability (UX)**: Not applicable — Quota Enforcement exposes no user-facing UI. It provides a
   developer SDK and a server-side API consumed exclusively by platform services.
-- **Internationalization / Localization**: Not applicable — the module exposes no user-facing text, labels, or
+- **Internationalization / Localization**: Not applicable — the gear exposes no user-facing text, labels, or
   locale-sensitive output.
-- **Privacy by Design (GDPR Art. 25)**: Not applicable as a standalone module requirement. Subject IDs stored by Quota
+- **Privacy by Design (GDPR Art. 25)**: Not applicable as a standalone gear requirement. Subject IDs stored by Quota
   Enforcement are opaque internal platform identifiers; PII management is the responsibility of the platform identity
   layer (e.g., `account-management`).
-- **Regulatory Compliance (GDPR, HIPAA, PCI DSS, SOX)**: Not applicable as a standalone module requirement — this is an
-  internal platform infrastructure module. Quota Enforcement handles no payment card data (PCI DSS N/A), no healthcare
+- **Regulatory Compliance (GDPR, HIPAA, PCI DSS, SOX)**: Not applicable as a standalone gear requirement — this is an
+  internal platform infrastructure gear. Quota Enforcement handles no payment card data (PCI DSS N/A), no healthcare
   records (HIPAA N/A), and no financial reporting data (SOX N/A). Platform-level regulatory obligations are governed at
   the platform level.
 
@@ -2482,7 +2482,7 @@ The following commonly applicable NFR categories are not applicable to this modu
 
 - **Protocol/Format**: Rust trait implemented by each storage backend plugin
 
-- **Compatibility**: Plugin contract versioned with the module's major version; plugins must match the module's major
+- **Compatibility**: Plugin contract versioned with the gear's major version; plugins must match the gear's major
   version.
 
 #### Coordination Plugin Contract
@@ -2496,7 +2496,7 @@ The following commonly applicable NFR categories are not applicable to this modu
   dispatcher singletons. Bootstrap reachability is validated via a `try_lock` + `release` probe on each `LockScope::*`
   value (no separate health-check method).
 
-- **Compatibility**: Plugin contract versioned with the module's major version; backwards-compatible additive changes
+- **Compatibility**: Plugin contract versioned with the gear's major version; backwards-compatible additive changes
   are allowed within a major version. The contract is intentionally separate from the Storage Plugin contract so that
   the coordination backend can evolve independently of the data backend.
 
@@ -2509,7 +2509,7 @@ The following commonly applicable NFR categories are not applicable to this modu
 - **Protocol/Format**: Rust trait implemented by each notification sink plugin in P1; P2 will additionally route through
   the platform EventBus.
 
-- **Compatibility**: Plugin contract versioned with the module's major version; backwards-compatible additive changes
+- **Compatibility**: Plugin contract versioned with the gear's major version; backwards-compatible additive changes
   are allowed within a major version.
 
 #### Subject Manager Lifecycle Contract — Indirect via Quota Manager
@@ -2533,15 +2533,15 @@ The following commonly applicable NFR categories are not applicable to this modu
 
 - [ ] `p1` - **ID**: `cpt-cf-quota-enforcement-contract-quota-resolution-engine-plugin`
 
-- **Direction**: required from Engine implementor; P1 built-ins (`most-restrictive-wins`, `cel`) ship with the module.
-  Additional Engines are linked into the module binary at build time.
+- **Direction**: required from Engine implementor; P1 built-ins (`most-restrictive-wins`, `cel`) ship with the gear.
+  Additional Engines are linked into the gear binary at build time.
 
 - **Protocol/Format**: Rust trait (`QuotaResolutionEngineV1`) with config-validation and evaluate entry points;
   `engine_config` is opaque to the Quota Enforcement core and validated by the Engine's own validator. Decision shape is
   `{ result, debit_plan: Map<quota_id, QuotaDebitPlan>, diagnostics }` with the Debit-Plan invariants enforced at the QE
   core boundary (see `cpt-cf-quota-enforcement-fr-quota-resolution-engine`).
 
-- **Compatibility**: Plugin contract versioned with the module's major version; backwards-compatible additive changes (
+- **Compatibility**: Plugin contract versioned with the gear's major version; backwards-compatible additive changes (
   new optional `QuotaDebitPlan` fields, new `EvaluationContext` bindings) are allowed within a major version. Removing
   or changing the meaning of an existing field is a major-version break.
 
@@ -2896,7 +2896,7 @@ on behalf of a tenant administrator)
   referencing an unknown `engine_id` are rejected at create/update time; narrower scopes than `metric` are not reachable
   through the P1 API and are tracked as an Open Question
 - [ ] Quota Resolution Engine plugin contract is implemented; P1 ships `most-restrictive-wins` (hardcoded) and `cel`
-  (sandboxed); both are registered automatically at module bootstrap
+  (sandboxed); both are registered automatically at gear bootstrap
 - [ ] Engine config validation is delegated to the named Engine at Policy create/update; the `cel` Engine performs parse
   \+ type-check at this stage and rejects syntactic and type errors with line/column; the `most-restrictive-wins` Engine
   rejects any non-empty config
@@ -2996,9 +2996,9 @@ on behalf of a tenant administrator)
   `batch_debit(mode=atomic, items=[{metric=M, amount=500}, {metric=M, amount=500}])` returns batch-level `Denied`
   (item-1 evaluated against `remaining=800` returns `Allowed`; item-2 evaluates against `remaining=300` and returns
   `Denied`; batch rolls back, no mutations persisted)
-- [ ] Engine bootstrap is fail-fast: if any built-in Engine in the deployment manifest fails to register, the module
+- [ ] Engine bootstrap is fail-fast: if any built-in Engine in the deployment manifest fails to register, the gear
   fails readiness, refuses requests, increments `engine_bootstrap_failures_total`, and emits a structured log entry; the
-  module does NOT silently fall back to a different Engine
+  gear does NOT silently fall back to a different Engine
 - [ ] Validity-window semantics are Engine-driven: built-in `most-restrictive-wins` excludes Quotas whose `time` falls
   outside `[validity_start, validity_end]` from the Debit Plan by default; operator-authored Policies MAY override (
   grace periods, expected-window matching against `request.metadata.expected_window`); leases acquired within a valid
@@ -3127,12 +3127,12 @@ on behalf of a tenant administrator)
 
 | Assumption                                                                                                                  | Owner                              | Validation                                                                                                               |
 | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| The `toolkit-db` infrastructure is available and provisioned with sufficient capacity for Quota Enforcement's expected scale | Platform Infrastructure            | Verified at module bootstrapping; Quota Enforcement fails to start if `toolkit-db` is unreachable                         |
+| The `toolkit-db` infrastructure is available and provisioned with sufficient capacity for Quota Enforcement's expected scale | Platform Infrastructure            | Verified at gear bootstrapping; Quota Enforcement fails to start if `toolkit-db` is unreachable                         |
 | `authz-resolver` is deployed and reachable                                                                                  | Platform Infrastructure            | Verified at gateway startup via health check; gateway fails readiness if PDP is unreachable                              |
 | `types-registry` is deployed and reachable for metric validation                                                            | Platform Engineering               | Verified at gateway startup; Quota create/update operations fail with an actionable error if the registry is unreachable |
 | Per-tenant quota density and operation rate fit within the published NFRs at first production deployment                    | Platform Engineering               | Pre-prod load testing at 10 000 ops/sec across 100M synthetic subjects                                                   |
 | Notification sinks register with the Quota Enforcement plugin contract at deployment time                                   | Per-deployment integration team    | Quota Enforcement telemetry surfaces "no notification sinks registered" warning; events are dropped silently otherwise   |
-| At least one storage plugin is deployed alongside the Quota Enforcement module                                              | Platform Infrastructure / Operator | Gateway readiness check fails when no plugin resolves                                                                    |
+| At least one storage plugin is deployed alongside the Quota Enforcement gear                                              | Platform Infrastructure / Operator | Gateway readiness check fails when no plugin resolves                                                                    |
 
 ## 12. Risks
 
@@ -3150,10 +3150,10 @@ on behalf of a tenant administrator)
 - **Shared metric-identifier namespace across QE, Usage Collector, and `types-registry`.** P1 QE uses
   `gts.cf.qe.metric.*` for the illustrative GTS instance examples in §3.2 because no platform-wide convention has been
   ratified for the metric identifier namespace shared between QE (which references metrics in Quotas) and the Usage
-  Collector (which emits usage records). Once the cross-module convention for shared type identifiers is resolved at the
+  Collector (which emits usage records). Once the cross-gear convention for shared type identifiers is resolved at the
   platform level, QE revisits the namespace choice and renames references in lockstep. QE PRD/DESIGN remains
   format-agnostic in the meantime per §3.2 ("QE inherits whatever format the registry permits"). Owner: Platform
-  Engineering — target resolution: pending cross-module type-convention decision.
+  Engineering — target resolution: pending cross-gear type-convention decision.
 - **Built-in `cascade-priority` Engine**: cascade is expressible via `cel` in P1; should P2 ship a hardcoded
   `cascade-priority` Engine for operators who do not want to author CEL? Trade-off: convenience and lower
   CEL-attack-surface vs. coupling QE to one specific cascade variant before operator preferences are observed in
@@ -3287,10 +3287,10 @@ on behalf of a tenant administrator)
 
 ## 14. Traceability
 
-- **Informal upstream requirements**: no formal `UPSTREAM_REQS.md` is maintained for this module
+- **Informal upstream requirements**: no formal `UPSTREAM_REQS.md` is maintained for this gear
 - **Design**: [DESIGN.md](./DESIGN.md)
 - **ADRs**: see [DESIGN §5 Traceability](./DESIGN.md) for the canonical ADR catalogue
 - **Features**: [features/](./features/) — to be authored
-- **Related modules**: [Usage Collector PRD](../../usage-collector/docs/PRD.md),
+- **Related gears**: [Usage Collector PRD](../../usage-collector/docs/PRD.md),
   [Account Management PRD](../../account-management/docs/PRD.md),
   [Resource Group PRD](../../resource-group/docs/PRD.md), [Types Registry PRD](../../types-registry/docs/PRD.md)

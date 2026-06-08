@@ -1,6 +1,6 @@
 //! GTS module analyzer — orchestrator + CLI.
 //!
-//! Scans a single module directory for the Global Type System (GTS):
+//! Scans a single gear directory for the Global Type System (GTS):
 //! types defined here, instances declared here, and all GTS identifier references
 //! across `.rs` / `.md` / `.json` / `.toml` / `.yaml` files. Output: markdown or JSON.
 
@@ -31,7 +31,7 @@ use crate::walk::Walker;
     about = "Analyze GTS (Global Type System) usage in a single Gear."
 )]
 struct Cli {
-    /// Module directory to scan.
+    /// Gear directory to scan.
     module_path: PathBuf,
 
     /// Output format.

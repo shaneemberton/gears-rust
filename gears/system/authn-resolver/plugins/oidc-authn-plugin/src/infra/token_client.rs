@@ -61,7 +61,7 @@ struct CacheIdentity {
 
 /// HTTP client for `OAuth2` `client_credentials` token exchange with caching.
 ///
-/// Created once during module init and shared via `Arc`. Uses the same
+/// Created once during gear init and shared via `Arc`. Uses the same
 /// `reqwest::Client` and `OidcDiscovery` as the JWT validation path.
 pub struct TokenClient {
     http_client: reqwest::Client,

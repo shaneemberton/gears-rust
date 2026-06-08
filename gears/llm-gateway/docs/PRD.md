@@ -12,7 +12,7 @@
   - [2.1 Human Actors](#21-human-actors)
   - [2.2 System Actors](#22-system-actors)
 - [3. Operational Concept & Environment](#3-operational-concept--environment)
-  - [3.1 Module-Specific Environment Constraints](#31-module-specific-environment-constraints)
+  - [3.1 Gear-Specific Environment Constraints](#31-gear-specific-environment-constraints)
   - [3.2 Data Ownership & Classification](#32-data-ownership--classification)
 - [4. Scope](#4-scope)
   - [4.1 In Scope](#41-in-scope)
@@ -50,7 +50,7 @@ LLM Gateway is the central integration point between platform consumers and exte
 
 The Gateway supports diverse modalities: text generation, embeddings, vision, audio, video, and document processing. It handles both synchronous and asynchronous operations, including streaming responses and long-running jobs. All interactions go through the Outbound API Gateway for reliability and credential management.
 
-Gateway is stateless for request processing — it does not store conversation history or execute tools, and consumers provide full context with each request. Gateway persists async and batch job state (internal-to-provider job ID mappings, job results) to support long-running operations that can take up to 24 hours. Gateway guarantees at-least-once delivery of usage records to the Usage Tracker module.
+Gateway is stateless for request processing — it does not store conversation history or execute tools, and consumers provide full context with each request. Gateway persists async and batch job state (internal-to-provider job ID mappings, job results) to support long-running operations that can take up to 24 hours. Gateway guarantees at-least-once delivery of usage records to the Usage Tracker gear.
 
 **Target Users**:
 - **Platform Developers** — build AI-powered features using Gateway API
@@ -60,13 +60,13 @@ Gateway is stateless for request processing — it does not store conversation h
 
 Platform consumers need access to AI capabilities from multiple LLM providers — OpenAI, Anthropic, Google, and others. Each provider has its own API format, authentication mechanism, error semantics, and rate limiting behavior. Without a unified abstraction, every consumer must implement provider-specific integration logic, handle failover independently, and manage credentials directly. This fragments the codebase, increases the surface area for security issues, and makes it difficult to enforce consistent governance policies across the platform.
 
-The current state requires each consuming module to negotiate provider differences at the application layer: translating request formats, normalizing error responses, and implementing retry logic per provider. Usage tracking and budget enforcement are ad-hoc or absent, making it impossible to provide tenant-level cost visibility or enforce spending limits. Content moderation and PII filtering require each consumer to integrate interception logic independently, with no guarantee of consistent policy enforcement.
+The current state requires each consuming gear to negotiate provider differences at the application layer: translating request formats, normalizing error responses, and implementing retry logic per provider. Usage tracking and budget enforcement are ad-hoc or absent, making it impossible to provide tenant-level cost visibility or enforce spending limits. Content moderation and PII filtering require each consumer to integrate interception logic independently, with no guarantee of consistent policy enforcement.
 
 LLM Gateway addresses these problems by providing a single integration point that abstracts provider differences behind a unified API. It centralizes governance — budget enforcement, rate limiting, usage tracking, and audit logging — at the tenant level. Pre-call and post-response interceptors enable consistent content moderation and PII filtering policies without requiring consumer-side implementation.
 
 ### 1.3 Goals (Business Outcomes)
 
-**Success Criteria** (required at GA, baseline: new module — no prior data; measured over 7-day rolling window after initial 30-day burn-in period):
+**Success Criteria** (required at GA, baseline: new gear — no prior data; measured over 7-day rolling window after initial 30-day burn-in period):
 - Gateway overhead < 50ms P99 at up to 1 000 concurrent requests (excluding provider latency)
 - Availability ≥ 99.9% measured monthly (Gateway infrastructure only — excludes provider outages; fallback-active mode counts as available)
 - Expected steady-state throughput: up to 500 requests/second; peak: up to 2 000 requests/second
@@ -96,15 +96,15 @@ LLM Gateway addresses these problems by providing a single integration point tha
 | OAGW | Outbound API Gateway — handles external API calls, credential injection, circuit breaking |
 | TTFT | Time-to-first-token — latency until first response chunk |
 | GTS | Generic Type System — JSON Schema-based type definitions |
-| FileStorage | Platform module for storing and retrieving binary files (images, audio, video, documents) |
-| Model Registry | Platform module that resolves model identifiers to provider and endpoint information per tenant |
+| FileStorage | Platform gear for storing and retrieving binary files (images, audio, video, documents) |
+| Model Registry | Platform gear that resolves model identifiers to provider and endpoint information per tenant |
 | Hook Plugin | Gears plugin architecture extension point for per-request processing. Multiple plugins can be enabled per tenant and are invoked in order. Pre-call plugins run before the provider adapter and can modify or block requests. Post-call plugins run after the full response is available and are observe-only — the response has already been delivered or is delivered unconditionally, so there is nothing to modify or block. |
 
 ## 2. Actors
 
 ### 2.1 Human Actors
 
-No dedicated human actors. All interactions with LLM Gateway are mediated through the Consumer system actor (platform modules, external API clients). Platform administrators who configure models and providers do so through Model Registry, not through LLM Gateway directly.
+No dedicated human actors. All interactions with LLM Gateway are mediated through the Consumer system actor (platform gears, external API clients). Platform administrators who configure models and providers do so through Model Registry, not through LLM Gateway directly.
 
 ### 2.2 System Actors
 
@@ -156,16 +156,16 @@ Note: Gateway may report more AI credits than the tenant's allocated quota becau
 - **Data exchanged**: Quota check requests (tenant context); receives quota status (available/exceeded).
 - **Availability**: If Quota Manager is unavailable, Gateway rejects the request with a quota-check-unavailable error. Gateway does not bypass quota checks silently.
 
-Note: The specific component that provides quota management is an open question. The PRD defines the need for a quota-checking dependency but does not prescribe which module or service fulfills this role.
+Note: The specific component that provides quota management is an open question. The PRD defines the need for a quota-checking dependency but does not prescribe which gear or service fulfills this role.
 
-#### Audit Module
+#### Audit Gear
 
-**ID**: `cpt-cf-llm-gateway-actor-audit-module`
+**ID**: `cpt-cf-llm-gateway-actor-audit-gear`
 
 - **Role**: Compliance event logging.
 - **Direction**: outbound
 - **Data exchanged**: Audit events (request started, completed, failed, blocked, fallback triggered) with tenant/user/model attribution.
-- **Availability**: Audit Module unavailability does not block request processing. Audit events are delivered best-effort — Gateway logs a warning if delivery fails but does not reject the consumer request.
+- **Availability**: Audit Gear unavailability does not block request processing. Audit events are delivered best-effort — Gateway logs a warning if delivery fails but does not reject the consumer request.
 
 #### Model Registry
 
@@ -178,11 +178,11 @@ Note: The specific component that provides quota management is an open question.
 
 ## 3. Operational Concept & Environment
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
 - Requires persistent storage for async/batch job state and guaranteed usage record delivery
 - All external provider calls route through Outbound API Gateway (OAGW) — Gateway never calls providers directly
-- Media files (images, audio, video, documents) are stored and retrieved via FileStorage module
+- Media files (images, audio, video, documents) are stored and retrieved via FileStorage gear
 
 ### 3.2 Data Ownership & Classification
 
@@ -446,11 +446,11 @@ The system **MUST** accept a batch of requests for async processing at reduced c
 
 - [ ] `p4` - **ID**: `cpt-cf-llm-gateway-fr-audit-events-v1`
 
-The system **MUST** emit audit events via Audit Module for compliance: request started, completed, failed, blocked, fallback triggered.
+The system **MUST** emit audit events via Audit Gear for compliance: request started, completed, failed, blocked, fallback triggered.
 
 Cross-cutting concern — applies to all operations, no dedicated UC.
 
-**Actors**: `cpt-cf-llm-gateway-actor-audit-module`
+**Actors**: `cpt-cf-llm-gateway-actor-audit-gear`
 
 ## 6. Non-Functional Requirements
 
@@ -470,18 +470,18 @@ Async job records (ID mappings, results) are retained for 10 minutes after compl
 
 - [ ] `p2` - **ID**: `cpt-cf-llm-gateway-nfr-compatibility-v1`
 
-Gateway API **MUST** maintain backward compatibility within the same major version. Breaking changes require a new API version prefix. Co-existence with other platform modules is guaranteed — Gateway communicates exclusively through SDK traits and ClientHub, with no shared mutable state. The specific API protocol is a design choice documented in DESIGN.md.
+Gateway API **MUST** maintain backward compatibility within the same major version. Breaking changes require a new API version prefix. Co-existence with other platform gears is guaranteed — Gateway communicates exclusively through SDK traits and ClientHub, with no shared mutable state. The specific API protocol is a design choice documented in DESIGN.md.
 
 ### NFR Exclusions
 
-The following quality domains are handled at the platform level and do not require module-specific NFRs:
+The following quality domains are handled at the platform level and do not require gear-specific NFRs:
 
-- **Authentication / Authorization**: Handled by platform AuthN/AuthZ modules via SecurityContext. All Gateway endpoints require valid authentication; authorization is enforced per tenant through platform middleware.
+- **Authentication / Authorization**: Handled by platform AuthN/AuthZ gears via SecurityContext. All Gateway endpoints require valid authentication; authorization is enforced per tenant through platform middleware.
 - **Security implementation**: Credential management handled by CredStore; TLS and network security handled by infrastructure. Content security (PII filtering, moderation) is handled by Hook Plugins, not Gateway itself. Data classification and ownership are documented in § 3.2.
-- **Safety**: Not applicable — LLM Gateway is a software-only API module with no physical interaction or safety-critical operations.
-- **Usability / Accessibility**: Not applicable — API-only module with no user interface.
+- **Safety**: Not applicable — LLM Gateway is a software-only API gear with no physical interaction or safety-critical operations.
+- **Usability / Accessibility**: Not applicable — API-only gear with no user interface.
 - **Compliance / Regulatory**: LLM Gateway does not store conversation content. Synchronous request/response data is transient. Async and batch job results are durably persisted for the retention period (up to 48 hours) and may contain provider response data that includes PII depending on consumer requests; Gateway treats all persisted job results as potentially sensitive and relies on retention-based cleanup as the primary data protection control. Compliance requirements for data processed by LLM providers are the responsibility of consumers and the providers themselves.
-- **Operations (Deployment / Monitoring)**: Deployment, infrastructure monitoring, distributed tracing, and health checks are handled by platform infrastructure. Module-level operational metrics (request counters, latency histograms, error breakdowns) are in scope — see Observability NFR below.
+- **Operations (Deployment / Monitoring)**: Deployment, infrastructure monitoring, distributed tracing, and health checks are handled by platform infrastructure. Gear-level operational metrics (request counters, latency histograms, error breakdowns) are in scope — see Observability NFR below.
 - **Maintainability / Documentation**: Follows platform-wide documentation standards. API documentation generated from OpenAPI specs in DESIGN.
 
 ### Recovery
@@ -513,7 +513,7 @@ All metrics **MUST** be emittable via the platform's OpenTelemetry metrics infra
 
 ## 7. Public Library Interfaces
 
-Not applicable — LLM Gateway exposes only a REST API (documented in DESIGN.md), not a public Rust crate interface. If inter-module programmatic access is needed in the future, an SDK crate with ClientHub traits will be introduced as a separate artifact.
+Not applicable — LLM Gateway exposes only a REST API (documented in DESIGN.md), not a public Rust crate interface. If inter-gear programmatic access is needed in the future, an SDK crate with ClientHub traits will be introduced as a separate artifact.
 
 ## 8. Use Cases
 
@@ -1038,7 +1038,7 @@ Not applicable — LLM Gateway exposes only a REST API (documented in DESIGN.md)
 | Usage Tracker | Receives AI credit consumption reports | `p1` |
 | Quota Manager | Checks available AI credit quotas before request execution (specific component TBD — see Open Questions) | `p2` |
 | Type Registry | Resolves GTS schema references for tool definitions | `p2` |
-| Audit Module | Receives compliance audit events | `p4` |
+| Audit Gear | Receives compliance audit events | `p4` |
 
 ## 11. Assumptions
 
@@ -1059,11 +1059,11 @@ Not applicable — LLM Gateway exposes only a REST API (documented in DESIGN.md)
 
 ## 13. Open Questions
 
-- **Quota enforcement ownership and component** (Owner: Platform Architecture, Resolve by: before P2 implementation begins): Two related decisions must be made together. (1) *Ownership boundary*: does Gateway own quota *enforcement* (atomic preflight reserve + terminal settle + bounded debit on abort) or only *metering* (report usage, external component enforces)? The current `check_quota()` → proceed → `report_usage()` sequence is non-atomic — under concurrent load, multiple requests pass `check_quota()` before any `report_usage()` completes, allowing a tenant to exceed their limit by N×budget (N = concurrent in-flight requests). If Gateway owns enforcement, the reserve/settle pattern is required, not optional — a best-effort gate is effectively decorative under load. If Gateway does metering only, the external component handles enforcement asynchronously. (2) *Component identity*: the specific component that provides quota management is not yet defined — it may be a dedicated Quota Manager module, an extension of Usage Tracker, or an external service. Both decisions must be resolved before implementing `cpt-cf-llm-gateway-fr-budget-enforcement-v1`.
+- **Quota enforcement ownership and component** (Owner: Platform Architecture, Resolve by: before P2 implementation begins): Two related decisions must be made together. (1) *Ownership boundary*: does Gateway own quota *enforcement* (atomic preflight reserve + terminal settle + bounded debit on abort) or only *metering* (report usage, external component enforces)? The current `check_quota()` → proceed → `report_usage()` sequence is non-atomic — under concurrent load, multiple requests pass `check_quota()` before any `report_usage()` completes, allowing a tenant to exceed their limit by N×budget (N = concurrent in-flight requests). If Gateway owns enforcement, the reserve/settle pattern is required, not optional — a best-effort gate is effectively decorative under load. If Gateway does metering only, the external component handles enforcement asynchronously. (2) *Component identity*: the specific component that provides quota management is not yet defined — it may be a dedicated Quota Manager gear, an extension of Usage Tracker, or an external service. Both decisions must be resolved before implementing `cpt-cf-llm-gateway-fr-budget-enforcement-v1`.
 - **Budget enforcement edge cases** (Owner: Platform Architecture, Resolve by: with quota enforcement ownership decision above): The following scenarios must be addressed when the ownership boundary is decided: (a) *Provider stream without usage* — if a provider stream closes before delivering usage data (network error, provider error mid-stream), policy must specify whether to debit input tokens only, report zero, or surface an error; (b) *Fallback billing* — when a primary provider fails after consuming input tokens, policy must define whether partial cost is reported before initiating fallback or only on final completion, with one usage event per committed debit and no double-reporting across fallback attempts; (c) *Background job budgeting* — quota is checked at submission time but the job executes minutes later under a possibly changed quota state, requiring the reserve/settle pattern to span the submission-to-execution gap if Gateway owns enforcement.
 - **Rate limiting mechanism** (Owner: Platform Architecture, Resolve by: before P2 implementation begins): Rate limiting (`cpt-cf-llm-gateway-fr-rate-limiting-v1`) is closely related to quota management. Whether rate limiting and quota enforcement are provided by the same component or separate components is an open question.
-- **Request monitoring and observability** (Owner: Platform Architecture, Resolve by: before P1 implementation begins): The LLM Gateway needs to track how many requests are being processed, including metrics such as request counts, latency, error rates, and token usage per provider/model. However, the platform does not yet have a standardized approach to monitoring and observability across modules. A platform-wide monitoring strategy must be agreed upon before implementing module-level metrics, to ensure consistency and avoid fragmented solutions.
-- **Cross-module request traceability** (Owner: Platform Architecture, Resolve by: before P1 implementation begins): The platform needs a mechanism that assigns a request ID at the incoming requests gateway (api-gateway module) and propagates it through all inter-module calls via ClientHub/SDK traits. This would enable end-to-end request tracing across module boundaries — for example, a consumer request arriving at the API gateway, flowing through LLM Gateway, then to Model Registry and Usage Tracker, all correlated by a single platform-level request ID. Currently, each module operates with its own request context; there is no standardized correlation ID propagated across inter-module boundaries. This is a platform-level concern that affects all modules, not just LLM Gateway. The LLM Gateway's response `id` (`cpt-cf-llm-gateway-fr-request-traceability-v1`) provides module-level traceability, but a platform-wide mechanism is needed for cross-module correlation.
+- **Request monitoring and observability** (Owner: Platform Architecture, Resolve by: before P1 implementation begins): The LLM Gateway needs to track how many requests are being processed, including metrics such as request counts, latency, error rates, and token usage per provider/model. However, the platform does not yet have a standardized approach to monitoring and observability across gears. A platform-wide monitoring strategy must be agreed upon before implementing gear-level metrics, to ensure consistency and avoid fragmented solutions.
+- **Cross-gear request traceability** (Owner: Platform Architecture, Resolve by: before P1 implementation begins): The platform needs a mechanism that assigns a request ID at the incoming requests gateway (api-gateway gear) and propagates it through all inter-gear calls via ClientHub/SDK traits. This would enable end-to-end request tracing across gear boundaries — for example, a consumer request arriving at the API gateway, flowing through LLM Gateway, then to Model Registry and Usage Tracker, all correlated by a single platform-level request ID. Currently, each gear operates with its own request context; there is no standardized correlation ID propagated across inter-gear boundaries. This is a platform-level concern that affects all gears, not just LLM Gateway. The LLM Gateway's response `id` (`cpt-cf-llm-gateway-fr-request-traceability-v1`) provides gear-level traceability, but a platform-wide mechanism is needed for cross-gear correlation.
 
 ## 14. Traceability
 

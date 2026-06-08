@@ -44,7 +44,7 @@ serde_json = { workspace = true }
 # Logging
 tracing = { workspace = true }
 
-# Required by toolkit::module macro
+# Required by toolkit::gear macro
 inventory = { workspace = true }
 
 [dev-dependencies]

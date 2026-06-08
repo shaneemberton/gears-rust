@@ -9,7 +9,7 @@ use utoipa::ToSchema;
 use crate::domain::model::quota::{PeriodResult, QuotaStatusResult, TierResult};
 use crate::domain::service::{actions, resources};
 use crate::domain::stream_events::{QuotaPeriod, QuotaTier};
-use crate::module::AppServices;
+use crate::gear::AppServices;
 
 // ════════════════════════════════════════════════════════════════════════════
 // Response DTOs

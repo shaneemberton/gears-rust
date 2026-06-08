@@ -1,6 +1,6 @@
 //! Observability metrics for the Oidc `AuthN` plugin.
 //!
-//! The host installs the global meter provider during startup. This module owns
+//! The host installs the global meter provider during startup. This gear owns
 //! the typed OpenTelemetry instruments used across the plugin and exposes a
 //! small, domain-oriented recording API to the rest of the codebase.
 

@@ -275,7 +275,7 @@ impl<R: TenantRepo> BootstrapService<R> {
     /// an empty TOML table deserialises to `Uuid::nil()`; see
     /// `feature-platform-bootstrap.md` lines 23-25).
     ///
-    /// Module wiring (`module.rs::init`) is the canonical validate
+    /// Gear wiring (`gear.rs::init`) is the canonical validate
     /// call site because it owns the strict/non-strict branching: a
     /// strict-mode validation failure is lifecycle-fatal, whereas a
     /// non-strict failure logs and skips bootstrap entirely. Tests
@@ -288,7 +288,7 @@ impl<R: TenantRepo> BootstrapService<R> {
     /// caller violated the validate-before-construct contract above.
     /// Release builds strip the assertion, so the contract MUST be
     /// honored at every call site (production path is honored by
-    /// `module.rs::init`).
+    /// `gear.rs::init`).
     #[must_use]
     pub fn new(repo: Arc<R>, idp: Arc<dyn IdpPluginClient>, cfg: BootstrapConfig) -> Self {
         // Single `validate()` call so the assertion message and the
@@ -298,7 +298,7 @@ impl<R: TenantRepo> BootstrapService<R> {
         {
             panic!(
                 "BootstrapConfig must be validated before constructing BootstrapService; \
-                 module wiring is the canonical validate call site (see module.rs::init). \
+                 gear wiring is the canonical validate call site (see gear.rs::init). \
                  Validation failed: {err}"
             );
         }
@@ -313,7 +313,7 @@ impl<R: TenantRepo> BootstrapService<R> {
     }
 
     /// Attach the GTS Types Registry client used for root-tenant-type
-    /// preflight. Tests that exercise non-GTS paths may omit this; module
+    /// preflight. Tests that exercise non-GTS paths may omit this; gear
     /// wiring supplies it when `ClientHub` resolves the registry client.
     #[must_use]
     pub fn with_types_registry(mut self, types_registry: Arc<dyn TypesRegistryClient>) -> Self {
@@ -326,7 +326,7 @@ impl<R: TenantRepo> BootstrapService<R> {
     /// `UnsupportedOperation` policy `TenantService::compensate_failed_activation`
     /// uses: refuse to delete the local row when a real plugin returns
     /// Unsupported under `idp.required = true`, because vendor-side
-    /// state may exist that AM cannot reach. Module wiring sets this;
+    /// state may exist that AM cannot reach. Gear wiring sets this;
     /// tests that operate against `NoopIdpProvider` (or that don't care
     /// about the orphan-prevention path) can omit it and inherit the
     /// `idp.required = false` default.
@@ -359,7 +359,7 @@ impl<R: TenantRepo> BootstrapService<R> {
     /// failed to confirm IdP-side cleanup, or a deadline-exhausted
     /// peer-wait surfaces as `Err(_)` rather than `Ok(Provisioning)`
     /// — the strict-mode `init` gate in
-    /// `module::run_bootstrap_phase` decides whether to abort or
+    /// `gear::run_bootstrap_phase` decides whether to abort or
     /// proceed without an active root.
     ///
     /// # Errors
@@ -1109,7 +1109,7 @@ impl<R: TenantRepo> BootstrapService<R> {
             req = req.with_metadata(meta);
         }
         // Cap the IdP call at the bootstrap deadline so a hung
-        // provider cannot stretch `module::init` past
+        // provider cannot stretch `gear::init` past
         // `idp_wait_timeout`. Treat a timeout as
         // `IdpUnavailable` after compensating the row — the saga
         // retry loop handles that variant the same way it handles a
@@ -1415,7 +1415,7 @@ impl<R: TenantRepo> BootstrapService<R> {
     ///   reconcile it.
     ///
     /// The deprovision attempt is bounded by the bootstrap deadline
-    /// so a hung provider cannot stretch `module::init` past the
+    /// so a hung provider cannot stretch `gear::init` past the
     /// configured wall-clock cap.
     #[allow(
         clippy::cognitive_complexity,
@@ -1812,9 +1812,9 @@ fn handle_skip(root: TenantModel) -> TenantModel {
 /// Surface a `Provisioning` root older than `2 × idp_wait_timeout`
 /// (the FEATURE-§3 stuck threshold) as a non-success signal: the
 /// previous attempt crashed mid-saga, the provisioning reaper will
-/// compensate, and module init is NOT complete. Returning an error
+/// compensate, and gear init is NOT complete. Returning an error
 /// (rather than `Ok(_)` with the still-Provisioning model) lets the
-/// strict-mode init gate in `module::run_bootstrap_phase` decide
+/// strict-mode init gate in `gear::run_bootstrap_phase` decide
 /// whether to abort or proceed without an active root.
 fn handle_deferred_to_reaper_stuck(root: &TenantModel) -> DomainError {
     emit_metric(

@@ -2,7 +2,7 @@
 //!
 //! These are the shapes that pass through the AM REST boundary
 //! (request bodies, query parameters, response envelopes) and through
-//! any inter-module Rust callers wired through `ClientHub`. They are
+//! any inter-gear Rust callers wired through `ClientHub`. They are
 //! deliberately slim and stable:
 //!
 //! * Inputs ([`CreateTenantRequest`], [`UpdateTenantRequest`]) carry only what
@@ -110,7 +110,7 @@ pub struct Tenant {
 /// the canonical `UUIDv5` via [`gts::GtsID`] internally so callers do not
 /// have to supply two parallel identifiers that can diverge. The field
 /// is typed [`GtsTypeId`] rather than `String` so callers (REST
-/// handler, inter-module Rust consumers) get a self-documenting
+/// handler, inter-gear Rust consumers) get a self-documenting
 /// contract and any generated JSON Schema annotates the field with
 /// `format: gts-schema-id`. Wire shape stays a string.
 #[derive(Debug, Clone, Serialize, Deserialize)]

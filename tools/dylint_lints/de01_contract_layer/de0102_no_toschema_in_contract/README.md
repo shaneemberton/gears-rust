@@ -2,7 +2,7 @@
 
 ### What it does
 
-Checks that structs and enums in contract modules do not derive `ToSchema` from utoipa (OpenAPI schema generation).
+Checks that structs and enums in contract gears do not derive `ToSchema` from utoipa (OpenAPI schema generation).
 
 ### Why is this bad?
 
@@ -20,10 +20,10 @@ This separation provides:
 // ❌ Bad - contract model derives ToSchema
 mod contract {
     use utoipa::ToSchema;
-    
+
     #[derive(ToSchema)]
-    pub struct User { 
-        pub id: String 
+    pub struct User {
+        pub id: String
     }
 }
 ```
@@ -33,18 +33,18 @@ Use instead:
 ```rust
 // ✅ Good - contract model without ToSchema
 mod contract {
-    pub struct User { 
-        pub id: String 
+    pub struct User {
+        pub id: String
     }
 }
 
 // Separate DTO in API layer with ToSchema
 mod api {
     use utoipa::ToSchema;
-    
+
     #[derive(ToSchema)]
-    pub struct UserDto { 
-        pub id: String 
+    pub struct UserDto {
+        pub id: String
     }
 }
 ```

@@ -4,13 +4,13 @@
 
 ### 1.1 Purpose
 
-Mini Chat is a multi-tenant AI chat module that provides users with a conversational interface backed by a large language model. Users can send messages, receive streamed responses in real time, upload documents, and ask questions about uploaded content. The module enforces strict tenant isolation, usage-based cost controls, and emits audit events.
+Mini Chat is a multi-tenant AI chat gear that provides users with a conversational interface backed by a large language model. Users can send messages, receive streamed responses in real time, upload documents, and ask questions about uploaded content. The gear enforces strict tenant isolation, usage-based cost controls, and emits audit events.
 
 Parent tenant / MSP administrators MUST NOT have access to chat content. Admin visibility is limited to aggregated usage and operational metrics.
 
 #### Mini Chat vs Main Chat
 
-Mini Chat is a lightweight, self-contained chat module designed for rapid delivery. The platform roadmap also includes a full-featured Main Chat module. The two modules differ in scope and extensibility:
+Mini Chat is a lightweight, self-contained chat gear designed for rapid delivery. The platform roadmap also includes a full-featured Main Chat gear. The two gears differ in scope and extensibility:
 
 | Aspect | Mini Chat | Main Chat (future) |
 |--------|-----------|---------------------|
@@ -81,7 +81,7 @@ Current gaps: no native chat experience within the platform; no way to query upl
 
 ## 3. Operational Concept & Environment
 
-No module-specific environment constraints beyond platform defaults.
+No gear-specific environment constraints beyond platform defaults.
 
 ## 4. Scope
 
@@ -136,7 +136,7 @@ This PRD uses **P1/P2** to describe phased scope. The `p1`/`p2` tags on requirem
 - Additional quota periods beyond the P1 set (4-hourly rolling windows, weekly periods, 12h rolling windows)
 - Per-tenant quota timezone configuration (P1 uses UTC for all calendar-based period boundaries)
 - Quota warning thresholds and `quota_warnings` in SSE done events (deferred to P2+)
-- Module-specific multi-lingual support (LLM handles languages natively; no module-level i18n)
+- Gear-specific multi-lingual support (LLM handles languages natively; no gear-level i18n)
 - Per-feature dynamic feature flags beyond the `ai_chat` license gate and emergency kill switches (DESIGN.md lines 166-168)
 
 ### 4.3 Deferred (P2+)
@@ -462,7 +462,7 @@ The system MUST verify that the user's tenant has the `ai_chat` feature enabled 
 
 The system MUST emit structured audit events to the platform's `audit_service` for completed chat turns and policy decisions (one structured event per completed turn). Each event MUST include: tenant, user, chat reference, event type, model used, token counts, latency metrics, and policy decisions (quota checks, license gate results). Mini Chat does not store audit data locally.
 
-Before emitting events, the mini-chat module MUST redact obvious secret patterns from any included content. Redaction is best-effort and pattern-based. It is designed to catch common secret formats but does not guarantee detection of all sensitive data (e.g., obfuscated tokens, custom credential formats). Audit payloads containing customer content MUST be treated as sensitive data by `audit_service`. P1 redaction rules MUST include at least:
+Before emitting events, the mini-chat gear MUST redact obvious secret patterns from any included content. Redaction is best-effort and pattern-based. It is designed to catch common secret formats but does not guarantee detection of all sensitive data (e.g., obfuscated tokens, custom credential formats). Audit payloads containing customer content MUST be treated as sensitive data by `audit_service`. P1 redaction rules MUST include at least:
 
 - Replace any `Authorization: Bearer <...>` header value with `Authorization: Bearer [REDACTED]`
 - Replace any `api_key`, `x-api-key`, `client_secret`, `access_token`, `refresh_token` values with `[REDACTED]` when they appear in `key=value` or JSON string field form
@@ -570,7 +570,7 @@ The UI experience MUST be resilient to SSE disconnects and idempotency conflicts
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Tenant Isolation
 

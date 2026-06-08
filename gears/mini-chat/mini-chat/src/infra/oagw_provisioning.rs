@@ -1,6 +1,6 @@
 //! OAGW upstream and route registration for configured LLM providers.
 //!
-//! Called once during `Module::init()` to ensure every provider entry
+//! Called once during `Gear::init()` to ensure every provider entry
 //! has a corresponding OAGW upstream (with auth config) and route.
 //!
 //! After each successful `create_upstream`, the OAGW-assigned alias is
@@ -31,7 +31,7 @@ pub async fn register_oagw_upstreams(
 ) -> anyhow::Result<()> {
     for (provider_id, entry) in providers.iter_mut() {
         // Register root upstream + route. Fail hard — without upstreams the
-        // module cannot proxy LLM requests.
+        // gear cannot proxy LLM requests.
         let upstream = create_upstream(gateway, ctx, provider_id, entry)
             .await
             .ok_or_else(|| {

@@ -1,13 +1,13 @@
 //! Lazy `IdpPluginClient` wrapper that defers vendor-based plugin
 //! selection to first call.
 //!
-//! AM's `Module::init` runs during toolkit's *config* phase. At that
+//! AM's `Gear::init` runs during toolkit's *config* phase. At that
 //! point the types-registry catalogue is still in its private
 //! staging buffer — `list_instances` returns 0 for runtime-registered
 //! plugin instances even when the plugin's `register()` succeeded
 //! earlier in the same init pass. The catalogue only commits to
-//! *ready* mode after every module's `init()` resolves (see
-//! `types-registry/src/module.rs::post_init::switch_to_ready`),
+//! *ready* mode after every gear's `init()` resolves (see
+//! `types-registry/src/gear.rs::post_init::switch_to_ready`),
 //! which is strictly after AM's init returns.
 //!
 //! To respect the established
@@ -64,7 +64,7 @@ use types_registry_sdk::{InstanceQuery, TypesRegistryClient};
 
 use crate::infra::idp::NoopIdpProvider;
 
-/// Lazy `IdP` plugin resolver — see module docs for the contract.
+/// Lazy `IdP` plugin resolver — see gear docs for the contract.
 pub struct LazyIdpProvider {
     hub: Arc<ClientHub>,
     registry: Arc<dyn TypesRegistryClient>,

@@ -32,20 +32,20 @@ The Usage Collector must support sustained ingestion of at least 10,000 records/
 
 - `cpt-cf-usage-collector-nfr-query-latency` — aggregation queries over 30-day single-tenant ranges must complete within 500 ms p95.
 - `cpt-cf-usage-collector-nfr-throughput` — sustained ingestion of ≥ 10,000 records/sec.
-- `cpt-cf-usage-collector-fr-pluggable-storage` — persistence and query are reached through a dedicated Plugin SPI resolved lazily on the first dispatch via the Plugin Host (the host module's own Service) and the GTS Registry.
+- `cpt-cf-usage-collector-fr-pluggable-storage` — persistence and query are reached through a dedicated Plugin SPI resolved lazily on the first dispatch via the Plugin Host (the host gear's own Service) and the GTS Registry.
 - `cpt-cf-usage-collector-nfr-workload-isolation` — query workloads must not degrade ingestion p95 latency.
 - PRD §1.3 backend-agnostic objective (centralized metering goal) — operator-selected backends fit workload profile without coordinated collector releases.
 - `cpt-cf-usage-collector-nfr-plugin-contract-stability` (PRD §6.1) — surface stability must hold across plugin churn so plugin authors and the core release independently.
 
 ## Considered Options
 
-- Plugin SPI binding via Plugin Host + GTS Registry — operator configuration (`[usage_collector].vendor` read once at `Module::init`) selects one plugin identity per GTS instance; the host's `GtsPluginSelector` resolves the bound instance lazily on the first dispatch after the `types-registry` is consistent; the core reaches persistence and query only through the Plugin SPI.
+- Plugin SPI binding via Plugin Host + GTS Registry — operator configuration (`[usage_collector].vendor` read once at `Gear::init`) selects one plugin identity per GTS instance; the host's `GtsPluginSelector` resolves the bound instance lazily on the first dispatch after the `types-registry` is consistent; the core reaches persistence and query only through the Plugin SPI.
 - Embedded single backend — the core directly couples to one chosen technology (e.g., ClickHouse) with internal abstraction; alternative backends are forks or branches.
 - In-process driver registry without SPI — the core ships with several drivers compiled in and exposes a configuration switch but uses no platform-level SPI mechanism.
 
 ## Decision Outcome
 
-Chosen option: "Plugin SPI binding via Plugin Host + GTS Registry", because it satisfies the pluggable-storage FR and the query/ingestion NFRs simultaneously without forcing the core to take a position on any specific backend's schema, dialect, or client library. The Plugin SPI is the single seam between the core and persistence/query; the active backend is resolved lazily on the first dispatch after the `types-registry` is consistent and reachable only through SPI methods. There is no separate "Module Orchestrator" component — binding is decentralised across the host module's `Service` constructor (which materializes the `GtsPluginSelector`) and each plugin module's own `init()` (which performs the scoped `ClientHub::register_scoped`). Each plugin ships its own implementation, deployment guide, and operational runbook on an independent release schedule from the Usage Collector.
+Chosen option: "Plugin SPI binding via Plugin Host + GTS Registry", because it satisfies the pluggable-storage FR and the query/ingestion NFRs simultaneously without forcing the core to take a position on any specific backend's schema, dialect, or client library. The Plugin SPI is the single seam between the core and persistence/query; the active backend is resolved lazily on the first dispatch after the `types-registry` is consistent and reachable only through SPI methods. There is no separate "Gear Orchestrator" component — binding is decentralised across the host gear's `Service` constructor (which materializes the `GtsPluginSelector`) and each plugin gear's own `init()` (which performs the scoped `ClientHub::register_scoped`). Each plugin ships its own implementation, deployment guide, and operational runbook on an independent release schedule from the Usage Collector.
 
 ### Consequences
 
@@ -65,7 +65,7 @@ Compliance is confirmed through (a) design review of §3.7 confirming that no SQ
 
 ### Plugin SPI binding via Plugin Host + GTS Registry
 
-The active backend is selected by operator configuration (`[usage_collector].vendor` read once at `Module::init`) and reached only through the platform's Plugin SPI mechanism, with binding lifecycle decentralised across the host module's `Service` constructor (which materializes the `GtsPluginSelector`) and each plugin module's own `init()` (which performs the scoped `ClientHub::register_scoped`); the active instance is resolved lazily on the first dispatch via the GTS Registry. There is no separate "Module Orchestrator" component.
+The active backend is selected by operator configuration (`[usage_collector].vendor` read once at `Gear::init`) and reached only through the platform's Plugin SPI mechanism, with binding lifecycle decentralised across the host gear's `Service` constructor (which materializes the `GtsPluginSelector`) and each plugin gear's own `init()` (which performs the scoped `ClientHub::register_scoped`); the active instance is resolved lazily on the first dispatch via the GTS Registry. There is no separate "Gear Orchestrator" component.
 
 - Good, because it removes every backend-specific dependency from the core and lets operators meet NFR thresholds with the technology that fits their workload.
 - Good, because plugin authors and the core release independently under the major-version stability contract.
@@ -89,7 +89,7 @@ The core ships with several drivers compiled in and exposes a configuration swit
 - Good, because driver selection is simple and avoids platform-wide binding machinery.
 - Bad, because adding a new backend requires a core release, reintroducing the very coupling the SPI exists to remove.
 - Bad, because operators cannot run plugin-author releases independently; every backend update demands a core rebuild.
-- Bad, because it bypasses platform conventions (Plugin Host + GTS Registry + ClientHub) and creates a one-off persistence pattern that diverges from other modules.
+- Bad, because it bypasses platform conventions (Plugin Host + GTS Registry + ClientHub) and creates a one-off persistence pattern that diverges from other gears.
 
 ## More Information
 

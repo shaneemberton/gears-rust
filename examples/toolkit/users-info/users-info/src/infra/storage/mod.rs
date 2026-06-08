@@ -2,7 +2,7 @@
 //!
 //! ## Architecture
 //!
-//! This module contains ALL `SeaORM`-specific code and database operations:
+//! This gear contains ALL `SeaORM`-specific code and database operations:
 //! - `entity/` - `SeaORM` entity definitions (users, cities, addresses)
 //! - `mapper.rs` - Conversions between `SeaORM` models and SDK contract types
 //! - `odata_mapper.rs` - `OData` filter → `SeaORM` column mappings
@@ -18,7 +18,7 @@
 //!
 //! ## `OData` Integration
 //!
-//! The `odata_mapper` module maps SDK filter enums to database columns:
+//! The `odata_mapper` gear maps SDK filter enums to database columns:
 //! - `UserODataMapper` - Maps `UserFilterField` → `user::Column`
 //! - `CityODataMapper` - Maps `CityFilterField` → `city::Column`
 //!

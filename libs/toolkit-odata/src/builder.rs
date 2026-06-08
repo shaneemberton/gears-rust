@@ -1,11 +1,11 @@
 //! Typed `OData` query builder
 //!
-//! This module provides a generic, reusable typed query builder for `OData` that produces
+//! This gear provides a generic, reusable typed query builder for `OData` that produces
 //! `ODataQuery` with correct filter hashing.
 //!
 //! # Design
 //!
-//! - **Schema trait**: Defines field enums and their string mappings (from `schema` module)
+//! - **Schema trait**: Defines field enums and their string mappings (from `schema` gear)
 //! - **`FieldRef`**: Type-safe field references with schema and Rust type markers
 //! - **Filter constructors**: Typed comparison and string operations returning AST expressions
 //! - **`QueryBuilder`**: Fluent API for building queries with filter/order/select/limit

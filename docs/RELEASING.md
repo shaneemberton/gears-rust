@@ -28,13 +28,13 @@ Publishing is controlled by Cargo manifests:
 
 This repo is configured so that:
 - `apps/**` and `examples/**` are **not** publishable (we set `publish = false`)
-- `libs/**` and `modules/**` are publishable as intended
+- `libs/**` and `gears/**` are publishable as intended
 
 ### Versioning policy (as implemented)
 
 - **Framework (`libs/toolkit-*`)**: share a single version via `version.workspace = true` and the root workspace version (`Cargo.toml` → `[workspace.package] version`).
 - **System SDKs (`libs/system-sdks/**`)**: each crate has its own explicit version.
-- **Modules (`modules/**`)**: each module and each `*-sdk` has its own explicit version.
+- **Gears (`gears/**`)**: each gear and each `*-sdk` has its own explicit version.
 
 ### Dependency ordering
 

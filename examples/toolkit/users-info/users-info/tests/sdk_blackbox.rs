@@ -11,8 +11,8 @@ use authz_resolver_sdk::{
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use toolkit::config::ConfigProvider;
-use toolkit::{ClientHub, DatabaseCapability, Module, ModuleCtx};
-use toolkit_db::migration_runner::run_migrations_for_module;
+use toolkit::{ClientHub, DatabaseCapability, Gear, GearCtx};
+use toolkit_db::migration_runner::run_migrations_for_gear;
 use toolkit_db::{ConnectOpts, DBProvider, Db, DbError, connect_db};
 use toolkit_security::{SecurityContext, pep_properties};
 use uuid::Uuid;
@@ -72,15 +72,15 @@ impl AuthZResolverClient for MockAuthZResolver {
 }
 
 struct MockConfigProvider {
-    modules: HashMap<String, serde_json::Value>,
+    gears: HashMap<String, serde_json::Value>,
 }
 
 impl MockConfigProvider {
     fn new_users_info_default() -> Self {
-        let mut modules = HashMap::new();
-        // ModuleCtx::raw_config expects: modules.<name> = { database: ..., config: ... }
+        let mut gears = HashMap::new();
+        // GearCtx::raw_config expects: gears.<name> = { database: ..., config: ... }
         // For this test we supply config only; DB handle is injected directly.
-        modules.insert(
+        gears.insert(
             "users_info".to_owned(),
             json!({
                 "config": {
@@ -91,19 +91,19 @@ impl MockConfigProvider {
                 }
             }),
         );
-        Self { modules }
+        Self { gears }
     }
 }
 
 impl ConfigProvider for MockConfigProvider {
-    fn get_module_config(&self, module_name: &str) -> Option<&serde_json::Value> {
-        self.modules.get(module_name)
+    fn get_gear_config(&self, gear_name: &str) -> Option<&serde_json::Value> {
+        self.gears.get(gear_name)
     }
 }
 
 #[tokio::test]
 async fn users_info_registers_sdk_client_and_handles_basic_crud() {
-    // Arrange: build a real Db for sqlite in-memory, run module migrations, then init module.
+    // Arrange: build a real Db for sqlite in-memory, run gear migrations, then init gear.
     let db: Db = connect_db(
         "sqlite::memory:",
         ConnectOpts {
@@ -117,10 +117,10 @@ async fn users_info_registers_sdk_client_and_handles_basic_crud() {
 
     let hub = Arc::new(ClientHub::new());
 
-    // Register mock AuthZ resolver before initializing the module
+    // Register mock AuthZ resolver before initializing the gear
     hub.register::<dyn AuthZResolverClient>(Arc::new(MockAuthZResolver));
 
-    let ctx = ModuleCtx::new(
+    let ctx = GearCtx::new(
         "users_info",
         Uuid::new_v4(),
         Arc::new(MockConfigProvider::new_users_info_default()),
@@ -129,11 +129,11 @@ async fn users_info_registers_sdk_client_and_handles_basic_crud() {
     )
     .with_db(dbp);
 
-    let module = UsersInfo::default();
-    run_migrations_for_module(&db, "users_info", module.migrations())
+    let gear = UsersInfo::default();
+    run_migrations_for_gear(&db, "users_info", gear.migrations())
         .await
         .expect("migrate");
-    module.init(&ctx).await.expect("init");
+    gear.init(&ctx).await.expect("init");
 
     // Act: resolve SDK client from hub and do basic CRUD.
     let client = ctx

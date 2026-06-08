@@ -24,7 +24,7 @@ Created:  2026-04-09 by Diffora
   - [5.5 Plugin Discovery & Registration](#55-plugin-discovery--registration)
   - [5.6 Resilience & Timeouts](#56-resilience--timeouts)
 - [6. Non-Functional Requirements](#6-non-functional-requirements)
-  - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
+  - [6.1 Gear-Specific NFRs](#61-gear-specific-nfrs)
   - [6.2 NFR Exclusions](#62-nfr-exclusions)
 - [7. Public Library Interfaces](#7-public-library-interfaces)
   - [7.1 Public API Surface](#71-public-api-surface)
@@ -47,17 +47,17 @@ Created:  2026-04-09 by Diffora
 
 ### 1.1 Purpose
 
-The OIDC AuthN Resolver Plugin provides authentication services for the Gears middleware by integrating with OpenID Connect-compliant Identity Providers (IdPs). It validates JWT access tokens, extracts identity claims, and produces the platform's `SecurityContext` structure that downstream modules consume for authorization and tenant-scoped access control.
+The OIDC AuthN Resolver Plugin provides authentication services for the Gears middleware by integrating with OpenID Connect-compliant Identity Providers (IdPs). It validates JWT access tokens, extracts identity claims, and produces the platform's `SecurityContext` structure that downstream gears consume for authorization and tenant-scoped access control.
 
 The plugin is a vendor-specific implementation of the AuthN Resolver plugin interface, following the Gears gateway + plugin architecture pattern. It ships as the default authentication plugin for deployments using standard OIDC-compliant IdPs.
 
 ### 1.2 Background / Problem Statement
 
-Gears need a consistent, high-performance mechanism to authenticate incoming API requests and establish caller identity. Without a centralized authentication plugin, each module would independently validate tokens, parse claims, and construct identity context — leading to duplicated logic, inconsistent claim interpretation, and security gaps.
+Gears need a consistent, high-performance mechanism to authenticate incoming API requests and establish caller identity. Without a centralized authentication plugin, each gear would independently validate tokens, parse claims, and construct identity context — leading to duplicated logic, inconsistent claim interpretation, and security gaps.
 
 The platform requires multi-tenant authentication where tenant isolation is achieved via claims embedded in access tokens rather than per-tenant IdP instances. A single OIDC issuer can serve many tenants (each tenant identified by a claim), while multiple issuers can coexist for different tenant groups. The target is 10,000+ tenants without requiring per-tenant IdP configuration.
 
-Additionally, modules performing background work (scheduled jobs, event handlers) require authenticated `SecurityContext` instances without an incoming HTTP request. This necessitates a service-to-service credential exchange mechanism that follows the same authentication pipeline.
+Additionally, gears performing background work (scheduled jobs, event handlers) require authenticated `SecurityContext` instances without an incoming HTTP request. This necessitates a service-to-service credential exchange mechanism that follows the same authentication pipeline.
 
 ### 1.3 Goals (Business Outcomes)
 
@@ -72,10 +72,10 @@ Additionally, modules performing background work (scheduled jobs, event handlers
 |------|------------|
 | AuthN | Authentication — verifying the identity of a caller. |
 | AuthZ | Authorization — determining what an authenticated caller is allowed to do. |
-| SecurityContext | Platform-wide identity structure containing subject ID, tenant ID, subject type, token scopes, and bearer token. Produced by the AuthN plugin, consumed by all downstream modules. |
+| SecurityContext | Platform-wide identity structure containing subject ID, tenant ID, subject type, token scopes, and bearer token. Produced by the AuthN plugin, consumed by all downstream gears. |
 | OIDC | OpenID Connect — an identity layer on top of OAuth 2.0 that provides standard endpoints for discovery, token validation, and identity claims. |
 | JWKS | JSON Web Key Set — a set of cryptographic keys used to verify JWT signatures, published by the IdP. |
-| S2S | Service-to-service — communication between platform modules without an end-user HTTP request. |
+| S2S | Service-to-service — communication between platform gears without an end-user HTTP request. |
 | IdP | Identity Provider — the external OIDC-compliant service that issues and manages access tokens. |
 | First-party app | A platform-owned application (portal, CLI) that receives unrestricted scopes. |
 | Third-party app | A partner integration that receives only its granted OAuth2 scopes. |
@@ -99,15 +99,15 @@ Additionally, modules performing background work (scheduled jobs, event handlers
 
 - **Role**: Extracts bearer tokens from incoming HTTP `Authorization` headers and delegates authentication to the AuthN Resolver gateway, which routes to this plugin.
 
-#### Domain Modules (Request Path)
+#### Domain Gears (Request Path)
 
-**ID**: `cpt-cf-authn-plugin-actor-domain-module`
+**ID**: `cpt-cf-authn-plugin-actor-domain-gear`
 
 - **Role**: Consume the `SecurityContext` produced by the plugin for PEP (Policy Enforcement Point) decisions. Do not interact with the plugin directly — receive `SecurityContext` via middleware injection.
 
-#### Domain Modules (Background Tasks)
+#### Domain Gears (Background Tasks)
 
-**ID**: `cpt-cf-authn-plugin-actor-background-module`
+**ID**: `cpt-cf-authn-plugin-actor-background-gear`
 
 - **Role**: Invoke `exchange_client_credentials` to obtain an authenticated `SecurityContext` for background work (scheduled jobs, event handlers, async processing) when no incoming HTTP request is available.
 
@@ -119,7 +119,7 @@ Additionally, modules performing background work (scheduled jobs, event handlers
 
 ## 3. Operational Concept & Environment
 
-No module-specific environment constraints beyond project defaults. The plugin runs as an in-process library within the host module's runtime. All IdP communication uses HTTPS with certificate validation.
+No gear-specific environment constraints beyond project defaults. The plugin runs as an in-process library within the host gear's runtime. All IdP communication uses HTTPS with certificate validation.
 
 ## 4. Scope
 
@@ -265,8 +265,8 @@ The plugin MUST cache JWKS key sets in memory with configurable TTL (default: 1h
 
 The plugin MUST implement OAuth2 `client_credentials` grant (RFC 6749 §4.4) to obtain access tokens for service-to-service communication. The obtained JWT MUST be validated through the same pipeline as bearer token authentication. The resulting `SecurityContext` MUST include the obtained access token as `bearer_token`.
 
-- **Rationale**: Modules performing background work need authenticated `SecurityContext` instances without an incoming HTTP request.
-- **Actors**: `cpt-cf-authn-plugin-actor-background-module`
+- **Rationale**: Gears performing background work need authenticated `SecurityContext` instances without an incoming HTTP request.
+- **Actors**: `cpt-cf-authn-plugin-actor-background-gear`
 
 #### S2S Token Caching
 
@@ -281,7 +281,7 @@ The plugin MUST cache S2S authentication results keyed by `(client_id, normalize
 Concurrent cache misses for the same full cache key MUST NOT cause duplicate IdP requests. When the S2S result cache reaches `s2s_oauth.token_cache.max_entries`, it MUST evict the least-recently-used (`LRU`) entry. TTL expiry still applies independently.
 
 - **Rationale**: Avoids repeated IdP round-trips for the same S2S token variant while preventing reuse across different scope sets or credential values; also prevents thundering herd on cache miss.
-- **Actors**: `cpt-cf-authn-plugin-actor-background-module`
+- **Actors**: `cpt-cf-authn-plugin-actor-background-gear`
 
 #### S2S Default Subject Type
 
@@ -344,7 +344,7 @@ The plugin MUST maintain circuit-breaker state keyed by the outbound HTTP host s
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### JWT Validation Latency
 
@@ -421,7 +421,7 @@ Bearer tokens and client secrets MUST never be logged, persisted, or included in
 
 - **Type**: Rust async trait (`AuthNResolverClient`)
 - **Stability**: stable
-- **Description**: Public API for platform modules. Provides `authenticate(bearer_token)` and `exchange_client_credentials(request)`. Delegates to the configured plugin.
+- **Description**: Public API for platform gears. Provides `authenticate(bearer_token)` and `exchange_client_credentials(request)`. Delegates to the configured plugin.
 - **Breaking Change Policy**: Major version bump required; within a version, only additive changes.
 
 #### AuthN Resolver Plugin Interface
@@ -483,14 +483,14 @@ Bearer tokens and client secrets MUST never be logged, persisted, or included in
 
 - [ ] `p2` - **ID**: `cpt-cf-authn-plugin-usecase-s2s-exchange`
 
-**Actor**: `cpt-cf-authn-plugin-actor-background-module`
+**Actor**: `cpt-cf-authn-plugin-actor-background-gear`
 
 **Preconditions**:
 - S2S configuration (IdP discovery URL, client credentials) is provided
 - Plugin is registered with ClientHub
 
 **Main Flow**:
-1. Background module constructs a `ClientCredentialsRequest` (containing `client_id`, `client_secret`, and `scopes`) and calls `exchange_client_credentials(request)`.
+1. Background gear constructs a `ClientCredentialsRequest` (containing `client_id`, `client_secret`, and `scopes`) and calls `exchange_client_credentials(request)`.
 2. Plugin normalizes `scopes`, derives a `credential_fingerprint` from `client_secret`, builds the S2S cache key, and checks token cache.
 3. On cache miss: Plugin resolves token endpoint and performs `client_credentials` grant.
 4. Plugin validates the obtained JWT through the standard validation pipeline.
@@ -498,7 +498,7 @@ Bearer tokens and client secrets MUST never be logged, persisted, or included in
 6. Plugin caches the token and returns `AuthenticationResult`.
 
 **Postconditions**:
-- Background module has an authenticated `SecurityContext` with a valid `bearer_token`.
+- Background gear has an authenticated `SecurityContext` with a valid `bearer_token`.
 
 **Alternative Flows**:
 - **Cached token available**: Plugin returns cached result without IdP call (sub-millisecond).

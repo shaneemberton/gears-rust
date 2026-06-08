@@ -16,16 +16,16 @@ async fn test_dbmanager_no_global_config() {
 
     let manager = DbManager::from_figment(figment, home_dir).unwrap();
 
-    // Should return None for any module when no module config exists
-    let result = manager.get("test_module").await.unwrap();
+    // Should return None for any gear when no gear config exists
+    let result = manager.get("test_gear").await.unwrap();
     assert!(result.is_none());
 }
 
 #[tokio::test]
-async fn test_dbmanager_module_no_database() {
+async fn test_dbmanager_gear_no_database() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "config": {
                     "some_setting": "value"
                 }
@@ -38,8 +38,8 @@ async fn test_dbmanager_module_no_database() {
 
     let manager = DbManager::from_figment(figment, home_dir).unwrap();
 
-    // Should return None when module has no database section
-    let result = manager.get("test_module").await.unwrap();
+    // Should return None when gear has no database section
+    let result = manager.get("test_gear").await.unwrap();
     assert!(result.is_none());
 }
 
@@ -80,13 +80,13 @@ async fn test_dbmanager_server_merge() {
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
         "database": global_config,
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "server": "test_server",
-                    "dbname": "moduledb",  // Override server dbname
+                    "dbname": "geardb",  // Override server dbname
                     "params": {
-                        "application_name": "test_module"  // Additional param
+                        "application_name": "test_gear"  // Additional param
                     }
                 }
             }
@@ -100,7 +100,7 @@ async fn test_dbmanager_server_merge() {
 
     // This would normally try to connect to PostgreSQL, but we can't test actual connection
     // without a real database. Just check that it doesn't panic during build phase.
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     // We expect an error since PostgreSQL feature is not enabled by default
     assert!(
@@ -115,8 +115,8 @@ async fn test_dbmanager_server_merge() {
 #[tokio::test]
 async fn test_dbmanager_missing_server_reference() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "server": "nonexistent_server"
                 }
@@ -130,7 +130,7 @@ async fn test_dbmanager_missing_server_reference() {
     let manager = DbManager::from_figment(figment, home_dir).unwrap();
 
     // Should fail with error about missing server
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
     println!("Result: {result:?}");
     assert!(result.is_err());
     let error = result.unwrap_err();

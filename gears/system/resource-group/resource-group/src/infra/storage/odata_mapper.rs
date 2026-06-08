@@ -3,7 +3,7 @@
 // @cpt-dod:cpt-cf-resource-group-dod-sdk-foundation-rest-odata:p1
 //! Infrastructure layer mapping from type-safe `FilterNode` to `SeaORM` Conditions.
 //!
-//! This module maps from DTO-level filter fields to `SeaORM` Column types.
+//! This gear maps from DTO-level filter fields to `SeaORM` Column types.
 
 use toolkit_db::odata::sea_orm_filter::{FieldToColumn, ODataFieldMapping};
 

@@ -11,26 +11,26 @@ use rustc_span::Span;
 dylint_linting::declare_early_lint! {
     /// ### What it does
     ///
-    /// Enforces that Client and PluginClient traits in non-system modules have version suffixes (V1, V2, etc.).
+    /// Enforces that Client and PluginClient traits in non-system gears have version suffixes (V1, V2, etc.).
     ///
     /// # Why is this bad?
     ///
-    /// Non-system modules require explicit versioning for their public API contracts to enable
+    /// Non-system gears require explicit versioning for their public API contracts to enable
     /// parallel versions and clear upgrade paths. System gears are exempt because they follow
     /// different versioning rules managed at the platform level.
     ///
     /// # Scope
-    /// - **Applies to**: All SDK crates in `modules/*` (except `gears/system/*`) and `examples/*`
+    /// - **Applies to**: All SDK crates in `gears/*` (except `gears/system/*`) and `examples/*`
     /// - **Does NOT apply to**: System gears only (`gears/system/*`)
     ///
     /// # Example
     /// ```rust,ignore
-    /// // Bad (in modules/simple_user_settings or examples/*)
+    /// // Bad (in gears/simple_user_settings or examples/*)
     /// pub trait UsersInfoClient: Send + Sync {
     ///     async fn get_user(&self) -> Result<User, Error>;
     /// }
     ///
-    /// // Good (in modules/simple_user_settings or examples/*)
+    /// // Good (in gears/simple_user_settings or examples/*)
     /// pub trait UsersInfoClientV1: Send + Sync {
     ///     async fn get_user(&self) -> Result<User, Error>;
     /// }
@@ -42,7 +42,7 @@ dylint_linting::declare_early_lint! {
     /// ```
     pub DE0504_CLIENT_VERSIONING,
     Deny,
-    "Client and PluginClient traits in non-system modules must have version suffixes (V1, V2, etc.) (DE0504)"
+    "Client and PluginClient traits in non-system gears must have version suffixes (V1, V2, etc.) (DE0504)"
 }
 
 impl EarlyLintPass for De0504ClientVersioning {
@@ -57,8 +57,8 @@ impl EarlyLintPass for De0504ClientVersioning {
             return;
         }
 
-        // EXEMPTION: Skip system modules (gears/system/*) from versioning requirements.
-        // UI tests always run for testing purposes even if they simulate system modules.
+        // EXEMPTION: Skip system gears (gears/system/*) from versioning requirements.
+        // UI tests always run for testing purposes even if they simulate system gears.
         if is_system_module(cx, item.span) && !is_ui_test(cx, item.span) {
             return;
         }
@@ -92,12 +92,12 @@ fn is_ui_test(cx: &EarlyContext<'_>, span: Span) -> bool {
     lint_utils::is_temp_path(&file_path)
 }
 
-/// Checks if the file is part of a system module (gears/system/*).
+/// Checks if the file is part of a system gear (gears/system/*).
 fn is_system_module(cx: &EarlyContext<'_>, span: Span) -> bool {
     let Some(file_path) = lint_utils::filename_str(cx.sess().source_map(), span) else {
         return false;
     };
-    file_path.contains("gears/system/") || file_path.contains("modules\\system\\")
+    file_path.contains("gears/system/") || file_path.contains("gears\\system\\")
 }
 
 fn emit_lint(
@@ -118,7 +118,7 @@ fn emit_lint(
 
     cx.span_lint(DE0504_CLIENT_VERSIONING, span, |diag| {
         diag.primary_message(format!(
-            "Client trait `{trait_name}` in non-system module must have a version suffix (DE0504)"
+            "Client trait `{trait_name}` in non-system gear must have a version suffix (DE0504)"
         ));
         diag.help(format!(
             "rename trait to `{suggestion}` to indicate API version"
@@ -141,7 +141,7 @@ mod tests {
 
     // NOTE: Positive-case testing (lint fires on bad code) is covered by UI tests in ui/
     // (non_system_missing_version.rs, invalid_version_suffix.rs, generic_parameters.rs).
-    // Integration tests in tests/system_module_exemption.rs verify the system module
+    // Integration tests in tests/system_module_exemption.rs verify the system gear
     // exemption works with real crate paths, which cannot be tested through UI tests.
 
     // --- Unit tests for lint_utils::parse_version_suffix ---

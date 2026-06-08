@@ -1,6 +1,6 @@
 //! Side-effect-free replay for completed turns.
 //!
-//! Structurally separated from the streaming execution path: this module
+//! Structurally separated from the streaming execution path: this gear
 //! accepts only read-only dependencies (`DbProvider`, `MessageRepository`)
 //! and cannot access `QuotaService`, outbox, provider, or finalization types.
 

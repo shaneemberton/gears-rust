@@ -1256,7 +1256,7 @@ components:
         Discrimination model:
           * `type` carries the canonical-error category as a `gts://` URI
             (e.g. `gts://gts.cf.core.errors.err.v1~cf.core.err.service_unavailable.v1~`).
-            This is the stable broad-category discriminator across all modules.
+            This is the stable broad-category discriminator across all gears.
           * `status` carries the HTTP status (e.g. `503`).
           * `context` is a per-category structured object documented in
             `toolkit-canonical-errors`. Categories that carry a finer reason

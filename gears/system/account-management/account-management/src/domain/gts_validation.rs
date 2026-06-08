@@ -3,7 +3,7 @@
 //! AM resource shapes (`tenant`, `user`) are pinned by JSON Schemas
 //! published under `gears/system/account-management/docs/schemas/`
 //! and registered in the GTS Types Registry at deployment time. This
-//! module is the single AM-side seam that fetches a resolved schema
+//! gear is the single AM-side seam that fetches a resolved schema
 //! from `TypesRegistryClient` and runs `jsonschema::validator_for`
 //! against the supplied field values — adapting the
 //! `cf-resource-group::domain::validation::validate_metadata_via_gts`
@@ -25,12 +25,12 @@
 //! authoritative without forcing synthetic `id` placeholders that
 //! couple the helper to the schema's `required` list.
 //!
-//! Service layers MUST call into this module instead of hardcoding
+//! Service layers MUST call into this gear instead of hardcoding
 //! length / format constants at the call site so the schema files
 //! remain the single source of truth. AM business rules that are
 //! *wider* than the JSON Schema (e.g. "username MUST not be
 //! all-whitespace" — which the schema's `minLength: 1` does not
-//! reject) stay in the service layer; this module only enforces the
+//! reject) stay in the service layer; this gear only enforces the
 //! structural contract.
 //!
 //! # Behaviour when a schema is not registered
@@ -47,7 +47,7 @@
 //!   The helper returns
 //!   [`DomainError::ServiceUnavailable`] instead, so
 //!   `provision_user` is unavailable until the operator seeds the
-//!   catalog. The dependency is declared in `module.rs::deps`; treat
+//!   catalog. The dependency is declared in `gear.rs::deps`; treat
 //!   schema-missing as a degraded-dependency signal rather than a
 //!   silent passthrough.
 //! * **Tenant name schema (`gts.cf.core.am.tenant.v1~`)** —
@@ -117,7 +117,7 @@ pub(crate) const TENANT_TYPE_ID: &str = "gts.cf.core.am.tenant.v1~";
 ///
 /// # Errors
 ///
-/// See module-level docs.
+/// See gear-level docs.
 pub async fn validate_new_user_payload_via_gts(
     payload: &IdpNewUser,
     types_registry: &dyn TypesRegistryClient,
@@ -172,7 +172,7 @@ pub async fn validate_new_user_payload_via_gts(
 ///
 /// # Errors
 ///
-/// See module-level docs.
+/// See gear-level docs.
 pub async fn validate_tenant_name_via_gts(
     name: &str,
     types_registry: &dyn TypesRegistryClient,
@@ -191,7 +191,7 @@ pub async fn validate_tenant_name_via_gts(
 
 /// Fetch the effective property map for `type_id`, returning `None`
 /// when the schema is not registered (so callers can short-circuit
-/// to AM-side guards). See module-level docs for the failure-mode
+/// to AM-side guards). See gear-level docs for the failure-mode
 /// contract on other registry errors.
 async fn lookup_effective_properties(
     type_id: &'static str,

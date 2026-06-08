@@ -6,7 +6,7 @@
 //! without re-stubbing the full ~15-method `ResourceGroupClient`
 //! trait at every call site. The in-file fakes inside
 //! `super::checker::tests` exercise the checker in isolation; this
-//! module exists for the cross-module integration use case.
+//! gear exists for the cross-gear integration use case.
 
 #![cfg(test)]
 

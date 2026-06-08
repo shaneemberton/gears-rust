@@ -4,7 +4,7 @@ CredStore storage-backend plugin that serves pre-configured secrets from YAML co
 
 ## Overview
 
-The `cf-gears-static-credstore-plugin` module provides:
+The `cf-gears-static-credstore-plugin` gear provides:
 
 - **Static secret mapping** — secrets defined in YAML config, loaded and validated at init
 - **Four sharing scopes** — Private, Tenant, Shared (tenant-scoped), and Global
@@ -12,11 +12,11 @@ The `cf-gears-static-credstore-plugin` module provides:
 - **Deterministic precedence** — lookup order: Private → Tenant → Shared → Global
 - **Strict config validation** — invalid keys, duplicate entries, and contradictory field combinations are rejected at startup
 
-The plugin registers itself via the types registry as a `CredStorePluginClientV1` implementation and is discovered by the `credstore` gateway module.
+The plugin registers itself via the types registry as a `CredStorePluginClientV1` implementation and is discovered by the `credstore` gateway gear.
 
 ## Configuration
 
-Add the plugin section under your module configuration:
+Add the plugin section under your gear configuration:
 
 ```yaml
 static-credstore-plugin:
@@ -98,7 +98,7 @@ For **Private** secrets, `owner_id` comes from the config. For **Tenant**, **Sha
 ## Architecture
 
 ```
-module.rs          ToolKit module — init, config loading, GTS registration
+gear.rs          ToolKit gear — init, config loading, GTS registration
 config.rs          YAML config model + resolve_sharing() + validation docs
 domain/
   service.rs       Service — from_config() builder + get() lookup
@@ -108,10 +108,10 @@ domain/
 
 ### Init sequence
 
-1. Load `StaticCredStorePluginConfig` from module config
+1. Load `StaticCredStorePluginConfig` from gear config
 2. `Service::from_config()` — validate all entries, build lookup maps
 3. Register GTS plugin instance in types-registry
-4. Store `Arc<Service>` in module state
+4. Store `Arc<Service>` in gear state
 5. Register `CredStorePluginClientV1` scoped client in `ClientHub`
 
 ## Testing

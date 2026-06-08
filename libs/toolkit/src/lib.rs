@@ -1,12 +1,12 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-//! # `ToolKit` - Declarative Module System
+//! # `ToolKit` - Declarative Gear System
 //!
-//! A unified crate for building modular applications with declarative module definitions.
+//! A unified crate for building modular applications with declarative gear definitions.
 //!
 //! ## Features
 //!
-//! - **Declarative**: Use `#[module(...)]` attribute to declare modules
-//! - **Auto-discovery**: Modules are automatically discovered via inventory
+//! - **Declarative**: Use `#[gear(...)]` attribute to declare gears
+//! - **Auto-discovery**: Gears are automatically discovered via inventory
 //! - **Type-safe**: Compile-time validation of capabilities
 //! - **Phase-based lifecycle**: executed by `HostRuntime` (see `runtime/host_runtime.rs` docs)
 //!
@@ -51,14 +51,14 @@
 //! - **Type Safety**: Compile-time verification of dependencies
 //! - **Flexibility**: Individual service injection without coupling
 //!
-//! ## Basic Module Example
+//! ## Basic Gear Example
 //!
 //! ```rust,ignore
-//! use toolkit::{module, Module, DbModule, RestfulModule, StatefulModule};
+//! use toolkit::{gear, Gear, DbGear, RestfulGear, StatefulGear};
 //!
 //! #[derive(Default)]
-//! #[module(name = "user", deps = ["database"], capabilities = [db, rest, stateful])]
-//! pub struct UserModule;
+//! #[gear(name = "user", deps = ["database"], capabilities = [db, rest, stateful])]
+//! pub struct UserGear;
 //!
 //! // Implement the declared capabilities...
 //! ```
@@ -73,33 +73,33 @@ pub use async_trait::async_trait;
 // Re-export inventory for user convenience
 pub use inventory;
 
-// Module system exports
+// Gear system exports
 pub use crate::contracts::*;
 pub use crate::contracts::{GrpcServiceCapability, RegisterGrpcServiceFn};
 
-// Configuration module
+// Configuration gear
 pub mod config;
-pub use config::{ConfigError, ConfigProvider, module_config_or_default, module_config_required};
+pub use config::{ConfigError, ConfigProvider, gear_config_or_default, gear_config_required};
 
-// Context module
+// Context gear
 pub mod context;
-pub use context::{ModuleContextBuilder, ModuleCtx};
+pub use context::{GearContextBuilder, GearCtx};
 
-// Module system implementations for macro code
+// Gear system implementations for macro code
 pub mod client_hub;
 pub mod registry;
 
 // Re-export main types
 pub use client_hub::ClientHub;
-pub use registry::ModuleRegistry;
+pub use registry::GearRegistry;
 
 // Re-export the macros from the proc-macro crate
-pub use toolkit_macros::{ExpandVars, lifecycle, module};
+pub use toolkit_macros::{ExpandVars, gear, lifecycle};
 
-// Re-export var_expand module so derive-generated impls resolve via ::toolkit::var_expand
+// Re-export var_expand gear so derive-generated impls resolve via ::toolkit::var_expand
 pub use toolkit_utils::var_expand;
 
-// Core module contracts and traits
+// Core gear contracts and traits
 pub mod contracts;
 // Type-safe API operation builder
 pub mod api;
@@ -139,14 +139,14 @@ pub mod gts;
 pub use toolkit_sdk::{Secured, WithSecurityContext};
 
 pub use backends::{
-    BackendKind, InstanceHandle, LocalProcessBackend, ModuleRuntimeBackend, OopBackend,
-    OopModuleConfig, OopSpawnConfig,
+    BackendKind, GearRuntimeBackend, InstanceHandle, LocalProcessBackend, OopBackend,
+    OopGearConfig, OopSpawnConfig,
 };
 pub use lifecycle::{Lifecycle, Runnable, Status, StopReason, WithLifecycle};
 pub use plugins::GtsPluginSelector;
 pub use runtime::{
-    DEFAULT_SHUTDOWN_DEADLINE, DbOptions, Endpoint, ModuleInstance, ModuleManager,
-    OopModuleSpawnConfig, OopSpawnOptions, RunOptions, ShutdownOptions, run,
+    DEFAULT_SHUTDOWN_DEADLINE, DbOptions, Endpoint, GearInstance, GearManager, OopGearSpawnConfig,
+    OopSpawnOptions, RunOptions, ShutdownOptions, run,
 };
 
 #[cfg(feature = "bootstrap")]

@@ -23,7 +23,7 @@ const CHILDREN_PATH: &str = "/account-management/v1/tenants/{tenant_id}/children
 /// `POST /tenants/{tenant_id}:suspend`, but axum 0.8.x pins
 /// `matchit = "=0.8.4"` which cannot split `{param}:suffix` in one
 /// segment. The sub-resource form here is the in-tree fallback (same
-/// pattern as `modules/mini-chat/.../routes/turns.rs::retry`); cutover
+/// pattern as `gears/mini-chat/.../routes/turns.rs::retry`); cutover
 /// to the colon-method waits on axum bumping matchit (`>= 0.9.2`,
 /// see <https://github.com/tokio-rs/axum/pull/3702>) and the upstream
 /// routing issue <https://github.com/tokio-rs/axum/issues/3140>.

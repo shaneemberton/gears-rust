@@ -1,12 +1,12 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-//! API Gateway Module
+//! API Gateway Gear
 //!
-//! Main API Gateway module — owns the HTTP server (`rest_host`) and collects
+//! Main API Gateway gear — owns the HTTP server (`rest_host`) and collects
 //! typed operation specs to emit a single `OpenAPI` document.
 
 // === MODULE DEFINITION ===
-pub mod module;
-pub use module::ApiGateway;
+pub mod gear;
+pub use gear::ApiGateway;
 
 // === INTERNAL MODULES ===
 mod assets;

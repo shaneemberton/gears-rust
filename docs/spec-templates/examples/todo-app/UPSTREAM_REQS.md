@@ -4,7 +4,7 @@
 
 - [1. Overview](#1-overview)
   - [1.1 Purpose](#11-purpose)
-  - [1.2 Requesting Modules](#12-requesting-modules)
+  - [1.2 Requesting Gears](#12-requesting-gears)
 - [2. Requirements](#2-requirements)
   - [2.1 Sync Service](#21-sync-service)
 - [3. Priorities](#3-priorities)
@@ -17,11 +17,11 @@
 
 ### 1.1 Purpose
 
-Todo App is a task management module. This document consolidates requirements from modules that depend on Todo App to expose task data and change tracking for synchronization across devices.
+Todo App is a task management gear. This document consolidates requirements from gears that depend on Todo App to expose task data and change tracking for synchronization across devices.
 
-### 1.2 Requesting Modules
+### 1.2 Requesting Gears
 
-| Module | Why it needs this module |
+| Gear | Why it needs this gear |
 |--------|-------------------------|
 | sync-service | Needs Todo App to track task modification timestamps and expose a changes feed for incremental cross-device synchronization |
 
@@ -33,19 +33,19 @@ Todo App is a task management module. This document consolidates requirements fr
 
 - [ ] `p1` - **ID**: `cpt-examples-todo-app-upreq-modification-timestamps`
 
-The module **MUST** record a last-modified timestamp on every task change (create, update, complete, delete) so that the sync service can request only changes since a given point in time.
+The gear **MUST** record a last-modified timestamp on every task change (create, update, complete, delete) so that the sync service can request only changes since a given point in time.
 
 - **Rationale**: Without per-task modification timestamps, the sync service must transfer the entire task set on every sync cycle, which does not scale and wastes bandwidth.
-- **Source**: `modules/sync-service`
+- **Source**: `gears/sync-service`
 
 #### Expose Changes Feed
 
 - [ ] `p1` - **ID**: `cpt-examples-todo-app-upreq-changes-feed`
 
-The module **MUST** expose an ordered feed of task changes (created, updated, completed, deleted) filterable by timestamp, so the sync service can perform incremental synchronization.
+The gear **MUST** expose an ordered feed of task changes (created, updated, completed, deleted) filterable by timestamp, so the sync service can perform incremental synchronization.
 
 - **Rationale**: Sync service needs a pull-based mechanism to discover what changed since the last sync checkpoint; polling the full task list is insufficient for real-time sync targets (<5s).
-- **Source**: `modules/sync-service`
+- **Source**: `gears/sync-service`
 
 ## 3. Priorities
 
@@ -60,4 +60,4 @@ The module **MUST** expose an ordered feed of task changes (created, updated, co
 
 ### Sync Service Sources
 
-<!-- Source IDs will be added when sync-service module is created -->
+<!-- Source IDs will be added when sync-service gear is created -->

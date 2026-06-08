@@ -14,7 +14,7 @@
 //! # New Architecture
 //! The crate now supports:
 //! - Typed `DbConnectOptions` using sqlx `ConnectOptions` (no DSN string building)
-//! - Per-module database factories with configuration merging
+//! - Per-gear database factories with configuration merging
 //! - `SQLite` PRAGMA whitelist for security
 //! - Environment variable expansion in passwords and DSNs
 //!
@@ -39,10 +39,10 @@
 //!                 }
 //!             }
 //!         },
-//!         "test_module": {
+//!         "test_gear": {
 //!             "database": {
 //!                 "server": "main",
-//!                 "dbname": "module_db"
+//!                 "dbname": "gear_db"
 //!             }
 //!         }
 //!     })));
@@ -52,7 +52,7 @@
 //! let db_manager = Arc::new(DbManager::from_figment(figment, home_dir).unwrap());
 //!
 //! // Use in runtime with DbOptions::Manager(db_manager)
-//! // Modules can then use: ctx.db_required_async().await?
+//! // Gears can then use: ctx.db_required_async().await?
 //! ```
 
 #![cfg_attr(
@@ -70,10 +70,10 @@
 // Re-export key types for public API
 pub use advisory_locks::{DbLockGuard, LockConfig};
 
-// Re-export sea_orm_migration for modules that implement DatabaseCapability
+// Re-export sea_orm_migration for gears that implement DatabaseCapability
 pub use sea_orm_migration;
 
-// Core modules
+// Core gears
 pub mod advisory_locks;
 pub mod config;
 pub mod contention;
@@ -88,12 +88,12 @@ pub mod secure;
 
 mod db_provider;
 
-// Internal modules
+// Internal gears
 mod pool_opts;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
-// Re-export important types from new modules
+// Re-export important types from new gears
 pub use config::{DbConnConfig, GlobalDatabaseConfig, PoolCfg};
 pub use manager::DbManager;
 pub use options::redact_credentials_in_dsn;
@@ -106,7 +106,7 @@ pub use db_provider::DBProvider;
 
 /// Connect and return a secure `Db` (no `DbHandle` exposure).
 ///
-/// This is the public constructor intended for module code and tests.
+/// This is the public constructor intended for gear code and tests.
 ///
 /// # Errors
 ///
@@ -467,7 +467,7 @@ impl DbHandle {
 
     // --- SeaORM accessor ---
 
-    /// Create a secure database wrapper for module code.
+    /// Create a secure database wrapper for gear code.
     ///
     /// This returns a `Db` which provides controlled access to the database
     /// via `conn()` and `transaction()` methods.
@@ -477,7 +477,7 @@ impl DbHandle {
     /// **INTERNAL**: Get raw `SeaORM` connection for internal runtime operations.
     ///
     /// This is `pub(crate)` and should **only** be used by:
-    /// - The migration runner (for executing module migrations)
+    /// - The migration runner (for executing gear migrations)
     /// - Internal infrastructure code within `toolkit-db`
     ///
     #[must_use]
@@ -491,7 +491,7 @@ impl DbHandle {
     /// - The `Db` wrapper for creating runners
     /// - Internal infrastructure code within `toolkit-db`
     ///
-    /// **NEVER expose this to modules.**
+    /// **NEVER expose this to gears.**
     #[must_use]
     pub(crate) fn sea_internal_ref(&self) -> &DatabaseConnection {
         &self.sea
@@ -499,13 +499,13 @@ impl DbHandle {
 
     // --- Advisory locks ---
 
-    /// Acquire an advisory lock with the given key and module namespace.
+    /// Acquire an advisory lock with the given key and gear namespace.
     ///
     /// # Errors
     /// Returns an error if the lock cannot be acquired.
-    pub async fn lock(&self, module: &str, key: &str) -> Result<DbLockGuard> {
+    pub async fn lock(&self, gear: &str, key: &str) -> Result<DbLockGuard> {
         let lock_manager = advisory_locks::LockManager::new(self.dsn.clone());
-        let guard = lock_manager.lock(module, key).await?;
+        let guard = lock_manager.lock(gear, key).await?;
         Ok(guard)
     }
 
@@ -515,12 +515,12 @@ impl DbHandle {
     /// Returns an error if an unrecoverable lock error occurs.
     pub async fn try_lock(
         &self,
-        module: &str,
+        gear: &str,
         key: &str,
         config: LockConfig,
     ) -> Result<Option<DbLockGuard>> {
         let lock_manager = advisory_locks::LockManager::new(self.dsn.clone());
-        let res = lock_manager.try_lock(module, key, config).await?;
+        let res = lock_manager.try_lock(gear, key, config).await?;
         Ok(res)
     }
 
@@ -591,15 +591,15 @@ mod tests {
             .map_or(0, |d| d.as_nanos());
         let test_id = format!("test_basic_{now}");
 
-        let guard1 = db.lock("test_module", &format!("{test_id}_key1")).await?;
-        let _guard2 = db.lock("test_module", &format!("{test_id}_key2")).await?;
+        let guard1 = db.lock("test_gear", &format!("{test_id}_key1")).await?;
+        let _guard2 = db.lock("test_gear", &format!("{test_id}_key2")).await?;
         let _guard3 = db
-            .lock("different_module", &format!("{test_id}_key1"))
+            .lock("different_gear", &format!("{test_id}_key1"))
             .await?;
 
         // Deterministic unlock to avoid races with async Drop cleanup
         guard1.release().await;
-        let _guard4 = db.lock("test_module", &format!("{test_id}_key1")).await?;
+        let _guard4 = db.lock("test_gear", &format!("{test_id}_key1")).await?;
         Ok(())
     }
 
@@ -614,9 +614,9 @@ mod tests {
             .map_or(0, |d| d.as_nanos());
         let test_id = format!("test_diff_{now}");
 
-        let _guard1 = db.lock("test_module", &format!("{test_id}_key1")).await?;
-        let _guard2 = db.lock("test_module", &format!("{test_id}_key2")).await?;
-        let _guard3 = db.lock("other_module", &format!("{test_id}_key1")).await?;
+        let _guard1 = db.lock("test_gear", &format!("{test_id}_key1")).await?;
+        let _guard2 = db.lock("test_gear", &format!("{test_id}_key2")).await?;
+        let _guard3 = db.lock("other_gear", &format!("{test_id}_key1")).await?;
         Ok(())
     }
 
@@ -631,7 +631,7 @@ mod tests {
             .map_or(0, |d| d.as_nanos());
         let test_id = format!("test_config_{now}");
 
-        let _guard1 = db.lock("test_module", &format!("{test_id}_key")).await?;
+        let _guard1 = db.lock("test_gear", &format!("{test_id}_key")).await?;
 
         let config = LockConfig {
             max_wait: Some(Duration::from_millis(200)),
@@ -641,7 +641,7 @@ mod tests {
         };
 
         let result = db
-            .try_lock("test_module", &format!("{test_id}_different_key"), config)
+            .try_lock("test_gear", &format!("{test_id}_different_key"), config)
             .await?;
         assert!(
             result.is_some(),

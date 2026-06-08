@@ -1,6 +1,6 @@
 # TR AuthZ Plugin
 
-AuthZ resolver plugin that resolves tenant hierarchy via `TenantResolverClient`. Delegates all tenant operations to the tenant-resolver module instead of accessing Resource Group directly.
+AuthZ resolver plugin that resolves tenant hierarchy via `TenantResolverClient`. Delegates all tenant operations to the tenant-resolver gear instead of accessing Resource Group directly.
 
 ## How It Works
 
@@ -11,7 +11,7 @@ AuthZ resolver plugin that resolves tenant hierarchy via `TenantResolverClient`.
 ## Configuration
 
 ```yaml
-modules:
+gears:
   tr_authz_plugin:
     config:
       vendor: "constructorfabric"

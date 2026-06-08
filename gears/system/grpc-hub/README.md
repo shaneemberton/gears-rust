@@ -1,18 +1,18 @@
-# gRPC Hub Module
+# gRPC Hub Gear
 
-This module builds and hosts the single `tonic::Server` instance for the process.
+This gear builds and hosts the single `tonic::Server` instance for the process.
 
 ## Overview
 
-The `cf-gears-grpc-hub` crate implements the `grpc_hub` module and is responsible for:
+The `cf-gears-grpc-hub` crate implements the `grpc_hub` gear and is responsible for:
 
 - Hosting the gRPC server
-- Installing gRPC services collected from other modules
+- Installing gRPC services collected from other gears
 
 ## Configuration
 
 ```yaml
-modules:
+gears:
   grpc_hub:
     config:
       # TCP example: "0.0.0.0:50051"

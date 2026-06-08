@@ -1,6 +1,6 @@
 # Nodes Registry SDK
 
-SDK crate for the nodes registry module.
+SDK crate for the nodes registry gear.
 
 ## Overview
 

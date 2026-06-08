@@ -122,18 +122,18 @@ pattern = "libs/**/*.md"
 id      = "tools/dylint_lints"
 pattern = "tools/dylint_lints/**/*.md"
 
-# ── Modules ───────────────────────────────────────────────────────────────────
+# ── Gears ───────────────────────────────────────────────────────────────────
 
 [[categories]]
-id    = "modules"
-label = "Modules"
+id    = "gears"
+label = "Gears"
 
 [[categories.buckets]]
-id      = "modules-system"
+id      = "gears-system"
 pattern = "gears/system/*/**/*.md"
 
 [[categories.buckets]]
-id      = "modules-other"
+id      = "gears-other"
 pattern = "gears/*/**/*.md"
 
 # ── Control Plane Views ─────────────────────────────────────────────────────

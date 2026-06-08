@@ -1,7 +1,7 @@
 //! Pure helpers shared across the `SeaORM` repo split.
 //!
 //! Visibility: `pub(super)` — these helpers are private to the
-//! `repo_impl` module tree (siblings: `reads`, `lifecycle`,
+//! `repo_impl` gear tree (siblings: `reads`, `lifecycle`,
 //! `updates`, `retention`).
 
 use std::future::Future;

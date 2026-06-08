@@ -35,7 +35,7 @@
                 { "path": "gears/auth/architecture/features/sso.md", "kind": "FEATURE", "traceability": "FULL" }
               ],
               "codebase": [
-                { "name": "Auth Module", "path": "src/gears/auth", "extensions": [".ts"] }
+                { "name": "Auth Gear", "path": "src/gears/auth", "extensions": [".ts"] }
               ],
               "children": []
             }

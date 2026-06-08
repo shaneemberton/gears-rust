@@ -4,7 +4,7 @@
 //! The classifier emits [`IntegrityCategory::RootCountAnomaly`] when:
 //!
 //! * `root_count > 1` — multiple roots break the invariant.
-//! * `root_count == 0 && total_count > 0` — zero roots but the module
+//! * `root_count == 0 && total_count > 0` — zero roots but the gear
 //!   has tenants (anomalous; bootstrap requires a single root).
 
 use crate::domain::tenant::integrity::{IntegrityCategory, Violation};
@@ -29,7 +29,7 @@ pub(super) fn classify(snap: &Snapshot) -> Vec<Violation> {
         out.push(Violation {
             category: IntegrityCategory::RootCountAnomaly,
             tenant_id: None,
-            details: "no root tenant present but module has tenants".to_owned(),
+            details: "no root tenant present but gear has tenants".to_owned(),
         });
     }
     out

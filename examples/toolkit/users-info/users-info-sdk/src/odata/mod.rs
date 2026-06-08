@@ -1,7 +1,7 @@
 //! `OData` filter field definitions for `user_info` resources.
 //!
-//! This module defines the filterable fields for each resource exposed by the
-//! `user_info` module. These field enums are used for type-safe `OData` filter
+//! This gear defines the filterable fields for each resource exposed by the
+//! `user_info` gear. These field enums are used for type-safe `OData` filter
 //! construction and validation.
 //!
 //! ## Usage
@@ -13,7 +13,7 @@
 //!
 //! ## Feature Gate
 //!
-//! This module requires the `odata` feature to be enabled.
+//! This gear requires the `odata` feature to be enabled.
 
 mod addresses;
 mod cities;

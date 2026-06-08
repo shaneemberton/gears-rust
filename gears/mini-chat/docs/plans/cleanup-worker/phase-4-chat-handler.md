@@ -159,7 +159,7 @@ impl ChatCleanupHandler {
 }
 ```
 
-### 4.4 Register in module.rs
+### 4.4 Register in gear.rs
 
 ```rust
 .queue(&chat_cleanup_queue_name, partitions)

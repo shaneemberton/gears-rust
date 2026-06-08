@@ -1,7 +1,7 @@
 // Updated: 2026-04-28 by Constructor Tech
 //! `OpenAPI` registry for schema and operation management
 //!
-//! This module provides a standalone `OpenAPI` registry that collects operation specs
+//! This gear provides a standalone `OpenAPI` registry that collects operation specs
 //! and schemas, and builds a complete `OpenAPI` document from them.
 
 use anyhow::Result;

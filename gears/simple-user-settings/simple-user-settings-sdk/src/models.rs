@@ -1,7 +1,7 @@
-//! Public models for the settings module.
+//! Public models for the settings gear.
 //!
 //! These are transport-agnostic data structures that define the contract
-//! between the settings module and its consumers.
+//! between the settings gear and its consumers.
 //!
 //! All models are marked with `#[domain_model]` to enforce DDD boundaries
 //! at compile time - they cannot contain infrastructure types.

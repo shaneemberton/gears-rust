@@ -198,7 +198,7 @@ Mark review as "PARTIAL" if not all domains completed.
 - [ ] No capability is mentioned without a supporting requirement
 - [ ] Requirements are prioritized (implicit or explicit)
 - [ ] Dependencies between requirements are identified
-- [ ] If an UPSTREAM_REQS document exists for this module, every `upreq` ID is covered by at least one FR or NFR via a `**Covers**:` field
+- [ ] If an UPSTREAM_REQS document exists for this gear, every `upreq` ID is covered by at least one FR or NFR via a `**Covers**:` field
 
 ### BIZ-PRD-004: Use Case Coverage
 **Severity**: HIGH

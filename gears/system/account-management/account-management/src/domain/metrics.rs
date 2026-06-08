@@ -10,7 +10,7 @@
 //! Existing call sites emit through the stringly-typed helpers
 //! [`emit_metric`], [`emit_gauge_value`], and [`emit_histogram_value`].
 //! When the infra adapter has installed a [`MetricsFacadeBridge`] via
-//! [`install_facade_bridge`] (done in [`crate::module`] init), emissions
+//! [`install_facade_bridge`] (done in [`crate::gear`] init), emissions
 //! are forwarded to OpenTelemetry instruments. Before installation —
 //! and in tests that do not wire the adapter — the helpers are silent
 //! no-ops, preserving the pre-init posture.
@@ -172,12 +172,12 @@ impl MetricKind {
 // [`emit_gauge_value`] / [`emit_histogram_value`] helpers into the
 // OpenTelemetry-backed adapter without requiring every call site to
 // migrate at once. The adapter installs an implementation during
-// module init; calls before installation are silent no-ops.
+// gear init; calls before installation are silent no-ops.
 
 /// Forwarder used by the [`emit_*`] helpers to reach a real metrics
 /// adapter without the domain layer depending on infra. The infra
 /// adapter implements this trait; [`install_facade_bridge`] installs
-/// the implementation at module-init time.
+/// the implementation at gear-init time.
 pub trait MetricsFacadeBridge: Send + Sync + 'static {
     /// Forward an [`emit_metric`] call (counter-only today; the helper
     /// rejects gauge / histogram kinds at the call site).
@@ -200,14 +200,14 @@ type BridgeArc = Arc<dyn MetricsFacadeBridge>;
 /// Process-wide bridge slot. `ArcSwap` gives lock-free reads on the
 /// emit hot path and lets [`install_facade_bridge`] *replace* the
 /// active bridge — needed when a test harness swaps the global meter
-/// provider between AM module inits (the new adapter's instruments
+/// provider between AM gear inits (the new adapter's instruments
 /// are bound to the new provider; an unconditionally first-wins
 /// `OnceLock` would freeze emissions on the stale instruments).
 static FACADE_BRIDGE: LazyLock<ArcSwap<Option<BridgeArc>>> =
     LazyLock::new(|| ArcSwap::from(Arc::new(None)));
 
 /// Install (or replace) the process-wide facade bridge. Called once
-/// during AM module init; idempotent across re-inits — the most
+/// during AM gear init; idempotent across re-inits — the most
 /// recent installation wins. The bridge stays installed for the
 /// lifetime of the process unless overwritten, matching the
 /// `opentelemetry::global::set_meter_provider` posture which itself
@@ -216,7 +216,7 @@ static FACADE_BRIDGE: LazyLock<ArcSwap<Option<BridgeArc>>> =
 /// Returns `true` if this call installed the *first* bridge, `false`
 /// if a prior bridge was replaced. The boolean is informational —
 /// callers can log on the rare "already installed" branch (parallel
-/// module init in test harnesses, meter-provider hot-swap) but should
+/// gear init in test harnesses, meter-provider hot-swap) but should
 /// not treat it as an error.
 pub fn install_facade_bridge(bridge: BridgeArc) -> bool {
     let prev = FACADE_BRIDGE.swap(Arc::new(Some(bridge)));

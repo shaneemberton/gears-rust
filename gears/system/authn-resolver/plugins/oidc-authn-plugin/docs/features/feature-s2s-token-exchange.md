@@ -43,7 +43,7 @@ The purpose is to provide authenticated non-user execution contexts through the 
 
 | Actor | Role in Feature |
 |-------|-----------------|
-| `cpt-cf-authn-plugin-actor-background-module` | Requests authenticated context for background execution. |
+| `cpt-cf-authn-plugin-actor-background-gear` | Requests authenticated context for background execution. |
 | `cpt-cf-authn-plugin-actor-idp` | Serves token endpoint for client-credentials grant. |
 
 ### 1.4 References
@@ -62,7 +62,7 @@ The purpose is to provide authenticated non-user execution contexts through the 
 
 - [x] `p2` - **ID**: `cpt-cf-authn-plugin-flow-s2s-token-exchange-exchange-client-credentials`
 
-**Actor**: `cpt-cf-authn-plugin-actor-background-module`
+**Actor**: `cpt-cf-authn-plugin-actor-background-gear`
 
 **Steps**:
 1. [x] - `p2` - Receive `ClientCredentialsRequest` with client identity, secret, and optional scopes. - `inst-s2s-receive-request`
@@ -74,7 +74,7 @@ The purpose is to provide authenticated non-user execution contexts through the 
 6. [x] - `p2` - Validate obtained token through standard JWT pipeline. - `inst-s2s-validate-token`
 7. [x] - `p2` - Map claims into `SecurityContext` and apply default subject type if needed. - `inst-s2s-map-context`
 8. [x] - `p2` - Store result in bounded cache with TTL min(token-expiry, configured-ttl). - `inst-s2s-store-cache`
-9. [x] - `p2` - **RETURN** `AuthenticationResult` to calling module. - `inst-s2s-return-result`
+9. [x] - `p2` - **RETURN** `AuthenticationResult` to calling gear. - `inst-s2s-return-result`
 
 ## 3. Processes / Business Logic (CDSL)
 

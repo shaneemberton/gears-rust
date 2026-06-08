@@ -1,4 +1,4 @@
-//! `SeaORM` migrations for the Account Management module.
+//! `SeaORM` migrations for the Account Management gear.
 //!
 //! * `m0001_initial_schema` — `tenants`, `tenant_closure`,
 //!   `tenant_metadata` tables with every column and index needed by

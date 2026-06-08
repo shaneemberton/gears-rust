@@ -3,7 +3,7 @@
 //! Extracted into a companion file per dylint `DE1101` (inline test
 //! blocks > 100 lines must move out of the production source file).
 //! The fakes here are local to the checker's unit tests; the
-//! cross-module `SlowRgClient` used by service-level integration
+//! cross-gear `SlowRgClient` used by service-level integration
 //! tests lives in `super::test_helpers`.
 
 use super::*;

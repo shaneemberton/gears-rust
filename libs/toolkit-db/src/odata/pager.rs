@@ -1,6 +1,6 @@
 //! Minimal fluent builder for combining Secure ORM scoping with `OData` pagination.
 //!
-//! This module provides `OPager`, a small ergonomic builder that:
+//! This gear provides `OPager`, a small ergonomic builder that:
 //! - Applies security scope via `Entity::find().secure().scope_with(&scope)`
 //! - Applies `OData` filter + cursor + order + limit via `paginate_with_odata`
 //! - Keeps all existing types without introducing facades or macros

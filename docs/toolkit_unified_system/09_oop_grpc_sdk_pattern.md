@@ -1,17 +1,17 @@
-# Out-of-Process Modules and gRPC SDK Pattern
+# Out-of-Process Gears and gRPC SDK Pattern
 
-ToolKit supports running modules as separate processes with gRPC-based inter-process communication. This enables process isolation, language flexibility, and independent scaling.
+ToolKit supports running gears as separate processes with gRPC-based inter-process communication. This enables process isolation, language flexibility, and independent scaling.
 
 ## Core invariants
 
-- **Rule**: For OoP modules, use the SDK pattern with a single `*-sdk` crate containing API trait, types, gRPC client, and wiring helpers.
-- **Rule**: For gRPC: server implementations live in the module itself; the SDK crate provides only the client.
+- **Rule**: For OoP gears, use the SDK pattern with a single `*-sdk` crate containing API trait, types, gRPC client, and wiring helpers.
+- **Rule**: For gRPC: server implementations live in the gear itself; the SDK crate provides only the client.
 - **Rule**: For gRPC clients: always use `toolkit_transport_grpc::client` utilities (`connect_with_stack`, `connect_with_retry`).
 - **Rule**: Use `CancellationToken` for coordinated shutdown across the entire process tree.
 
 ## RuntimeKind
 
-Modules can run in two modes:
+Gears can run in two modes:
 
 ```rust
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -23,12 +23,12 @@ pub enum RuntimeKind {
 }
 ```
 
-## OoP Module Configuration
+## OoP Gear Configuration
 
 ### YAML configuration
 
 ```yaml
-modules:
+gears:
   calculator:
     runtime:
       type: oop
@@ -44,8 +44,8 @@ modules:
 
 ### Configuration fields
 
-- `type: oop` — marks the module as out-of-process
-- `executable_path` — path to the module binary (supports `~` expansion)
+- `type: oop` — marks the gear as out-of-process
+- `executable_path` — path to the gear binary (supports `~` expansion)
 - `args` — command-line arguments passed to the executable
 - `working_directory` — optional working directory for the process
 - `environment` — environment variables to set for the process
@@ -60,7 +60,7 @@ use toolkit::bootstrap::oop::{OopRunOptions, run_oop_with_options};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opts = OopRunOptions {
-        module_name: "my_module".to_string(),
+        gear_name: "my_gear".to_string(),
         instance_id: None,  // Auto-generated UUID
         directory_endpoint: "http://127.0.0.1:50051".to_string(),
         config_path: None,
@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
 
 | Field | Description |
 |-------|-------------|
-| `module_name` | Logical module name (e.g., "file-parser") |
+| `gear_name` | Logical gear name (e.g., "file-parser") |
 | `instance_id` | Instance ID (defaults to random UUID) |
 | `directory_endpoint` | DirectoryService gRPC endpoint |
 | `config_path` | Path to configuration file |
@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
 3. **DirectoryService connection** — connects to the master host's directory service
 4. **Instance registration** — registers with DirectoryService for discovery
 5. **Heartbeat loop** — starts background heartbeat task
-6. **Module lifecycle** — runs the normal module lifecycle (init → migrate → start)
+6. **Gear lifecycle** — runs the normal gear lifecycle (init → migrate → start)
 7. **Graceful shutdown** — deregisters from DirectoryService on exit
 
 ### Shutdown model
@@ -102,31 +102,31 @@ async fn main() -> anyhow::Result<()> {
 Shutdown is driven by a single root `CancellationToken` per process:
 
 - OS signals (SIGTERM, SIGINT, Ctrl+C) are hooked at bootstrap level
-- The root token is passed to `RunOptions::Token` for module runtime shutdown
+- The root token is passed to `RunOptions::Token` for gear runtime shutdown
 - Background tasks (like heartbeat) use child tokens derived from the root
-- On shutdown, the module deregisters itself from DirectoryService before exiting
+- On shutdown, the gear deregisters itself from DirectoryService before exiting
 
 ## SDK Pattern for OoP
 
-### Module structure with SDK
+### Gear structure with SDK
 
 ```
-modules/my_module/
-  ├── my_module-sdk/              # SDK for consumers (everything in one place)
+gears/my_gear/
+  ├── my_gear-sdk/                # SDK for consumers (everything in one place)
   │   ├── Cargo.toml
   │   ├── build.rs                # Proto compilation
   │   ├── proto/
-  │   │   └── my_module.proto     # gRPC service definition
+  │   │   └── my_gear.proto       # gRPC service definition
   │   └── src/
   │       ├── lib.rs              # Re-exports everything
   │       ├── api.rs              # API trait + types + errors
   │       ├── client.rs           # gRPC client impl (using toolkit-transport-grpc)
   │       └── wiring.rs           # wire_client() helper function
-  └── my_module/                  # Module implementation + SERVER
+  └── my_gear/                    # Gear implementation + SERVER
       ├── Cargo.toml
       └── src/
-          ├── lib.rs              # Module definition, re-exports SDK
-          ├── module.rs           # Module struct + traits
+          ├── lib.rs              # Gear definition, re-exports SDK
+          ├── gear.rs             # Gear struct + traits
           ├── grpc_server.rs      # gRPC server implementation
           └── main.rs             # OoP binary entry point
 ```
@@ -134,8 +134,8 @@ modules/my_module/
 ### Key points
 
 - The `-sdk` crate contains everything consumers need: API trait, types, gRPC client, and wiring helpers
-- Server implementations are owned by the module itself, not the SDK
-- Consumers only need one dependency: `my_module-sdk`
+- Server implementations are owned by the gear itself, not the SDK
+- Consumers only need one dependency: `my_gear-sdk`
 
 ## SDK Crate Structure
 
@@ -146,38 +146,38 @@ modules/my_module/
 
 // API trait and types
 mod api;
-pub use api::{MyModuleApi, MyModuleError, Input, Output};
+pub use api::{MyGearApi, MyGearError, Input, Output};
 
 // gRPC proto stubs
 pub mod proto {
-    tonic::include_proto!("my_module.v1");
+    tonic::include_proto!("my_gear.v1");
 }
-pub use proto::my_module_service_client::MyModuleServiceClient;
-pub use proto::my_module_service_server::{MyModuleService, MyModuleServiceServer};
+pub use proto::my_gear_service_client::MyGearServiceClient;
+pub use proto::my_gear_service_server::{MyGearService, MyGearServiceServer};
 
 // gRPC client
 mod client;
-pub use client::MyModuleGrpcClient;
+pub use client::MyGearGrpcClient;
 
 // Wiring helpers
 mod wiring;
 pub use wiring::{wire_client, build_client};
 
 /// Service name for discovery
-pub const SERVICE_NAME: &str = "my_module.v1.MyModuleService";
+pub const SERVICE_NAME: &str = "my_gear.v1.MyGearService";
 ```
 
 ### API Trait (in SDK)
 
 ```rust
-// my_module-sdk/src/api.rs
+// my_gear-sdk/src/api.rs
 use async_trait::async_trait;
 use uuid::Uuid;
 
-/// API trait for MyModule
+/// API trait for MyGear
 #[async_trait]
-pub trait MyModuleApi: Send + Sync {
-    async fn do_something(&self, input: Input) -> Result<Output, MyModuleError>;
+pub trait MyGearApi: Send + Sync {
+    async fn do_something(&self, input: Input) -> Result<Output, MyGearError>;
 }
 
 /// Input type
@@ -196,7 +196,7 @@ pub struct Output {
 
 /// Error type
 #[derive(thiserror::Error, Debug)]
-pub enum MyModuleError {
+pub enum MyGearError {
     #[error("Not found: {id}")]
     NotFound { id: Uuid },
     #[error("Validation error: {message}")]
@@ -209,27 +209,27 @@ pub enum MyModuleError {
 ### gRPC Client (in SDK)
 
 ```rust
-// my_module-sdk/src/client.rs
-use crate::{api::MyModuleApi, proto};
+// my_gear-sdk/src/client.rs
+use crate::{api::MyGearApi, proto};
 use async_trait::async_trait;
 use toolkit_transport_grpc::client::{GrpcClient, GrpcClientExt};
 use tonic::transport::Channel;
 
-pub struct MyModuleGrpcClient {
-    inner: GrpcClient<proto::my_module_service_client::MyModuleServiceClient<Channel>>,
+pub struct MyGearGrpcClient {
+    inner: GrpcClient<proto::my_gear_service_client::MyGearServiceClient<Channel>>,
 }
 
-impl MyModuleGrpcClient {
+impl MyGearGrpcClient {
     pub fn new(channel: Channel) -> Self {
         Self {
-            inner: GrpcClient::new(proto::my_module_service_client::MyModuleServiceClient::new(channel)),
+            inner: GrpcClient::new(proto::my_gear_service_client::MyGearServiceClient::new(channel)),
         }
     }
 }
 
 #[async_trait]
-impl MyModuleApi for MyModuleGrpcClient {
-    async fn do_something(&self, input: crate::api::Input) -> Result<crate::api::Output, crate::api::MyModuleError> {
+impl MyGearApi for MyGearGrpcClient {
+    async fn do_something(&self, input: crate::api::Input) -> Result<crate::api::Output, crate::api::MyGearError> {
         let request = proto::DoSomethingRequest {
             id: Some(input.id.to_string()),
             message: input.message,
@@ -239,12 +239,12 @@ impl MyModuleApi for MyModuleGrpcClient {
             .inner
             .call(|client| async move { client.do_something(request).await })
             .await
-            .map_err(|e| crate::api::MyModuleError::Internal)?;
+            .map_err(|e| crate::api::MyGearError::Internal)?;
 
         Ok(crate::api::Output {
             result: response.result,
             timestamp: chrono::DateTime::parse_from_rfc3339(&response.timestamp)
-                .map_err(|_| crate::api::MyModuleError::Internal)?
+                .map_err(|_| crate::api::MyGearError::Internal)?
                 .with_timezone(&chrono::Utc),
         })
     }
@@ -254,15 +254,15 @@ impl MyModuleApi for MyModuleGrpcClient {
 ### Wiring helpers (in SDK)
 
 ```rust
-// my_module-sdk/src/wiring.rs
-use crate::{MyModuleApi, MyModuleGrpcClient, SERVICE_NAME};
+// my_gear-sdk/src/wiring.rs
+use crate::{MyGearApi, MyGearGrpcClient, SERVICE_NAME};
 use toolkit_transport_grpc::client::{connect_with_stack, connect_with_retry};
 use tonic::transport::Channel;
 
 /// Wire a gRPC client with default stack
-pub async fn wire_client(endpoint: &str) -> Result<Box<dyn MyModuleApi>, Box<dyn std::error::Error>> {
+pub async fn wire_client(endpoint: &str) -> Result<Box<dyn MyGearApi>, Box<dyn std::error::Error>> {
     let channel = connect_with_stack(endpoint).await?;
-    let client = MyModuleGrpcClient::new(channel);
+    let client = MyGearGrpcClient::new(channel);
     Ok(Box::new(client))
 }
 
@@ -271,9 +271,9 @@ pub async fn build_client(
     endpoint: &str,
     max_retries: u32,
     retry_delay: std::time::Duration,
-) -> Result<Box<dyn MyModuleApi>, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn MyGearApi>, Box<dyn std::error::Error>> {
     let channel = connect_with_retry(endpoint, max_retries, retry_delay).await?;
-    let client = MyModuleGrpcClient::new(channel);
+    let client = MyGearGrpcClient::new(channel);
     Ok(Box::new(client))
 }
 
@@ -283,30 +283,30 @@ pub fn service_name() -> &'static str {
 }
 ```
 
-## Module Implementation
+## Gear Implementation
 
-### gRPC Server (in module)
+### gRPC Server (in gear)
 
 ```rust
-// my_module/src/grpc_server.rs
-use crate::api::{MyModuleApi, Input, Output, MyModuleError};
-use crate::proto::{my_module_service_server::MyModuleService, DoSomethingRequest, DoSomethingResponse};
+// my_gear/src/grpc_server.rs
+use crate::api::{MyGearApi, Input, Output, MyGearError};
+use crate::proto::{my_gear_service_server::MyGearService, DoSomethingRequest, DoSomethingResponse};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
-pub struct MyModuleGrpcServer {
-    service: Arc<dyn MyModuleApi>,
+pub struct MyGearGrpcServer {
+    service: Arc<dyn MyGearApi>,
 }
 
-impl MyModuleGrpcServer {
-    pub fn new(service: Arc<dyn MyModuleApi>) -> Self {
+impl MyGearGrpcServer {
+    pub fn new(service: Arc<dyn MyGearApi>) -> Self {
         Self { service }
     }
 }
 
 #[async_trait]
-impl MyModuleService for MyModuleGrpcServer {
+impl MyGearService for MyGearGrpcServer {
     async fn do_something(
         &self,
         request: Request<DoSomethingRequest>,
@@ -329,30 +329,30 @@ impl MyModuleService for MyModuleGrpcServer {
                 Ok(Response::new(response))
             }
             Err(err) => Err(match err {
-                MyModuleError::NotFound { .. } => Status::not_found(err.to_string()),
-                MyModuleError::Validation { .. } => Status::invalid_argument(err.to_string()),
-                MyModuleError::Internal => Status::internal(err.to_string()),
+                MyGearError::NotFound { .. } => Status::not_found(err.to_string()),
+                MyGearError::Validation { .. } => Status::invalid_argument(err.to_string()),
+                MyGearError::Internal => Status::internal(err.to_string()),
             }),
         }
     }
 }
 ```
 
-### Module registration with gRPC
+### Gear registration with gRPC
 
 ```rust
-// my_module/src/module.rs
-#[toolkit::module(
-    name = "my_module",
+// my_gear/src/gear.rs
+#[toolkit::gear(
+    name = "my_gear",
     capabilities = [stateful],
-    client = my_module_sdk::MyModuleApi,
+    client = my_gear_sdk::MyGearApi,
     lifecycle(entry = "serve", stop_timeout = "30s")
 )]
-pub struct MyModule {
+pub struct MyGear {
     service: Arc<crate::domain::service::MyService>,
 }
 
-impl MyModule {
+impl MyGear {
     pub fn new() -> Self {
         Self {
             service: Arc::new(crate::domain::service::MyService::new()),
@@ -366,11 +366,11 @@ impl MyModule {
     ) -> anyhow::Result<()> {
         // Create gRPC server
         let addr = "0.0.0.0:50051".parse()?;
-        let grpc_server = MyModuleGrpcServer::new(self.service.clone());
+        let grpc_server = MyGearGrpcServer::new(self.service.clone());
 
         // Start server
         let server_future = tonic::transport::Server::builder()
-            .add_service(my_module_sdk::proto::my_module_service_server::MyModuleServiceServer::new(grpc_server))
+            .add_service(my_gear_sdk::proto::my_gear_service_server::MyGearServiceServer::new(grpc_server))
             .serve_with_shutdown(addr, cancel.cancelled());
 
         ready.notify();
@@ -381,31 +381,31 @@ impl MyModule {
 }
 ```
 
-> The `client = ...` attribute validates the trait at compile time and exposes MODULE_NAME, but does not auto-register the client into ClientHub. You must still register it explicitly in your `init()` method using `ctx.client_hub().register::<dyn my_module_sdk::MyModuleApi>(client)`.
+> The `client = ...` attribute validates the trait at compile time and exposes MODULE_NAME, but does not auto-register the client into ClientHub. You must still register it explicitly in your `init()` method using `ctx.client_hub().register::<dyn my_gear_sdk::MyGearApi>(client)`.
 
-## Client Registration (in module)
+## Client Registration (in gear)
 
 ### Register both local and remote clients
 
 ```rust
-// In module's init()
-async fn register_clients(&self, ctx: &ModuleCtx) -> anyhow::Result<()> {
+// In gear's init()
+async fn register_clients(&self, ctx: &GearCtx) -> anyhow::Result<()> {
     // Try local client first
-    if let Ok(local_client) = ctx.client_hub().try_get::<dyn my_module_sdk::MyModuleApi>() {
-        ctx.client_hub().register::<dyn my_module_sdk::MyModuleApi>(local_client);
+    if let Ok(local_client) = ctx.client_hub().try_get::<dyn my_gear_sdk::MyGearApi>() {
+        ctx.client_hub().register::<dyn my_gear_sdk::MyGearApi>(local_client);
         return Ok(());
     }
 
     // Fall back to remote client
     let endpoint = "http://127.0.0.1:50051";
-    let remote_client = my_module_sdk::wire_client(endpoint).await?;
-    ctx.client_hub().register::<dyn my_module_sdk::MyModuleApi>(remote_client);
+    let remote_client = my_gear_sdk::wire_client(endpoint).await?;
+    ctx.client_hub().register::<dyn my_gear_sdk::MyGearApi>(remote_client);
 
     Ok(())
 }
 ```
 
-## Testing OoP modules
+## Testing OoP gears
 
 ### Test with mock server
 
@@ -413,11 +413,11 @@ async fn register_clients(&self, ctx: &ModuleCtx) -> anyhow::Result<()> {
 #[tokio::test]
 async fn test_grpc_client() {
     // Start mock server
-    let mock_server = MockMyModuleServer::new();
+    let mock_server = MockMyGearServer::new();
     let server_addr = mock_server.start().await;
 
     // Create client
-    let client = my_module_sdk::wire_client(&format!("http://{}", server_addr)).await.unwrap();
+    let client = my_gear_sdk::wire_client(&format!("http://{}", server_addr)).await.unwrap();
 
     // Test API
     let input = Input {
@@ -434,8 +434,8 @@ async fn test_grpc_client() {
 
 - [ ] Create `*-sdk` crate with API trait, types, gRPC client, and wiring helpers.
 - [ ] Define `.proto` file and generate gRPC stubs in SDK.
-- [ ] Implement gRPC server in module crate.
+- [ ] Implement gRPC server in gear crate.
 - [ ] Use `toolkit_transport_grpc::client` utilities for connections.
-- [ ] Register both local and remote clients in module.
+- [ ] Register both local and remote clients in gear.
 - [ ] Use `CancellationToken` for coordinated shutdown.
 - [ ] Test with mock gRPC servers.

@@ -1,6 +1,6 @@
 //! RPC-level retry helper for unary gRPC calls.
 //!
-//! This module provides a generic retry helper [`call_with_retry`] that implements
+//! This gear provides a generic retry helper [`call_with_retry`] that implements
 //! safe retries with exponential backoff and jitter for unary gRPC calls.
 //!
 //! ## Retry Policy

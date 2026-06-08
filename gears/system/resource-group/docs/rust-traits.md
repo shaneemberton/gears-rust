@@ -253,7 +253,7 @@ extending `ResourceGroupReadHierarchy` with `list_memberships`. The shipped SDK
 collapses this: `list_memberships` (and `get_group`) live directly on
 `ResourceGroupReadHierarchy`, and the vendor-specific plugin gateway resolves
 `dyn ResourceGroupReadHierarchy`. A vendor backend replaces the registered
-`ResourceGroupReadHierarchy` implementation at module init rather than
+`ResourceGroupReadHierarchy` implementation at gear init rather than
 implementing a distinct plugin trait.
 
 ## ClientHub Registration

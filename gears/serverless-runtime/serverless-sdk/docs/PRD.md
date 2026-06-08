@@ -19,7 +19,7 @@ Updated: 2026-03-30 by Constructor Tech
       - [Function Author](#function-author)
       - [Adapter Developer](#adapter-developer)
   - [3. Operational Concept \& Environment](#3-operational-concept--environment)
-    - [3.1 Module-Specific Environment Constraints](#31-module-specific-environment-constraints)
+    - [3.1 Gear-Specific Environment Constraints](#31-gear-specific-environment-constraints)
   - [4. Scope](#4-scope)
     - [4.1 In Scope](#41-in-scope)
     - [4.2 Out of Scope](#42-out-of-scope)
@@ -43,7 +43,7 @@ Updated: 2026-03-30 by Constructor Tech
     - [5.7 Adapter Conformance Suite](#57-adapter-conformance-suite)
       - [Conformance Test Suite](#conformance-test-suite)
   - [6. Non-Functional Requirements](#6-non-functional-requirements)
-    - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
+    - [6.1 Gear-Specific NFRs](#61-gear-specific-nfrs)
       - [No Engine-Specific Dependencies](#no-engine-specific-dependencies)
       - [Zero Unsafe Code](#zero-unsafe-code)
       - [Low Per-Invocation Overhead](#low-per-invocation-overhead)
@@ -74,7 +74,7 @@ functional capabilities, and quality attributes.
 
 SCOPE:
   ✓ Business goals and success criteria
-  ✓ Actors (users, systems) that interact with this module
+  ✓ Actors (users, systems) that interact with this gear
   ✓ Functional requirements (WHAT, not HOW)
   ✓ Non-functional requirements (quality attributes, SLOs)
   ✓ Scope boundaries (in/out of scope)
@@ -95,7 +95,7 @@ STANDARDS ALIGNMENT:
 ### 1.1 Purpose
 
 `serverless-runtime-sdk` is the single engine-agnostic, stable Rust library of the
-CF/Gears Serverless Runtime module. It defines the types and traits shared by the
+CF/Gears Serverless Runtime gear. It defines the types and traits shared by the
 host and by runtime adapters.
 
 The invocation flow:
@@ -119,7 +119,7 @@ flowchart LR
 | `ServerlessRuntimeClient` | host | adapter (to emit index-update events) |
 | `FunctionHandler<I, O>` / `WorkflowHandler<I, O>` | runtime adapter (wraps the function author's authoring asset) | adapter |
 
-> **Note on "who implements `FunctionHandler`".** The `impl FunctionHandler<I, O> for …` lives inside the runtime adapter: the adapter provides a Rust type that wraps a function author's authoring asset (a Starlark script, a Rust activity fn, a compiled WASM module, a deployed Lambda function, …) and executes it from inside `call`. Function authors do not implement SDK traits directly; they author in the adapter's own authoring model and the adapter bridges that into a `FunctionHandler`. An adapter could expose `FunctionHandler` directly as its authoring model for power users, but that's a minority case.
+> **Note on "who implements `FunctionHandler`".** The `impl FunctionHandler<I, O> for …` lives inside the runtime adapter: the adapter provides a Rust type that wraps a function author's authoring asset (a Starlark script, a Rust activity fn, a compiled WASM gear, a deployed Lambda function, …) and executes it from inside `call`. Function authors do not implement SDK traits directly; they author in the adapter's own authoring model and the adapter bridges that into a `FunctionHandler`. An adapter could expose `FunctionHandler` directly as its authoring model for power users, but that's a minority case.
 
 **Shared domain** (used across all three parties): `InvocationRecord`,
 `CompensationContext`, `RuntimeErrorCategory`, `RuntimeErrorPayload`, `RetryPolicy`,
@@ -129,7 +129,7 @@ flowchart LR
 `InvocationRecord`), `CompensationInput` (from `CompensationContext`), `ServerlessSdkError`
 (maps to `RuntimeErrorCategory`).
 
-**Other modules**: `environment` (the `Environment` trait with a standard
+**Other gears**: `environment` (the `Environment` trait with a standard
 `CredStoreEnvironment` implementation for synchronous config/secret access), `trace`
 (adapter-only helper that emits `TimelineEventType` events around handler calls).
 
@@ -162,7 +162,7 @@ a single authoring mental model regardless of the underlying engine technology.
 
 ### 1.3 Goals (Business Outcomes)
 
-_Baseline: module is new (no prior implementation). All targets apply at first stable release (v0.1.0)._
+_Baseline: gear is new (no prior implementation). All targets apply at first stable release (v0.1.0)._
 
 - **FunctionHandler portability**: Adapter developers can implement handlers against a single
   contract that works unchanged across any CF/Gears execution engine.
@@ -214,7 +214,7 @@ _Baseline: module is new (no prior implementation). All targets apply at first s
 
 - **Role**: A platform developer building an adapter crate (e.g., Starlark, Temporal)
   within the Serverless Runtime. Implements the SDK handler contracts
-  (`FunctionHandler`, `WorkflowHandler`), wires the `trace` module for invocation
+  (`FunctionHandler`, `WorkflowHandler`), wires the `trace` gear for invocation
   instrumentation, and integrates SDK-defined types (`Context`, `ServerlessSdkError`)
   into the runtime's invocation-routing and error-categorisation logic.
 - **Needs**: Ergonomic, well-documented handler contracts they can implement from
@@ -229,7 +229,7 @@ _Baseline: module is new (no prior implementation). All targets apply at first s
 
 ## 3. Operational Concept & Environment
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
 - It must contain **no unsafe code** (enforced by workspace `unsafe_code = "forbid"`).
 - It must have **no engine-specific dependencies** (no `temporal-sdk`, `starlark`,
@@ -277,9 +277,9 @@ _Baseline: module is new (no prior implementation). All targets apply at first s
   for saga compensation).
 - `ServerlessSdkError` typed error enum with documented `RuntimeErrorCategory` mapping.
 
-**Other modules**:
+**Other gears**:
 
-- `trace` module — adapter-only instrumentation utilities that emit
+- `trace` gear — adapter-only instrumentation utilities that emit
   `tracing` spans and `TimelineEventType` events.
 
 ### 4.2 Out of Scope
@@ -288,7 +288,7 @@ _Baseline: module is new (no prior implementation). All targets apply at first s
 - `InvocationStatus` state machine — owned by the runtime (host).
 - `TenantRuntimePolicy`, `Schedule`, `Trigger`, `Webhook` — owned by the runtime (host).
 - Retry *execution* — the `RetryPolicy` *type* (max attempts, backoff, non-retryable
-  error classification) is in scope and exported from this SDK's `domain` module so every
+  error classification) is in scope and exported from this SDK's `domain` gear so every
   adapter honours it consistently, but actually *applying* the policy — scheduling retries,
   dead-lettering after exhaustion — is performed by each adapter using its backend-native
   retry mechanism (Temporal retry policy, SQS retry + DLQ, Step Functions catcher, etc.).
@@ -456,9 +456,9 @@ model intentionally excludes both because they originate outside handler code.
 
 #### Adapter-Facing Timeline Instrumentation
 
-- [ ] `p1` - **ID**: `cpt-cf-serverless-runtime-sdk-fr-trace-module`
+- [ ] `p1` - **ID**: `cpt-cf-serverless-runtime-sdk-fr-trace-gear`
 
-The crate MUST provide a `trace` module with adapter-facing instrumentation wrappers that
+The crate MUST provide a `trace` gear with adapter-facing instrumentation wrappers that
 wrap handler invocations in structured spans and emit lifecycle events covering: invocation
 start, success, failure, and the compensation equivalents (`compensation_started`,
 `compensation_completed`, `compensation_failed`), mapping to `InvocationTimelineEvent` variants.
@@ -472,7 +472,7 @@ start, success, failure, and the compensation equivalents (`compensation_started
 - [ ] `p1` - **ID**: `cpt-cf-serverless-runtime-sdk-fr-no-consumer-tracing`
 
 Handler invocation and compensation methods MUST NOT emit any observability events or spans
-directly. All instrumentation MUST be contained in the `trace` module and invisible to
+directly. All instrumentation MUST be contained in the `trace` gear and invisible to
 SDK consumers.
 
 - **Rationale**: FunctionHandler implementations remain clean and free of platform-specific observability
@@ -500,7 +500,7 @@ and error taxonomy.
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### No Engine-Specific Dependencies
 
@@ -583,10 +583,10 @@ requirements in these areas is deliberate, not an omission.
 | Authentication requirements (SEC-PRD-001) | N/A | No user-facing sessions, no HTTP endpoints, no credential management at the SDK layer. Auth to secret stores is the adapter's responsibility. |
 | Authorization / RBAC (SEC-PRD-002) | N/A | No permission model; all actors are trusted internal platform developers. Access control is the adapter/runtime concern. |
 | PII / data classification (SEC-PRD-003) | N/A | The SDK does not store, transmit, or inspect data. `CompensationInput` fields and `Environment` secrets are opaque blobs; data classification is the adapter/runtime concern. |
-| Audit logging as security concern (SEC-PRD-004) | Addressed via §5.6 | Invocation lifecycle tracing events are emitted per §5.6 (trace module). Security audit logging beyond invocation events is the adapter/runtime concern. |
+| Audit logging as security concern (SEC-PRD-004) | Addressed via §5.6 | Invocation lifecycle tracing events are emitted per §5.6 (trace gear). Security audit logging beyond invocation events is the adapter/runtime concern. |
 | Privacy by design (SEC-PRD-005) | N/A | Internal developer tooling; no end-user PII collection. |
 | Operational safety / fail-safe (SAFE-PRD-001, SAFE-PRD-002) | N/A | Pure library; no safety-critical operations, no physical systems interface, no hazards. |
-| Monitoring / alerting / log retention (OPS-PRD-002) | N/A | Pure library; monitoring configuration is the adapter/runtime concern. The `trace` module provides the observability hooks; consumers configure retention. |
+| Monitoring / alerting / log retention (OPS-PRD-002) | N/A | Pure library; monitoring configuration is the adapter/runtime concern. The `trace` gear provides the observability hooks; consumers configure retention. |
 | UX accessibility — WCAG (UX-PRD-002) | N/A | No end-user UI; developer SDK only. |
 | UX internationalization (UX-PRD-003) | N/A | No UI or user-facing strings. Error message strings are English-only; acceptable for internal developer tooling. |
 | UX inclusivity (UX-PRD-005) | N/A | Developer SDK; no diverse end-user population considerations. |
@@ -731,7 +731,7 @@ surface, stability classifications, and breaking change policies, see [DESIGN.md
 | JSON value type | Opaque JSON fields in `CompensationInput` (`workflow_state_snapshot`, etc.) | p1 |
 | Error derivation | Ergonomic `Display + std::error::Error` derivation for `ServerlessSdkError` | p1 |
 | Stable async trait mechanism | Async fn in trait definitions for `FunctionHandler` and `WorkflowHandler` (see DESIGN.md for rationale) | p1 |
-| Structured tracing | Span emission in `trace` module | p1 |
+| Structured tracing | Span emission in `trace` gear | p1 |
 | Serverless Runtime DESIGN | Defines `InvocationRecord`, `CompensationContext`, `RuntimeErrorCategory` | p1 |
 
 ---
@@ -765,5 +765,5 @@ There are no open questions at this time.
 ## 13. Traceability
 
 - **Design**: [DESIGN.md](./DESIGN.md)
-- **Serverless Runtime PRD**: [modules/serverless-runtime/docs/PRD.md](../../docs/PRD.md)
-- **Serverless Runtime DESIGN**: [modules/serverless-runtime/docs/DESIGN.md](../../docs/DESIGN.md)
+- **Serverless Runtime PRD**: [gears/serverless-runtime/docs/PRD.md](../../docs/PRD.md)
+- **Serverless Runtime DESIGN**: [gears/serverless-runtime/docs/DESIGN.md](../../docs/DESIGN.md)

@@ -41,7 +41,7 @@ This DECOMPOSITION breaks the OIDC AuthN Resolver Plugin into six features that 
 - **Depends On**: None
 
 - **Scope**:
-  - Module wiring and startup initialization
+  - Gear wiring and startup initialization
   - GTS identity construction and ClientHub registration
   - Plugin metadata (vendor key, priority, display name)
   - Startup validation for trusted issuers, algorithm policy, claim mappings, and timeout/retry/circuit-breaker boundaries
@@ -259,7 +259,7 @@ This DECOMPOSITION breaks the OIDC AuthN Resolver Plugin into six features that 
 
 - [x] `p2` - **ID**: `cpt-cf-authn-plugin-feature-s2s-token-exchange`
 
-- **Purpose**: Enable authenticated background-module execution via OAuth2 client-credentials exchange and cache-aware `SecurityContext` production.
+- **Purpose**: Enable authenticated background-gear execution via OAuth2 client-credentials exchange and cache-aware `SecurityContext` production.
 
 - **Depends On**:
   - `cpt-cf-authn-plugin-feature-plugin-bootstrap-config-validation`

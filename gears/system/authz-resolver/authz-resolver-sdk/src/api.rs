@@ -7,8 +7,8 @@ use crate::models::{EvaluationRequest, EvaluationResponse};
 
 /// Public API trait for the `AuthZ` resolver gateway.
 ///
-/// This trait is registered in `ClientHub` by the module and
-/// can be consumed by other modules acting as PEPs:
+/// This trait is registered in `ClientHub` by the gear and
+/// can be consumed by other gears acting as PEPs:
 ///
 /// ```ignore
 /// let authz = hub.get::<dyn AuthZResolverClient>()?;

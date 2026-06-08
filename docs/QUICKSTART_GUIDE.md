@@ -7,15 +7,15 @@ Start Gears example server and verify it works. For project overview, see [READM
 ## Start the Server
 
 ```bash
-# With example modules (tenant-resolver, users-info)
+# With example gears (tenant-resolver, users-info)
 make example
 
-# Or minimal (no example modules)
+# Or minimal (no example gears)
 make quickstart
 ```
 
 Server runs on `http://127.0.0.1:8087`.
-The example configuration also sets `modules.api-gateway.config.prefix_path: "/cf"` in `config/quickstart.yaml`, so API docs and endpoints are exposed under `/cf`.
+The example configuration also sets `gears.api-gateway.config.prefix_path: "/cf"` in `config/quickstart.yaml`, so API docs and endpoints are exposed under `/cf`.
 Change `prefix_path` if you want a different base path, or set it to an empty string to serve the API at the root.
 
 ---
@@ -41,15 +41,15 @@ Open <http://127.0.0.1:8087/cf/docs> in your browser for the full API reference 
 curl -s http://127.0.0.1:8087/cf/openapi.json > openapi.json
 ```
 
-### Module Examples
+### Gear Examples
 
-Each module has a QUICKSTART.md with minimal curl examples:
+Each gear has a QUICKSTART.md with minimal curl examples:
 
 - [File Parser](../gears/file-parser/QUICKSTART.md) - Parse documents into structured blocks
 - [Nodes Registry](../gears/system/nodes-registry/QUICKSTART.md) - Hardware and system info
 - [Tenant Resolver](../gears/system/tenant-resolver/QUICKSTART.md) - Multi-tenant hierarchy
 
-> **Note:** Module quickstarts show basic usage only. Use `/cf/docs` for complete API documentation in the example setup. This path is configurable via `api_gateway.prefix_path`.
+> **Note:** Gear quickstarts show basic usage only. Use `/cf/docs` for complete API documentation in the example setup. This path is configurable via `api_gateway.prefix_path`.
 
 ---
 
@@ -75,4 +75,4 @@ pkill -f cf-gears-server
 
 - [/cf/docs](http://127.0.0.1:8087/cf/docs) - Full API reference
 - [ARCHITECTURE_MANIFEST.md](ARCHITECTURE_MANIFEST.md) - Architecture principles
-- [TOOLKIT_UNIFIED_SYSTEM/README.md](./toolkit_unified_system/README.md) - Module system
+- [TOOLKIT_UNIFIED_SYSTEM/README.md](./toolkit_unified_system/README.md) - Gear system

@@ -3,7 +3,7 @@
 - **Status**: Superseded
 - **Date**: 2026-02-09
 - **Deciders**: OAGW Team
-- **Superseded By**: Single-module implementation with internal trait-based service isolation (2026-02-17). The original multi-crate design was simplified during implementation to a single `oagw` crate with DDD-Light layering (`domain/infra/api`). The CP/DP separation is preserved as internal domain traits, not separate crates.
+- **Superseded By**: Single-gear implementation with internal trait-based service isolation (2026-02-17). The original multi-crate design was simplified during implementation to a single `oagw` crate with DDD-Light layering (`domain/infra/api`). The CP/DP separation is preserved as internal domain traits, not separate crates.
 
 ## Context and Problem Statement
 
@@ -25,7 +25,7 @@ OAGW is being designed as a greenfield project without existing code. We need to
 
 ## Decision
 
-OAGW is implemented as a single module (`oagw` crate) with internal service isolation via domain traits and DDD-Light layering:
+OAGW is implemented as a single gear (`oagw` crate) with internal service isolation via domain traits and DDD-Light layering:
 
 ### Internal Services
 
@@ -50,12 +50,12 @@ OAGW is implemented as a single module (`oagw` crate) with internal service isol
     - Strip sensitive/hop-by-hop headers from responses
 - **Dependencies**: `ControlPlaneService`, `AuthPluginRegistry`, `CredentialRepository`, `reqwest::Client`
 
-### Module Structure
+### Gear Structure
 
 ```text
 gears/system/oagw/
 ├── oagw-sdk/              # Public API: ServiceGatewayClientV1 trait, models, errors
-└── oagw/                  # Single module crate
+└── oagw/                  # Single gear crate
     └── src/
         ├── api/rest/      # Transport layer (handlers, routes, DTOs)
         ├── domain/        # Business logic (traits, models, errors)
@@ -69,7 +69,7 @@ All services communicate via in-process trait method calls. There is no inter-se
 
 - REST handlers call `ControlPlaneService` or `DataPlaneService` directly
 - `DataPlaneServiceImpl` holds an `Arc<dyn ControlPlaneService>` for config resolution
-- Services are wired together during ToolKit module initialization in `module.rs`
+- Services are wired together during ToolKit gear initialization in `gear.rs`
 
 ## Consequences
 
@@ -107,7 +107,7 @@ Three separate library crates (`oagw`, `oagw-cp`, `oagw-dp`) with toolkit wiring
 - Microservice mode not needed for current scale
 - Additional complexity without clear benefit
 
-**Not adopted**: The single-module approach provides the same testability and separation of concerns with less complexity. The trait boundaries are preserved, making future extraction straightforward if needed.
+**Not adopted**: The single-gear approach provides the same testability and separation of concerns with less complexity. The trait boundaries are preserved, making future extraction straightforward if needed.
 
 ### Alternative 2: Monolithic Service (No Internal Separation)
 
@@ -133,5 +133,5 @@ Single crate with no CP/DP trait distinction — all logic in handlers.
 
 ## References
 
-- Gears Toolkit framework documentation (module lifecycle and dependency injection)
+- Gears Toolkit framework documentation (gear lifecycle and dependency injection)
 - Gear patterns: `tenant_resolver`, `types_registry`

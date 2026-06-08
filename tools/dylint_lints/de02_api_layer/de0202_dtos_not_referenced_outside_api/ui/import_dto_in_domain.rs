@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/domain/
+// simulated_dir=/cf-gears/gears/some_gear/domain/
 #![allow(unused)]
 
 mod api {

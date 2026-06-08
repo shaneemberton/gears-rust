@@ -2864,7 +2864,7 @@ async fn expire_pending_escalation_warn_silent_when_failed_below_half_of_due_tot
 
 #[tokio::test]
 async fn reaper_tick_expires_then_soft_deletes_in_one_pass() {
-    // The conversion reaper loop in `module.rs` interleaves
+    // The conversion reaper loop in `gear.rs` interleaves
     // `expire_pending` and `soft_delete_resolved` on the same tick.
     // This test exercises both calls back-to-back on a single fake
     // state to pin three contracts:
@@ -3959,7 +3959,7 @@ async fn max_listing_top_defaults_to_platform_cap_and_honours_override() {
     // Pins the operator-cap accessor REST handlers consult before
     // clamping `$top` on the listing endpoints. The default mirrors
     // the platform-wide 200 baked into `CONVERSION_LISTING_LIMIT_CFG`;
-    // `with_listing_max_top` lets production wiring (`module.rs`)
+    // `with_listing_max_top` lets production wiring (`gear.rs`)
     // override from `cfg.listing.max_top` without rebuilding the
     // entire service.
     let conv = Arc::new(FakeConversionRepo::new());

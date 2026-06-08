@@ -16,16 +16,16 @@ name = "resource_group_inline_case"
 path = "ui/resource_group_inline_case.rs"
 
 [[example]]
-name = "resource_group_out_of_line_test_module"
-path = "ui/resource_group_out_of_line_test_module.rs"
+name = "resource_group_out_of_line_test_gear"
+path = "ui/resource_group_out_of_line_test_gear.rs"
 
 [[example]]
 name = "resource_group_separate_test_file_tests"
 path = "ui/resource_group_separate_test_file_tests.rs"
 
 [[example]]
-name = "other_module_inline_case"
-path = "ui/other_module_inline_case.rs"
+name = "other_gear_inline_case"
+path = "ui/other_gear_inline_case.rs"
 
 [[example]]
 name = "resource_group_cfg_not_test"
@@ -37,7 +37,7 @@ path = "ui/naming_correct_case.rs"
 
 [[example]]
 name = "naming_wrong_module"
-path = "ui/naming_wrong_module.rs"
+path = "ui/naming_wrong_gear.rs"
 
 [[example]]
 name = "naming_path_forbidden"

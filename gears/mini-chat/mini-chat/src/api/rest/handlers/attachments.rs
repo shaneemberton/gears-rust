@@ -16,7 +16,7 @@ use crate::domain::mime_validation::{
     truncate_filename, validate_mime,
 };
 use crate::domain::ports::metric_labels::{kind as kind_label, upload_result};
-use crate::module::AppServices;
+use crate::gear::AppServices;
 
 // ── multer::Field → FileStream adapter ──────────────────────────────────
 

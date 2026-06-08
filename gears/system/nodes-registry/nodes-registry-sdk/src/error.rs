@@ -1,4 +1,4 @@
-/// Errors for the nodes registry module
+/// Errors for the nodes registry gear
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum NodesRegistryError {
     #[error("Node not found with ID: {0}")]

@@ -1,20 +1,20 @@
 //! Database configuration types.
 //!
-//! This module contains the canonical definitions of all database configuration
+//! This gear contains the canonical definitions of all database configuration
 //! structures used throughout the system. These types are deserialized directly
 //! from Figment configuration.
 //!
 //! # Configuration Precedence Rules
 //!
 //! The database configuration system follows a strict precedence hierarchy when
-//! merging global server configurations with module-specific overrides:
+//! merging global server configurations with gear-specific overrides:
 //!
 //! | Priority | Source | Description | Example |
 //! |----------|--------|-------------|---------|
-//! | 1 (Highest) | Module `params` map | Key-value parameters in module config | `params: {synchronous: "FULL"}` |
-//! | 2 | Module DSN query params | Parameters in module-level DSN | `sqlite://file.db?synchronous=NORMAL` |
-//! | 3 | Module fields | Individual connection fields | `host: "localhost", port: 5432` |
-//! | 4 | Module DSN base | Core DSN without query params | `postgres://user:pass@host/db` |
+//! | 1 (Highest) | Gear `params` map | Key-value parameters in gear config | `params: {synchronous: "FULL"}` |
+//! | 2 | Gear DSN query params | Parameters in gear-level DSN | `sqlite://file.db?synchronous=NORMAL` |
+//! | 3 | Gear fields | Individual connection fields | `host: "localhost", port: 5432` |
+//! | 4 | Gear DSN base | Core DSN without query params | `postgres://user:pass@host/db` |
 //! | 5 | Server `params` map | Key-value parameters in server config | Global server `params` |
 //! | 6 | Server DSN query params | Parameters in server-level DSN | Server DSN query string |
 //! | 7 | Server fields | Individual connection fields in server | Server `host`, `port`, etc. |
@@ -22,11 +22,11 @@
 //!
 //! ## Merge Rules
 //!
-//! 1. **Field Precedence**: Module fields always override server fields
-//! 2. **DSN Precedence**: Module DSN overrides server DSN completely
-//! 3. **Params Merging**: `params` maps are merged, with module params taking precedence
-//! 4. **Pool Configuration**: Module pool config overrides server pool config entirely
-//! 5. **`SQLite` Paths**: `file`/`path` fields are module-only and never inherited from servers
+//! 1. **Field Precedence**: Gear fields always override server fields
+//! 2. **DSN Precedence**: Gear DSN overrides server DSN completely
+//! 3. **Params Merging**: `params` maps are merged, with gear params taking precedence
+//! 4. **Pool Configuration**: Gear pool config overrides server pool config entirely
+//! 5. **`SQLite` Paths**: `file`/`path` fields are gear-only and never inherited from servers
 //!
 //! ## Conflict Detection
 //!
@@ -54,7 +54,7 @@ pub struct GlobalDatabaseConfig {
     pub auto_provision: Option<bool>,
 }
 
-/// Reusable DB connection config for both global servers and modules.
+/// Reusable DB connection config for both global servers and gears.
 /// DSN must be a FULL, valid DSN if provided (dsn crate compliant).
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -80,16 +80,16 @@ pub struct DbConnConfig {
     #[serde(default)]
     pub params: Option<HashMap<String, String>>,
 
-    // SQLite file-based helpers (module-level only; ignored for global):
-    pub file: Option<String>,  // relative name under home_dir/module
+    // SQLite file-based helpers (gear-level only; ignored for global):
+    pub file: Option<String>,  // relative name under home_dir/gear
     pub path: Option<PathBuf>, // absolute path
 
     // Connection pool overrides:
     #[serde(default)]
     pub pool: Option<PoolCfg>,
 
-    // Module-level only: reference to a global server by name.
-    // If absent, this module config must be fully self-sufficient (dsn or fields).
+    // Gear-level only: reference to a global server by name.
+    // If absent, this gear config must be fully self-sufficient (dsn or fields).
     pub server: Option<String>,
 }
 

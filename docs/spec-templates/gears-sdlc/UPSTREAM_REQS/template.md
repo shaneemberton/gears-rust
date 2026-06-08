@@ -1,25 +1,25 @@
-# UPSTREAM_REQS — {Module Name}
+# UPSTREAM_REQS — {Gear Name}
 
 <!--
 =============================================================================
 UPSTREAM REQUIREMENTS
 =============================================================================
-PURPOSE: Capture requirements that existing modules place on a module that
-does not exist yet, so nothing is lost when the module is eventually designed.
+PURPOSE: Capture requirements that existing gears place on a gear that
+does not exist yet, so nothing is lost when the gear is eventually designed.
 
 SCOPE:
-  ✓ Which existing modules need this future module and why
-  ✓ Functional and non-functional requirements from each requesting module
+  ✓ Which existing gears need this future gear and why
+  ✓ Functional and non-functional requirements from each requesting gear
   ✓ Priority of each requirement
 
 NOT IN THIS DOCUMENT:
-  ✗ How the future module will be implemented → DESIGN.md
+  ✗ How the future gear will be implemented → DESIGN.md
   ✗ Full product vision and business goals → PRD.md
   ✗ Architecture decisions → ADR/
   ✗ Interface details (API contracts, data formats) → DESIGN.md
 
 LIFECYCLE:
-  This is a seed artifact. When the module's PRD is created, it MUST
+  This is a seed artifact. When the gear's PRD is created, it MUST
   trace back to this document to prove all upstream requirements are addressed.
 
 REQUIREMENT LANGUAGE:
@@ -37,26 +37,26 @@ REQUIREMENT LANGUAGE:
 
 ### 1.1 Purpose
 
-{1-2 paragraphs: What future module is needed and what gap does it fill?}
+{1-2 paragraphs: What future gear is needed and what gap does it fill?}
 
-### 1.2 Requesting Modules
+### 1.2 Requesting Gears
 
-| Module | Why it needs this module |
+| Gear | Why it needs this gear |
 |--------|-------------------------|
-| {module name} | {brief justification} |
+| {gear name} | {brief justification} |
 
 ## 2. Requirements
 
-### 2.1 {Requesting Module Name}
+### 2.1 {Requesting Gear Name}
 
 #### {Requirement Name}
 
 - [ ] `p1` - **ID**: `cpt-{system}-upreq-{slug}`
 
-The future module **MUST** {do something specific requested by this module}.
+The future gear **MUST** {do something specific requested by this gear}.
 
-- **Rationale**: {Why the requesting module needs this.}
-- **Source**: `modules/{requesting_module}`
+- **Rationale**: {Why the requesting gear needs this.}
+- **Source**: `gears/{requesting_gear}`
 
 ## 3. Priorities
 

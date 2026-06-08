@@ -1,4 +1,4 @@
-//! Domain models for the `AuthZ` resolver module.
+//! Domain models for the `AuthZ` resolver gear.
 //!
 //! Based on `AuthZEN` 1.0 evaluation model with constraint extensions.
 

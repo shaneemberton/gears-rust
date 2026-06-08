@@ -2,7 +2,7 @@
 //!
 //! Platform base GTS types (plugin base, permission base, and future
 //! role/grant/binding) live in the dedicated `toolkit-gts` crate alongside
-//! the link-time inventory machinery. This module re-exports them for
+//! the link-time inventory machinery. This gear re-exports them for
 //! convenience so existing consumers can continue writing
 //! `use toolkit::gts::PluginV1;` without an extra dependency.
 //!

@@ -22,7 +22,7 @@ pub mod k8s_lease;
 
 /// Boxed async work function that receives a [`CancellationToken`].
 ///
-/// The token fires when leadership is lost or the module shuts down.
+/// The token fires when leadership is lost or the gear shuts down.
 /// The function may be invoked more than once (after re-election),
 /// hence `Fn` and not `FnOnce`.
 pub type LeaderWorkFn = Box<
@@ -53,7 +53,7 @@ where
 pub trait LeaderElector: Send + Sync + std::fmt::Debug {
     /// Run `work` only while this instance holds leadership for `role`.
     ///
-    /// Returns when `cancel` fires (module shutdown) or on unrecoverable error.
+    /// Returns when `cancel` fires (gear shutdown) or on unrecoverable error.
     ///
     /// # Errors
     ///

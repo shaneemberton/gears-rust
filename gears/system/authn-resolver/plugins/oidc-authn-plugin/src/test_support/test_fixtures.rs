@@ -1,6 +1,6 @@
 //! Unit-test key material and helpers for the oidc-authn-plugin crate.
 //!
-//! This module is gated behind `#[cfg(test)]` so nothing is compiled into
+//! This gear is gated behind `#[cfg(test)]` so nothing is compiled into
 //! production builds.
 
 use std::sync::OnceLock;

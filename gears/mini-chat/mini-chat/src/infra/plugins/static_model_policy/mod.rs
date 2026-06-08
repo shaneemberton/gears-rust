@@ -1,7 +1,7 @@
 pub mod config;
-pub mod module;
+pub mod gear;
 pub mod service;
 #[cfg(test)]
 mod tests;
 
-pub use module::StaticMiniChatModelPolicyPlugin;
+pub use gear::StaticMiniChatModelPolicyPlugin;

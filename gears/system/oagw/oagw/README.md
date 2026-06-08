@@ -1,19 +1,19 @@
 # OAGW
 
-Outbound API Gateway module. Manages upstreams and routes, enforces auth and rate limits, and proxies outbound requests over HTTP, SSE, and WebSocket.
+Outbound API Gateway gear. Manages upstreams and routes, enforces auth and rate limits, and proxies outbound requests over HTTP, SSE, and WebSocket.
 
 ## Overview
 
-The `cf-gears-oagw` module provides:
+The `cf-gears-oagw` gear provides:
 
 - **Upstream management** — CRUD for external upstream services with alias-based resolution
 - **Route management** — CRUD for routes with HTTP/gRPC match rules, plugins, and rate limits
 - **Proxy pipeline** — alias resolution → authZ → credential injection → rate limiting → HTTP forwarding
 - **Plugin system** — per-upstream/route auth plugins (`noop`, `api-key`; extensible)
 - **Type provisioning** — loads pre-configured upstreams and routes from the types registry on startup
-- **ClientHub integration** — registers `ServiceGatewayClientV1` for inter-module use
+- **ClientHub integration** — registers `ServiceGatewayClientV1` for inter-gear use
 
-This module depends on `types-registry` and `authz-resolver`.
+This gear depends on `types-registry` and `authz-resolver`.
 
 ## Usage
 

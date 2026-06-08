@@ -1,4 +1,4 @@
-//! REST handler functions for the Account Management module.
+//! REST handler functions for the Account Management gear.
 
 pub mod common;
 pub mod conversions;

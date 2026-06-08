@@ -1,4 +1,4 @@
-//! Local (in-process) client for the tenant resolver module.
+//! Local (in-process) client for the tenant resolver gear.
 
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use super::{DomainError, Service};
 
 /// Local client wrapping the TR service.
 ///
-/// Registered in `ClientHub` by the TR module during `init()`.
+/// Registered in `ClientHub` by the TR gear during `init()`.
 #[domain_model]
 pub struct TenantResolverLocalClient {
     svc: Arc<Service>,

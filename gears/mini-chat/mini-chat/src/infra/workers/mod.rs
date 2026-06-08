@@ -1,4 +1,4 @@
-//! Background workers spawned during module startup.
+//! Background workers spawned during gear startup.
 //!
 //! Each worker is an autonomous async task with its own interval loop
 //! and graceful shutdown via [`CancellationToken`].

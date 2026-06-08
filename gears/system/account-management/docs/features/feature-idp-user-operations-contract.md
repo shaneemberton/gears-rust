@@ -37,7 +37,7 @@
 
 ### 1.1 Overview
 
-Owns the pluggable `IdpPluginClient` user-operations contract — tenant-scoped provision, deprovision, and query — that makes the configured IdP the authoritative source of truth for user identity and user-tenant binding. Publishes the GTS user-projection schema `gts.cf.core.am.user.v1~` consumed by downstream features (e.g., `user-groups` membership checks) and designs three tenant-scoped REST operations (`POST` / `DELETE` / `GET /tenants/{tenant_id}/users[/{user_id}]`) layered on top of the contract; the REST handlers themselves are delivered in `gears-rust#1813`. Concrete provider adapters (Keycloak, Zitadel, Dex, etc.) conform to this contract but are delivered outside this module.
+Owns the pluggable `IdpPluginClient` user-operations contract — tenant-scoped provision, deprovision, and query — that makes the configured IdP the authoritative source of truth for user identity and user-tenant binding. Publishes the GTS user-projection schema `gts.cf.core.am.user.v1~` consumed by downstream features (e.g., `user-groups` membership checks) and designs three tenant-scoped REST operations (`POST` / `DELETE` / `GET /tenants/{tenant_id}/users[/{user_id}]`) layered on top of the contract; the REST handlers themselves are delivered in `gears-rust#1813`. Concrete provider adapters (Keycloak, Zitadel, Dex, etc.) conform to this contract but are delivered outside this gear.
 
 ### 1.2 Purpose
 
@@ -315,7 +315,7 @@ Every REST endpoint layered over the contract **MUST** require a valid `Security
 
 ## 7. Deliberate Omissions
 
-- **Conforming IdP plugin implementations (Keycloak adapter, Zitadel adapter, Dex adapter, etc.)** — *Delivered in separate crates outside this module.* This feature owns the `IdpPluginClient` trait surface and the AM-side handler layer; concrete adapters conform to the trait but ship independently per `adr-idp-contract-separation` and DECOMPOSITION §2.5 scope.
+- **Conforming IdP plugin implementations (Keycloak adapter, Zitadel adapter, Dex adapter, etc.)** — *Delivered in separate crates outside this gear.* This feature owns the `IdpPluginClient` trait surface and the AM-side handler layer; concrete adapters conform to the trait but ship independently per `adr-idp-contract-separation` and DECOMPOSITION §2.5 scope.
 - **Tenant-lifecycle IdP operations (`provision_tenant`, `deprovision_tenant`)** — *Owned by `cpt-cf-account-management-feature-tenant-hierarchy-management`* (DECOMPOSITION §2.2). Those are side effects of tenant create / delete at the tenant boundary; this feature owns only the user-operations half of the contract.
 - **Token validation, session renewal, federation, credential policy, MFA policy** — *Inherited from the platform AuthN layer and the configured IdP provider* (DESIGN §4.2; PRD §6.2). AM does not validate tokens, enforce MFA, rotate credentials, or manage federation; `SecurityContext` validation is a platform-layer precondition for every endpoint.
 - **User-group orchestration, user-group membership, nested user groups** — *Owned by `cpt-cf-account-management-feature-user-groups`* (DECOMPOSITION §2.6). That feature depends on this one for authoritative user-existence checks but owns the group hierarchy, membership writes, and Resource Group delegation itself.

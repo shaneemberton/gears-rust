@@ -1,6 +1,6 @@
-//! Module Orchestrator Contracts
+//! Gear Orchestrator Contracts
 //!
-//! Domain contracts and client interfaces for module orchestration.
+//! Domain contracts and client interfaces for gear orchestration.
 //! This crate provides the `DirectoryClient` trait and related types that
 //! define the contract for service discovery and instance management.
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]

@@ -1,6 +1,6 @@
 //! GTS schema definitions for tenant resolver plugins.
 //!
-//! This module defines the GTS type for tenant resolver plugin instances.
+//! This gear defines the GTS type for tenant resolver plugin instances.
 //! Plugins register instances of this type with the types-registry to be
 //! discovered by the gateway.
 

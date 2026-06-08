@@ -1,22 +1,22 @@
 # AuthZ Resolver
 
-Main module for authorization in Gears. Discovers AuthZ plugins via GTS types-registry and routes policy evaluation to the selected plugin (PDP).
+Main gear for authorization in Gears. Discovers AuthZ plugins via GTS types-registry and routes policy evaluation to the selected plugin (PDP).
 
 ## Overview
 
-The `cf-gears-authz-resolver` module provides:
+The `cf-gears-authz-resolver` gear provides:
 
 - **Plugin discovery** — Finds AuthZ plugins via GTS types-registry
 - **Vendor-based selection** — Selects plugin by vendor and priority
 - **Policy evaluation routing** — Delegates AuthZEN-based evaluation requests to the active PDP plugin
-- **ClientHub integration** — Registers `AuthZResolverClient` for inter-module use
+- **ClientHub integration** — Registers `AuthZResolverClient` for inter-gear use
 
-This is a **main module** — it contains no authorization logic itself. All operations are delegated to the active plugin (e.g., `cf-gears-static-authz-plugin` for development, or a custom implementation).
+This is a **main gear** — it contains no authorization logic itself. All operations are delegated to the active plugin (e.g., `cf-gears-static-authz-plugin` for development, or a custom implementation).
 
 ## Architecture
 
 ```
-Consumer Module (PEP)
+Consumer Gear (PEP)
     │
     ▼
 PolicyEnforcer  (SDK helper — builds request, compiles response)
@@ -57,7 +57,7 @@ let scope = enforcer.access_scope(&ctx, &USER, "list", None).await?;
 
 ## Configuration
 
-The module is configured via the server's YAML config. Plugin selection is automatic based on GTS registration. Use the `static-authz` feature flag to compile in the development plugin.
+The gear is configured via the server's YAML config. Plugin selection is automatic based on GTS registration. Use the `static-authz` feature flag to compile in the development plugin.
 
 ## Writing a Plugin
 

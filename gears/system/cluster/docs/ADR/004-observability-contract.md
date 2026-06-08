@@ -30,7 +30,7 @@ date: 2026-04-02
 
 ## Context and Problem Statement
 
-The cluster module is platform-tier infrastructure that every Gear depends on. When a cluster operation misbehaves — a lock that never releases, an election that flaps, a cache that times out — the first tool operators reach for is observability data: traces, metrics, and logs. The quality and consistency of that data determines how fast an incident is triaged.
+The cluster gears platform-tier infrastructure that every Gear depends on. When a cluster operation misbehaves — a lock that never releases, an election that flaps, a cache that times out — the first tool operators reach for is observability data: traces, metrics, and logs. The quality and consistency of that data determines how fast an incident is triaged.
 
 Three failure modes recur when infrastructure libraries don't treat observability as a first-class contract:
 
@@ -42,7 +42,7 @@ This ADR establishes that observability signals are part of the cluster SDK's co
 
 ## Decision Drivers
 
-- Cluster is consumed by every module — the cost of inconsistent observability is multiplied across the whole platform.
+- Cluster is consumed by every gear — the cost of inconsistent observability is multiplied across the whole platform.
 - Operators build long-lived dashboards and alerts; silent renames break them.
 - Prometheus cardinality is a known production failure mode; unbounded label values must be prevented by convention, not discovered after outages.
 - The design document should state the principle, not enumerate 40 span names.

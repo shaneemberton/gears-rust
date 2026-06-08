@@ -11,8 +11,8 @@ async fn test_dbmanager_sqlite_with_file() {
     let db_filename = format!("test_manager_{}.db", std::process::id());
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": db_filename,
@@ -29,13 +29,13 @@ async fn test_dbmanager_sqlite_with_file() {
     let manager = DbManager::from_figment(figment, home_dir).unwrap();
 
     // Should successfully create SQLite database
-    let result = manager.get("test_module").await.unwrap();
+    let result = manager.get("test_gear").await.unwrap();
     assert!(result.is_some());
 
     let db = result.unwrap();
     assert_eq!(db.db_engine(), "sqlite");
 
-    let expected_path = temp_dir.path().join("test_module").join(&db_filename);
+    let expected_path = temp_dir.path().join("test_gear").join(&db_filename);
     assert!(
         expected_path.exists(),
         "Expected SQLite file at {}",
@@ -49,8 +49,8 @@ async fn test_dbmanager_sqlite_with_path() {
     let db_path = temp_dir.path().join("absolute.db");
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "path": db_path,
@@ -67,7 +67,7 @@ async fn test_dbmanager_sqlite_with_path() {
     let manager = DbManager::from_figment(figment, home_dir).unwrap();
 
     // Should successfully create SQLite database at absolute path
-    let result = manager.get("test_module").await.unwrap();
+    let result = manager.get("test_gear").await.unwrap();
     assert!(result.is_some());
 
     let db = result.unwrap();
@@ -83,8 +83,8 @@ async fn test_dbmanager_sqlite_with_path() {
 #[tokio::test]
 async fn test_dbmanager_caching() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "dsn": "sqlite::memory:",
@@ -102,11 +102,11 @@ async fn test_dbmanager_caching() {
     let manager = DbManager::from_figment(figment, home_dir).unwrap();
 
     // First call should create the db
-    let result1 = manager.get("test_module").await.unwrap();
+    let result1 = manager.get("test_gear").await.unwrap();
     assert!(result1.is_some());
 
     // Second call should return cached db (sharing is an internal detail)
-    let result2 = manager.get("test_module").await.unwrap();
+    let result2 = manager.get("test_gear").await.unwrap();
     assert!(result2.is_some());
 
     let db1 = result1.unwrap();
@@ -117,7 +117,7 @@ async fn test_dbmanager_caching() {
 
 #[tokio::test]
 async fn test_dbmanager_sqlite_server_without_dsn() {
-    // Test that SQLite servers without DSN work correctly with module file specification
+    // Test that SQLite servers without DSN work correctly with gear file specification
     let global_config = GlobalDatabaseConfig {
         servers: {
             let mut servers = HashMap::new();
@@ -136,7 +136,7 @@ async fn test_dbmanager_sqlite_server_without_dsn() {
                         acquire_timeout: Some(Duration::from_secs(30)),
                         ..Default::default()
                     }),
-                    ..Default::default() // No DSN - module specifies file
+                    ..Default::default() // No DSN - gear specifies file
                 },
             );
             servers
@@ -146,12 +146,12 @@ async fn test_dbmanager_sqlite_server_without_dsn() {
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
         "database": global_config,
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "server": "sqlite_server",
-                    "file": format!("module_{}.db", std::process::id())  // Should be placed in module home directory
+                    "file": format!("gear_{}.db", std::process::id())  // Should be placed in gear home directory
                 }
             }
         }
@@ -162,21 +162,21 @@ async fn test_dbmanager_sqlite_server_without_dsn() {
 
     let manager = DbManager::from_figment(figment, home_dir.clone()).unwrap();
 
-    // Should successfully create SQLite database in module subdirectory
-    let result = manager.get("test_module").await.unwrap();
+    // Should successfully create SQLite database in gear subdirectory
+    let result = manager.get("test_gear").await.unwrap();
     assert!(result.is_some());
 
     let db = result.unwrap();
     assert_eq!(db.db_engine(), "sqlite");
 
     // Verify the database was created in the correct location (the filename will be dynamically generated)
-    let module_dir = home_dir.join("test_module");
+    let gear_dir = home_dir.join("test_gear");
     assert!(
-        module_dir.exists(),
-        "Module directory should be created at {module_dir:?}"
+        gear_dir.exists(),
+        "Gear directory should be created at {gear_dir:?}"
     );
-    // Check if any .db file exists in the module directory
-    let db_files: Vec<_> = std::fs::read_dir(&module_dir)
+    // Check if any .db file exists in the gear directory
+    let db_files: Vec<_> = std::fs::read_dir(&gear_dir)
         .unwrap()
         .filter_map(|entry| {
             let entry = entry.ok()?;
@@ -190,6 +190,6 @@ async fn test_dbmanager_sqlite_server_without_dsn() {
         .collect();
     assert!(
         !db_files.is_empty(),
-        "At least one .db file should be created in {module_dir:?}"
+        "At least one .db file should be created in {gear_dir:?}"
     );
 }

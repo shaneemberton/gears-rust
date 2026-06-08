@@ -1,6 +1,6 @@
 //! Field projection support for `$select` `OData` queries.
 //!
-//! This module provides utilities for projecting DTOs based on selected fields.
+//! This gear provides utilities for projecting DTOs based on selected fields.
 //! It allows handlers to filter response objects to only include requested fields.
 
 use serde_json::{Map, Value, json};

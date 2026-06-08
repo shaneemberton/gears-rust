@@ -13,7 +13,7 @@ The `cf-gears-toolkit-odata` crate provides:
 
 ## Additional
 
-This module includes code from:
+This gear includes code from:
 
 Project: odata-params
 License: MIT

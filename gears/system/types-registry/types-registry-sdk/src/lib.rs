@@ -1,7 +1,7 @@
 //! Types Registry SDK
 //!
-//! This crate provides the public API for the `types-registry` module:
-//! - `TypesRegistryClient` trait for inter-module communication
+//! This crate provides the public API for the `types-registry` gear:
+//! - `TypesRegistryClient` trait for inter-gear communication
 //! - `GtsTypeSchema` / `GtsInstance` typed entity models
 //! - `TypeSchemaQuery` / `InstanceQuery` for filtering
 //! - `GtsTypeId` / `GtsInstanceId` typed identifiers

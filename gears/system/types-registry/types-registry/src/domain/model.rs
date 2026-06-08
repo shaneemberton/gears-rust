@@ -1,6 +1,6 @@
-//! Internal domain models for the Types Registry module.
+//! Internal domain models for the Types Registry gear.
 //!
-//! These types are NOT part of the public SDK surface — external modules
+//! These types are NOT part of the public SDK surface — external gears
 //! consume the typed [`GtsTypeSchema`](types_registry_sdk::GtsTypeSchema) /
 //! [`GtsInstance`](types_registry_sdk::GtsInstance) views. The kind-agnostic
 //! `GtsEntity` and `ListQuery` types are kept here as the contract between
@@ -108,7 +108,7 @@ pub enum SegmentMatchScope {
 
 /// Query parameters for listing GTS entities (kind-agnostic).
 ///
-/// Internal to the parent module. SDK callers use [`TypeSchemaQuery`] /
+/// Internal to the parent gear. SDK callers use [`TypeSchemaQuery`] /
 /// [`InstanceQuery`] (pattern-only) and the service translates those to this
 /// struct. The REST handler builds the full struct directly so the wire
 /// contract retains the per-segment `vendor` / `package` / `namespace`

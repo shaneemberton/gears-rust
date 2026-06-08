@@ -128,7 +128,7 @@ impl AuthZResolverClient for MockAuthZResolver {
 #[must_use]
 pub fn mock_enforcer() -> PolicyEnforcer {
     let authz: Arc<dyn AuthZResolverClient> = Arc::new(MockAuthZResolver);
-    // Mirror the production wiring in `module.rs`: AM advertises
+    // Mirror the production wiring in `gear.rs`: AM advertises
     // `TenantHierarchy` so the PDP returns the native
     // `InTenantSubtree` predicate. Without the capability the
     // production PDP would downgrade to a pre-resolved `In`, and

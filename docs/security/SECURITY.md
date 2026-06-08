@@ -105,7 +105,7 @@ Gears implement a **PDP/PEP authorization model** per NIST SP 800-162, extended 
 
 ```
 Client → AuthN Middleware → AuthN Resolver (token validation)
-       → Module Handler (PEP) → AuthZ Resolver (PDP, policy evaluation)
+       → Gear Handler (PEP) → AuthZ Resolver (PDP, policy evaluation)
        → Constraints compiled to AccessScope
        → Database (query with WHERE clauses from constraints)
 ```
@@ -130,7 +130,7 @@ pub struct SecurityContext {
 
 > Source: [`OIDC AuthN Plugin DESIGN.md`](../../gears/system/authn-resolver/plugins/oidc-authn-plugin/docs/DESIGN.md) · [ADR-0002](../arch/authorization/ADR/0002-split-authn-authz-resolvers.md) · [ADR-0003](../arch/authorization/ADR/0003-authn-resolver-minimalist-interface.md)
 
-Validates bearer JWTs via OIDC discovery and JWKS, extracts claims, and constructs the `SecurityContext`. AuthN and AuthZ are **split into independent resolver modules** (ADR-0002) with pluggable vendor-specific implementations.
+Validates bearer JWTs via OIDC discovery and JWKS, extracts claims, and constructs the `SecurityContext`. AuthN and AuthZ are **split into independent resolver gears** (ADR-0002) with pluggable vendor-specific implementations.
 
 The current **OIDC AuthN plugin** supports:
 
@@ -185,7 +185,7 @@ Hierarchical multi-tenancy with a **single-root tree topology** (exactly one ten
 - **Barriers** — child tenants set `self_managed = true` to create a privacy barrier. Parents cannot see that subtree's business data by default; `BarrierMode` controls per-resource-type relaxation (e.g., billing ignores barriers while tasks respect them).
 - **`tenant_closure` table** — materialized `(ancestor_id, descendant_id, barrier, descendant_status)` enables efficient `in_tenant_subtree` predicate compilation to SQL subqueries.
 
-**Tenant Resolver** is a plugin-based system module providing tenant graph operations (get, ancestors, descendants, `is_ancestor`) via `TenantResolverClient`:
+**Tenant Resolver** is a plugin-based system gear providing tenant graph operations (get, ancestors, descendants, `is_ancestor`) via `TenantResolverClient`:
 
 - **Plugin architecture** — gateway discovers a backend plugin by GTS vendor string; routes all calls through `TenantResolverPluginClient`. Built-in plugins: `static-tr-plugin` (in-memory tree from config), `single-tenant-tr-plugin` (enforces `ctx.subject_tenant_id()` as the only tenant).
 - **Barrier-aware traversal** — ancestor/descendant walks respect `self_managed` barriers and use visited sets for cycle safety.
@@ -236,7 +236,7 @@ Custom dylint rules (`DE0901`, `DE0902`) validate GTS identifier correctness at 
 
 ## 4. Credentials Storage Architecture
 
-> Source: [`modules/credstore/`](../../gears/credstore/) · [`modules/credstore/docs/DESIGN.md`](../../gears/credstore/docs/DESIGN.md)
+> Source: [`gears/credstore/`](../../gears/credstore/) · [`gears/credstore/docs/DESIGN.md`](../../gears/credstore/docs/DESIGN.md)
 
 Gears provide a **plugin-based credential storage gateway** for managing secrets across the platform. The architecture separates the gateway (routing, authorization) from storage backends (plugin implementations).
 
@@ -396,10 +396,10 @@ The project uses `aws-lc-rs` (via `rustls`) as its primary TLS cryptographic bac
 
 Gears applications can be built with FIPS 140-3 validated cryptography by enabling the `fips` feature flag on `cf-gears-toolkit`, `cf-gears-toolkit-http`, and any binary that ships TLS. A single feature flag selects a per-target CMVP-validated backend behind one shared `rustls 0.23` TLS state machine:
 
-| Target | Validated module | How it routes |
+| Target | Validated gear | How it routes |
 |---|---|---|
-| Linux (x86_64, aarch64) | **AWS-LC FIPS Provider v2** — CMVP cert [#4816](https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4816) | `rustls/fips` + `aws-lc-fips-sys`; activated via target-gated shim `cf-gears-rustls-fips-shim` |
-| macOS (any arch) | **Apple corecrypto User-Space Module** — per-macOS-major CMVP cert (search by *"Apple corecrypto Module"* on the [CMVP database](https://csrc.nist.gov/projects/cryptographic-module-validation-program/validated-modules/search)) | In-tree `cf-gears-rustls-corecrypto-provider` over `Security.framework` + `CommonCrypto` |
+| Linux (x86_64, aarch64) | **AWS-LC FIPS Provider v2** — CMVP cert [#4816](https://csrc.nist.gov/projects/cryptographic-gear-validation-program/certificate/4816) | `rustls/fips` + `aws-lc-fips-sys`; activated via target-gated shim `cf-gears-rustls-fips-shim` |
+| macOS (any arch) | **Apple corecrypto User-Space Gear** — per-macOS-major CMVP cert (search by *"Apple corecrypto Gear"* on the [CMVP database](https://csrc.nist.gov/projects/cryptographic-gear-validation-program/validated-gears/search)) | In-tree `cf-gears-rustls-corecrypto-provider` over `Security.framework` + `CommonCrypto` |
 | Windows (x86_64) | **Microsoft Windows CNG** (`bcrypt.dll`) — per-Windows-build CMVP cert | Community `rustls-cng-crypto` (caret-pinned `0.1.x`); requires OS-level FIPS-mode via `HKLM\System\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy = 1` |
 
 ```sh
@@ -412,7 +412,7 @@ cargo build -p cf-gears-server --features fips
 
 | Target | Toolchain |
 |---|---|
-| Linux + `fips` | C toolchain, `cmake`, `perl`, `go` (required by `aws-lc-fips-sys` build script — module integrity checks) |
+| Linux + `fips` | C toolchain, `cmake`, `perl`, `go` (required by `aws-lc-fips-sys` build script — gear integrity checks) |
 | macOS + `fips` | Xcode Command Line Tools + Rust toolchain. No `cmake` / `perl` / `go`. The per-target shim excludes `aws-lc-fips-sys` from the macOS build graph entirely. |
 | Windows + `fips` (native) | MSVC + Windows SDK. No `cmake` / `perl` / `go`. CNG is loaded at runtime from `bcrypt.dll`. |
 | Windows + `fips` (cross-compile from Linux/macOS) | `cargo install cargo-xwin` plus `ninja`. See `make check-windows-fips`. |
@@ -428,7 +428,7 @@ Under `--features fips`, the `ClientHello` and `ServerHello` offer **only** FIPS
 | TLS 1.2 cipher suites | `ECDHE_{ECDSA,RSA}_WITH_AES_{128,256}_GCM_SHA{256,384}` (×4 — Linux + Windows only) |
 | Key exchange | NIST P-256, P-384 ECDHE |
 | Signature verify | ECDSA P-256/P-384/P-521, RSA-PSS, RSA PKCS#1 v1.5 (SHA-256/384/512) |
-| Signature sign (server-side / mTLS) | Same scope as verify; routed through the validated module (`SecKeyCreateSignature` on macOS, `BCryptSignHash` on Windows, `EVP_PKEY_sign` on Linux) |
+| Signature sign (server-side / mTLS) | Same scope as verify; routed through the validated gear (`SecKeyCreateSignature` on macOS, `BCryptSignHash` on Windows, `EVP_PKEY_sign` on Linux) |
 | Hash / HMAC / HKDF | SHA-256, SHA-384 (HKDF is an Approved KDF per NIST SP 800-56C) |
 | TLS 1.2 Extended Master Secret (RFC 7627) | **required** (`require_ems = true`) per NIST SP 800-52 Rev. 2 §3.5 |
 | RSA modulus floor | ≥ 2048 bits (NIST FIPS 186-5 §5.1) — enforced at server-side key load on macOS |
@@ -492,12 +492,12 @@ See [`examples/cf-gears-fips-probe/README.md`](../../examples/cf-gears-fips-prob
 
 ### What this does NOT claim
 
-- **Gears list itself is not on the CMVP Validated Modules list.** The validated modules are Apple corecrypto, AWS-LC FIPS Provider, and Microsoft Windows CNG. Gears are *consumers* of those modules.
+- **Gears list itself is not on the CMVP Validated Gears list.** The validated gears are Apple corecrypto, AWS-LC FIPS Provider, and Microsoft Windows CNG. Gears are *consumers* of those gears.
 - **CMVP OE-coverage is the deployment's responsibility.** A FIPS claim is void if the running OS version is not inside the cert's OE. The macOS runtime gate is fail-closed; Linux + Windows OE coverage is verified manually per release.
 - **`CryptoProvider::fips() = true` is a runtime witness, not just design intent.** On macOS it reflects the OE check (`oe::fips_witness_ok`); on Windows, the OS FIPS-mode flag. On Linux, runtime OE-validation is not yet implemented; OE coverage is verified manually per release via the §release-checklist CMVP-cert search.
 - **TLS 1.2 PRF on macOS is not CAVS-listed.** Apple corecrypto exposes generic HMAC primitives but not a CAVS-listed dedicated TLS PRF (unlike `aws-lc-fips`'s `tls_prf::Algorithm`). Consequence: `fips_provider()` on macOS is TLS-1.3-only; customers requiring TLS 1.2 on macOS+FIPS must accept that those connections do not carry a FIPS claim.
 - **JWT signature validation does not go through the FIPS path.** `jsonwebtoken` uses `ring` / non-FIPS `aws-lc-rs` for RSA / ECDSA verification on bearer tokens. Treat tokens as authentication context, not as data covered by the cryptographic claim. Out of scope today; tracked as **TODO-7** in [FIPS PRD §13](fips/PRD.md#13-open-questions). Cleanup is gated by `deny-fips.toml` Phase B promotion.
-- **Non-FIPS crypto crates remain in the final binary on macOS+fips.** `ring` is pulled in transitively by `pingora-rustls`, `pingora-pool`, and `ureq`; non-FIPS `aws-lc-rs` is pulled in by rustls's default feature set; `chacha20` is pulled in by the `rand` ecosystem. These are **not invoked** on the TLS data plane (the installed `CryptoProvider` routes every TLS primitive through the validated module) but the symbols are linked into the binary. Linkage smoke (above) confirms no non-validated shared libraries appear at runtime.
+- **Non-FIPS crypto crates remain in the final binary on macOS+fips.** `ring` is pulled in transitively by `pingora-rustls`, `pingora-pool`, and `ureq`; non-FIPS `aws-lc-rs` is pulled in by rustls's default feature set; `chacha20` is pulled in by the `rand` ecosystem. These are **not invoked** on the TLS data plane (the installed `CryptoProvider` routes every TLS primitive through the validated gear) but the symbols are linked into the binary. Linkage smoke (above) confirms no non-validated shared libraries appear at runtime.
 - **Server-side TLS keys load from PEM/DER bytes by default.** The bytes transit user-space memory before reaching `SecKeyCreateWithData` / `BCryptImportKeyPair` / `EVP_PKEY_new`. Strict-FIPS auditors operating under "no plaintext CSPs outside the boundary" require a Keychain / NCrypt / HSM flow; tracked as **TODO-1**.
 
 ### Deep references
@@ -588,13 +588,13 @@ Gears provide a CLI tool for scaffolding new repositories that automatically inh
 | **Makefile targets** | `make deny` (cargo-deny), `make fuzz` (continuous fuzzing), `make dylint` (custom lints), `make safety` (full suite) |
 | **cargo-deny configuration** | `deny.toml` with RustSec advisory checks, license allow-lists, source restrictions |
 
-This ensures every new service or module repository starts with the same defense-in-depth baseline described in this document, eliminating configuration drift across the platform.
+This ensures every new service or gear repository starts with the same defense-in-depth baseline described in this document, eliminating configuration drift across the platform.
 
 ## 15. Opportunities for Improvement
 
 The following areas have been identified for future hardening:
 
-1. **FIPS-140-3 — non-TLS crypto cleanup** — the `--features fips` build routes the **TLS data plane** through a CMVP-validated module on Linux, macOS, and Windows (see §9). Open items, tracked in the [FIPS PRD §13](fips/PRD.md#13-open-questions):
+1. **FIPS-140-3 — non-TLS crypto cleanup** — the `--features fips` build routes the **TLS data plane** through a CMVP-validated gear on Linux, macOS, and Windows (see §9). Open items, tracked in the [FIPS PRD §13](fips/PRD.md#13-open-questions):
    - **TODO-7** — JWT signature validation (`jsonwebtoken`) currently uses `ring` / non-FIPS `aws-lc-rs`. Audit the surface and either replace upstream, fork, or restrict JWT to symmetric HMAC. Build-time floor enforced via [`deny-fips.toml`](../../deny-fips.toml) Phase B promotion.
    - **TODO-8** — Runtime Operational Environment validation on Linux + Windows (macOS already has a sysctl-based fail-closed gate). Today OE coverage on Linux + Windows is verified manually per release via CMVP cert search.
    - **TODO-1** — Keychain / NCrypt / HSM-stored private keys for server-side TLS (today's PEM/DER load is acceptable for development and most production deployments where filesystem permissions guard the key).
@@ -605,7 +605,7 @@ The following areas have been identified for future hardening:
    - Detecting hardcoded secrets or API keys
    - Enforcing `SecretString` / `SecretValue` usage for sensitive fields
    - Flagging raw SQL string construction
-   - Validating `SecurityContext` propagation in module handlers
+   - Validating `SecurityContext` propagation in gear handlers
 6. **Fuzz target expansion** — current implemented targets cover OData parsers (`fuzz_odata_filter`, `fuzz_odata_cursor`, `fuzz_odata_orderby`). Planned targets: `fuzz_yaml_config`, `fuzz_html_parser`, `fuzz_pdf_parser`, `fuzz_json_config`, `fuzz_markdown_parser`
 7. **Kani formal verification** — expand use of the [Kani Rust Verifier](https://model-checking.github.io/kani/) for proving safety properties on critical code paths (`make kani`)
 8. **SBOM generation** — add Software Bill of Materials generation to CI for supply-chain transparency

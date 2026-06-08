@@ -26,7 +26,7 @@ date: 2026-05-24
 
 ## Context and Problem Statement
 
-The Usage Collector exposes ingestion, query, deactivation, and metric-lifecycle operations across three surfaces (REST API, in-process SDK trait, and Plugin SPI), and every operation must be authorized against the caller's SecurityContext plus the operation's full attribution tuple (tenant, resource, source module, Metric, and optionally subject). The platform already provides a centralized Policy Decision Point (PDP) called `authz-resolver`; the question is whether the collector should anchor all authorization at the PDP, maintain its own per-tenant or per-Metric access table, or hybridize the two. Centralized metering is shared across many emitters and consumers, so authorization placement directly affects how access policy evolves and how rapidly drift can creep in between policy declaration and policy enforcement.
+The Usage Collector exposes ingestion, query, deactivation, and metric-lifecycle operations across three surfaces (REST API, in-process SDK trait, and Plugin SPI), and every operation must be authorized against the caller's SecurityContext plus the operation's full attribution tuple (tenant, resource, source gear, Metric, and optionally subject). The platform already provides a centralized Policy Decision Point (PDP) called `authz-resolver`; the question is whether the collector should anchor all authorization at the PDP, maintain its own per-tenant or per-Metric access table, or hybridize the two. Centralized metering is shared across many emitters and consumers, so authorization placement directly affects how access policy evolves and how rapidly drift can creep in between policy declaration and policy enforcement.
 
 ## Decision Drivers
 
@@ -34,13 +34,13 @@ The Usage Collector exposes ingestion, query, deactivation, and metric-lifecycle
 - `cpt-cf-usage-collector-nfr-authorization` — authorization must be enforced on every read and write, including query-result scoping via PDP-returned constraint filters.
 - `cpt-cf-usage-collector-fr-ingestion-authorization` — a single PDP check per record against the full attribution tuple is required before plugin dispatch.
 - `cpt-cf-usage-collector-fr-tenant-isolation` — tenant isolation must be enforced through PDP authorization rather than per-tenant trust inside the collector.
-- PRD §1.3 centralized-metering goal — keep policy declaration and enforcement in one platform-owned location to avoid divergence between source modules and the metering substrate.
+- PRD §1.3 centralized-metering goal — keep policy declaration and enforcement in one platform-owned location to avoid divergence between source gears and the metering substrate.
 - PRD §2 fail-closed posture and `cpt-cf-usage-collector-nfr-graceful-degradation` — no anonymous bypass, no cached PDP decision, no synthesized identity.
 
 ## Considered Options
 
 - PDP-centric authorization — every operation delegates the authorization decision to `authz-resolver` and applies PDP-returned constraint filters to queries before plugin dispatch; the collector keeps no access state.
-- In-collector ACL cache — the collector maintains its own per-tenant, per-Metric, and per-source-module access table, refreshed periodically from a platform source of truth, and evaluates authorization locally.
+- In-collector ACL cache — the collector maintains its own per-tenant, per-Metric, and per-source-gear access table, refreshed periodically from a platform source of truth, and evaluates authorization locally.
 - Hybrid model — PDP for slow-changing access decisions (e.g., Metric registration, deactivation) plus a short-lived in-collector PDP-decision cache for hot ingestion paths.
 
 ## Decision Outcome
@@ -54,7 +54,7 @@ Authentication is owned upstream by the ToolKit gateway (REST surface) via `Oper
 ### Consequences
 
 - The collector inherits PDP availability as a hard dependency on the ingestion hot path; outages of `authz-resolver` translate to deterministic ingestion rejection rather than degraded admission.
-- Policy changes (new tenants, new source modules, new Metric grants) propagate without any collector-side reconfiguration or cache invalidation.
+- Policy changes (new tenants, new source gears, new Metric grants) propagate without any collector-side reconfiguration or cache invalidation.
 - The single-PDP-check-per-record budget is on the synchronous ingestion path and is explicitly accounted for inside `cpt-cf-usage-collector-nfr-ingestion-latency` (≤ 200 ms p95).
 - Query result scoping is uniformly driven by PDP-returned constraint filters; user-supplied filters can only narrow within the authorized scope.
 - The collector cannot independently authorize an emission or read; if the PDP is unreachable, the operation fails closed (no shadow allow path, no synthesized identity, no degraded mode).
@@ -80,7 +80,7 @@ The collector has no access state of its own; every decision is made by `authz-r
 
 ### In-collector ACL cache
 
-The collector maintains its own per-tenant, per-Metric, and per-source-module access table, refreshed from a platform source of truth and evaluated locally on each request.
+The collector maintains its own per-tenant, per-Metric, and per-source-gear access table, refreshed from a platform source of truth and evaluated locally on each request.
 
 - Good, because ingestion does not block on PDP availability and the per-record authorization cost stays in-process.
 - Bad, because it duplicates the platform's authorization state and re-creates the drift surface the centralized PDP exists to eliminate.

@@ -25,27 +25,27 @@ The GTS naming conventions provide simple, human-readable, globally unique ident
 
 The diagram above illustrates the principal Gear architecture. The deployed component set depends on the target environment and build configuration; for example it can be a single executable for the desktop build or multiple containers for a cloud server.
 
-Each module encapsulates a well-defined piece of business logic and exposes **versioned contracts** to its consumers via Rust-native interfaces, HTTP APIs, or gRPC. In addition, modules can define their own **plugin interfaces** that allow pluggable implementations of processing and storage concerns, enabling extensibility without coupling core logic to concrete backends. Additionally, modules can define **adapter interfaces** for compile-time selection of an implementation.
+Each gear encapsulates a well-defined piece of business logic and exposes **versioned contracts** to its consumers via Rust-native interfaces, HTTP APIs, or gRPC. In addition, gears can define their own **plugin interfaces** that allow pluggable implementations of processing and storage concerns, enabling extensibility without coupling core logic to concrete backends. Additionally, gears can define **adapter interfaces** for compile-time selection of an implementation.
 
-All interaction between modules and between modules and their plugins happens strictly through these versioned public interfaces. No module or plugin is allowed to depend on another module’s internal structures or implementation details. This enforces loose coupling, enables independent evolution and versioning, and allows modules or plugin implementations to be replaced without impacting the rest of the system.
+All interaction between gears and between gears and their plugins happens strictly through these versioned public interfaces. No gear or plugin is allowed to depend on another gear’s internal structures or implementation details. This enforces loose coupling, enables independent evolution and versioning, and allows gears or plugin implementations to be replaced without impacting the rest of the system.
 
-## Modules Categories
+## Gears Categories
 
-All modules can be divided into several categories:
+All gears can be divided into several categories:
 - **API Ingress** - the public ingress layer for external traffic; currently represented by API gateway
-- **Business Logic Modules** - modules implementing the main SaaS service logic built on top of CF/Gears Toolkit and system modules
-- **Gen AI Modules** - foundational generative AI capabilities such as chat, model management, agents, memory, search, crawling, scheduling, and MCP integration
-- **Serverless** - functions/workflows, runtimes, durable state, settings, and cluster coordination modules
+- **Business Logic Gears** - gears implementing the main SaaS service logic built on top of CF/Gears Toolkit and system gears
+- **Gen AI Gears** - foundational generative AI capabilities such as chat, model management, agents, memory, search, crawling, scheduling, and MCP integration
+- **Serverless** - functions/workflows, runtimes, durable state, settings, and cluster coordination gears
 - **Core Functionality** - shared platform capabilities such as audit, usage collection, jobs, registries, file handling, quotas, notifications, analytics, and approvals
-- **Core Platform Integration Modules** - interfaces for other modules and adapters for real Core Platform services (see below)
+- **Core Platform Integration Gears** - interfaces for other gears and adapters for real Core Platform services (see below)
 - **Core Platform Services** - external services that implement Core Platform functionality, such as tenancy management, access policies, licensing, credentials, and outbound egress control
 
-The **Core Platform Integration Modules** layer abstracts integration with core platform services, such as IdP, policy management, licensing, and credentials management that that can be out of scope of Gears. This keeps Gears reusable: it can run as a standalone platform, or it can integrate into an existing enterprise platform by wiring adapters to the platform’s services.
+The **Core Platform Integration Gears** layer abstracts integration with core platform services, such as IdP, policy management, licensing, and credentials management that that can be out of scope of Gears. This keeps Gears reusable: it can run as a standalone platform, or it can integrate into an existing enterprise platform by wiring adapters to the platform’s services.
 
 ## Dependency rules
 - Authentication/authorization: all **external HTTP** traffic is enforced by `api-gateway` middleware, and secure ORM access is scoped by `SecurityContext`. In-process calls must propagate `SecurityContext` and use SDK/clients; bypassing middlewares is not permitted for gateway paths.
-- Business Logic Modules MAY depend on Gen AI Modules, Serverless modules, and Core Functionality modules through stable contracts
-- Gen AI Modules MAY depend on Serverless modules and Core Functionality modules
+- Business Logic Gears MAY depend on Gen AI Gears, Serverless gears, and Core Functionality gears through stable contracts
+- Gen AI Gears MAY depend on Serverless gears and Core Functionality gears
 - Only integration/adapters talk to external components
 - No “cross-category sideways” deps except through contracts.
 - No circular dependencies allowed
@@ -54,16 +54,16 @@ The **Core Platform Integration Modules** layer abstracts integration with core 
 
 API Gateway is the single public entry point into Gears for all external clients. It terminates protocols, exposes versioned REST APIs with OpenAPI documentation, and applies a consistent middleware stack for authentication, authorization hooks, rate limiting, validation, and observability. API Gateway is responsible for request shaping and policy enforcement, but contains no business logic.
 
-Once a request is validated, it is routed to the appropriate module via stable contracts. All domain decisions and state changes occur downstream, allowing gateway to remain simple, auditable, and scalable while internal modules evolve independently.
+Once a request is validated, it is routed to the appropriate gear via stable contracts. All domain decisions and state changes occur downstream, allowing gateway to remain simple, auditable, and scalable while internal gears evolve independently.
 
 Every external request MUST pass through:
-API Gateway → Auth Resolver → Policy Manager → License Resolver → Execution Module → Tenant Resolver → Audit / Usage Collector → Response
+API Gateway → Auth Resolver → Policy Manager → License Resolver → Execution Gear → Tenant Resolver → Audit / Usage Collector → Response
 
 ### API Gateway
 #### Responsibility
 Provide the single public API entrypoint for Gears, including request routing, auth hooks, versioned REST surface, and OpenAPI publication.
 #### High Level Scenarios
-- [x] p1 - route versioned HTTP APIs to modules and expose OpenAPI
+- [x] p1 - route versioned HTTP APIs to gears and expose OpenAPI
 - [x] p1 - enforce request limits, timeouts, and basic middleware
 - [x] p2 - unified authn/z + license checks at gateway
 - [ ] p3 - streaming endpoints (SSE) for long-running operations
@@ -74,17 +74,17 @@ Provide the single public API entrypoint for Gears, including request routing, a
 - [API](../gears/system/api-gateway/README.md)
 - TODO: SDK link
 
-## Business Logic Modules
+## Business Logic Gears
 
-**Business Logic Modules** are the primary user-facing SaaS capabilities built on top of Gears. They compose Gen AI Modules, Serverless modules, Core Functionality modules, and Core Platform integrations into domain-specific product workflows while keeping product semantics isolated from shared platform infrastructure.
+**Business Logic Gears** are the primary user-facing SaaS capabilities built on top of Gears. They compose Gen AI Gears, Serverless gears, Core Functionality gears, and Core Platform integrations into domain-specific product workflows while keeping product semantics isolated from shared platform infrastructure.
 
-The architecture diagram uses placeholder business modules `A-E` to illustrate that multiple independent product domains can coexist on the same platform contracts. Each business module owns its domain models, user journeys, and business rules, while shared platform modules provide reusable execution, AI, governance, and integration capabilities.
+The architecture diagram uses placeholder business gears `A-E` to illustrate that multiple independent product domains can coexist on the same platform contracts. Each business gear owns its domain models, user journeys, and business rules, while shared platform gears provide reusable execution, AI, governance, and integration capabilities.
 
-## Gen AI Modules
+## Gen AI Gears
 
-**Gen AI Modules** provide the core AI capabilities of Gears and represent the primary value layer for building AI-powered SaaS applications. These modules encapsulate domain-specific GenAI functionality such as conversational orchestration, model inference, retrieval-augmented generation (RAG), agent execution, prompt management, and tool invocation. They are responsible for transforming user intent and contextual data into AI-generated outputs while enforcing platform-level constraints such as tenancy, security, policy, and usage limits.
+**Gen AI Gears** provide the core AI capabilities of Gears and represent the primary value layer for building AI-powered SaaS applications. These gears encapsulate domain-specific GenAI functionality such as conversational orchestration, model inference, retrieval-augmented generation (RAG), agent execution, prompt management, and tool invocation. They are responsible for transforming user intent and contextual data into AI-generated outputs while enforcing platform-level constraints such as tenancy, security, policy, and usage limits.
 
-These modules are designed to be highly composable and extensible: they rely on Serverless and Core Functionality modules (e.g., settings, jobs, usage collection, audit) and integrate with external AI providers or local runtimes through well-defined gateways. Gen AI Modules do not directly manage enterprise governance concerns (licensing, identity, credentials); instead, they delegate those responsibilities to shared platform modules and core platform adapters to remain focused on AI behavior and orchestration logic.
+These gears are designed to be highly composable and extensible: they rely on Serverless and Core Functionality gears (e.g., settings, jobs, usage collection, audit) and integrate with external AI providers or local runtimes through well-defined gateways. Gen AI Gears do not directly manage enterprise governance concerns (licensing, identity, credentials); instead, they delegate those responsibilities to shared platform gears and core platform adapters to remain focused on AI behavior and orchestration logic.
 
 ### Execution flow overview
 1. Chat Engine / API-triggered entry
@@ -94,7 +94,7 @@ These modules are designed to be highly composable and extensible: they rely on 
 5. Agent orchestration (AI Agents Registry, Serverless Gateway, Serverless Runtimes)
 6. Persistence & feedback (Agent Memory, Usage Collector, Audit)
 
-The principal diagram visualizes the primary Gen AI modules. `Prompts Registry`, `Model Runtime Controller`, and `Local Search Index` are supporting modules kept in this document even though they are omitted from the top-level diagram for readability.
+The principal diagram visualizes the primary Gen AI gears. `Prompts Registry`, `Model Runtime Controller`, and `Local Search Index` are supporting gears kept in this document even though they are omitted from the top-level diagram for readability.
 
 ### Chat Engine
 #### Responsibility
@@ -315,9 +315,9 @@ Provide fast local indexing and retrieval over ingested content for search and g
 
 ## Serverless
 
-**Serverless** modules provide functions/workflows execution, runtime management, durable state primitives, settings, and cross-instance coordination primitives. In the current target architecture this category includes Serverless Gateway, Serverless Runtimes, Settings Service, Durable Objects, and Cluster Plane.
+**Serverless** gears provide functions/workflows execution, runtime management, durable state primitives, settings, and cross-instance coordination primitives. In the current target architecture this category includes Serverless Gateway, Serverless Runtimes, Settings Service, Durable Objects, and Cluster Plane.
 
-This layer is reusable by both Business Logic Modules and Gen AI Modules. It exposes stable contracts for function execution and runtime orchestration while delegating identity, licensing, credentials, quotas, and other governance concerns to Core Functionality and Core Platform Integration modules.
+This layer is reusable by both Business Logic Gears and Gen AI Gears. It exposes stable contracts for function execution and runtime orchestration while delegating identity, licensing, credentials, quotas, and other governance concerns to Core Functionality and Core Platform Integration gears.
 
 ### Serverless Gateway
 #### Responsibility
@@ -365,7 +365,7 @@ Provide typed configuration and preferences at tenant/user scope, supporting fea
 
 ### Durable Objects
 #### Responsibility
-Provide durable state primitives and generic CRUD storage for typed resources that do not warrant a dedicated module, using a fixed schema envelope (identity, ownership, timestamps) and a flexible JSON payload governed by GTS type definitions.
+Provide durable state primitives and generic CRUD storage for typed resources that do not warrant a dedicated gear, using a fixed schema envelope (identity, ownership, timestamps) and a flexible JSON payload governed by GTS type definitions.
 #### High Level Scenarios
 - [ ] p1 - create, read, update, and soft-delete typed resources with tenant isolation and GTS type-based access control
 - [ ] p1 - OData $filter/$orderby and cursor-based pagination on schema fields
@@ -374,7 +374,7 @@ Provide durable state primitives and generic CRUD storage for typed resources th
 - [ ] p1 - configurable soft-delete retention with background purge task
 - [ ] p2 - batch CRUD operations (POST /resources:batch, POST /resources:batch-get) per DNA BATCH.md
 - [ ] p2 - per-resource-type lifecycle notification events (created/updated/deleted) via Events Broker
-- [ ] p2 - per-resource-type audit events via Audit Module
+- [ ] p2 - per-resource-type audit events via Audit Gear
 - [ ] p3 - alternative storage plugins (search engines, vendor-provided backends) with per-type routing
 - [ ] p4 - on-change events and serverless functions or workflows invocation
 - [ ] p4 - full-text search API with search-capable plugin support
@@ -401,9 +401,9 @@ Provide platform-wide cross-instance coordination primitives with uniform semant
 
 ## Core Functionality
 
-**Core Functionality** modules provide the cross-cutting platform capabilities required to run Gears as a secure, observable, and operationally consistent system. They implement system-wide concerns such as notifications, approvals, analytics, auditability, usage collection, background job execution, eventing, node discovery, file handling, quotas, and type registration.
+**Core Functionality** gears provide the cross-cutting platform capabilities required to run Gears as a secure, observable, and operationally consistent system. They implement system-wide concerns such as notifications, approvals, analytics, auditability, usage collection, background job execution, eventing, node discovery, file handling, quotas, and type registration.
 
-Core Functionality modules provide reusable operational services that Business Logic, Gen AI, and Serverless modules consume through stable contracts, ensuring consistency, compliance, and operational correctness across the platform.
+Core Functionality gears provide reusable operational services that Business Logic, Gen AI, and Serverless gears consume through stable contracts, ensuring consistency, compliance, and operational correctness across the platform.
 
 ### Emails Storage
 #### Responsibility
@@ -520,14 +520,14 @@ Measure platform usage (API calls, compute, storage) for quotas, billing, and in
 
 ### Events Broker
 #### Responsibility
-Provide platform-wide event publishing and subscription for asynchronous workflows and loose coupling between modules.
+Provide platform-wide event publishing and subscription for asynchronous workflows and loose coupling between gears.
 #### High Level Scenarios
 - [ ] p1 - publish and subscribe to typed events
 - [ ] p1 - integration with GTS and authz
 - [ ] p2 - support custom plugins for events persistency (per topic)
 - [ ] p2 - support in-memory filtering
 - [ ] p3 - provide delivery retries, dead-letter handling, and replay
-- [ ] p4 - enforce event-contract governance across modules
+- [ ] p4 - enforce event-contract governance across gears
 #### More details
 - TODO: PRD link
 - TODO: Design link
@@ -571,7 +571,7 @@ GTS schema-storage service for tool definitions and contracts.
 - [x] p1 - get schema by ID (for LLM Gateway tool resolution)
 - [x] p1 - batch get schemas
 - [x] p2 - validate, register and resolve types and instances by versioned identifiers
-- [ ] p2 - distribute GTS instances and schemas updates across modules safely via events generation
+- [ ] p2 - distribute GTS instances and schemas updates across gears safely via events generation
 - [ ] p3 - schemas and instances import/export in different formats (YAML, RAML)
 #### More details
 - [PRD](../gears/system/types-registry/docs/PRD.md)
@@ -622,15 +622,15 @@ Fetch remote files and stage them for parsing, storage, and workflow execution u
 - TODO: API link
 - TODO: SDK link
 
-## Core Platform Integration Modules
+## Core Platform Integration Gears
 
-**Core Platform Integration Modules** provide a thin abstraction layer between Gears and external or enterprise-grade platform services such as identity providers, license managers, credential stores, and outbound traffic governance systems. These modules expose minimal, stable interfaces that Gears can depend on without being coupled to a specific vendor, protocol, or deployment environment.
+**Core Platform Integration Gears** provide a thin abstraction layer between Gears and external or enterprise-grade platform services such as identity providers, license managers, credential stores, and outbound traffic governance systems. These gears expose minimal, stable interfaces that Gears can depend on without being coupled to a specific vendor, protocol, or deployment environment.
 
-The primary role of these adapter modules is decoupling: they allow Gears to operate either as a standalone platform (using local implementations) or as a component embedded into a larger enterprise ecosystem. Adapter modules do not own authoritative state or business rules; instead, they translate Gears’s internal contracts into calls to external core platform services, handling protocol adaptation, caching, and integration-specific concerns.
+The primary role of these adapter gears is decoupling: they allow Gears to operate either as a standalone platform (using local implementations) or as a component embedded into a larger enterprise ecosystem. Adapter gears do not own authoritative state or business rules; instead, they translate Gears’s internal contracts into calls to external core platform services, handling protocol adaptation, caching, and integration-specific concerns.
 
 ### Tenant Resolver
 #### Responsibility
-Introduces an abstraction layer over tenant relationship services. The goal is to expose a single entry point for retrieving related tenants (parents, children, siblings) without coupling modules to a specific directory implementation.
+Introduces an abstraction layer over tenant relationship services. The goal is to expose a single entry point for retrieving related tenants (parents, children, siblings) without coupling gears to a specific directory implementation.
 #### High Level Scenarios
 - [x] p1 - resolve related tenant IDs (parent, children) based on given ID
 - [x] p1 - integrated adapter for single-tenant and single-user use-case (desktop app)
@@ -703,7 +703,7 @@ Introduces an abstraction layer behind the real Outbound API Gateway. The main g
 
 Core Platform Services are authoritative, enterprise-level services that may exist outside of Gears and act as systems of record for critical governance domains such as accounts, identity, access policies, licensing, credentials, and outbound egress control. These components typically belong to an organization’s broader platform or SaaS ecosystem and may already be deployed, certified, and governed independently of Gears.
 
-Gears does not aim to be the system of record for these capabilities at enterprise level, but allows to integrate with external components operating in an integrated environment. It relies on adapter modules to interact with these external components through well-defined contracts. This approach allows Gears to inherit enterprise-grade security, compliance, and governance guarantees while remaining portable, reusable, and safe to embed into existing platforms without duplicating or conflicting with core business infrastructure.
+Gears does not aim to be the system of record for these capabilities at enterprise level, but allows to integrate with external components operating in an integrated environment. It relies on adapter gears to interact with these external components through well-defined contracts. This approach allows Gears to inherit enterprise-grade security, compliance, and governance guarantees while remaining portable, reusable, and safe to embed into existing platforms without duplicating or conflicting with core business infrastructure.
 
 ### Account Manager
 #### Responsibility
@@ -807,7 +807,7 @@ sequenceDiagram
   box "Gears"
     participant I as API gateway (api-gateway)
     participant LIC as License resolver
-    participant M as Target module (REST handler)
+    participant M as Target gear (REST handler)
     participant D as Domain service
     participant DB as DB (SecureConn)
     participant EB as Events Broker

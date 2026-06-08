@@ -47,7 +47,7 @@ dylint_linting::declare_early_lint! {
     /// ```
     pub DE0301_NO_INFRA_IN_DOMAIN,
     Deny,
-    "domain modules should not import infrastructure dependencies (DE0301)"
+    "domain gears should not import infrastructure dependencies (DE0301)"
 }
 
 /// Forbidden import patterns for domain layer

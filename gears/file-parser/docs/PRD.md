@@ -49,9 +49,9 @@ File Parser provides document parsing and content extraction capabilities for th
 
 ### 1.2 Background / Problem Statement
 
-Platform modules — most notably the Chat Engine and LLM Gateway — need to process user-uploaded documents as grounding material for AI responses. These documents arrive as binary uploads in varying formats (PDF, HTML, spreadsheets, presentations, Word documents, images, plain text).
+Platform gears — most notably the Chat Engine and LLM Gateway — need to process user-uploaded documents as grounding material for AI responses. These documents arrive as binary uploads in varying formats (PDF, HTML, spreadsheets, presentations, Word documents, images, plain text).
 
-The module was designed from the start with extensibility in mind: the `FileParserBackend` trait defines the plugin contract, and `FileParserService` acts as the gateway that routes requests to the correct plugin.
+The gear was designed from the start with extensibility in mind: the `FileParserBackend` trait defines the plugin contract, and `FileParserService` acts as the gateway that routes requests to the correct plugin.
 
 The previous implementation had four separate format-specific plugins (`HtmlParser`, `PdfParser`, `XlsxParser`, `PptxParser`) each backed by different libraries (`tl`, `pdf-extract`, `calamine`, `pptx-to-md`), resulting in fragmented logic, inconsistent output quality, and no support for DOCX or images. The current version consolidates the four PDF/HTML/spreadsheet/presentation plugins into a single `KreuzbergParser`, adds `DocxParser` and `ImageParser`, and retains `PlainTextParser` and `StubParser` — all within the same gateway+plugin architecture.
 
@@ -61,7 +61,7 @@ The previous implementation had four separate format-specific plugins (`HtmlPars
 - Support a plugin architecture that allows new parser backends to be added without changing the REST API or the gateway
 - Return structured content that preserves document semantics (headings, lists, tables, inline annotations)
 - Produce Markdown output suitable for injection into LLM prompts
-- Enable downstream modules to process documents without understanding format-specific details
+- Enable downstream gears to process documents without understanding format-specific details
 - Parse common formats with ≥ 95% accuracy; respond in < 5 s for documents < 10 MB
 
 ### 1.4 Glossary
@@ -93,22 +93,22 @@ The previous implementation had four separate format-specific plugins (`HtmlPars
 
 ### 2.2 System Actors
 
-#### Consumer Module
+#### Consumer Gear
 
 **ID**: `fdd-file-parser-actor-consumer`
 
 <!-- fdd-id-content -->
-**Role**: Internal platform module (e.g., Chat Engine) that calls File Parser programmatically as part of a document-processing workflow.
+**Role**: Internal platform gear (e.g., Chat Engine) that calls File Parser programmatically as part of a document-processing workflow.
 **Needs**: Reliable structured content extraction from files on the server filesystem (`parse-local`) or from binary payloads.
 <!-- fdd-id-content -->
 
 ## 3. Operational Concept & Environment
 
-> **Note**: Project-wide runtime, OS, architecture, and lifecycle policy are defined in the root PRD. Only module-specific deviations are documented here.
+> **Note**: Project-wide runtime, OS, architecture, and lifecycle policy are defined in the root PRD. Only gear-specific deviations are documented here.
 
-File Parser runs as a stateless HTTP service within the Gears middleware. Each request is fully self-contained: the module accepts an uploaded file (or a local path), routes it to the appropriate plugin, extracts content, and returns the result without persisting any state. Temporary files used by individual plugins are cleaned up after each request.
+File Parser runs as a stateless HTTP service within the Gears middleware. Each request is fully self-contained: the gear accepts an uploaded file (or a local path), routes it to the appropriate plugin, extracts content, and returns the result without persisting any state. Temporary files used by individual plugins are cleaned up after each request.
 
-The module requires an `allowed_local_base_dir` config entry to be set at startup. If the value is missing or unresolvable, the module fails to start.
+The gear requires an `allowed_local_base_dir` config entry to be set at startup. If the value is missing or unresolvable, the gear fails to start.
 
 ## 4. Scope
 
@@ -178,7 +178,7 @@ Currently registered plugins (in priority order):
 **ID**: [ ] `p2` `fdd-file-parser-fr-plugin-extensibility-v1`
 
 <!-- fdd-id-content -->
-The system SHALL support registration of additional parser plugins without requiring changes to the REST API or the gateway. A new plugin SHALL only need to implement the `FileParserBackend` trait and be added to the plugin registry in `src/module.rs`. The new plugin's extensions SHALL automatically appear in the `/info` response and be routable via `/upload` and `/parse-local`.
+The system SHALL support registration of additional parser plugins without requiring changes to the REST API or the gateway. A new plugin SHALL only need to implement the `FileParserBackend` trait and be added to the plugin registry in `src/gear.rs`. The new plugin's extensions SHALL automatically appear in the `/info` response and be routable via `/upload` and `/parse-local`.
 
 **Actors**: `fdd-file-parser-actor-consumer`
 <!-- fdd-id-content -->
@@ -214,7 +214,7 @@ System SHALL convert the extracted document structure to Markdown format, preser
 **ID**: [ ] `p1` `fdd-file-parser-fr-local-path-security-v1`
 
 <!-- fdd-id-content -->
-System SHALL reject local file paths containing `..` traversal components. System SHALL require a mandatory `allowed_local_base_dir` configuration; the module SHALL fail to start if this field is missing or the path cannot be resolved. System SHALL canonicalize the requested path (resolving symlinks) and reject paths that do not fall under the base directory. Rejected requests SHALL return HTTP 403 and be logged at `warn` level.
+System SHALL reject local file paths containing `..` traversal components. System SHALL require a mandatory `allowed_local_base_dir` configuration; the gear SHALL fail to start if this field is missing or the path cannot be resolved. System SHALL canonicalize the requested path (resolving symlinks) and reject paths that do not fall under the base directory. Rejected requests SHALL return HTTP 403 and be logged at `warn` level.
 
 **Actors**: `fdd-file-parser-actor-api-user`, `fdd-file-parser-actor-consumer`
 <!-- fdd-id-content -->
@@ -261,7 +261,7 @@ System SHALL maintain 99.9% uptime SLA.
 
 ### 7.1 Public API Surface
 
-REST endpoints exposed by the module:
+REST endpoints exposed by the gear:
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -273,7 +273,7 @@ REST endpoints exposed by the module:
 
 ### 7.2 External Integration Contracts
 
-No external service contracts. The module depends only on in-process Rust libraries (`kreuzberg`, `docx-rust`) and the host filesystem for `parse-local` endpoints.
+No external service contracts. The gear depends only on in-process Rust libraries (`kreuzberg`, `docx-rust`) and the host filesystem for `parse-local` endpoints.
 
 ## 8. Use Cases
 
@@ -294,7 +294,7 @@ User uploads a document in a supported format and receives parsed content as str
 **ID**: [ ] `p1` `fdd-file-parser-usecase-local-parse-v1`
 
 <!-- fdd-id-content -->
-Consumer module requests parsing of a file already present on the server filesystem.
+Consumer gear requests parsing of a file already present on the server filesystem.
 
 **Actors**: `fdd-file-parser-actor-consumer`
 **Preconditions**: File exists under `allowed_local_base_dir` and has an extension claimed by a registered plugin.
@@ -313,7 +313,7 @@ Consumer module requests parsing of a file already present on the server filesys
 | Unknown format rejection | Upload of unsupported extension returns HTTP 400 |
 | Parser info endpoint | `/info` returns all registered plugins with their correct extension lists |
 | File size limit | Upload exceeding configured limit returns HTTP 413 |
-| Plugin extensibility | Adding a new plugin to `module.rs` causes it to appear in `/info` without other code changes |
+| Plugin extensibility | Adding a new plugin to `gear.rs` causes it to appear in `/info` without other code changes |
 
 ## 10. Dependencies
 
@@ -330,7 +330,7 @@ Consumer module requests parsing of a file already present on the server filesys
 - All registered parser plugins are stateless and safe to share across concurrent requests.
 - The `bundled-pdfium` feature provides a sufficiently up-to-date PDFium for production PDF parsing.
 - The configured `max_file_size_mb` (default 100 MB) is sufficient for current use cases; revision requires an NFR update.
-- Consumer modules calling `parse-local` are trusted to supply valid paths within `allowed_local_base_dir`.
+- Consumer gears calling `parse-local` are trusted to supply valid paths within `allowed_local_base_dir`.
 - `kreuzberg =4.9.4` will remain available on crates.io for the foreseeable future; any upgrade is a deliberate, reviewed action.
 
 ## 12. Risks
@@ -341,7 +341,7 @@ Consumer module requests parsing of a file already present on the server filesys
 | PPTX multi-slide / table limitations persist in future kreuzberg releases | Medium | Low | Tests marked `#[ignore]` with strict assertions; re-evaluate on upgrade |
 | PDFium bundled binary lags security patches | Low | Medium | Track pdfium releases; update via kreuzberg upgrade when license permits |
 | Large document OOM under concurrency | Low | Medium | Configurable size limit enforced before any plugin is invoked; monitor memory usage in production |
-| Plugin registration order conflict (two plugins claim same extension) | Low | Low | First-match semantics are deterministic; document registration order in `module.rs` |
+| Plugin registration order conflict (two plugins claim same extension) | Low | Low | First-match semantics are deterministic; document registration order in `gear.rs` |
 | `docx-rust` does not support all DOCX features | Medium | Low | Known limitation; `DocxParser` extracts text and basic structure; rich formatting may be lost |
 
 ## Appendix

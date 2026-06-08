@@ -24,7 +24,7 @@ Provides a simple, config-driven authentication mechanism so that the platform c
 ## Configuration
 
 ```yaml
-modules:
+gears:
   static_authn_plugin:
     config:
       vendor: "constructorfabric"

@@ -741,7 +741,7 @@ impl Default for TestDpBuilder {
 /// Test harness providing both an `AppState` (for REST handlers) and a
 /// `ServiceGatewayClientV1` facade (for programmatic data setup in tests).
 pub struct TestAppState {
-    pub state: crate::module::AppState,
+    pub state: crate::gear::AppState,
     pub facade: Arc<dyn ServiceGatewayClientV1>,
 }
 
@@ -768,7 +768,7 @@ pub fn build_test_app_state(
         Arc::new(ServiceGatewayClientV1Facade::new(cp.clone(), dp.clone()));
     hub.register::<dyn ServiceGatewayClientV1>(facade.clone());
     TestAppState {
-        state: crate::module::AppState {
+        state: crate::gear::AppState {
             cp,
             dp,
             backend_selector,

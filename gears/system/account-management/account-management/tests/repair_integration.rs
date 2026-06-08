@@ -526,7 +526,7 @@ async fn repair_concurrent_burst_observes_only_gate_or_success() {
 }
 
 // Imports re-exported from `common` shadow the bare types the tests
-// use; declared at the bottom so the module-level `use common::*;`
+// use; declared at the bottom so the gear-level `use common::*;`
 // stays the single discoverable import surface.
 use toolkit_security::AccessScope;
 use uuid::Uuid;

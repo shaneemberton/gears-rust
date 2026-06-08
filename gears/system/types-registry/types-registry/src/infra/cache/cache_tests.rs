@@ -2,7 +2,7 @@
 //!
 //! Kept in a sibling `_tests.rs` file per the `de1101_tests_in_separate_files`
 //! repo lint. Linked into `cache.rs` via `#[path = "cache_tests.rs"] mod tests;`,
-//! so the module sees `cache.rs` as `super`.
+//! so the gear sees `cache.rs` as `super`.
 
 use super::*;
 use serde_json::json;

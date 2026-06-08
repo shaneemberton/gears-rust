@@ -70,7 +70,7 @@ This feature bridges RG with the AuthZ ecosystem. The integration read port prov
 - **Design**: [DESIGN.md](../DESIGN.md) — sections 3.2 (Integration Read Service), 3.3 (API Contracts, Integration Read), 3.6 (sequences: authz-rg-sql-split, auth-modes, mtls-authz-read, jwt-rg-request, e2e-authz-flow)
 - **DECOMPOSITION**: [DECOMPOSITION.md](../DECOMPOSITION.md) entry 2.5
 - **Dependencies**: Features 0003, 0004 — hierarchy data, membership data
-- **Not applicable**: UX (backend API — no user interface); COMPL (internal platform module — no regulatory data handling); OPS observability and rollout are managed at the module infrastructure level (DESIGN §3.7 and platform runbooks); PERF targets are set at the system level in PRD.md NFR section.
+- **Not applicable**: UX (backend API — no user interface); COMPL (internal platform gear — no regulatory data handling); OPS observability and rollout are managed at the gear infrastructure level (DESIGN §3.7 and platform runbooks); PERF targets are set at the system level in PRD.md NFR section.
 
 ## 2. Actor Flows (CDSL)
 
@@ -162,7 +162,7 @@ This feature bridges RG with the AuthZ ecosystem. The integration read port prov
 
 **Steps**:
 1. [x] - `p1` - Integration read request arrives via ResourceGroupReadHierarchy trait - `inst-plugin-1`
-2. [x] - `p1` - RG Module resolves configured provider from module config - `inst-plugin-2`
+2. [x] - `p1` - RG Gear resolves configured provider from gear config - `inst-plugin-2`
 3. [x] - `p1` - **IF** built-in provider configured - `inst-plugin-3`
    1. [x] - `p1` - Route to local persistence path: execute query against RG database - `inst-plugin-3a`
 4. [x] - `p1` - **IF** vendor-specific provider configured - `inst-plugin-4`
@@ -384,13 +384,13 @@ In-source `#[cfg(test)]` tests covering auth-mode decision and tenant-scope enfo
 
 > General E2E testing philosophy, patterns, and infrastructure: [`docs/toolkit_unified_system/13_e2e_testing.md`](../../../../../docs/toolkit_unified_system/13_e2e_testing.md).
 
-Tests S3 and S4 verify the real AuthZ wiring in `module.rs` that unit tests cannot reach: `authz_integration_test.rs` mocks the PDP, `tenant_filtering_db_test.rs` constructs `AccessScope` manually — neither exercises the live `PolicyEnforcer` → `SecureORM` pipeline.
+Tests S3 and S4 verify the real AuthZ wiring in `gear.rs` that unit tests cannot reach: `authz_integration_test.rs` mocks the PDP, `tenant_filtering_db_test.rs` constructs `AccessScope` manually — neither exercises the live `PolicyEnforcer` → `SecureORM` pipeline.
 
 ### S3: `test_authz_tenant_filter_applied`
 
 **Seam**: AuthZ → SecureORM full chain — SecurityContext → PolicyEnforcer → AccessScope → `WHERE tenant_id IN (...)`.
 
-**Why not in unit tests**: Unit tests mock the PDP or pass a manually constructed `AccessScope` directly to the repo. Neither verifies the real wiring in `module.rs` where `PolicyEnforcer` is created from `ClientHub` and injected into `GroupService`.
+**Why not in unit tests**: Unit tests mock the PDP or pass a manually constructed `AccessScope` directly to the repo. Neither verifies the real wiring in `gear.rs` where `PolicyEnforcer` is created from `ClientHub` and injected into `GroupService`.
 
 ```
 POST /groups {name: "AuthZ Test"}       → 201, note tenant_id from response

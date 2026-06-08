@@ -1,6 +1,6 @@
 //! Tower layers for HTTP client middleware
 //!
-//! This module provides Tower service layers that can be composed to build
+//! This gear provides Tower service layers that can be composed to build
 //! the HTTP client middleware stack.
 //!
 //! ## Available Layers

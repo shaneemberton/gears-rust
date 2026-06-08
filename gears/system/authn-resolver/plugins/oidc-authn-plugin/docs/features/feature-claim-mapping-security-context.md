@@ -42,7 +42,7 @@ The purpose is to produce a consistent, policy-ready identity context from token
 | Actor | Role in Feature |
 |-------|-----------------|
 | `cpt-cf-authn-plugin-actor-api-gateway` | Receives mapped `SecurityContext` on request-path authenticate calls. |
-| `cpt-cf-authn-plugin-actor-background-module` | Receives mapped `SecurityContext` on S2S exchanges. |
+| `cpt-cf-authn-plugin-actor-background-gear` | Receives mapped `SecurityContext` on S2S exchanges. |
 | `cpt-cf-authn-plugin-actor-platform-admin` | Configures claim mapping and first-party client list. |
 
 ### 1.4 References

@@ -5,7 +5,7 @@ Updated: 2026-03-18 by Constructor Tech
 
 ## What it does
 
-Detects `pub type X = Y` aliases in **contract modules** where `Y` is a primitive-like type (Uuid, String, integers, etc.). Such aliases provide zero compile-time type safety and should be newtypes instead.
+Detects `pub type X = Y` aliases in **contract gears** where `Y` is a primitive-like type (Uuid, String, integers, etc.). Such aliases provide zero compile-time type safety and should be newtypes instead.
 
 ## Why is this bad?
 
@@ -15,7 +15,7 @@ Type aliases are useful for generics or shortening complex types, not for wrappi
 
 ## Scope
 
-This lint **only** enforces in **contract modules** (paths containing `contract/`). SDK and contract boundaries are where transparent primitive aliases cause API type-safety problems.
+This lint **only** enforces in **contract gears** (paths containing `contract/`). SDK and contract boundaries are where transparent primitive aliases cause API type-safety problems.
 
 ## Example
 
@@ -60,4 +60,4 @@ This lint is configured to **deny** by default.
 
 - [Newtype pattern](https://doc.rust-lang.org/rust-by-example/generics/new_types.html)
 - [DE0309](../../de03_domain_layer/de0309_must_have_domain_model) - Must Have Domain Model
-- [Module layout and SDK pattern](../../../../docs/toolkit_unified_system/02_module_layout_and_sdk_pattern.md)
+- [Gear layout and SDK pattern](../../../../docs/toolkit_unified_system/02_gear_layout_and_sdk_pattern.md)

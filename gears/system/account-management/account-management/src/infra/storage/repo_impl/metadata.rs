@@ -3,7 +3,7 @@
 //! Mirrors the conventions established by the sibling [`TenantRepoImpl`]
 //! split (`reads`, `lifecycle`, `updates`, `retention`,
 //! [`ConversionRepoImpl`]): every method on the [`MetadataRepo`] trait is
-//! dispatched to a `pub(super)` free function in this module, every DB
+//! dispatched to a `pub(super)` free function in this gear, every DB
 //! call forwards the caller's [`AccessScope`] through `SecureORM` (the
 //! `tenant_metadata` entity is declared `Scopable(tenant_col =
 //! "tenant_id", no_resource, no_owner, no_type)` so a caller-built

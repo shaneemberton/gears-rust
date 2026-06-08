@@ -27,16 +27,16 @@ decision-makers: Constructor Fabric Steering Committee
 
 ## Context and Problem Statement
 
-`tenant_closure` is AM's canonical transitive-ancestry table, read today by the Tenant Resolver Plugin and planned for future replication to business modules that need subtree/barrier awareness without cross-module calls to AM.
+`tenant_closure` is AM's canonical transitive-ancestry table, read today by the Tenant Resolver Plugin and planned for future replication to business gears that need subtree/barrier awareness without cross-gear calls to AM.
 
 The original design wrote a closure row for every `tenants` row from the moment it was inserted during the tenant-create saga, including the transient `provisioning` state. `descendant_status` carried the `provisioning` value on those rows, and the Tenant Resolver Plugin applied an unconditional `descendant_status <> 'provisioning'` predicate on every closure-driven read to hide them from SDK responses.
 
 This works for a single-reader model but creates two problems once the closure becomes a publication contract:
 
 1. **Replication surface leak.** Every replica consumer must know about `provisioning` and filter it out. Internal AM saga state flows across the replication boundary even though only SDK-visible tenants are consumed.
-2. **Burden on every future reader.** Business modules integrating against a replicated `tenant_closure` inherit the provisioning-exclusion obligation. Missing the filter yields silently wrong subtree queries.
+2. **Burden on every future reader.** Business gears integrating against a replicated `tenant_closure` inherit the provisioning-exclusion obligation. Missing the filter yields silently wrong subtree queries.
 
-Review feedback (external) raised this explicitly: *"Did you consider an option to don't store provisioning records in the tenant_closure table? In the future we will use the same tenant_closure table in the business modules and implement replication mechanism for it. We will have to handle those records with the provisioning state separately."*
+Review feedback (external) raised this explicitly: *"Did you consider an option to don't store provisioning records in the tenant_closure table? In the future we will use the same tenant_closure table in the business gears and implement replication mechanism for it. We will have to handle those records with the provisioning state separately."*
 
 ## Decision Drivers
 
@@ -60,7 +60,7 @@ Closure rows are inserted in a single transaction with the `provisioning → act
 
 ### Consequences
 
-- **Good**: The closure becomes a clean publication contract. Any future consumer — the Tenant Resolver Plugin today, business-module replicas tomorrow — never observes provisioning state and carries no provisioning-specific filtering obligation.
+- **Good**: The closure becomes a clean publication contract. Any future consumer — the Tenant Resolver Plugin today, business gear replicas tomorrow — never observes provisioning state and carries no provisioning-specific filtering obligation.
 - **Good**: `tenant_closure.descendant_status` CHECK tightens to `{active, suspended, deleted}`, eliminating one internal-state value from the schema surface.
 - **Good**: The Tenant Resolver Plugin's unconditional `descendant_status <> 'provisioning'` filter goes away. Provisioning invisibility becomes structural — closure-driven reads cannot surface provisioning tenants by construction. Plugin-side provisioning filtering remains only as defense-in-depth on direct `tenants` reads (existence probes, bulk-by-ids, ancestor hydration JOINs).
 - **Good**: Hot-path performance is preserved — `descendant_status` remains denormalized for fast status-filtered subtree reads; no JOIN regression on `get_descendants`.

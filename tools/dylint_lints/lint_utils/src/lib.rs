@@ -532,7 +532,7 @@ fn get_path_str_from_session(source_map: &SourceMap, span: Span) -> Option<Strin
 }
 
 /// Extract simulated directory path from a comment at the start of a file.
-/// Looks for a comment like: `// simulated_dir=/cf-gears/gears/some_module/contract/`
+/// Looks for a comment like: `// simulated_dir=/cf-gears/gears/some_gear/contract/`
 /// Returns None if no such comment is found.
 ///
 /// Only checks files in temporary directories to avoid unnecessary file I/O in production.

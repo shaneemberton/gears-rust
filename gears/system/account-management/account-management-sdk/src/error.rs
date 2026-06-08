@@ -78,7 +78,7 @@ pub enum AccountManagementError {
     /// Root tenant status is immutable — `suspend` / `unsuspend` refused.
     /// Symmetric with [`Self::RootTenantCannotDelete`]: the platform
     /// root is a singleton whose lifecycle state must not flip from
-    /// the public API. Downstream modules that branch on
+    /// the public API. Downstream gears that branch on
     /// `root.status` may take unexpected paths (read-only mode,
     /// refuse provisioning, etc.) without a documented recovery
     /// runbook.

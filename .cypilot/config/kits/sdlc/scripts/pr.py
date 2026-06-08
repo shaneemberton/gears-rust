@@ -24,10 +24,10 @@ import sys
 
 try:
     import tomllib
-except ModuleNotFoundError:  # Python < 3.11
+except GearNotFoundError:  # Python < 3.11
     try:
         import tomli as tomllib  # type: ignore[no-redef]
-    except ModuleNotFoundError:
+    except GearNotFoundError:
         tomllib = None  # type: ignore[assignment]
 
 

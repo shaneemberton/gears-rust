@@ -3,7 +3,7 @@
 //! Mirrors the conventions established by the sibling [`TenantRepoImpl`]
 //! splits ([`reads`], [`lifecycle`], [`retention`]): every method on the
 //! [`ConversionRepo`] trait is dispatched to a free function in this
-//! module, all reads / mutations go through `SecureORM` against the
+//! gear, all reads / mutations go through `SecureORM` against the
 //! `conversion_requests` entity. The entity declares
 //! `Scopable(tenant_col = "tenant_id", resource_col = "id", no_owner,
 //! no_type)`, so a caller-bound `AccessScope` compiles into a real
@@ -319,7 +319,7 @@ impl ODataFieldMapping<ConversionRequestFilterField> for ConversionRequestODataM
 /// Pagination limits for the conversion-request listing surface.
 /// Mirrors [`super::metadata::METADATA_LIMIT_CFG`] /
 /// [`super::reads::TENANT_LISTING_LIMIT_CFG`] so every AM listing
-/// endpoint shares one platform-wide cap. The module-config
+/// endpoint shares one platform-wide cap. The gear-config
 /// `listing.max_top` accessor remains for future REST handlers that
 /// want to surface the per-deployment cap; the repo seam itself uses
 /// this constant to defend against builders that forget to clamp.

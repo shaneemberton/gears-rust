@@ -1,4 +1,4 @@
-// simulated_dir=modules/simple-resource-registry/simple-resource-registry/src/api/rest
+// simulated_dir=gears/simple-resource-registry/simple-resource-registry/src/api/rest
 
 use toolkit::api::OperationBuilder;
 

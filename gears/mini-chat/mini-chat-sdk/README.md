@@ -1,6 +1,6 @@
 # Mini Chat SDK
 
-Plugin SDK for the mini-chat module: policy plugin traits, domain models, and error types.
+Plugin SDK for the mini-chat gear: policy plugin traits, domain models, and error types.
 
 ## Overview
 

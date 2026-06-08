@@ -1,12 +1,12 @@
-# Nodes Registry Module
+# Nodes Registry Gear
 
 Node inventory and node system information for Gears
 
 ## Overview
 
-The `cf-gears-nodes-registry` crate implements the `nodes_registry` module.
+The `cf-gears-nodes-registry` crate implements the `nodes_registry` gear.
 
-The module manages node information (host/VM/container) and provides REST endpoints to:
+The gear manages node information (host/VM/container) and provides REST endpoints to:
 
 - List nodes
 - Get node by ID
@@ -16,7 +16,7 @@ The module manages node information (host/VM/container) and provides REST endpoi
 ## Configuration
 
 ```yaml
-modules:
+gears:
   nodes_registry:
     config:
       enabled: true

@@ -4,19 +4,19 @@
 
 ### 1.1 Architectural Vision
 
-The contract-binding system introduces a two-layer trait architecture for ToolKit modules. The first layer is the **base trait** -- a plain Rust trait with zero annotations that defines the domain contract. The second layer is the **transport projection** -- a trait that extends the base and carries transport-specific annotations (HTTP paths, methods, streaming). A proc macro processes the projection and generates a REST client, OpenAPI spec, and any transport-specific logic.
+The contract-binding system introduces a two-layer trait architecture for ToolKit gears. The first layer is the **base trait** -- a plain Rust trait with zero annotations that defines the domain contract. The second layer is the **transport projection** -- a trait that extends the base and carries transport-specific annotations (HTTP paths, methods, streaming). A proc macro processes the projection and generates a REST client, OpenAPI spec, and any transport-specific logic.
 
 Four **contract types** encode operational semantics directly in the trait name. The contract type determines the failure domain, transaction scope, timeout requirements, and error handling strategy. There is no configuration file, no annotation, and no runtime flag that overrides what the name declares.
 
-- **Api** -- the module offers this across a boundary. Remote. Caller handles timeouts, retries, circuit breakers.
-- **Embedded** -- the module offers this in-process. Local. Shares the caller's failure domain and transaction scope.
-- **Backend** -- the module needs a plugin that operates across a boundary. Remote-capable. Transport projections provide the remote binding.
-- **Extension** -- the module needs a plugin that operates in-process. Local. Fast, deterministic, no transport.
+- **Api** -- the gear offers this across a boundary. Remote. Caller handles timeouts, retries, circuit breakers.
+- **Embedded** -- the gear offers this in-process. Local. Shares the caller's failure domain and transaction scope.
+- **Backend** -- the gear needs a plugin that operates across a boundary. Remote-capable. Transport projections provide the remote binding.
+- **Extension** -- the gear needs a plugin that operates in-process. Local. Fast, deterministic, no transport.
 
 Consumers always depend on the base trait (`Arc<dyn NotificationBackend>`). Whether the underlying implementation is a compile-time plugin or a generated REST client is invisible to the consumer.
 
 ```text
-  Module SDK crate
+  Gear SDK crate
   ┌──────────────────────────────────────────────────────────────────┐
   │                                                                  │
   │  trait NotificationBackend          (base contract, zero annot.) │
@@ -54,7 +54,7 @@ Consumers always depend on the base trait (`Arc<dyn NotificationBackend>`). Whet
                               │
                               v
                  ┌─────────────────────────┐
-                 │  Module business logic  │
+                 │  Gear business logic  │
                  │  (same code regardless  │
                  │   of binding mode)      │
                  └─────────────────────────┘
@@ -64,14 +64,14 @@ Consumers always depend on the base trait (`Arc<dyn NotificationBackend>`). Whet
 
 | Term | Definition |
 |------|------------|
-| Contract | A Rust trait that defines an interface between a module and its consumers or plugins. Always a plain trait with zero transport annotations. |
+| Contract | A Rust trait that defines an interface between a gear and its consumers or plugins. Always a plain trait with zero transport annotations. |
 | Transport projection | A trait that extends a contract with transport-specific annotations (HTTP paths, methods, streaming). Generates a client and OpenAPI spec via proc macro. Named `{Base}Rest` or `{Base}Grpc`. |
-| Api | A contract the module **offers** across a boundary. Caller assumes independent failure domain, timeouts, retries, error mapping. Cannot participate in the caller's ACID transaction. Trait name ends with `Api`. Example: `NotificationApi`. |
-| Embedded | A contract the module **offers** in-process. Shares the caller's failure domain and can participate in the caller's transaction. Has lifecycle (start/stop), state, background workers. If it fails, the caller fails. No timeout/retry needed. Trait name ends with `Embedded`. Example: `EventProducerEmbedded`. |
-| Backend | A contract the module **needs**, satisfied across a boundary. Same operational semantics as Api: independent failure domain, timeout, retry, circuit breaker. Cannot participate in the module's ACID transaction. Trait name ends with `Backend`. Example: `NotificationBackend`. |
-| Extension | A contract the module **needs**, satisfied in-process. Shares the module's failure domain. Can participate in the module's transaction. Fast, deterministic, no retry. If it fails, the module fails. Trait name ends with `Extension`. Example: `NotificationFormatterExtension`. |
-| Offers | The module implements the trait and serves it to consumers. |
-| Needs | The module depends on the trait and expects a plugin to implement it. |
+| Api | A contract the gear **offers** across a boundary. Caller assumes independent failure domain, timeouts, retries, error mapping. Cannot participate in the caller's ACID transaction. Trait name ends with `Api`. Example: `NotificationApi`. |
+| Embedded | A contract the gear **offers** in-process. Shares the caller's failure domain and can participate in the caller's transaction. Has lifecycle (start/stop), state, background workers. If it fails, the caller fails. No timeout/retry needed. Trait name ends with `Embedded`. Example: `EventProducerEmbedded`. |
+| Backend | A contract the gear **needs**, satisfied across a boundary. Same operational semantics as Api: independent failure domain, timeout, retry, circuit breaker. Cannot participate in the gear's ACID transaction. Trait name ends with `Backend`. Example: `NotificationBackend`. |
+| Extension | A contract the gear **needs**, satisfied in-process. Shares the gear's failure domain. Can participate in the gear's transaction. Fast, deterministic, no retry. If it fails, the gear fails. Trait name ends with `Extension`. Example: `NotificationFormatterExtension`. |
+| Offers | The gear implements the trait and serves it to consumers. |
+| Needs | The gear depends on the trait and expects a plugin to implement it. |
 | Base trait | The first layer -- a plain Rust trait defining the domain contract with no transport annotations. |
 | Projection trait | The second layer -- extends the base with transport annotations. Processed by a proc macro to generate client code. |
 | Binding mode | Whether a contract is satisfied by a compile-time plugin or a generated REST/gRPC client. Determined by which traits exist, not by an annotation. |
@@ -164,14 +164,14 @@ The four-type segregation encodes this asymmetry in the type system. A migration
 | `cpt-cf-binding-fr-directory-contract` | Service directory trait defined for GTS ID resolution and OpenAPI validation at registration. Implementation out of scope (cluster work). |
 | `cpt-cf-binding-fr-openapi-validation` | Directory fetches `/.well-known/openapi.json` from remote services and validates endpoint presence, HTTP methods, and content types before registration. |
 | `cpt-cf-binding-fr-clienthub-fallback` | ClientHub supports fallback resolution: compile-time registration takes priority, REST proxy instantiated from directory when no compile-time plugin exists. |
-| `cpt-cf-binding-fr-proxy-wiring` | Module lifecycle includes a proxy wiring phase after plugin discovery and before post-init. REST proxies instantiated only for traits with no compile-time registration. |
+| `cpt-cf-binding-fr-proxy-wiring` | Gear lifecycle includes a proxy wiring phase after plugin discovery and before post-init. REST proxies instantiated only for traits with no compile-time registration. |
 | `cpt-cf-binding-fr-consumer-agnostic` | Consumer code is binding-mode-agnostic. `hub.get::<dyn NotificationBackend>()` works identically whether backed by a compile-time plugin or a REST proxy. |
 | `cpt-cf-binding-fr-versioning` | `#[non_exhaustive]` on request/response structs. Default trait methods for new methods. Breaking changes require new major version. |
 
 ### 1.6 Architecture Layers
 
 ```text
-  Module business logic
+  Gear business logic
          │
          │  hub.get::<dyn NotificationBackend>()
          v
@@ -280,7 +280,7 @@ All HTTP dependencies (`reqwest`, `schemars`) are behind a `rest-client` Cargo f
 
 - [ ] `p1` - **ID**: `cpt-cf-binding-constraint-rfc9457-errors`
 
-All error responses from generated REST clients use RFC 9457 Problem Details with the `error_code` and `error_domain` extension fields. `error_code` is UPPER_SNAKE_CASE derived from the Rust enum variant name. `error_domain` is a dot-separated module namespace. Round-trip serialization preserves the original error variant.
+All error responses from generated REST clients use RFC 9457 Problem Details with the `error_code` and `error_domain` extension fields. `error_code` is UPPER_SNAKE_CASE derived from the Rust enum variant name. `error_domain` is a dot-separated gear namespace. Round-trip serialization preserves the original error variant.
 
 #### No Server Generation
 
@@ -329,7 +329,7 @@ pub trait NotificationFormatterExtension: Send + Sync {
 3. Code review and audit are mechanical. Every remote call has `ctx` visible in the signature; calls without it are locally scoped by construction.
 4. Middleware composes cleanly. Layers that inject tenant context, validate tokens, or emit audit logs hook into a single, uniform slot.
 
-Local contracts (Embedded, Extension) do not require `SecurityContext` because they run in the caller's scope and inherit the caller's context directly (task-local storage, explicit parameters, or module-owned state). Authors MAY pass `SecurityContext` explicitly to local methods when the contract needs it.
+Local contracts (Embedded, Extension) do not require `SecurityContext` because they run in the caller's scope and inherit the caller's context directly (task-local storage, explicit parameters, or gear-owned state). Authors MAY pass `SecurityContext` explicitly to local methods when the contract needs it.
 
 #### OpenAPI at Well-Known Path
 
@@ -352,7 +352,7 @@ Remote services expose their OpenAPI spec at `/.well-known/openapi.json`. The se
 | Alternative | Why Rejected |
 |-------------|-------------|
 | Single-trait annotations (`#[toolkit_contract(binding = [compile, rest])]`) | Mixes transport with domain. REST annotations do not apply to gRPC. Compile-time plugins carry unnecessary annotation weight. Cannot add a new transport without modifying the base trait. |
-| Separate module for transport mapping (not a trait) | Loses compile-time signature checking. The mapping between base methods and HTTP endpoints would be a configuration file or a separate struct, not compiler-verified. A method rename in the base trait would silently break the mapping. |
+| Separate gear for transport mapping (not a trait) | Loses compile-time signature checking. The mapping between base methods and HTTP endpoints would be a configuration file or a separate struct, not compiler-verified. A method rename in the base trait would silently break the mapping. |
 
 ### D2: Four Contract Types
 
@@ -444,7 +444,7 @@ The three diagrams below each answer a different question. They share a common v
 **Scenario 1: Consumer holding a trait object.** *Shows that the consumer calls the base trait and never sees the REST transport — the same code works for compile-time and REST bindings.*
 
 ```
-  // Consumer code (e.g., the notification module using a delivery plugin)
+  // Consumer code (e.g., the notification gear using a delivery plugin)
   let backend: Arc<dyn NotificationBackend> = hub.get();
   backend.deliver(&req).await;
             │
@@ -511,7 +511,7 @@ Perspective: **plugin author**. Point: the plugin implements the base trait like
 - Adding a gRPC projection later is purely additive — a new trait `NotificationBackendGrpc: NotificationBackend`, a new macro `#[toolkit_grpc_contract]`, a new generated client. The base trait and existing REST projection are untouched.
 - A compile-time plugin that only implements the base trait works everywhere — because the projection trait's default delegation bridges the gap automatically.
 
-**Manual implementation is always allowed.** The macro generates a default client for the common case (POST + JSON, SSE streaming, exponential-backoff retry). When a module needs behavior the macro does not express — complex path templates, query parameter composition, custom authentication, connection pooling with per-tenant routing, bespoke retry strategies, request signing — the author can write a hand-crafted client that implements the same base trait directly. The consumer still gets `Arc<dyn NotificationBackend>`; the generated client and the hand-written client are indistinguishable from the consumer's perspective. The macro is a convenience for the common case, not a lock-in. Hand-written clients can coexist with macro-generated ones in the same codebase.
+**Manual implementation is always allowed.** The macro generates a default client for the common case (POST + JSON, SSE streaming, exponential-backoff retry). When a gear needs behavior the macro does not express — complex path templates, query parameter composition, custom authentication, connection pooling with per-tenant routing, bespoke retry strategies, request signing — the author can write a hand-crafted client that implements the same base trait directly. The consumer still gets `Arc<dyn NotificationBackend>`; the generated client and the hand-written client are indistinguishable from the consumer's perspective. The macro is a convenience for the common case, not a lock-in. Hand-written clients can coexist with macro-generated ones in the same codebase.
 
 ### D4: ContractError Derive
 
@@ -519,7 +519,7 @@ Perspective: **plugin author**. Point: the plugin implements the base trait like
 
 **Decision**: `#[derive(ContractError)]` on an error enum generates RFC 9457 Problem Details conversion with `error_code` (UPPER_SNAKE_CASE from variant name) and `error_domain` (from `#[contract_error(domain = "...")]` attribute). The generated code supports round-trip serialization: `to_problem_details()` and `from_problem_details()` preserve the original variant including all structured context fields.
 
-**Rationale**: Machine-readable error reconstruction across module boundaries. The `error_code` + `error_domain` pair uniquely identifies the error variant. Unknown codes or domains fall back to an `Internal` variant, ensuring the system never panics on unrecognized errors.
+**Rationale**: Machine-readable error reconstruction across gear boundaries. The `error_code` + `error_domain` pair uniquely identifies the error variant. Unknown codes or domains fall back to an `Internal` variant, ensuring the system never panics on unrecognized errors.
 
 ```rust
 #[derive(Debug, Clone, ContractError)]
@@ -562,11 +562,11 @@ Generated `error_code` values: `NOTIFICATION_NOT_FOUND`, `DELIVERY_UNAVAILABLE`,
 |-------|------|----------------|
 | `cf-toolkit-contract-macros` | proc-macro | `#[toolkit_rest_contract]` -- generates REST client struct, OpenAPI spec function, SSE streaming, retryable methods. `#[derive(ContractError)]` -- generates Problem Details conversion with `error_code` + `error_domain`. Method annotations: `#[get]`, `#[post]`, `#[put]`, `#[delete]`, `#[patch]`. Parameter annotations: `#[path]`, `#[query]`, `#[header]`, `#[streaming]`, `#[retryable]`. |
 | `cf-toolkit-contract-runtime` | lib | `ProblemDetails` struct (RFC 9457 with extension fields). SSE stream parser (byte stream to typed events). `ClientConfig` (base URL, timeout, retry policy). `RetryConfig` and `with_retry()` helper for exponential backoff. |
-| Module SDK crates (e.g., `notification-sdk`) | lib | Base traits (zero annotations, no macro dependency). Transport projection traits (behind `rest-client` feature). Feature-gated: `rest-client` enables `reqwest`, `schemars`, and the generated REST client. Without the feature, only the base trait is available. |
-| `cf-toolkit` (modified) | lib | ClientHub: fallback resolution (compile-time first, then REST proxy from directory). Module lifecycle: new proxy wiring phase after plugin discovery, before post-init. |
-| `cf-toolkit-macros` (modified) | proc-macro | Alignment with ADR-0004 module/plugin declaration macros. |
+| Gear SDK crates (e.g., `notification-sdk`) | lib | Base traits (zero annotations, no macro dependency). Transport projection traits (behind `rest-client` feature). Feature-gated: `rest-client` enables `reqwest`, `schemars`, and the generated REST client. Without the feature, only the base trait is available. |
+| `cf-toolkit` (modified) | lib | ClientHub: fallback resolution (compile-time first, then REST proxy from directory). Gear lifecycle: new proxy wiring phase after plugin discovery, before post-init. |
+| `cf-toolkit-macros` (modified) | proc-macro | Alignment with ADR-0004 gear/plugin declaration macros. |
 
-### SDK Crate Layout (per module)
+### SDK Crate Layout (per gear)
 
 ```text
 notification-sdk/
@@ -754,4 +754,4 @@ Path variables (`#[path]`), query parameters (`#[query]`), header injection (`#[
 - **ADR-0001** — contract source of truth: [`./ADR/0001-cpt-cf-binding-adr-contract-source-of-truth.md`](./ADR/0001-cpt-cf-binding-adr-contract-source-of-truth.md)
 - **ADR-0002** — OpenAPI spec limits: [`./ADR/0002-cpt-cf-binding-adr-openapi-spec-limits.md`](./ADR/0002-cpt-cf-binding-adr-openapi-spec-limits.md)
 - **PoC**: [striped-zebra-dev/toolkit-binding-poc](https://github.com/striped-zebra-dev/toolkit-binding-poc)
-- **Module/plugin declaration and resolution**: [PR #1380](https://github.com/constructorfabric/gears-rust/pull/1380)
+- **Gear/plugin declaration and resolution**: [PR #1380](https://github.com/constructorfabric/gears-rust/pull/1380)

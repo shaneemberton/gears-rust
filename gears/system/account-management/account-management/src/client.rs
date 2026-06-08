@@ -3,7 +3,7 @@
 //! the impl-side [`TenantService`] and [`UserService`].
 //!
 //! Construction happens once in
-//! [`crate::module::AccountManagementModule::init`] (or its bootstrap
+//! [`crate::gear::AccountManagementGear::init`] (or its bootstrap
 //! sibling) and the resulting `Arc<dyn AccountManagementClient>` is
 //! registered in `ClientHub` so every external consumer resolves
 //! through the SDK trait, never the impl service directly.
@@ -16,7 +16,7 @@
 //!   `infra::sdk_error_mapping`. The REST handler (when it lands)
 //!   lifts further to `toolkit_canonical_errors::CanonicalError` via
 //!   the `account_management_error_to_canonical` helper in the same
-//!   module. No new error vocabulary is introduced at this boundary.
+//!   gear. No new error vocabulary is introduced at this boundary.
 //! * Does NOT add any extra authorization / validation — those live
 //!   in the service layer where they belong (PEP for tenants, plugin
 //!   guards for users).
@@ -54,7 +54,7 @@ use crate::domain::user::service::UserService;
 /// is `R: TenantRepo + 'static`.
 #[allow(
     clippy::struct_field_names,
-    reason = "AM-internal `*_service` suffix on every field is the established convention across `module.rs` / `client.rs` / `TenantService::with_*` — stripping it would lose the obvious one-to-one mapping from `service` field to backing `Arc<XxxService>`"
+    reason = "AM-internal `*_service` suffix on every field is the established convention across `gear.rs` / `client.rs` / `TenantService::with_*` — stripping it would lose the obvious one-to-one mapping from `service` field to backing `Arc<XxxService>`"
 )]
 pub struct AccountManagementClientImpl<R: TenantRepo> {
     tenant_service: Arc<TenantService<R>>,
@@ -64,7 +64,7 @@ pub struct AccountManagementClientImpl<R: TenantRepo> {
 
 impl<R: TenantRepo> AccountManagementClientImpl<R> {
     /// Build the adapter from the three already-constructed services.
-    /// `module.rs` owns the wiring; this constructor just hooks them
+    /// `gear.rs` owns the wiring; this constructor just hooks them
     /// up behind the SDK trait.
     #[must_use]
     pub const fn new(

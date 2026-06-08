@@ -36,7 +36,7 @@ impl AutoNotify {
 
 #[tokio::test]
 async fn stays_starting_until_ready_signal() {
-    let m = ReadyAware.into_module();
+    let m = ReadyAware.into_gear();
     let parent = CancellationToken::new();
     m.start(parent.clone()).await.unwrap();
 
@@ -52,7 +52,7 @@ async fn stays_starting_until_ready_signal() {
 
 #[tokio::test]
 async fn auto_notify_when_no_ready_param() {
-    let m = AutoNotify.into_module();
+    let m = AutoNotify.into_gear();
     let parent = CancellationToken::new();
     m.start(parent.clone()).await.unwrap();
     // Await-ready=true but method has no ReadySignal -> auto-notify -> Running quickly
@@ -68,7 +68,7 @@ async fn auto_notify_when_no_ready_param() {
 async fn drop_cleans_up_background_task() {
     let parent = CancellationToken::new();
     let handle = tokio::spawn(async move {
-        let m = AutoNotify.into_module();
+        let m = AutoNotify.into_gear();
         m.start(parent.clone()).await.unwrap();
         // Drop without explicit stop(); background task should be aborted/cancelled
         m

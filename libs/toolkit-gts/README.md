@@ -4,10 +4,10 @@ ToolKit integration with the [Global Type System](https://github.com/hypernetix/
 
 ## What this crate is for
 
-- **Link-time inventory** — any `#[gts_type_schema(...)]`-annotated struct or `gts_instance!` declaration, in any crate linked into the process, lands in a shared `inventory`-based collector. `types-registry::init()` reads the collector and registers everything before publishing its client. No per-module registration code is required for entries known at compile time.
-- **Platform base types** — this crate also ships the handful of shipped base Type Schemas that many modules need directly: `PluginV1<P>` (base of every toolkit plugin instance) and `AuthzPermissionV1` (base of every authorization permission).
+- **Link-time inventory** — any `#[gts_type_schema(...)]`-annotated struct or `gts_instance!` declaration, in any crate linked into the process, lands in a shared `inventory`-based collector. `types-registry::init()` reads the collector and registers everything before publishing its client. No per-gear registration code is required for entries known at compile time.
+- **Platform base types** — this crate also ships the handful of shipped base Type Schemas that many gears need directly: `PluginV1<P>` (base of every toolkit plugin instance) and `AuthzPermissionV1` (base of every authorization permission).
 
-Module-specific Type Schemas (e.g. plugin specs or module-local permission extensions) can use either the wrapped `#[gts_type_schema(...)]` macro from this crate (and join the inventory automatically) or the raw upstream `#[gts_macros::struct_to_gts_schema(...)]` macro plus runtime registration in the module's `init()`. Both paths end up in `types-registry`; the first has zero boilerplate.
+Gear-specific Type Schemas (e.g. plugin specs or gear-local permission extensions) can use either the wrapped `#[gts_type_schema(...)]` macro from this crate (and join the inventory automatically) or the raw upstream `#[gts_macros::struct_to_gts_schema(...)]` macro plus runtime registration in the gear's `init()`. Both paths end up in `types-registry`; the first has zero boilerplate.
 
 ## Adding a platform base Type Schema (inside this crate)
 
@@ -96,9 +96,9 @@ No compile-time field checking — validation happens at `types-registry::switch
 
 ### Generic base types
 
-Some base types (e.g. `PluginV1<P>`) are generic over a derived-spec `P: GtsSchema`. Spell such instances with turbofish — `PluginV1::<DerivedSpec> { …, properties: DerivedSpec }`. The derived spec is declared with `#[gts_macros::struct_to_gts_schema(base = PluginV1, ...)]` in the owning module and, when its `properties` depend on config, registered with `types-registry` at module `init()` (in-process: it already has a reference to itself; OoP: via an SDK-level publish helper).
+Some base types (e.g. `PluginV1<P>`) are generic over a derived-spec `P: GtsSchema`. Spell such instances with turbofish — `PluginV1::<DerivedSpec> { …, properties: DerivedSpec }`. The derived spec is declared with `#[gts_macros::struct_to_gts_schema(base = PluginV1, ...)]` in the owning gear and, when its `properties` depend on config, registered with `types-registry` at gear `init()` (in-process: it already has a reference to itself; OoP: via an SDK-level publish helper).
 
 ## Boundary with `types-registry`
 
 - `types-registry` is a **content-agnostic** aggregator. It calls `all_inventory_type_schemas()` / `all_inventory_instances()` and registers whatever it finds. It never names specific types, so adding a new GTS Type requires zero edits in `types-registry`.
-- The inventory is process-global. In in-process runs, `types-registry::init()` already sees every contributing crate's entries. In the future OoP world, each process publishes its own inventory to the remote registry via the SDK; modules are not involved in that either way.
+- The inventory is process-global. In in-process runs, `types-registry::init()` already sees every contributing crate's entries. In the future OoP world, each process publishes its own inventory to the remote registry via the SDK; gears are not involved in that either way.

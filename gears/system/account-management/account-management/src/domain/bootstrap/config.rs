@@ -10,14 +10,14 @@
 //! loop on `IdpUnavailable` raised during `provision_tenant`. The
 //! bootstrap saga itself is gated by
 //! [`BootstrapConfig::strict`] — `true` makes a bootstrap failure
-//! lifecycle-fatal during module `init`, while `false` logs the
-//! failure and lets the module proceed (useful for dev or multi-region
+//! lifecycle-fatal during gear `init`, while `false` logs the
+//! failure and lets the gear proceed (useful for dev or multi-region
 //! splits where the root tenant is bootstrapped out of band).
 //!
 //! `BootstrapConfig` is deliberately separate from
 //! [`crate::config::AccountManagementConfig`] so deployments that bootstrap
 //! externally (multi-region splash-page / CI smoke tests / unit tests)
-//! can leave the slot `None` without polluting the rest of the module
+//! can leave the slot `None` without polluting the rest of the gear
 //! configuration with optional fields.
 
 use std::time::Duration;
@@ -102,9 +102,9 @@ pub struct BootstrapConfig {
     #[serde(with = "toolkit_utils::humantime_serde")]
     pub idp_retry_backoff_max: Duration,
 
-    /// Strict-mode flag. When `true`, a bootstrap failure aborts module
+    /// Strict-mode flag. When `true`, a bootstrap failure aborts gear
     /// `init` (lifecycle-fatal). When `false`, the failure is logged
-    /// and the module proceeds — useful for dev / multi-region splits
+    /// and the gear proceeds — useful for dev / multi-region splits
     /// where the root tenant is bootstrapped out of band.
     pub strict: bool,
 }
@@ -138,7 +138,7 @@ impl BootstrapConfig {
     /// platform start (see `feature-platform-bootstrap.md` lines
     /// 23-25 — UUIDs are "deployment-stable; changing it between
     /// platform restarts breaks the `fr-bootstrap-idempotency`
-    /// contract"). This validator is invoked by the module-level
+    /// contract"). This validator is invoked by the gear-level
     /// wiring before constructing `BootstrapService` so the failure
     /// surfaces during `init` rather than at the first DB write.
     ///

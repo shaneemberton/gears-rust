@@ -62,9 +62,9 @@ impl<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait, MR: MembershipRepository
 
 // @cpt-begin:cpt-cf-resource-group-flow-integration-auth-plugin-routing:p1:inst-plugin-2
 // @cpt-begin:cpt-cf-resource-group-flow-integration-auth-plugin-read:p1:inst-plugin-read-1
-// RG Module resolves configured provider from module config; AuthZ plugin
+// RG Gear resolves configured provider from gear config; AuthZ plugin
 // resolves `dyn ResourceGroupReadHierarchy` from `ClientHub` (registered in
-// `module.rs::init`). The provider trait registered here is the routing point.
+// `gear.rs::init`). The provider trait registered here is the routing point.
 // @cpt-end:cpt-cf-resource-group-flow-integration-auth-plugin-read:p1:inst-plugin-read-1
 // @cpt-end:cpt-cf-resource-group-flow-integration-auth-plugin-routing:p1:inst-plugin-2
 // @cpt-begin:cpt-cf-resource-group-flow-integration-auth-plugin-routing:p1:inst-plugin-3
@@ -73,11 +73,11 @@ impl<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait, MR: MembershipRepository
 // @cpt-begin:cpt-cf-resource-group-flow-integration-auth-plugin-routing:p1:inst-plugin-4
 // IF vendor-specific provider configured — currently no vendor provider is
 // wired in this monolith; vendor selection would replace the registered
-// `dyn ResourceGroupReadHierarchy` implementation at module init. The
+// `dyn ResourceGroupReadHierarchy` implementation at gear init. The
 // fallthrough is the built-in `RgReadService` below.
 // @cpt-begin:cpt-cf-resource-group-flow-integration-auth-plugin-routing:p1:inst-plugin-4a
 // Resolve plugin instance by configured vendor via types-registry (scoped by
-// GTS instance ID) — performed at module init when vendor config is present.
+// GTS instance ID) — performed at gear init when vendor config is present.
 // @cpt-end:cpt-cf-resource-group-flow-integration-auth-plugin-routing:p1:inst-plugin-4a
 // @cpt-begin:cpt-cf-resource-group-flow-integration-auth-plugin-routing:p1:inst-plugin-4b
 // Delegate to ResourceGroupReadPluginClient with SecurityContext passthrough —

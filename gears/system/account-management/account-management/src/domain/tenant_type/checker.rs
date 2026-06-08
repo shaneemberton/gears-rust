@@ -6,11 +6,11 @@
 //! `tenant_type` against the child type's `allowed_parent_types` trait
 //! resolved through the GTS Types Registry (`gts.cf.core.am.tenant_type.v1~`).
 //!
-//! This module owns the **trait abstraction**. Two implementations exist:
+//! This gear owns the **trait abstraction**. Two implementations exist:
 //!
 //! * [`InertTenantTypeChecker`] — admits everything. Used in unit tests
 //!   only; not bound in production. AM declares `types-registry` as a
-//!   hard `deps` and the module entry-point fail-closes `init` when
+//!   hard `deps` and the gear entry-point fail-closes `init` when
 //!   `TypesRegistryClient` cannot be resolved from `ClientHub`, so the
 //!   real implementation below is always wired in production.
 //! * [`crate::infra::types_registry::GtsTenantTypeChecker`] — the real
@@ -18,7 +18,7 @@
 //!   Resolves both schemas via `get_type_schemas_by_uuid` (one batched
 //!   round-trip), reads `effective_traits().allowed_parent_types`, and
 //!   admits iff the parent's chained GTS identifier is a member.
-//!   The `ClientHub` binding lives in the AM module entry-point.
+//!   The `ClientHub` binding lives in the AM gear entry-point.
 //!
 //! Failure mapping per FEATURE §6 (status / reason follow the
 //! canonical mapping in [`crate::infra::canonical_mapping`]):
@@ -81,7 +81,7 @@ pub trait TenantTypeChecker: Send + Sync {
 
 /// No-op checker — admits every parent / child pairing. Reserved for
 /// unit tests; not bound in production. AM declares `types-registry`
-/// as a hard `deps` and the module entry-point fail-closes `init`
+/// as a hard `deps` and the gear entry-point fail-closes `init`
 /// when `TypesRegistryClient` cannot be resolved from `ClientHub`.
 #[domain_model]
 #[derive(Debug, Default, Clone)]

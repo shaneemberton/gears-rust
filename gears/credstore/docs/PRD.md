@@ -12,7 +12,7 @@
   - [2.1 Human Actors](#21-human-actors)
   - [2.2 System Actors](#22-system-actors)
 - [3. Operational Concept & Environment](#3-operational-concept--environment)
-  - [3.1 Module-Specific Environment Constraints](#31-module-specific-environment-constraints)
+  - [3.1 Gear-Specific Environment Constraints](#31-gear-specific-environment-constraints)
 - [4. Scope](#4-scope)
   - [4.1 In Scope](#41-in-scope)
   - [4.2 Out of Scope](#42-out-of-scope)
@@ -23,7 +23,7 @@
   - [5.4 P1 — Encryption & Key Management](#54-p1--encryption--key-management)
   - [5.5 P2 — Planned](#55-p2--planned)
 - [6. Non-Functional Requirements](#6-non-functional-requirements)
-  - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
+  - [6.1 Gear-Specific NFRs](#61-gear-specific-nfrs)
 - [7. Public Library Interfaces](#7-public-library-interfaces)
   - [7.1 Public API Surface](#71-public-api-surface)
   - [7.2 External Integration Contracts](#72-external-integration-contracts)
@@ -46,7 +46,7 @@ functional capabilities, and quality attributes.
 
 SCOPE:
   ✓ Business goals and success criteria
-  ✓ Actors (users, systems) that interact with this module
+  ✓ Actors (users, systems) that interact with this gear
   ✓ Functional requirements (WHAT, not HOW)
   ✓ Non-functional requirements (quality attributes, SLOs)
   ✓ Scope boundaries (in/out of scope)
@@ -74,11 +74,11 @@ REQUIREMENT LANGUAGE:
 
 ### 1.1 Purpose
 
-CredStore provides per-tenant secret storage and retrieval for the platform. It abstracts backend differences behind a unified API, enabling platform modules to store and access credentials without coupling to a specific storage technology.
+CredStore provides per-tenant secret storage and retrieval for the platform. It abstracts backend differences behind a unified API, enabling platform gears to store and access credentials without coupling to a specific storage technology.
 
 ### 1.2 Background / Problem Statement
 
-Platform modules — most notably the Outbound API Gateway (OAGW) — need access to secrets (API keys, tokens, credentials) for making upstream API calls on behalf of tenants. These secrets must be stored securely, scoped per tenant, and accessible only to authorized consumers.
+Platform gears — most notably the Outbound API Gateway (OAGW) — need access to secrets (API keys, tokens, credentials) for making upstream API calls on behalf of tenants. These secrets must be stored securely, scoped per tenant, and accessible only to authorized consumers.
 
 Standard credential stores provide per-tenant isolation but do not support hierarchical multi-tenant sharing. In the platform's business model, parent tenants (partners) share API credentials with child tenants (customers). For example, a partner with an OpenAI API key and quota allows their customers to make requests through OAGW using the partner's key — without the customer ever seeing the actual secret value. This requires a hierarchical resolution model: when a customer requests a secret, the system walks up the tenant tree to find a shared secret from an ancestor.
 
@@ -88,7 +88,7 @@ Additionally, the platform runs in multiple environments: Kubernetes (where an e
 
 - Enable OAGW to retrieve tenant credentials for upstream API calls without exposing secret values to end users
 - Support hierarchical credential sharing so partners can share API access with customers
-- Decouple platform modules from specific credential storage backends
+- Decouple platform gears from specific credential storage backends
 - Enforce least-privilege access: read vs write authorization, service-to-service vs tenant self-service
 
 ### 1.4 Glossary
@@ -126,12 +126,12 @@ Additionally, the platform runs in multiple environments: Kubernetes (where an e
 **Role**: Service that proxies outbound API calls to external services. Retrieves secrets on behalf of tenants using service-to-service authentication with explicit tenant_id. Primary consumer of hierarchical secret resolution.
 <!-- cpt-cf-id-content -->
 
-#### Platform Module
+#### Platform Gear
 
-**ID**: `cpt-cf-credstore-actor-platform-module`
+**ID**: `cpt-cf-credstore-actor-platform-gear`
 
 <!-- cpt-cf-id-content -->
-**Role**: Any internal module consuming secrets via ClientHub in-process API. Reads or writes secrets using the calling tenant's SecurityCtx.
+**Role**: Any internal gear consuming secrets via ClientHub in-process API. Reads or writes secrets using the calling tenant's SecurityCtx.
 <!-- cpt-cf-id-content -->
 
 #### CredStore Backend
@@ -144,9 +144,9 @@ Additionally, the platform runs in multiple environments: Kubernetes (where an e
 
 ## 3. Operational Concept & Environment
 
-> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and integration patterns defined in root PRD. Document only module-specific deviations here.
+> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and integration patterns defined in root PRD. Document only gear-specific deviations here.
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
 - VendorA Credstore plugin requires network access to the Credstore Go service and valid OAuth2 client credentials
 - OS-protected storage plugin requires platform-specific keychain/credential APIs (macOS Keychain, Windows DPAPI)
@@ -167,7 +167,7 @@ Additionally, the platform runs in multiple environments: Kubernetes (where an e
 - Credentials Storage microservice plugin with encrypted storage and schema validation (P1)
 - Pluggable tenant key management via `KeyProvider` abstraction — local DB default, optional external KMS (P1)
 - OS-protected storage plugin (P2)
-- Module-level authorization enforcement (read vs write)
+- Gear-level authorization enforcement (read vs write)
 
 ### 4.2 Out of Scope
 
@@ -191,7 +191,7 @@ Additionally, the platform runs in multiple environments: Kubernetes (where an e
 The system **MUST** allow a tenant to store a secret with a reference (key), a value, and a sharing mode. For `tenant` and `shared` modes: if a secret with the same reference already exists for that tenant, the value and sharing mode are updated. For `private` mode: each owner (identified by `subject_id`) can store their own secret under the same reference — multiple private secrets with the same reference can coexist within one tenant (one per owner). A private secret and a tenant/shared secret with the same reference can also coexist.
 
 **Rationale**: Core capability — tenants need to manage their own API credentials.
-**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 #### Retrieve Own Secret
@@ -202,7 +202,7 @@ The system **MUST** allow a tenant to store a secret with a reference (key), a v
 The system **MUST** allow a tenant to retrieve the decrypted value of their own secret by reference. Returns the secret value or not-found if no secret with that reference exists for the tenant.
 
 **Rationale**: Tenants need to verify or use their own stored credentials.
-**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 #### Delete Secret
@@ -213,7 +213,7 @@ The system **MUST** allow a tenant to retrieve the decrypted value of their own 
 The system **MUST** allow a tenant to delete their own secret by reference. Descendants using a shared secret lose access immediately upon deletion.
 
 **Rationale**: Tenants must be able to revoke credentials.
-**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 #### Tenant Scoping
@@ -224,7 +224,7 @@ The system **MUST** allow a tenant to delete their own secret by reference. Desc
 The system **MUST** derive the owning tenant from the request SecurityCtx for all CRUD operations. Tenants MUST NOT create, update, or delete secrets belonging to other tenants.
 
 **Rationale**: Prevents cross-tenant data manipulation.
-**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 #### Secret Reference Validation
@@ -235,7 +235,7 @@ The system **MUST** derive the owning tenant from the request SecurityCtx for al
 The system **MUST** validate SecretRef format: alphanumeric characters, hyphens, and underscores only (`[a-zA-Z0-9_-]+`). Max length: 255 characters. Colons and other special characters are prohibited. Invalid references are rejected with a validation error.
 
 **Rationale**: Prevents ExternalID collisions in the deterministic mapping (e.g., `base64url("{tenant_id}:{key}")` for tenant/shared, `base64url("{tenant_id}:{key}:p:{owner_id}")` for private). Colons in SecretRef could cause different tenant/key pairs to map to the same ExternalID.
-**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 ### 5.2 P1 — Hierarchical Sharing
@@ -263,7 +263,7 @@ The system **MUST** support hierarchical secret resolution: given a secret refer
 
 **Hierarchical Direction**: Resolution is **upward-only** (child → parent → root). A tenant can access ancestor secrets marked as `shared`, but parent tenants **cannot** access child tenant secrets (even if marked as `shared`). This enforces least privilege and enables shadowing.
 
-**Implementation Note**: For simple plugins (VendorA Credstore, OS keychain), this walk-up algorithm and sharing mode enforcement are implemented in the Gateway module (credstore). The Gateway queries the tenant hierarchy via `tenant_resolver`, then at each level performs a two-phase lookup: first the Plugin's `get` with the caller's `owner_id` (private secret), then `get` without `owner_id` (tenant/shared secret). These plugins provide simple per-tenant key-value storage without hierarchical logic. The `credentials_storage` plugin implements credential merge resolution internally — when active, the Gateway delegates resolution to the plugin.
+**Implementation Note**: For simple plugins (VendorA Credstore, OS keychain), this walk-up algorithm and sharing mode enforcement are implemented in the Gateway gear (credstore). The Gateway queries the tenant hierarchy via `tenant_resolver`, then at each level performs a two-phase lookup: first the Plugin's `get` with the caller's `owner_id` (private secret), then `get` without `owner_id` (tenant/shared secret). These plugins provide simple per-tenant key-value storage without hierarchical logic. The `credentials_storage` plugin implements credential merge resolution internally — when active, the Gateway delegates resolution to the plugin.
 
 **Rationale**: Enables the core business use case — OAGW retrieves a partner's shared API key when making calls on behalf of a customer.
 **Actors**: `cpt-cf-credstore-actor-oagw`
@@ -289,7 +289,7 @@ If the tenant owns a secret with the same reference but it is **inaccessible** t
 <!-- cpt-cf-id-content -->
 The system **MUST** provide a retrieval operation that accepts an explicit tenant_id parameter (not derived from SecurityCtx). This operation is restricted to authorized service accounts (e.g., OAGW). The response **MUST** include the decrypted secret value.
 
-**Implementation Note**: OAGW is a ToolKit module that uses the standard CredStore SDK client (not a separate integration path). For service-to-service retrieval with explicit tenant_id, OAGW constructs a SecurityCtx with the target tenant_id and calls the Gateway's standard get operation. Hierarchical resolution is implemented in the Gateway module: the Gateway uses `tenant_resolver` to walk up the tenant hierarchy, performing a two-phase Plugin lookup at each level (private for caller, then tenant/shared) until a matching accessible secret is found.
+**Implementation Note**: OAGW is a ToolKit gear that uses the standard CredStore SDK client (not a separate integration path). For service-to-service retrieval with explicit tenant_id, OAGW constructs a SecurityCtx with the target tenant_id and calls the Gateway's standard get operation. Hierarchical resolution is implemented in the Gateway gear: the Gateway uses `tenant_resolver` to walk up the tenant hierarchy, performing a two-phase Plugin lookup at each level (private for caller, then tenant/shared) until a matching accessible secret is found.
 
 **Rationale**: OAGW operates as a service account and needs to retrieve secrets on behalf of arbitrary tenants with hierarchical resolution.
 **Actors**: `cpt-cf-credstore-actor-oagw`
@@ -305,7 +305,7 @@ The system **MUST** provide a retrieval operation that accepts an explicit tenan
 The system **MUST** require `Secrets:Read` permission for get and resolve operations.
 
 **Rationale**: Least-privilege access control.
-**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-oagw`, `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-oagw`, `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 #### Write Authorization
@@ -316,7 +316,7 @@ The system **MUST** require `Secrets:Read` permission for get and resolve operat
 The system **MUST** require `Secrets:Write` permission for put and delete operations.
 
 **Rationale**: Least-privilege access control.
-**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-tenant-admin`, `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 #### Gateway-Level Enforcement
@@ -327,7 +327,7 @@ The system **MUST** require `Secrets:Write` permission for put and delete operat
 Authorization **MUST** be enforced in the gateway layer, not in plugins. Plugins are storage adapters and MUST NOT implement authorization logic.
 
 **Rationale**: Prevents inconsistent authorization behavior across different backends.
-**Actors**: `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 ### 5.4 P1 — Encryption & Key Management
@@ -353,7 +353,7 @@ The Credentials Storage plugin **SHOULD** support pluggable key management via a
 The system **MUST** provide an OS-protected storage plugin for desktop/VM environments using platform-native secure storage (macOS Keychain, Windows DPAPI). This plugin supports basic per-tenant get/put/delete operations. In desktop/single-tenant environments, hierarchical resolution is not applicable (no multi-tenant hierarchy exists), so the Gateway returns only the requesting tenant's own secrets.
 
 **Rationale**: Desktop/VM environments lack access to VendorA Credstore.
-**Actors**: `cpt-cf-credstore-actor-platform-module`
+**Actors**: `cpt-cf-credstore-actor-platform-gear`
 <!-- cpt-cf-id-content -->
 
 #### Read-Only / Read-Write Credential Separation
@@ -369,7 +369,7 @@ The VendorA Credstore plugin **MUST** support optional separate OAuth2 client cr
 
 ## 6. Non-Functional Requirements
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Secret Value Confidentiality
 
@@ -394,7 +394,7 @@ Secret values **MUST NOT** appear in logs, error messages, or debug output at an
 <!-- cpt-cf-id-content -->
 **Type**: Rust trait (async)
 **Stability**: stable
-**Description**: Public API for platform modules to store, retrieve, and delete secrets. Registered in ClientHub without scope. Operations: `get`, `put`, `delete`. Hierarchical secret resolution is implemented in the Gateway module and accessed through standard `get` operations.
+**Description**: Public API for platform gears to store, retrieve, and delete secrets. Registered in ClientHub without scope. Operations: `get`, `put`, `delete`. Hierarchical secret resolution is implemented in the Gateway gear and accessed through standard `get` operations.
 **Breaking Change Policy**: Major version bump required
 <!-- cpt-cf-id-content -->
 
@@ -630,15 +630,15 @@ Secret values **MUST NOT** appear in logs, error messages, or debug output at an
 | VendorA Credstore | External Go service for secret persistence (Kubernetes environments) | `p1` |
 | OAGW | Primary consumer of hierarchical secret retrieval (uses CredStore SDK client) | `p1` |
 | OAuth/token provider | Shared component for Credstore REST authentication tokens | `p1` |
-| `tenant_resolver` | Provides tenant hierarchy information (used by Gateway module for hierarchical resolution walk-up) | `p1` |
+| `tenant_resolver` | Provides tenant hierarchy information (used by Gateway gear for hierarchical resolution walk-up) | `p1` |
 | `types_registry` | GTS-based plugin registration and discovery | `p1` |
 | External Key Service | External key management service (Vault, KMS) for tenant key storage when `ExternalKeyProvider` is active. Required for production deployments with key–data separation. | `p1` |
 
 ## 11. Assumptions
 
-- For simple plugins (VendorA, OS keychain), hierarchical secret resolution (walk-up algorithm and sharing mode enforcement) is implemented in the Gateway module (credstore). The `credentials_storage` plugin handles merge resolution internally.
+- For simple plugins (VendorA, OS keychain), hierarchical secret resolution (walk-up algorithm and sharing mode enforcement) is implemented in the Gateway gear (credstore). The `credentials_storage` plugin handles merge resolution internally.
 - Simple plugins and their backends provide per-tenant key-value storage without hierarchical logic. The `credentials_storage` plugin is a full microservice with its own resolution, encryption, and authorization.
-- OAGW is a ToolKit module that uses the standard CredStore SDK client (all access flows through Gateway→Plugin→Backend)
+- OAGW is a ToolKit gear that uses the standard CredStore SDK client (all access flows through Gateway→Plugin→Backend)
 - Gateway provides tenant-scoped CRUD operations, hierarchical resolution, and routes requests to the active storage plugin
 - Tenant hierarchy is managed externally and accessible via `tenant_resolver` (used by Gateway for hierarchical walk-up)
 - `sharing` field is stored in VendorA Credstore schema as metadata (used by Gateway for access control decisions)

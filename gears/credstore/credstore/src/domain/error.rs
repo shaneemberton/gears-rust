@@ -1,5 +1,5 @@
 // Updated: 2026-04-07 by Constructor Tech
-//! Domain errors for the credstore module.
+//! Domain errors for the credstore gear.
 
 use credstore_sdk::CredStoreError;
 use toolkit_macros::domain_model;

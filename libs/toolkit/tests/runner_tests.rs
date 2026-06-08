@@ -15,10 +15,10 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use toolkit::{
-    ModuleCtx,
+    GearCtx,
     config::ConfigProvider,
-    contracts::{Module, OpenApiRegistry, RestApiCapability, RunnableCapability},
-    registry::{ModuleRegistry, RegistryBuilder},
+    contracts::{Gear, OpenApiRegistry, RestApiCapability, RunnableCapability},
+    registry::{GearRegistry, RegistryBuilder},
     runtime::{DbOptions, RunOptions, ShutdownOptions, run},
 };
 
@@ -63,15 +63,15 @@ impl MockConfigProvider {
         }
     }
 
-    fn with_config(mut self, module_name: &str, config: serde_json::Value) -> Self {
-        self.configs.insert(module_name.to_owned(), config);
+    fn with_config(mut self, gear_name: &str, config: serde_json::Value) -> Self {
+        self.configs.insert(gear_name.to_owned(), config);
         self
     }
 }
 
 impl ConfigProvider for MockConfigProvider {
-    fn get_module_config(&self, module_name: &str) -> Option<&serde_json::Value> {
-        self.configs.get(module_name)
+    fn get_gear_config(&self, gear_name: &str) -> Option<&serde_json::Value> {
+        self.configs.get(gear_name)
     }
 }
 
@@ -87,10 +87,10 @@ impl<T> Pipe<T> for T {
     }
 }
 
-// Test module implementations with lifecycle tracking
+// Test gear implementations with lifecycle tracking
 #[allow(dead_code)]
 #[derive(Clone)]
-struct TestModule {
+struct TestGear {
     name: String,
     calls: CallTracker,
     should_fail_init: Arc<AtomicBool>,
@@ -101,7 +101,7 @@ struct TestModule {
 }
 
 #[allow(dead_code)]
-impl TestModule {
+impl TestGear {
     fn new(name: &str, calls: CallTracker) -> Self {
         Self {
             name: name.to_owned(),
@@ -141,21 +141,21 @@ impl TestModule {
 }
 
 #[async_trait::async_trait]
-impl Module for TestModule {
-    async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+impl Gear for TestGear {
+    async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
         self.calls
             .lock()
             .unwrap()
             .push(format!("{}.init", self.name));
         if self.should_fail_init.load(Ordering::SeqCst) {
-            anyhow::bail!("Init failed for module {}", self.name);
+            anyhow::bail!("Init failed for gear {}", self.name);
         }
         Ok(())
     }
 }
 
 #[cfg(feature = "db")]
-impl DatabaseCapability for TestModule {
+impl DatabaseCapability for TestGear {
     fn migrations(&self) -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
         self.calls
             .lock()
@@ -197,10 +197,10 @@ impl sea_orm_migration::MigrationTrait for FailingMigration {
     }
 }
 
-impl RestApiCapability for TestModule {
+impl RestApiCapability for TestGear {
     fn register_rest(
         &self,
-        _ctx: &ModuleCtx,
+        _ctx: &GearCtx,
         router: axum::Router,
         _openapi: &dyn OpenApiRegistry,
     ) -> anyhow::Result<axum::Router> {
@@ -209,21 +209,21 @@ impl RestApiCapability for TestModule {
             .unwrap()
             .push(format!("{}.register_rest", self.name));
         if self.should_fail_rest.load(Ordering::SeqCst) {
-            anyhow::bail!("REST registration failed for module {}", self.name);
+            anyhow::bail!("REST registration failed for gear {}", self.name);
         }
         Ok(router)
     }
 }
 
 #[async_trait::async_trait]
-impl RunnableCapability for TestModule {
+impl RunnableCapability for TestGear {
     async fn start(&self, _cancel: CancellationToken) -> anyhow::Result<()> {
         self.calls
             .lock()
             .unwrap()
             .push(format!("{}.start", self.name));
         if self.should_fail_start.load(Ordering::SeqCst) {
-            anyhow::bail!("Start failed for module {}", self.name);
+            anyhow::bail!("Start failed for gear {}", self.name);
         }
         Ok(())
     }
@@ -234,35 +234,29 @@ impl RunnableCapability for TestModule {
             .unwrap()
             .push(format!("{}.stop", self.name));
         if self.should_fail_stop.load(Ordering::SeqCst) {
-            anyhow::bail!("Stop failed for module {}", self.name);
+            anyhow::bail!("Stop failed for gear {}", self.name);
         }
         Ok(())
     }
 }
 
-// Helper to create a registry with test modules
+// Helper to create a registry with test gears
 #[allow(dead_code)]
-fn create_test_registry(modules: Vec<TestModule>) -> anyhow::Result<ModuleRegistry> {
+fn create_test_registry(gears: Vec<TestGear>) -> anyhow::Result<GearRegistry> {
     let mut builder = RegistryBuilder::default();
 
-    for module in modules {
-        let module_name = module.name.clone();
-        let module_name_str: &'static str = Box::leak(module_name.into_boxed_str());
-        let module = Arc::new(module);
+    for gear in gears {
+        let gear_name = gear.name.clone();
+        let gear_name_str: &'static str = Box::leak(gear_name.into_boxed_str());
+        let gear = Arc::new(gear);
 
-        builder.register_core_with_meta(module_name_str, &[], module.clone() as Arc<dyn Module>);
+        builder.register_core_with_meta(gear_name_str, &[], gear.clone() as Arc<dyn Gear>);
         #[cfg(feature = "db")]
-        builder.register_db_with_meta(
-            module_name_str,
-            module.clone() as Arc<dyn DatabaseCapability>,
-        );
-        builder.register_rest_with_meta(
-            module_name_str,
-            module.clone() as Arc<dyn RestApiCapability>,
-        );
+        builder.register_db_with_meta(gear_name_str, gear.clone() as Arc<dyn DatabaseCapability>);
+        builder.register_rest_with_meta(gear_name_str, gear.clone() as Arc<dyn RestApiCapability>);
         builder.register_stateful_with_meta(
-            module_name_str,
-            module.clone() as Arc<dyn RunnableCapability>,
+            gear_name_str,
+            gear.clone() as Arc<dyn RunnableCapability>,
         );
     }
 
@@ -276,7 +270,7 @@ fn create_mock_db_manager() -> Arc<toolkit_db::DbManager> {
 
     // Create a simple figment with mock database configuration
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "test_module": {
+        "test_gear": {
             "database": {
                 "dsn": "sqlite::memory:",
                 "params": {
@@ -297,15 +291,15 @@ async fn test_db_phase_failure_stops_lifecycle() {
     use toolkit::runtime::HostRuntime;
 
     let calls: CallTracker = Arc::new(Mutex::new(Vec::new()));
-    let failing = TestModule::new("fail_db", calls.clone()).fail_db();
+    let failing = TestGear::new("fail_db", calls.clone()).fail_db();
 
     let registry = create_test_registry(vec![failing]).expect("registry build");
 
-    // Provide DB config for this module so DB handle exists.
+    // Provide DB config for this gear so DB handle exists.
     let db_manager = {
         use figment::{Figment, providers::Serialized};
         let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-            "modules": {
+            "gears": {
                 "fail_db": {
                     "database": {
                         "dsn": "sqlite::memory:",
@@ -335,7 +329,7 @@ async fn test_db_phase_failure_stops_lifecycle() {
         None,
     );
 
-    let err = hr.run_module_phases().await.unwrap_err();
+    let err = hr.run_gear_phases().await.unwrap_err();
     let chain = format!("{err:#}");
     assert!(
         chain.contains("intentional migration failure"),
@@ -374,7 +368,7 @@ async fn test_db_options_none() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new()),
+        gears_cfg: Arc::new(MockConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel),
         clients: vec![],
@@ -404,8 +398,8 @@ async fn test_db_options_manager() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new().with_config(
-            "test_module",
+        gears_cfg: Arc::new(MockConfigProvider::new().with_config(
+            "test_gear",
             serde_json::json!({
                 "database": {
                     "dsn": "sqlite::memory:"
@@ -433,7 +427,7 @@ async fn test_shutdown_options_token() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new()),
+        gears_cfg: Arc::new(MockConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel.clone()),
         clients: vec![],
@@ -463,7 +457,7 @@ async fn test_shutdown_options_future() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new()),
+        gears_cfg: Arc::new(MockConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Future(Box::pin(async move {
             _ = rx.await;
@@ -495,7 +489,7 @@ async fn test_runner_with_config_provider() {
     cancel.cancel(); // Immediate shutdown
 
     let config_provider = MockConfigProvider::new().with_config(
-        "test_module",
+        "test_gear",
         serde_json::json!({
             "setting1": "value1",
             "setting2": 42
@@ -504,7 +498,7 @@ async fn test_runner_with_config_provider() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(config_provider),
+        gears_cfg: Arc::new(config_provider),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel),
         clients: vec![],
@@ -516,17 +510,17 @@ async fn test_runner_with_config_provider() {
     assert!(result.is_ok());
 }
 
-// Integration test for complete lifecycle (will work once we have proper module discovery mock)
+// Integration test for complete lifecycle (will work once we have proper gear discovery mock)
 #[tokio::test]
 async fn test_complete_lifecycle_success() {
-    // This test is a placeholder for when we can properly mock the module discovery
+    // This test is a placeholder for when we can properly mock the gear discovery
     // For now, we test that the runner doesn't panic with minimal setup
     let cancel = CancellationToken::new();
     cancel.cancel(); // Immediate shutdown
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new()),
+        gears_cfg: Arc::new(MockConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel),
         clients: vec![],
@@ -544,7 +538,7 @@ fn test_run_options_construction() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new()),
+        gears_cfg: Arc::new(MockConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel),
         clients: vec![],
@@ -571,7 +565,7 @@ async fn test_cancellation_during_startup() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new()),
+        gears_cfg: Arc::new(MockConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel.clone()),
         clients: vec![],
@@ -608,7 +602,7 @@ async fn test_multiple_config_provider_scenarios() {
     let empty_config = MockConfigProvider::new();
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(empty_config),
+        gears_cfg: Arc::new(empty_config),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel.clone()),
         clients: vec![],
@@ -622,7 +616,7 @@ async fn test_multiple_config_provider_scenarios() {
     // Test with complex config
     let complex_config = MockConfigProvider::new()
         .with_config(
-            "module1",
+            "gear1",
             serde_json::json!({
                 "setting1": "value1",
                 "nested": {
@@ -632,7 +626,7 @@ async fn test_multiple_config_provider_scenarios() {
             }),
         )
         .with_config(
-            "module2",
+            "gear2",
             serde_json::json!({
                 "array_setting": [1, 2, 3],
                 "string_setting": "test"
@@ -644,7 +638,7 @@ async fn test_multiple_config_provider_scenarios() {
 
     let opts2 = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(complex_config),
+        gears_cfg: Arc::new(complex_config),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel2),
         clients: vec![],
@@ -663,7 +657,7 @@ async fn test_runner_timeout_scenarios() {
 
     let opts = RunOptions {
         instance_id: Uuid::new_v4(),
-        modules_cfg: Arc::new(MockConfigProvider::new()),
+        gears_cfg: Arc::new(MockConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel.clone()),
         clients: vec![],
@@ -705,22 +699,22 @@ fn test_config_provider_edge_cases() {
         );
 
     // Test null config
-    let null_config = provider.get_module_config("test");
+    let null_config = provider.get_gear_config("test");
     assert!(null_config.is_some());
     assert!(null_config.unwrap().is_null());
 
     // Test empty config
-    let empty_config = provider.get_module_config("empty");
+    let empty_config = provider.get_gear_config("empty");
     assert!(empty_config.is_some());
     assert!(empty_config.unwrap().is_object());
 
     // Test complex config
-    let complex_config = provider.get_module_config("complex");
+    let complex_config = provider.get_gear_config("complex");
     assert!(complex_config.is_some());
     assert!(complex_config.unwrap()["a"]["b"]["c"] == "deep_value");
 
     // Test non-existent config
-    let missing_config = provider.get_module_config("nonexistent");
+    let missing_config = provider.get_gear_config("nonexistent");
     assert!(missing_config.is_none());
 }
 
@@ -735,10 +729,10 @@ async fn test_lifecycle_init_failure() {
     // if the runner supported dependency injection of the registry
 
     let calls = Arc::new(Mutex::new(Vec::new()));
-    let failing_module = TestModule::new("failing_module", calls.clone()).fail_init();
+    let failing_gear =  TestGear::new("failing_gear", calls.clone()).fail_init();
 
     // Would need a version of run() that accepts a pre-built registry
-    // let registry = create_test_registry(vec![failing_module]).unwrap();
+    // let registry = create_test_registry(vec![failing_gear]).unwrap();
     // let result = run_with_registry(opts, registry).await;
     // assert!(result.is_err());
     // assert!(result.unwrap_err().to_string().contains("Init failed"));
@@ -748,19 +742,19 @@ async fn test_lifecycle_init_failure() {
 async fn test_lifecycle_complete_success() {
     // Demonstrates testing a complete successful lifecycle
     let calls = Arc::new(Mutex::new(Vec::new()));
-    let modules = vec![
-        TestModule::new("module1", calls.clone()),
-        TestModule::new("module2", calls.clone()),
+    let gears = vec![
+        TestGear::new("gear1", calls.clone()),
+        TestGear::new("gear2", calls.clone()),
     ];
 
     // Would need runner API changes to support this
-    // let registry = create_test_registry(modules).unwrap();
+    // let registry = create_test_registry(gears).unwrap();
     // let result = run_with_registry(opts, registry).await;
     // assert!(result.is_ok());
 
     // Verify lifecycle call order
     // let call_log = calls.lock().unwrap();
-    // assert!(call_log.contains(&"module1.init".to_string()));
-    // assert!(call_log.contains(&"module2.init".to_string()));
+    // assert!(call_log.contains(&"gear1.init".to_string()));
+    // assert!(call_log.contains(&"gear2.init".to_string()));
 }
 */

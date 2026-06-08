@@ -28,7 +28,7 @@
 
 ### 1.1 Architectural Vision
 
-File Parser is a stateless toolkit service module that acts as a **parsing gateway**: it accepts document uploads (or local file paths), routes each request to the first registered parser plugin that claims the file's extension, and returns structured content. All format-specific extraction logic lives in individual plugin implementations of the `FileParserBackend` trait — the gateway itself has no knowledge of any file format.
+File Parser is a stateless toolkit service gear that acts as a **parsing gateway**: it accepts document uploads (or local file paths), routes each request to the first registered parser plugin that claims the file's extension, and returns structured content. All format-specific extraction logic lives in individual plugin implementations of the `FileParserBackend` trait — the gateway itself has no knowledge of any file format.
 
 Five plugins are shipped with this version, covering PDFs, HTML, spreadsheets, presentations, Word documents, plain text, and common image formats. Additional plugins (e.g. Tika, LibreOffice, IBM Document Understanding) can be added in future without changing the gateway or the REST API.
 
@@ -76,7 +76,7 @@ Markdown renderer    (src/domain/markdown.rs)
 
 - [ ] `p1` - **ID**: `cpt-cf-file-parser-principle-stateless`
 
-The module does not maintain session state. Each request is fully independent. Temporary files are cleaned up after processing.
+The gear does not maintain session state. Each request is fully independent. Temporary files are cleaned up after processing.
 
 #### Format-Agnostic API
 
@@ -88,7 +88,7 @@ The REST API is uniform regardless of input format. Format detection (extension 
 
 - [ ] `p1` - **ID**: `cpt-cf-file-parser-principle-single-backend`
 
-All format-specific extraction logic lives exclusively inside parser plugins. The `FileParserService` gateway contains no format knowledge. Each plugin implements the `FileParserBackend` trait, declares the extensions it handles, and is registered at module startup. The gateway selects the appropriate plugin at request time.
+All format-specific extraction logic lives exclusively inside parser plugins. The `FileParserService` gateway contains no format knowledge. Each plugin implements the `FileParserBackend` trait, declares the extensions it handles, and is registered at gear startup. The gateway selects the appropriate plugin at request time.
 
 ### 2.2 Constraints
 
@@ -109,7 +109,7 @@ Local file parsing (`parse-local`) validates paths before any filesystem access:
 (a) paths containing `..` components are rejected outright;
 (b) the requested path is canonicalized (resolving symlinks);
 (c) the canonical path must be a descendant of the mandatory `allowed_local_base_dir`.
-The module fails to start if `allowed_local_base_dir` is missing or unresolvable.
+The gear fails to start if `allowed_local_base_dir` is missing or unresolvable.
 Violations return HTTP 403 Forbidden. Rejected attempts are logged at `warn` level.
 <!-- fdd-id-content -->
 
@@ -178,7 +178,7 @@ REST endpoints: `/file-parser/v1/info`, `/file-parser/v1/upload`, `/file-parser/
 **ID**: [ ] `p1` `fdd-file-parser-component-parser-v1`
 
 <!-- fdd-id-content -->
-`FileParserService` (`src/domain/service.rs`) — the parsing gateway. Holds an ordered registry of `FileParserBackend` plugins populated at module startup. For each request:
+`FileParserService` (`src/domain/service.rs`) — the parsing gateway. Holds an ordered registry of `FileParserBackend` plugins populated at gear startup. For each request:
 1. Determines the file extension from the filename hint or Content-Type header.
 2. Iterates the plugin registry and selects the first plugin whose `supported_extensions()` contains the extension.
 3. Returns HTTP 400 if no plugin matches.
@@ -194,7 +194,7 @@ The gateway also enforces file size limits and path-traversal protection. It has
 **ID**: [ ] `p1` `fdd-file-parser-component-backend-v1`
 
 <!-- fdd-id-content -->
-Each plugin implements `FileParserBackend` (`src/domain/parser.rs`) and is registered at module startup in `src/module.rs`. Registration order determines priority (first match wins). Plugins currently shipped, in registration order:
+Each plugin implements `FileParserBackend` (`src/domain/parser.rs`) and is registered at gear startup in `src/gear.rs`. Registration order determines priority (first match wins). Plugins currently shipped, in registration order:
 
 | # | Plugin | Handled extensions | Backend library |
 |---|---|---|---|
@@ -204,7 +204,7 @@ Each plugin implements `FileParserBackend` (`src/domain/parser.rs`) and is regis
 | 4 | `ImageParser` | `png`, `jpg`, `jpeg`, `webp`, `gif` | internal (base64 encoding) |
 | 5 | `StubParser` | `doc`, `rtf`, `odt`, `xls`, `xlsx`, `ppt`, `pptx` | stub fallback |
 
-Future plugins implement `FileParserBackend` and are added to the `vec![]` in `module.rs` — no changes to the gateway or REST API are required.
+Future plugins implement `FileParserBackend` and are added to the `vec![]` in `gear.rs` — no changes to the gateway or REST API are required.
 
 Each plugin produces a `ParsedDocument` using the platform IR (`src/domain/ir.rs`). `KreuzbergParser` additionally uses `result_to_blocks` (`src/infra/parsers/ir_convert.rs`) to convert kreuzberg's `ExtractionResult` into that IR.
 <!-- fdd-id-content -->
@@ -265,7 +265,7 @@ pub trait FileParserBackend: Send + Sync {
 }
 ```
 
-Plugin registration is done at module startup in `src/module.rs`. The gateway selects the first registered plugin whose `supported_extensions()` contains the requested extension. Future versions may add a `priority() -> i32` method to allow explicit priority-based selection when multiple plugins claim the same extension.
+Plugin registration is done at gear startup in `src/gear.rs`. The gateway selects the first registered plugin whose `supported_extensions()` contains the requested extension. Future versions may add a `priority() -> i32` method to allow explicit priority-based selection when multiple plugins claim the same extension.
 
 ### 3.4 External Dependencies
 
@@ -315,7 +315,7 @@ File Parser is stateless and does not own any database tables or persistent stor
 # config/server.yaml (relevant keys)
 file_parser:
   max_file_size_mb: 100              # optional; default 100 MB
-  allowed_local_base_dir: /data/uploads   # required; module fails to start if absent
+  allowed_local_base_dir: /data/uploads   # required; gear fails to start if absent
 ```
 
 ### Error Mapping

@@ -4,7 +4,7 @@ use toolkit_gts::gts_type_schema;
 /// GTS type definition for mini-chat policy plugin instances.
 ///
 /// Each plugin registers an instance of this type with its vendor-specific
-/// instance ID. The mini-chat module discovers plugins by querying
+/// instance ID. The mini-chat gear discovers plugins by querying
 /// types-registry for instances matching this schema.
 ///
 /// # Instance ID Format

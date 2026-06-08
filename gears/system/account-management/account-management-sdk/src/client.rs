@@ -1,6 +1,6 @@
-//! Public inter-module client trait for the Account Management module.
+//! Public inter-gear client trait for the Account Management gear.
 //!
-//! [`AccountManagementClient`] is the single seam other modules /
+//! [`AccountManagementClient`] is the single seam other gears /
 //! plugins / the AM REST handler call into to drive AM's tenant and
 //! user surfaces. Consumers obtain it from `ClientHub`:
 //!
@@ -28,7 +28,7 @@
 //! through this trait — their DTOs
 //! (`ConversionRequest`, `ConversionCaller`, `ConversionStatus`,
 //! `TargetMode`, `ListConversionsQuery`, …) have not been hoisted
-//! into the SDK yet, and inter-module Rust consumers of the
+//! into the SDK yet, and inter-gear Rust consumers of the
 //! conversion lifecycle do not exist outside the (future) REST
 //! handler. They will join `AccountManagementClient` once the
 //! conversion DTO move lands. Until then the REST handler depends on
@@ -63,9 +63,9 @@ use crate::idp_user::{IdpNewUser, IdpUser, ListUsersQuery};
 use crate::metadata::{MetadataEntry, UpsertMetadataRequest};
 use crate::tenant::{CreateTenantRequest, Tenant, UpdateTenantRequest};
 
-/// Public inter-module client trait for the Account Management module.
+/// Public inter-gear client trait for the Account Management gear.
 ///
-/// See the module docstring for the uniform `SecurityContext`
+/// See the gear docstring for the uniform `SecurityContext`
 /// posture and the deferred-surface notes (conversion).
 ///
 /// # Error envelope
@@ -76,7 +76,7 @@ use crate::tenant::{CreateTenantRequest, Tenant, UpdateTenantRequest};
 /// (`infra::sdk_error_mapping::From<DomainError> for AccountManagementError`);
 /// the REST handler (when it lands) lifts to
 /// `toolkit_canonical_errors::CanonicalError` via the
-/// `account_management_error_to_canonical` helper in the same module.
+/// `account_management_error_to_canonical` helper in the same gear.
 /// Consumers match on [`AccountManagementError`] variants directly
 /// and never depend on `toolkit-canonical-errors`.
 #[async_trait]

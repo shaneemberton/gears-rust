@@ -200,7 +200,7 @@ public point embedded.
 A FIPS 140-3 claim under this provider rests on the Apple corecrypto cert
 covering the **exact running macOS version + arch**. Apple submits a new
 corecrypto-module CMVP package for each major macOS release; certificates
-listed at time of writing include (search by "Apple corecrypto Module" at
+listed at time of writing include (search by "Apple corecrypto Gear" at
 the CMVP search URL below):
 
 | Apple module version | macOS release | CMVP cert(s) (Intel, Apple silicon — User+Kernel) |

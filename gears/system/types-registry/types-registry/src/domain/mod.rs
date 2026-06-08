@@ -1,4 +1,4 @@
-//! Domain layer for the Types Registry module.
+//! Domain layer for the Types Registry gear.
 //!
 //! Contains business logic, error types, and repository traits.
 

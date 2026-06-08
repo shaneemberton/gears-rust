@@ -11,7 +11,7 @@ background refresh with jitter and exponential backoff. This replaces the former
 
 ### Public API
 
-Modules use a long-lived token capability:
+Gears use a long-lived token capability:
 
 ```rust
 #[derive(Clone)]
@@ -27,8 +27,8 @@ impl Token {
 
 Rules:
 
-- modules never see client credentials
-- modules never store the token string beyond request construction
+- gears never see client credentials
+- gears never store the token string beyond request construction
 - token is returned only as a transient `SecretString`
 
 ### Token configuration
@@ -130,6 +130,6 @@ The auth layer is inserted between retry and timeout in the tower stack, so each
 
 ### Integration rules
 
-- Token endpoint calls use a dedicated `HttpClient` built with `HttpClientConfig::token_endpoint()`. This client is internal to the token source and is not shared with module business logic.
-- Module outbound requests use `HttpClient` with the auth tower layer composed in. Tracing (OTel), retries, concurrency limits, and other middleware are already part of the `HttpClient` stack.
+- Token endpoint calls use a dedicated `HttpClient` built with `HttpClientConfig::token_endpoint()`. This client is internal to the token source and is not shared with gear business logic.
+- Gear outbound requests use `HttpClient` with the auth tower layer composed in. Tracing (OTel), retries, concurrency limits, and other middleware are already part of the `HttpClient` stack.
 - No migration or coexistence concerns — `TracedClient` has been removed; all outbound HTTP uses `toolkit-http::HttpClient`.

@@ -1,8 +1,8 @@
-use toolkit_macros::module;
+use toolkit_macros::gear;
 use tokio_util::sync::CancellationToken;
 use anyhow::Result;
 
-#[module(name="x", capabilities=[stateful], lifecycle(entry="serve", await_ready))]
+#[gear(name="x", capabilities=[stateful], lifecycle(entry="serve", await_ready))]
 pub struct X;
 
 impl X {
@@ -11,8 +11,8 @@ impl X {
 }
 
 #[async_trait::async_trait]
-impl toolkit::Module for X {
-    async fn init(&self, _ctx: &toolkit::ModuleCtx) -> anyhow::Result<()> { Ok(()) }
+impl toolkit::Gear for X {
+    async fn init(&self, _ctx: &toolkit::GearCtx) -> anyhow::Result<()> { Ok(()) }
 }
 
 fn main() {}

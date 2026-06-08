@@ -6,8 +6,8 @@ For the full architectural design (AuthZEN model, predicate types, caching, depl
 
 ## Core invariants
 
-- **Rule**: Authentication is handled by API Gateway middleware — modules receive a ready-to-use `SecurityContext`.
-- **Rule**: Use `SecureConn` for all DB access in handlers/services. Modules cannot access raw database connections/pools.
+- **Rule**: Authentication is handled by API Gateway middleware — gears receive a ready-to-use `SecurityContext`.
+- **Rule**: Use `SecureConn` for all DB access in handlers/services. Gears cannot access raw database connections/pools.
 - **Rule**: Derive `Scopable` on SeaORM entities with tenant/resource columns.
 - **Rule**: Use `PolicyEnforcer` from `authz-resolver-sdk` for all authorization decisions. Do not construct `AccessScope` manually in production code.
 - **Rule**: Every sensitive DB access MUST be covered by a PDP decision (via `PolicyEnforcer`). Exception: the approved prefetch-first flow for GET/UPDATE/DELETE may read with `AccessScope::allow_all()` before the PDP call, provided the required compensating checks are applied (see [GET prefetch pattern](#get--prefetch-pattern) and [UPDATE/DELETE prefetch + TOCTOU safety](#update--delete--prefetch--toctou-safety)).
@@ -21,7 +21,7 @@ For the full architectural design (AuthZEN model, predicate types, caching, depl
 ```text
 Request → API Gateway (AuthN middleware) → SecurityContext
               ↓
-         Module Handler (PEP)
+         Gear Handler (PEP)
               ↓
          PolicyEnforcer → AuthZ Resolver (PDP) → decision + constraints
               ↓
@@ -34,9 +34,9 @@ Three components work together:
 
 1. **AuthN Resolver** — validates bearer tokens, produces `SecurityContext` (subject identity, tenant, token scopes). Uses the gateway + plugin pattern to delegate to vendor-specific IdPs.
 2. **AuthZ Resolver (PDP)** — evaluates policies, returns `decision + constraints`. Uses the gateway + plugin pattern to delegate to vendor-specific authorization services.
-3. **Domain modules (PEP)** — call PDP via `PolicyEnforcer`, compile constraints to `AccessScope`, pass to `SecureConn` for SQL-level enforcement.
+3. **Domain gears (PEP)** — call PDP via `PolicyEnforcer`, compile constraints to `AccessScope`, pass to `SecureConn` for SQL-level enforcement.
 
-Module developers interact primarily with the PEP layer — the AuthN and AuthZ resolvers are infrastructure modules.
+Gear developers interact primarily with the PEP layer — the AuthN and AuthZ resolvers are infrastructure gears.
 
 ## AuthN: how requests get authenticated
 
@@ -100,15 +100,15 @@ pub async fn list_users(
 
 ### Wiring up
 
-1. **Declare dependency** on `authz-resolver` in your module:
+1. **Declare dependency** on `authz-resolver` in your gear:
 
 ```rust
-#[toolkit::module(
-    name = "my_module",
+#[toolkit::gear(
+    name = "my_gear",
     deps = ["authz-resolver"],
     capabilities = [db, rest],
 )]
-pub struct MyModule { /* ... */ }
+pub struct MyGear { /* ... */ }
 ```
 
 2. **Resolve the AuthZ client** from `ClientHub` during `init()`:
@@ -116,7 +116,7 @@ pub struct MyModule { /* ... */ }
 ```rust
 use authz_resolver_sdk::AuthZResolverClient;
 
-async fn init(&self, ctx: &ModuleCtx) -> anyhow::Result<()> {
+async fn init(&self, ctx: &GearCtx) -> anyhow::Result<()> {
     let authz = ctx.client_hub().get::<dyn AuthZResolverClient>()?;
     // Pass authz to your domain service...
 }
@@ -140,7 +140,7 @@ use authz_resolver_sdk::pep::ResourceType;
 use toolkit_security::pep_properties;
 
 pub const USER: ResourceType = ResourceType {
-    name: "my_module.user",
+    name: "my_gear.user",
     supported_properties: &[
         pep_properties::OWNER_TENANT_ID,  // tenant scoping
         pep_properties::RESOURCE_ID,       // resource-level access
@@ -148,7 +148,7 @@ pub const USER: ResourceType = ResourceType {
 };
 
 pub const DOCUMENT: ResourceType = ResourceType {
-    name: "my_module.document",
+    name: "my_gear.document",
     supported_properties: &[
         pep_properties::OWNER_TENANT_ID,
         pep_properties::RESOURCE_ID,
@@ -299,7 +299,7 @@ To use the custom property, include it in both `ResourceType.supported_propertie
 
 ```rust
 pub const ADDRESS: ResourceType = ResourceType {
-    name: "my_module.address",
+    name: "my_gear.address",
     supported_properties: &[
         pep_properties::OWNER_TENANT_ID,
         pep_properties::RESOURCE_ID,
@@ -345,7 +345,7 @@ Use `#[secure(unrestricted)]` only for truly global tables where the entity has 
 
 ## CRUD authorization patterns
 
-All patterns below are from the canonical `users-info` example module.
+All patterns below are from the canonical `users-info` example gear.
 
 ### LIST — simple scope
 
@@ -656,14 +656,14 @@ make example
 For the simplest local development (no auth at all), configure the API Gateway:
 
 ```yaml
-modules:
+gears:
   api-gateway:
     auth_disabled: true
 ```
 
 This injects a default `SecurityContext` for all requests without calling any AuthN resolver.
 
-**Important**: `auth_disabled` only skips AuthN. If your module depends on `authz-resolver`, the AuthZ call still happens (using the default `SecurityContext` from the gateway). Use static AuthZ plugin to provide predictable authorization responses.
+**Important**: `auth_disabled` only skips AuthN. If your gear depends on `authz-resolver`, the AuthZ call still happens (using the default `SecurityContext` from the gateway). Use static AuthZ plugin to provide predictable authorization responses.
 
 ## Testing with SecureConn
 
@@ -692,7 +692,7 @@ In tests, build scopes explicitly (`AccessScope::for_tenant(...)`, `AccessScope:
 ## Quick checklist
 
 ### AuthZ wiring
-- [ ] Add `deps = ["authz-resolver"]` to your module declaration.
+- [ ] Add `deps = ["authz-resolver"]` to your gear declaration.
 - [ ] Resolve `AuthZResolverClient` from `ClientHub` in `init()`.
 - [ ] Create `PolicyEnforcer::new(authz)` once, clone into sub-services.
 - [ ] Define `ResourceType` constants with `supported_properties` for each resource.

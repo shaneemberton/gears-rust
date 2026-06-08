@@ -5,13 +5,13 @@
 #
 # CF/Gears Example Server uses a centralized DbManager that:
 # 1. Loads global database server templates from `database.servers`
-# 2. For each module, merges server template with module-specific overrides
-# 3. Creates isolated database connections per module
-# 4. Caches DbHandle instances for reuse within the same module
+# 2. For each gear, merges server template with gear-specific overrides
+# 3. Creates isolated database connections per gear
+# 4. Caches DbHandle instances for reuse within the same gear
 #
 # Key principles:
-# - Each module gets its own database connection (no sharing)
-# - SQLite modules automatically get their own database file
+# - Each gear gets its own database connection (no sharing)
+# - SQLite gears automatically get their own database file
 # - Configuration follows a clear precedence hierarchy
 # - Environment variables are expanded (${VAR_NAME})
 # - All paths are resolved relative to server.home_dir
@@ -23,14 +23,14 @@ server:
 # Database configuration (DbManager architecture)
 #
 # The database config has two levels:
-# 1. Global "servers" - shared connection templates that modules can reference
-# 2. Per-module configs - specific database settings for each module
+# 1. Global "servers" - shared connection templates that gears can reference
+# 2. Per-gear configs - specific database settings for each gear
 #
 # Configuration precedence (highest to lowest):
-# - Module `params` map (highest priority)
-# - Module DSN query params
-# - Module fields (host, port, user, etc.)
-# - Module DSN base
+# - Gear `params` map (highest priority)
+# - Gear DSN query params
+# - Gear fields (host, port, user, etc.)
+# - Gear DSN base
 # - Server `params` map
 # - Server DSN query params
 # - Server fields
@@ -38,11 +38,11 @@ server:
 #
 database:
   # Global database servers - reusable connection templates
-  # These define shared settings that multiple modules can inherit
+  # These define shared settings that multiple gears can inherit
   servers:
-    # SQLite server template for user data modules
-    # Note: No DSN or file specified here - modules specify their own database files
-    # This prevents accidental sharing of SQLite databases between modules
+    # SQLite server template for user data gears
+    # Note: No DSN or file specified here - gears specify their own database files
+    # This prevents accidental sharing of SQLite databases between gears
     sqlite_users:
       engine: "sqlite"
       # SQLite PRAGMA parameters applied to all connections using this server
@@ -50,7 +50,7 @@ database:
         WAL: "true"              # Enable Write-Ahead Logging for better concurrency
         synchronous: "NORMAL"    # Balance between safety and performance
         busy_timeout: "5000"     # Wait 5 seconds for locked database
-      # Connection pool settings shared by all modules using this server
+      # Connection pool settings shared by all gears using this server
       pool:
         max_conns: 5             # Maximum 5 concurrent connections
         acquire_timeout: "30s"   # Timeout when acquiring connection from pool
@@ -89,8 +89,8 @@ logging:
     max_size_mb: 100
 
 
-# Per-module configurations using new structure
-modules:
+# Per-gear configurations using new structure
+gears:
   api-gateway:
     config:
       bind_addr: "0.0.0.0:8087"
@@ -107,13 +107,13 @@ modules:
       auth_disabled: true
       require_auth_by_default: true
 
-  module-orchestrator:
+  gear-orchestrator:
     config: {}
-    # No configuration needed for the module orchestrator
+    # No configuration needed for the gear orchestrator
 
   grpc-hub:
     config:
-      # Use ephemeral port; OoP modules receive the actual bound address from master host
+      # Use ephemeral port; OoP gears receive the actual bound address from master host
       listen_addr: "127.0.0.1:0"
 
   calculator:
@@ -121,10 +121,10 @@ modules:
       type: oop
       execution:
         executable_path: "calculator-oop.exe"
-        # CLI arguments passed to OoP module. Use --config to pass module's own config file:
+        # CLI arguments passed to OoP gear. Use --config to pass gear's own config file:
         # args: ["--config", "config/oop-example.yaml"]
         # The local config file is used to:
-        #   - Configure system modules for OoP process (e.g., grpc_hub.listen_addr)
+        #   - Configure system gears for OoP process (e.g., grpc_hub.listen_addr)
         #   - Override settings from master (TOOLKIT_MODULE_CONFIG)
         #   - Run in standalone mode (without master host)
         args: [ "--config", "./config/oop-example.yaml" ]
@@ -135,15 +135,15 @@ modules:
 
 
   users-info:
-    # Module-specific database configuration
+    # Gear-specific database configuration
     database:
       # Reference to global server template defined above
       server: "sqlite_users"               # Inherits params and pool settings from sqlite_users
 
-      # Module-specific database file (required for SQLite modules)
+      # Gear-specific database file (required for SQLite gears)
       file: "users_info.db"                # Creates: ~/.cf-gears/users_info/users_info.db
 
-      # Module can override server settings:
+      # Gear can override server settings:
       # params:
       #   synchronous: "FULL"              # Would override server's "NORMAL" setting
       #   custom_pragma: "value"           # Would add new PRAGMA setting
@@ -161,7 +161,7 @@ modules:
       # password: "${DB_PASSWORD}"         # Environment variable expansion
       # dbname: "users_db"                 # Override server database name
 
-    # Module-specific application configuration
+    # Gear-specific application configuration
     config:
       default_page_size: 5
       max_page_size: 100
@@ -219,7 +219,7 @@ modules:
           key: "openai-key"
           value: "sk-test-e2e-fake-key"
 
-  # File parser module configuration (no database needed)
+  # File parser gear configuration (no database needed)
   file-parser:
     config:
       allowed_local_base_dir: "C:\\Temp"
@@ -279,7 +279,7 @@ opentelemetry:
 
 # Example configurations for different database scenarios:
 #
-# Example 1: PostgreSQL server with multiple modules
+# Example 1: PostgreSQL server with multiple gears
 # ==================================================
 # database:
 #   servers:
@@ -294,17 +294,17 @@ opentelemetry:
 #       pool:
 #         max_conns: 20
 #         acquire_timeout: "30s"
-# modules:
-#   users_module:
+# gears:
+#   users_gear:
 #     database:
 #       server: "main_postgres"
-#       dbname: "users_db"              # Each module gets its own database
-#   orders_module:
+#       dbname: "users_db"              # Each gear gets its own database
+#   orders_gear:
 #     database:
 #       server: "main_postgres"
 #       dbname: "orders_db"             # Separate database for orders
 #       pool:
-#         max_conns: 10                 # Module-specific pool override
+#         max_conns: 10                 # Gear-specific pool override
 #
 # Example 2: Mixed database types
 # ===============================
@@ -314,7 +314,7 @@ opentelemetry:
 #       dsn: "postgres://user:${PG_PASS}@localhost:5432/main"
 #     redis_cache:
 #       dsn: "redis://localhost:6379/0"
-# modules:
+# gears:
 #   user_service:
 #     database:
 #       server: "postgres_main"
@@ -325,16 +325,16 @@ opentelemetry:
 #
 # Example 3: Complete DSN override
 # ================================
-# modules:
+# gears:
 #   analytics:
 #     database:
 #       dsn: "postgres://analytics:${ANALYTICS_PASSWORD}@analytics-db:5432/metrics?sslmode=require"
 #       # When DSN is specified, server reference is ignored
 #
-# Example 4: No database module
+# Example 4: No database gear
 # =============================
-# modules:
+# gears:
 #   static_files:
-#     # No database section - module won't get database access
+#     # No database section - gear won't get database access
 #     config:
 #       static_dir: "/var/www/static"

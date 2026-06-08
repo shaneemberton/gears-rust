@@ -126,7 +126,7 @@ UPSTREAM_REQS must NOT contain the following — report as violation if found:
 ### Phase 2: Content Creation
 
 - [ ] Write Overview: purpose and requesting modules table
-- [ ] For each requesting module: document requirements with rationale and source
+- [ ] For each requesting gear: document requirements with rationale and source
 - [ ] Write Priorities summary table
 - [ ] Write Traceability section
 
@@ -213,6 +213,6 @@ Issues:
 
 ### Options
 
-- [ ] UPSTREAM_REQS complete → `/cypilot-generate PRD` — create PRD for the new module (tracing back to UPSTREAM_REQS)
+- [ ] UPSTREAM_REQS complete → `/cypilot-generate PRD` — create PRD for the new gear (tracing back to UPSTREAM_REQS)
 - [ ] Need to add more requesting modules → continue editing UPSTREAM_REQS
 - [ ] Want checklist review only → `/cypilot-analyze semantic` — semantic validation

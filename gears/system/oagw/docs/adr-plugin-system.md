@@ -103,7 +103,7 @@ Included in `oagw` crate (`infra/plugin/`):
 
 ### External Plugins
 
-Separate toolkit modules implementing plugin traits:
+Separate ToolKit gears implementing plugin traits:
 
 ```rust
 // cf-gears-oagw-plugin-oauth2-pkce/src/lib.rs
@@ -156,7 +156,7 @@ impl ControlPlane {
 
 - **Clear trait boundaries**: Each plugin type has specific purpose
 - **Same traits for built-in and external**: No special-casing
-- **Toolkit integration**: External plugins are toolkit modules
+- **Toolkit integration**: External plugins are ToolKit gears
 - **Native Rust performance**: No WASM overhead for MVP
 - **Type safety**: Compile-time guarantees for built-in plugins
 

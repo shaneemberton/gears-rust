@@ -52,7 +52,7 @@ STANDARDS ALIGNMENT:
 **ID**: `cpt-cf-serverless-runtime-adr-temporal-workflow-engine`
 ## Context and Problem Statement
 
-The Serverless Runtime domain model defines a pluggable runtime architecture (`cpt-cf-serverless-runtime-principle-pluggable-adapters` — the traceability ID retains the legacy `adapters` slug; the design now consistently uses "runtime plugin" for the module and `RuntimeAdapter` for the trait it implements). This ADR covers the **Temporal runtime plugin** — one of multiple possible runtime plugin implementations (others include Starlark, WASM, cloud FaaS). The Temporal runtime plugin needs a workflow engine that:
+The Serverless Runtime domain model defines a pluggable runtime architecture (`cpt-cf-serverless-runtime-principle-pluggable-adapters` — the traceability ID retains the legacy `adapters` slug; the design now consistently uses "runtime plugin" for the gear and `RuntimeAdapter` for the trait it implements). This ADR covers the **Temporal runtime plugin** — one of multiple possible runtime plugin implementations (others include Starlark, WASM, cloud FaaS). The Temporal runtime plugin needs a workflow engine that:
 
 1. **Interprets workflow definitions** authored in the Serverless Workflow Specification DSL ([ADR-0003](0003-cpt-cf-serverless-runtime-adr-workflow-dsl.md)) — parsing task definitions, evaluating expressions, managing data flow between steps, and controlling execution flow (branching, loops, error handling).
 2. **Executes workflows durably** — persisting state across service restarts, providing automatic checkpointing, retry, compensation, and long-running workflow support lasting days to months.
@@ -67,7 +67,7 @@ The Serverless Runtime domain model defines a pluggable runtime architecture (`c
 * Multi-tenant isolation is mandatory — one tenant's workflows must not affect another tenant's execution, state, or data (BR-002, BR-036, BR-206)
 * The engine must have a Rust SDK for integration without FFI bridges or sidecar processes (project constraint — the platform is built in Rust)
 * The engine must be self-hostable with no vendor lock-in — the platform must control its own infrastructure (BR-035)
-* The engine must integrate as a standard ToolKit plugin module, following the established plugin architecture pattern (DESIGN: `cpt-cf-serverless-runtime-principle-pluggable-adapters`)
+* The engine must integrate as a standard ToolKit plugin gear, following the established plugin architecture pattern (DESIGN: `cpt-cf-serverless-runtime-principle-pluggable-adapters`)
 * The engine must implement the `RuntimeAdapter` trait interface (DESIGN: `cpt-cf-serverless-runtime-principle-pluggable-adapters`)
 * The engine must support configurable retry policies with exponential backoff and non-retryable error classification (BR-019)
 * The engine must provide execution visibility — queryable execution status, history, and timeline events (BR-015, BR-130)
@@ -101,7 +101,7 @@ Chosen option: **"Option A: Temporal"** as the durable execution backend, with a
 * Multi-tenant isolation is achieved at the application layer through `tenant_id`/`user_id` scoping in database queries and ownership checks.
 * Compensation is implemented at the DSL level through Try/Raise task composition (see [ADR-0003](0003-cpt-cf-serverless-runtime-adr-workflow-dsl.md)); the engine provides the durable execution guarantees that make this reliable.
 * Schedule management maps to Temporal's built-in Schedule API.
-* The engine integrates as a standard ToolKit plugin module.
+* The engine integrates as a standard ToolKit plugin gear.
 
 ### Confirmation
 

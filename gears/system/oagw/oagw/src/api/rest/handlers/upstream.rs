@@ -10,7 +10,7 @@ use crate::api::rest::error::domain_error_to_problem;
 use crate::api::rest::extractors::{PaginationQuery, parse_gts_id};
 use crate::domain::gts_helpers as gts;
 use crate::domain::model::Upstream;
-use crate::module::AppState;
+use crate::gear::AppState;
 
 fn to_response(u: Upstream) -> UpstreamResponse {
     UpstreamResponse {

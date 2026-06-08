@@ -1,6 +1,6 @@
 //! `SeaORM` entity definitions for AM-owned tables.
 //!
-//! Each module mirrors exactly one table declared in the migration set.
+//! Each gear mirrors exactly one table declared in the migration set.
 //! Entities contain no domain logic — they are `sea_orm` value types used
 //! by the repository implementation layer.
 

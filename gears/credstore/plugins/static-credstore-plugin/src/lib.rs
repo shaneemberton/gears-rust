@@ -2,6 +2,6 @@
 
 pub mod config;
 pub mod domain;
-pub mod module;
+pub mod gear;
 
-pub use module::StaticCredStorePlugin;
+pub use gear::StaticCredStorePlugin;

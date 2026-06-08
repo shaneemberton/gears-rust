@@ -1,5 +1,5 @@
 // Updated: 2026-04-07 by Constructor Tech
-//! Local (in-process) client for the credstore module.
+//! Local (in-process) client for the credstore gear.
 
 use std::sync::Arc;
 
@@ -12,7 +12,7 @@ use super::{DomainError, Service};
 
 /// Local client wrapping the credstore service.
 ///
-/// Registered in `ClientHub` by the credstore module during `init()`.
+/// Registered in `ClientHub` by the credstore gear during `init()`.
 #[domain_model]
 pub struct CredStoreLocalClient {
     svc: Arc<Service>,

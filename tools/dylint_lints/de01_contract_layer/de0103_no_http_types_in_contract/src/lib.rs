@@ -11,11 +11,11 @@ use lint_utils::is_in_contract_module_ast;
 dylint_linting::declare_early_lint! {
     /// ### What it does
     ///
-    /// Checks that contract modules do not import HTTP-specific types.
+    /// Checks that contract gears do not import HTTP-specific types.
     ///
     /// ### Why is this bad?
     ///
-    /// Contract modules should be transport-agnostic. HTTP is just one possible
+    /// Contract gears should be transport-agnostic. HTTP is just one possible
     /// transport layer. Using HTTP types in contracts couples the domain logic
     /// to a specific transport mechanism.
     ///
@@ -56,7 +56,7 @@ dylint_linting::declare_early_lint! {
     /// ```
     pub DE0103_NO_HTTP_TYPES_IN_CONTRACT,
     Deny,
-    "contract modules should not reference HTTP-specific types (DE0103)"
+    "contract gears should not reference HTTP-specific types (DE0103)"
 }
 
 const HTTP_TYPE_PATTERNS: &[&str] = &[
@@ -112,7 +112,7 @@ fn check_use_in_contract(cx: &rustc_lint::EarlyContext<'_>, item: &Item) {
             cx.span_lint(DE0103_NO_HTTP_TYPES_IN_CONTRACT, item.span, |diag| {
                 diag.primary_message("contract module imports HTTP type (DE0103)");
                 diag.help(
-                    "contract modules should be transport-agnostic; move HTTP types to api/rest/",
+                    "contract gears should be transport-agnostic; move HTTP types to api/rest/",
                 );
             });
             break;
@@ -122,7 +122,7 @@ fn check_use_in_contract(cx: &rustc_lint::EarlyContext<'_>, item: &Item) {
 
 impl EarlyLintPass for De0103NoHttpTypesInContract {
     fn check_item(&mut self, cx: &rustc_lint::EarlyContext<'_>, item: &Item) {
-        // Check use statements in file-based contract modules
+        // Check use statements in file-based contract gears
         if matches!(item.kind, ItemKind::Use(_)) && is_in_contract_module_ast(cx, item) {
             check_use_in_contract(cx, item);
         }

@@ -1,4 +1,4 @@
-//! Domain models for the `AuthN` resolver module.
+//! Domain models for the `AuthN` resolver gear.
 
 use secrecy::SecretString;
 

@@ -1,4 +1,4 @@
-# ADR: Rust ABI Client Library for Internal Modules
+# ADR: Rust ABI Client Library for Internal Gears
 
 - **Status**: Proposed
 - **Date**: 2026-02-03
@@ -9,7 +9,7 @@
 
 Internal Gears (workflow engines, agents, background jobs) need to make HTTP requests to external services (OpenAI, Anthropic, external APIs) but are **not allowed direct internet access** for security and observability reasons. All outbound requests must route through OAGW.
 
-**Problem**: Internal modules and third-party SDKs (like `async-openai`, `anthropic-sdk-rust`) expect a standard HTTP client interface. We need a **drop-in replacement client library** that:
+**Problem**: Internal gears and third-party SDKs (like `async-openai`, `anthropic-sdk-rust`) expect a standard HTTP client interface. We need a **drop-in replacement client library** that:
 
 1. **Routes requests through OAGW**: All requests go to OAGW's `/proxy/{alias}/*` endpoint
 2. **Supports multiple deployment modes**:
@@ -22,7 +22,7 @@ Internal Gears (workflow engines, agents, background jobs) need to make HTTP req
 
 **Current gaps**:
 
-- No client library for internal modules to use
+- No client library for internal gears to use
 - No abstraction for shared-process vs remote-OAGW modes
 - No streaming-aware API design
 - No SDK integration strategy
@@ -31,7 +31,7 @@ Internal Gears (workflow engines, agents, background jobs) need to make HTTP req
 
 ## Decision Drivers
 
-- **Ergonomics**: Simple, intuitive API for internal module developers
+- **Ergonomics**: Simple, intuitive API for internal gear developers
 - **SDK compatibility**: Works as HTTP backend for third-party Rust SDKs (OpenAI, Anthropic, etc.)
 - **Performance**: Zero-copy where possible, minimal allocations
 - **Safety**: Strong typing, compile-time guarantees
@@ -39,7 +39,7 @@ Internal Gears (workflow engines, agents, background jobs) need to make HTTP req
 - **Deployment transparency**: Same API works in shared-process and remote-OAGW modes
 - **Observability**: Request tracing, metrics collection routed through OAGW
 - **Testability**: Easy to mock for unit tests
-- **Security**: No direct internet access from internal modules
+- **Security**: No direct internet access from internal gears
 
 ## Considered Options
 
@@ -330,7 +330,7 @@ impl OagwClient {
 
 ```rust
 // Start OAGW proxy server on localhost:8080
-// Internal modules set: HTTP_PROXY=http://localhost:8080
+// Internal gears set: HTTP_PROXY=http://localhost:8080
 
 // OAGW proxy server intercepts requests and routes based on destination host
 // Request: GET https://api.openai.com/v1/chat/completions
@@ -493,10 +493,10 @@ impl Interceptor for OagwInterceptor {
 
 ### Recommended Strategy
 
-**Phase 0 (MVP)**: Pattern 4 (Wrapper Layer) for OpenAI + Pattern 1 (Drop-In Replacement) for internal modules
+**Phase 0 (MVP)**: Pattern 4 (Wrapper Layer) for OpenAI + Pattern 1 (Drop-In Replacement) for internal gears
 
 - + Immediate value: Works for critical use cases (OpenAI)
-- + Clean API: Internal modules get ergonomic client
+- + Clean API: Internal gears get ergonomic client
 - + Testable: Both patterns support mocking
 
 **Phase 1**: Pattern 2 (HTTP Proxy) for unmodified third-party SDKs
@@ -583,8 +583,8 @@ struct RemoteProxyClient {
 ```
 
 **Impact**:
-- Modules using different HTTP clients must include both dependencies
-- Binary size increase if module already uses another client
+- Gears using different HTTP clients must include both dependencies
+- Binary size increase if gear already uses another client
 - Pattern 1 (Drop-In Replacement) only works for reqwest-based SDKs
 - Cannot easily swap HTTP client implementation
 
@@ -855,7 +855,7 @@ Based on compatibility analysis, update phase priorities:
 - Response consumption: `.bytes()`, `.json()`, `.into_stream()`, `.into_sse_stream()`
 - Pattern 4 (Wrapper Layer) for OpenAI
 
-**Deliverable**: Internal modules can use OAGW in both async and sync contexts
+**Deliverable**: Internal gears can use OAGW in both async and sync contexts
 
 **Phase 1**: SharedProcessClient + HTTP Proxy
 
@@ -985,10 +985,10 @@ Add to crate-level documentation:
 
 ### Usage Example (Deployment-Agnostic)
 
-Internal module code **never changes** regardless of deployment mode:
+Internal gear code **never changes** regardless of deployment mode:
 
 ```rust
-// In your internal module (e.g., workflow_engine, agents)
+// In your internal gear (e.g., workflow_engine, agents)
 
 use oagw_client::{OagwClient, OagwClientConfig, Request, Method};
 
@@ -1528,7 +1528,7 @@ impl OagwClientConfig {
 
 #### Shared-Process Client (Internal Implementation)
 
-**Used when**: Internal module and OAGW run in the same process (development, single-executable deployment).
+**Used when**: Internal gear and OAGW run in the same process (development, single-executable deployment).
 
 ```rust
 struct SharedProcessClient {
@@ -1610,7 +1610,7 @@ impl SharedProcessClient {
 
 #### Remote OAGW Client (Internal Implementation)
 
-**Used when**: Internal module and OAGW run in separate processes (production, microservice deployment).
+**Used when**: Internal gear and OAGW run in separate processes (production, microservice deployment).
 
 ```rust
 struct RemoteProxyClient {
@@ -1797,7 +1797,7 @@ impl RemoteProxyClient {
 
 **Note**: Plugin development APIs (PluginContext, Starlark integration) are **not part of this client library**. They belong in OAGW's plugin system (see [ADR: Plugin System](./adr-plugin-system.md)).
 
-This client library is solely for **internal modules** to make HTTP requests **through** OAGW, not for developing plugins that **run inside** OAGW.
+This client library is solely for **internal gears** to make HTTP requests **through** OAGW, not for developing plugins that **run inside** OAGW.
 
 ### WebTransport Support (Future)
 
@@ -1848,7 +1848,7 @@ pub struct WebTransportStream {
 - Error handling and metrics
 - **SDK Integration**: Pattern 4 (Wrapper Layer) for OpenAI
 
-**Deliverable**: Internal modules can make HTTP requests (buffered and streaming) through OAGW in production
+**Deliverable**: Internal gears can make HTTP requests (buffered and streaming) through OAGW in production
 
 ### Phase 1: SharedProcessClient
 

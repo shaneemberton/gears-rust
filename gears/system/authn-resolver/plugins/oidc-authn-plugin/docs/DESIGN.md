@@ -41,11 +41,11 @@ Created:  2026-04-09 by Diffora
 
 ### 1.1 Architectural Vision
 
-The OIDC AuthN Resolver Plugin is a vendor-specific implementation of the AuthN Resolver plugin interface that integrates with any OpenID Connect-compliant Identity Provider (IdP) for authentication. It follows the Gears gateway + plugin pattern: the AuthN Resolver gateway module exposes a minimalist `authenticate()` interface to platform consumers, and the OIDC plugin provides the concrete validation logic behind that interface.
+The OIDC AuthN Resolver Plugin is a vendor-specific implementation of the AuthN Resolver plugin interface that integrates with any OpenID Connect-compliant Identity Provider (IdP) for authentication. It follows the Gears gateway + plugin pattern: the AuthN Resolver gateway gear exposes a minimalist `authenticate()` interface to platform consumers, and the OIDC plugin provides the concrete validation logic behind that interface.
 
-The plugin handles three core responsibilities: (1) **JWT local validation** — verify JWT access tokens using cached JWKS fetched from the IdP's standard OIDC endpoints; (2) **SecurityContext production** — extract claims from validated tokens using vendor-configurable claim mapping (`jwt.claim_mapping`) and map them to the platform's `SecurityContext` structure; (3) **S2S client credentials exchange** — obtain access tokens via the OAuth2 `client_credentials` grant for module-to-module communication when no incoming HTTP request exists.
+The plugin handles three core responsibilities: (1) **JWT local validation** — verify JWT access tokens using cached JWKS fetched from the IdP's standard OIDC endpoints; (2) **SecurityContext production** — extract claims from validated tokens using vendor-configurable claim mapping (`jwt.claim_mapping`) and map them to the platform's `SecurityContext` structure; (3) **S2S client credentials exchange** — obtain access tokens via the OAuth2 `client_credentials` grant for gear-to-gear communication when no incoming HTTP request exists.
 
-The architecture separates authentication concerns from authorization. The plugin produces a `SecurityContext` containing the authenticated subject identity, tenant binding, and token scopes. Authorization decisions — policy evaluation, tenant-scoped access filtering, barrier enforcement — are handled by downstream AuthZ Resolver and Tenant Resolver modules. The plugin is AuthN-only.
+The architecture separates authentication concerns from authorization. The plugin produces a `SecurityContext` containing the authenticated subject identity, tenant binding, and token scopes. Authorization decisions — policy evaluation, tenant-scoped access filtering, barrier enforcement — are handled by downstream AuthZ Resolver and Tenant Resolver gears. The plugin is AuthN-only.
 
 Multi-tenancy is claim-based: each tenant is served by exactly one OIDC issuer, while a single issuer may serve many tenants. Multiple trusted issuers can coexist for deployments that partition tenants across IdP instances. Tenant isolation is achieved via a configurable custom claim (default: `tenant_id`) injected into tokens by the IdP. The plugin extracts this claim and populates `SecurityContext.subject_tenant_id`. This approach scales to 10,000+ tenants per issuer without requiring per-tenant IdP configuration.
 
@@ -61,7 +61,7 @@ C4Context
     Enterprise_Boundary(platform, "Gears Middleware") {
         System(gateway, "API Gateway", "HTTP entrypoint")
         System(authn, "AuthN Resolver", "Authentication gateway with OIDC plugin")
-        System(modules, "Domain Modules", "PEP-protected services")
+        System(gears, "Domain Gears", "PEP-protected services")
     }
 
     System_Ext(idp, "OIDC Identity Provider", "One or more issuers with tenant_id claims")
@@ -70,7 +70,7 @@ C4Context
     Rel(dev, gateway, "API requests", "HTTPS + Bearer token")
     Rel(gateway, authn, "Token validation", "in-process / gRPC")
     Rel(authn, idp, "JWKS, discovery, token endpoint", "HTTPS")
-    Rel(modules, authn, "Token validation, S2S exchange", "in-process")
+    Rel(gears, authn, "Token validation, S2S exchange", "in-process")
 ```
 
 ### 1.2 Architecture Drivers
@@ -112,8 +112,8 @@ C4Context
 | Layer | Responsibility | Technology |
 |-------|---------------|------------|
 | SDK | Public client trait (`AuthNResolverClient`), plugin trait (`AuthNResolverPluginClient`), transport-agnostic models, error types | Rust traits + ClientHub registration (provided by `authn-resolver-sdk`) |
-| Gateway | Plugin resolution, vendor selection, request delegation | Rust module (provided by `authn-resolver`) |
-| Plugin (OIDC) | JWT validation, OIDC discovery, claim mapping, S2S exchange, caching | Rust + `jsonwebtoken` + HTTP client (this module) |
+| Gateway | Plugin resolution, vendor selection, request delegation | Rust gear (provided by `authn-resolver`) |
+| Plugin (OIDC) | JWT validation, OIDC discovery, claim mapping, S2S exchange, caching | Rust + `jsonwebtoken` + HTTP client (this gear) |
 
 **Technology Risks**:
 
@@ -236,13 +236,13 @@ The plugin uses only platform-approved open-source dependencies. No proprietary 
 
 #### Resource Constraints
 
-Resource constraints (team size, timeline) are not applicable at module level — tracked at project level. Regulatory constraints (token handling, PII in claims) are addressed in the Security Architecture section.
+Resource constraints (team size, timeline) are not applicable at gear level — tracked at project level. Regulatory constraints (token handling, PII in claims) are addressed in the Security Architecture section.
 
 #### Legacy System Integration
 
 - [x] `p2` - **ID**: `cpt-cf-authn-plugin-constraint-legacy-integration`
 
-Legacy system integration is handled through the pluggable AuthN Resolver plugin interface. Organizations with non-OIDC identity systems can implement their own `AuthNResolverPluginClient` without changes to the gateway or consuming modules.
+Legacy system integration is handled through the pluggable AuthN Resolver plugin interface. Organizations with non-OIDC identity systems can implement their own `AuthNResolverPluginClient` without changes to the gateway or consuming gears.
 
 **ADRs**: [ADR 0003: AuthN Resolver Minimalist Interface](../../../../../../docs/arch/authorization/ADR/0003-authn-resolver-minimalist-interface.md) — plugin interface enables custom implementations.
 
@@ -259,7 +259,7 @@ Legacy system integration is handled through the pluggable AuthN Resolver plugin
 | Entity | Description | Schema |
 |--------|-------------|--------|
 | `AuthenticationResult` | Wrapper containing a validated `SecurityContext` produced by successful authentication. | `authn-resolver-sdk` models |
-| `SecurityContext` | Platform-wide identity context: `subject_id`, `subject_type`, `subject_tenant_id`, `token_scopes`, `bearer_token`. Built by the AuthN plugin, consumed by all downstream modules. | `toolkit-security` |
+| `SecurityContext` | Platform-wide identity context: `subject_id`, `subject_type`, `subject_tenant_id`, `token_scopes`, `bearer_token`. Built by the AuthN plugin, consumed by all downstream gears. | `toolkit-security` |
 | `ClientCredentialsRequest` | Request to exchange OAuth2 client credentials for a `SecurityContext`. Contains `client_id`, `client_secret` (SecretString), and optional `scopes`. | `authn-resolver-sdk` models |
 | `AuthNResolverError` | Error enum with variants: `Unauthorized`, `ServiceUnavailable`, `NoPluginAvailable`, `TokenAcquisitionFailed`, `Internal`. | `authn-resolver-sdk` error |
 
@@ -488,7 +488,7 @@ Does not validate tokens. Does not manage token lifecycle. Does not perform intr
 
 ##### Why this component exists
 
-Modules performing background work (scheduled jobs, event handlers, async processing) need an authenticated `SecurityContext` without an incoming HTTP request. The Token Client exchanges OAuth2 client credentials for an access token, validates it through the same JWT pipeline, and returns a `SecurityContext`.
+Gears performing background work (scheduled jobs, event handlers, async processing) need an authenticated `SecurityContext` without an incoming HTTP request. The Token Client exchanges OAuth2 client credentials for an access token, validates it through the same JWT pipeline, and returns a `SecurityContext`.
 
 ##### Responsibility scope
 
@@ -667,7 +667,7 @@ Issuer selection is deterministic by configuration order: entries are evaluated 
 - **Technology**: Rust async trait + ClientHub
 - **Location**: [`authn-resolver-sdk/src/api.rs`](../../../authn-resolver-sdk/src/api.rs)
 
-The public API for modules. Delegates to the configured plugin.
+The public API for gears. Delegates to the configured plugin.
 
 | Operation | Input | Output | Key Behavior |
 |-----------|-------|--------|-------------|
@@ -748,15 +748,15 @@ The plugin determines app type during authentication and sets `token_scopes` acc
 
 ### 3.4 Internal Dependencies
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear    | Interface Used | Purpose |
 |-------------------|----------------|---------|
 | `toolkit-security` | `SecurityContext`, `SecurityContextBuilder` | Platform security context type produced by the plugin |
 | `authn-resolver-sdk` | `AuthNResolverPluginClient`, `AuthNResolverClient`, `AuthenticationResult`, `ClientCredentialsRequest`, `AuthNResolverError`, `AuthNResolverPluginSpecV1` | SDK types, traits, and GTS schema definition |
-| `toolkit` | `gts::PluginV1`, ClientHub, module lifecycle | Plugin framework, GTS integration, registration infrastructure |
+| `toolkit` | `gts::PluginV1`, ClientHub, gear lifecycle | Plugin framework, GTS integration, registration infrastructure |
 
 **Dependency Rules** (per project conventions):
 - No circular dependencies
-- Always use SDK modules for inter-module communication
+- Always use SDK modules for inter-gear communication
 - No cross-category sideways deps except through contracts
 - `SecurityContext` must be propagated across all in-process calls
 
@@ -811,7 +811,7 @@ sequenceDiagram
     participant Gateway as AuthN Resolver<br/>(Gateway)
     participant Plugin as OIDC Plugin
     participant IdP as OIDC IdP
-    participant Handler as Module Handler (PEP)
+    participant Handler as Gear Handler (PEP)
 
     Client->>Middleware: Request + Bearer Token
     Middleware->>Middleware: Extract bearer_token from Authorization header
@@ -925,7 +925,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Module as Domain Module<br/>(background task)
+    participant Gear as Domain Gear<br/>(background task)
     participant Resolver as AuthN Resolver<br/>Gateway
     participant Plugin as OIDC Plugin
     participant Cache as Token Cache
@@ -933,7 +933,7 @@ sequenceDiagram
     participant Validator as JWT Validator
     participant Mapper as Claim Mapper
 
-    Module->>Resolver: exchange_client_credentials(client_id, secret, scopes)
+    Gear->>Resolver: exchange_client_credentials(client_id, secret, scopes)
     Resolver->>Plugin: exchange_client_credentials(request)
     Plugin->>Cache: get(cache_key)
 
@@ -960,10 +960,10 @@ sequenceDiagram
         Plugin-->>Resolver: AuthenticationResult
     end
 
-    Resolver-->>Module: AuthenticationResult
+    Resolver-->>Gear: AuthenticationResult
 ```
 
-**Description**: S2S credential exchange for modules performing background work. On cache miss, the obtained JWT is validated through the same pipeline used by `authenticate()`, and the resulting `AuthenticationResult` is cached. On cache hit, the cached result is returned directly without re-validation — this ensures the warm-cache path is sub-millisecond (hashmap lookup + TTL check only). Cache identity is `(client_id, normalized_scopes, credential_fingerprint)`, where `normalized_scopes` is the requested scope set after normalization/deduplication/sorting and `credential_fingerprint` is derived from `client_secret` without storing the raw secret. TTL = `min(expires_in, s2s_oauth.token_cache.ttl)`. When the IdP does not include a `subject_type` claim in the `client_credentials` token (common for many IdPs), the `s2s_oauth.default_subject_type` configuration provides a fallback value so that `SecurityContext.subject_type` is always populated for S2S flows.
+**Description**: S2S credential exchange for gears performing background work. On cache miss, the obtained JWT is validated through the same pipeline used by `authenticate()`, and the resulting `AuthenticationResult` is cached. On cache hit, the cached result is returned directly without re-validation — this ensures the warm-cache path is sub-millisecond (hashmap lookup + TTL check only). Cache identity is `(client_id, normalized_scopes, credential_fingerprint)`, where `normalized_scopes` is the requested scope set after normalization/deduplication/sorting and `credential_fingerprint` is derived from `client_secret` without storing the raw secret. TTL = `min(expires_in, s2s_oauth.token_cache.ttl)`. When the IdP does not include a `subject_type` claim in the `client_credentials` token (common for many IdPs), the `s2s_oauth.default_subject_type` configuration provides a fallback value so that `SecurityContext.subject_type` is always populated for S2S flows.
 
 #### First-Party vs Third-Party App Detection
 
@@ -1007,7 +1007,7 @@ Not applicable — this plugin uses **in-memory caches only**. No persistent dat
 
 **Runtime issuer configuration changes**:
 
-`jwt.trusted_issuers` is read only during module startup. Runtime config reload is not supported for this plugin. Changing, adding, or removing a trusted issuer requires restarting the host so the plugin is rebuilt with fresh discovery, JWKS, and S2S token caches.
+`jwt.trusted_issuers` is read only during gear startup. Runtime config reload is not supported for this plugin. Changing, adding, or removing a trusted issuer requires restarting the host so the plugin is rebuilt with fresh discovery, JWKS, and S2S token caches.
 
 ### 3.8 Error Codes Reference
 
@@ -1047,7 +1047,7 @@ The plugin emits four error variants. The SDK also defines `NoPluginAvailable` (
 | **API Versioning & Evolution** | Covered by the `cpt-cf-authn-plugin-constraint-versioning` constraint. SDK trait stability is a versioning policy, not a separate design domain for this plugin. |
 | **Capacity and Cost Budgets** | The plugin is stateless with bounded in-memory caches. Infrastructure cost is negligible — no dedicated compute, storage, or database. The primary external cost driver (IdP API calls) is bounded by S2S exchange volume. |
 | **Event Architecture** | Plugin is synchronous request-response; no domain events are produced or consumed. Authentication outcomes are captured via structured audit logs and metrics, not events. |
-| **Deployment Architecture** | Plugin deploys as an in-process library loaded by the host module. Deployment topology is determined by the host module's deployment model. No standalone deployment artifacts, containers, or orchestration are required. |
+| **Deployment Architecture** | Plugin deploys as an in-process library loaded by the host gear. Deployment topology is determined by the host gear's deployment model. No standalone deployment artifacts, containers, or orchestration are required. |
 
 ### Security Architecture
 

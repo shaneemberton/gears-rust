@@ -1,7 +1,7 @@
 //! SQLite-specific tests
 //!
-//! This module organizes all SQLite-specific tests.
-//! All tests in this module require the `sqlite` feature flag.
+//! This gear organizes all SQLite-specific tests.
+//! All tests in this gear require the `sqlite` feature flag.
 
 #![cfg(feature = "sqlite")]
 

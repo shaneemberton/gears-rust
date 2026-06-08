@@ -64,7 +64,7 @@ pub struct Model {
     /// scanner-default substituted when the per-row override is NULL).
     #[sea_orm(nullable)]
     pub deleted_at: Option<OffsetDateTime>,
-    /// Optional per-tenant override of the module-default retention
+    /// Optional per-tenant override of the gear-default retention
     /// window. Stored as BIGINT seconds (not INTERVAL) so the shape is
     /// portable across `SQLite` / `MySQL` / Postgres.
     #[sea_orm(nullable)]

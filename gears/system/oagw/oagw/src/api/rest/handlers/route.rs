@@ -10,7 +10,7 @@ use crate::api::rest::error::domain_error_to_problem;
 use crate::api::rest::extractors::parse_gts_id;
 use crate::domain::gts_helpers as gts;
 use crate::domain::model::Route;
-use crate::module::AppState;
+use crate::gear::AppState;
 
 fn to_response(r: Route) -> RouteResponse {
     RouteResponse {

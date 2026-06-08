@@ -1,4 +1,4 @@
-# Account Management module — example operator configuration.
+# Account Management gear example operator configuration.
 #
 # Reference docs:
 #   - DESIGN.md §3.1 (hierarchy depth defaults), §3.5 (resource-ownership probe),
@@ -14,9 +14,9 @@
 #
 # `#[serde(default, deny_unknown_fields)]` is set on every section, so:
 #   - every field is OPTIONAL — omitted fields fall back to the default shown here
-#   - any UNKNOWN field rejects module init (loud misconfig surface)
+#   - any UNKNOWN field rejects gear init (loud misconfig surface)
 #
-# All durations are integer seconds (no humantime parsing on this module).
+# All durations are integer seconds (no humantime parsing on this gear).
 
 # =============================================================================
 # Listing — pagination clamps for collection endpoints
@@ -44,7 +44,7 @@ hierarchy:
 # =============================================================================
 # Tick + batch values MUST be > 0 — `tokio::time::interval` panics on
 # zero, and `LIMIT 0` would scan zero rows forever. `validate()`
-# rejects each at module init rather than crashing the lifecycle task
+# rejects each at gear init rather than crashing the lifecycle task
 # on its first tick.
 retention:
   # Hard-delete tick — scans rows whose `scheduled_at + retention <= now`
@@ -84,7 +84,7 @@ reaper:
 # IdP — external Identity Provider integration policy
 # =============================================================================
 # `AuthZResolverClient`, `TypesRegistryClient`, `ResourceGroupClient` are
-# declared as hard `deps` in `#[toolkit::module(...)]` and are ALWAYS
+# declared as hard `deps` in `#[toolkit::gear(...)]` and are ALWAYS
 # fail-closed on missing client — there is no config knob for them.
 # `IdpPluginClient` is the only optional plugin.
 idp:
@@ -106,7 +106,7 @@ idp:
 # Lifecycle windows for the dual-consent `pending -> {approved, cancelled,
 # rejected, expired}` flow. Defaults pinned in
 # `cpt-cf-account-management-adr-conversion-approval` (ADR-0003 §1) and
-# PRD §5.4. `validate()` rejects every out-of-range value at module init.
+# PRD §5.4. `validate()` rejects every out-of-range value at gear init.
 conversion:
   # Approval TTL applied at request_conversion time:
   # `expires_at = now() + approval_ttl_secs`. Default 72h.

@@ -5,14 +5,14 @@ ToolKit provides a type-safe operation builder that prevents half-wired routes a
 ## Core principles
 
 - **Rule**: Strictly follow the API guideline (`guidelines/DNA/REST/API.md`).
-- **Rule**: Do NOT implement a REST host. `api-gateway` owns the Axum server and OpenAPI. Modules only register routes via `register_routes(...)`.
+- **Rule**: Do NOT implement a REST host. `api-gateway` owns the Axum server and OpenAPI. Gears only register routes via `register_routes(...)`.
 - **Rule**: Use `Extension<Arc<Service>>` for dependency injection and attach the service ONCE after all routes are registered: `router = router.layer(Extension(service.clone()));`.
 - **Rule**: Use `Extension(ctx): Extension<SecurityContext>` extractor — the gateway injects `SecurityContext` as an Axum extension.
 - **Rule**: Follow the `<crate>.<resource>.<action>` convention for `operation_id` naming.
 - **Rule**: Use `toolkit::api::prelude::*` for ergonomic handler types (ApiResult, created_json, no_content).
 - **Rule**: Always return RFC 9457 Problem Details for all 4xx/5xx errors via `Problem` (implements `IntoResponse`).
 - **Rule**: Observability is provided by gateway: request tracing and `X-Request-Id` are already handled.
-- **Rule**: Do not add transport middlewares (CORS, timeouts, compression, body limits) at module level.
+- **Rule**: Do not add transport middlewares (CORS, timeouts, compression, body limits) at gear level.
 - **Rule**: Handlers should complete within ~30s (gateway timeout). If work may exceed that, return `202 Accepted`.
 
 ## OperationBuilder basics

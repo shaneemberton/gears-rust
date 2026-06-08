@@ -2,7 +2,7 @@
 
 ## Goal
 
-Replace the stub tick log in `orphan_watchdog.rs` with a real scan-finalize loop and inject the required dependencies through `background_workers.rs` and `module.rs`.
+Replace the stub tick log in `orphan_watchdog.rs` with a real scan-finalize loop and inject the required dependencies through `background_workers.rs` and `gear.rs`.
 
 ## Current State
 
@@ -149,9 +149,9 @@ where
 
 Alternative: add deps to `WorkerConfigs` as an `Option<OrphanWatchdogDeps>`, or create a separate `WorkerDeps` struct. Choose whichever approach is cleanest given the existing signature.
 
-### 5.5 Update `module.rs` wiring
+### 5.5 Update `gear.rs` wiring
 
-File: `src/module.rs`
+File: `src/gear.rs`
 
 In the `start()` method, construct `OrphanWatchdogDeps` from the already-available services:
 
@@ -182,7 +182,7 @@ The existing `disabled_returns_immediately` and `shutdown_on_cancel` tests need 
 ## Acceptance Criteria
 
 - [ ] Stub tick log replaced with real scan-finalize loop
-- [ ] Dependencies injected through `background_workers.rs` → `module.rs`
+- [ ] Dependencies injected through `background_workers.rs` → `gear.rs`
 - [ ] Graceful shutdown between candidates (`cancel.is_cancelled()` check)
 - [ ] Leader election still works correctly
 - [ ] Scan query failures don't crash the watchdog (retry on next tick)

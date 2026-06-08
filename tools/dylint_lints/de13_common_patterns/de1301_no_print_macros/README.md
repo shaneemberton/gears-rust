@@ -2,7 +2,7 @@
 
 ## Rule
 
-This lint forbids using the following macros in production Rust modules code:
+This lint forbids using the following macros in production Rust gears code:
 
 - `println!`
 - `eprintln!`
@@ -55,11 +55,11 @@ the boundary-level handling that the lint's guidance recommends:
 - Early bootstrap diagnostics before logging is initialized
 - Fatal error reporting in xtask / build tooling
 
-Functions inside nested modules within binary crates are still checked.
+Functions inside nested gears within binary crates are still checked.
 
 ### 5) Tests (`#[test]` / `#[tokio::test]` / `#[cfg(test)]`)
 
-Unit tests and test-only modules may use these macros for debug output and quick feedback.
+Unit tests and test-only gears may use these macros for debug output and quick feedback.
 
 ## Examples
 

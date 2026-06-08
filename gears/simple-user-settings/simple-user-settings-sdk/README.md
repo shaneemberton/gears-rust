@@ -1,6 +1,6 @@
 # Simple User Settings SDK
 
-SDK crate for the simple user settings module.
+SDK crate for the simple user settings gear.
 
 ## Overview
 

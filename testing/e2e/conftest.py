@@ -33,17 +33,17 @@ def auth_headers():
 def local_files_root():
     """
     Provide the root directory for local file parsing tests.
-    
+
     This can be overridden with E2E_LOCAL_FILES_ROOT env var.
     Default is the absolute path to e2e/testdata.
-    
+
     Returns:
         Path: Absolute path to the local files directory
     """
     env_path = os.getenv("E2E_LOCAL_FILES_ROOT")
     if env_path:
         return Path(env_path).resolve()
-    
+
     # Default to testdata directory
     testdata_dir = Path(__file__).parent / "testdata"
     return testdata_dir.resolve()
@@ -53,27 +53,27 @@ def local_files_root():
 def mock_http_server():
     """
     Start the mock HTTP server for URL-based parsing tests.
-    
+
     In local mode: Starts a Python HTTP server in the same process
     In Docker mode: Uses the 'mock' service from docker-compose
-    
+
     Yields:
         None (server is started as a side effect)
     """
     from mock_server import is_docker_mode, start_mock_server, stop_mock_server
-    
+
     # In Docker mode, the mock service is already running via docker-compose
     if is_docker_mode():
         yield
         return
-    
+
     # In local mode, start the mock server serving from testdata
     testdata_dir = Path(__file__).parent / "testdata"
     if not testdata_dir.exists():
         pytest.skip(f"testdata directory not found at {testdata_dir}")
-    
+
     server = start_mock_server(testdata_dir)
-    
+
     try:
         yield
     finally:
@@ -87,10 +87,10 @@ def pytest_configure(config):
     )
 
 
-# ── Module test environment orchestration ─────────────────────────────────
-# Re-export fixtures from lib.orchestrator so all modules can use them.
-# Modules override `module_test_env` in their own conftest for custom needs.
+# ── Gear test environment orchestration ─────────────────────────────────
+# Re-export fixtures from lib.orchestrator so all gears can use them.
+# Gears override `gear_test_env` in their own conftest for custom needs.
 
-from lib.orchestrator import test_env, module_test_env  # noqa: F401, E402
+from lib.orchestrator import test_env, gear_test_env  # noqa: F401, E402
 
 

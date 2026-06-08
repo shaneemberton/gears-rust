@@ -49,7 +49,7 @@ This lint is configured to **deny** by default.
 
 It checks all imports in `*/domain/*.rs` files for references to:
 - `sea_orm`, `sqlx` (database frameworks)
-- `infra::*` (infrastructure modules)
+- `infra::*` (infrastructure gears)
 
 ## See Also
 

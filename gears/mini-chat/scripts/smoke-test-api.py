@@ -7,11 +7,11 @@ Prerequisites:
      (static-credstore-plugin -> secrets -> value)
 
 Usage (from the repo root):
-  python3 modules/mini-chat/scripts/smoke-test-api.py                                  # run all steps
-  python3 modules/mini-chat/scripts/smoke-test-api.py --no-sse                         # skip SSE streaming (no real API key)
-  python3 modules/mini-chat/scripts/smoke-test-api.py --base-url http://host:port      # custom server address
-  python3 modules/mini-chat/scripts/smoke-test-api.py --api-url-prefix /x              # custom route prefix
-  python3 modules/mini-chat/scripts/smoke-test-api.py --indexing-delay 10              # seconds to wait for provider indexing (default 5)
+  python3 gears/mini-chat/scripts/smoke-test-api.py                                  # run all steps
+  python3 gears/mini-chat/scripts/smoke-test-api.py --no-sse                         # skip SSE streaming (no real API key)
+  python3 gears/mini-chat/scripts/smoke-test-api.py --base-url http://host:port      # custom server address
+  python3 gears/mini-chat/scripts/smoke-test-api.py --api-url-prefix /x              # custom route prefix
+  python3 gears/mini-chat/scripts/smoke-test-api.py --indexing-delay 10              # seconds to wait for provider indexing (default 5)
 """
 
 from __future__ import annotations

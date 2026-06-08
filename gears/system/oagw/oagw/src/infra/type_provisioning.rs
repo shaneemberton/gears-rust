@@ -1,7 +1,7 @@
 //! Infrastructure implementation of `TypeProvisioningService` backed by `TypesRegistryClient`.
 //!
 //! Queries the types-registry for upstream and route GTS instances registered
-//! by other modules during `init()`, deserializes their content, and returns
+//! by other gears during `init()`, deserializes their content, and returns
 //! domain-level provisioned objects for `post_init()` to insert into repos.
 
 use std::collections::HashMap;

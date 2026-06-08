@@ -1,6 +1,6 @@
 //! Secure database handle and runner types.
 //!
-//! This module provides the primary entry point for secure database access:
+//! This gear provides the primary entry point for secure database access:
 //!
 //! - [`Db`]: The database handle. NOT Clone, NOT storable by services.
 //! - [`DbConn`]: Non-transactional runner (borrows from `Db`).
@@ -148,7 +148,7 @@ impl Db {
 
     /// **INTERNAL**: Get a privileged `SeaORM` connection clone.
     ///
-    /// This must not be exposed to module code. It exists for infrastructure
+    /// This must not be exposed to gear code. It exists for infrastructure
     /// (migrations) inside `toolkit-db`.
     pub(crate) fn sea_internal(&self) -> DatabaseConnection {
         self.handle.sea_internal()
@@ -208,12 +208,12 @@ impl Db {
 
     // --- Advisory locks (forwarded, no `DbHandle` exposure) ---
 
-    /// Acquire an advisory lock with the given key and module namespace.
+    /// Acquire an advisory lock with the given key and gear namespace.
     ///
     /// # Errors
     /// Returns an error if the lock cannot be acquired.
-    pub async fn lock(&self, module: &str, key: &str) -> crate::Result<crate::DbLockGuard> {
-        self.handle.lock(module, key).await
+    pub async fn lock(&self, gear: &str, key: &str) -> crate::Result<crate::DbLockGuard> {
+        self.handle.lock(gear, key).await
     }
 
     /// Try to acquire an advisory lock with configurable retry/backoff policy.
@@ -222,11 +222,11 @@ impl Db {
     /// Returns an error if an unrecoverable lock error occurs.
     pub async fn try_lock(
         &self,
-        module: &str,
+        gear: &str,
         key: &str,
         config: crate::LockConfig,
     ) -> crate::Result<Option<crate::DbLockGuard>> {
-        self.handle.try_lock(module, key, config).await
+        self.handle.try_lock(gear, key, config).await
     }
 
     /// Execute a closure inside a database transaction (borrowed form).
@@ -782,4 +782,4 @@ impl std::fmt::Debug for DbTx<'_> {
 }
 
 // NOTE: tests for `Db` live under `libs/toolkit-db/tests/` so they can be gated per-backend
-// without creating feature-specific unused-import warnings in this module.
+// without creating feature-specific unused-import warnings in this gear.

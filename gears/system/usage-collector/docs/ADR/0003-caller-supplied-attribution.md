@@ -26,7 +26,7 @@ date: 2026-05-24
 
 ## Context and Problem Statement
 
-Every ingestion record carries an attribution tuple — tenant, resource (id + type), source module, Metric, and optionally subject — and the core must decide whether these fields are derived from the caller's SecurityContext, supplied by the caller and authorized by the PDP, or partially synthesized by the collector. Platform-level forwarders and parent-tenant-to-subtenant emission scenarios mean the caller's SecurityContext does not always match the emission's logical attribution; PII handling for the subject identifier is owned by the platform identity layer rather than the collector. The decision shapes the ingestion contract, the PDP authorization tuple, and the boundary between the metering substrate and the identity layer.
+Every ingestion record carries an attribution tuple — tenant, resource (id + type), source gear, Metric, and optionally subject — and the core must decide whether these fields are derived from the caller's SecurityContext, supplied by the caller and authorized by the PDP, or partially synthesized by the collector. Platform-level forwarders and parent-tenant-to-subtenant emission scenarios mean the caller's SecurityContext does not always match the emission's logical attribution; PII handling for the subject identifier is owned by the platform identity layer rather than the collector. The decision shapes the ingestion contract, the PDP authorization tuple, and the boundary between the metering substrate and the identity layer.
 
 ## Decision Drivers
 
@@ -39,25 +39,25 @@ Every ingestion record carries an attribution tuple — tenant, resource (id + t
 
 ## Considered Options
 
-- Caller-supplied attribution + PDP authorization — tenant, resource, source module, and subject are explicit ingestion-contract fields; the PDP authorizes the caller's identity against the supplied tuple before plugin dispatch.
+- Caller-supplied attribution + PDP authorization — tenant, resource, source gear, and subject are explicit ingestion-contract fields; the PDP authorizes the caller's identity against the supplied tuple before plugin dispatch.
 - Implicit attribution from SecurityContext — the collector derives tenant and subject from the caller's resolved SecurityContext; only resource and Metric remain caller-supplied.
 - Hybrid attribution — tenant supplied by caller, subject derived from SecurityContext, with a forwarder bypass flag for cross-tenant emission scenarios.
 
 ## Decision Outcome
 
-Chosen option: "Caller-supplied attribution + PDP authorization", because it is the only option that supports platform-level forwarders and parent-to-subtenant emission with a single uniform ingestion path, and it keeps the PII-management responsibility cleanly on the platform identity layer rather than smuggling it into the collector. The ingestion contract carries tenant, resource (id + type), source module, Metric, and optional subject; the PDP authorizes the caller's SecurityContext against this explicit tuple; the core never derives any attribution field from the caller's identity. Subject IDs remain opaque to the collector throughout ingestion, persistence, and query.
+Chosen option: "Caller-supplied attribution + PDP authorization", because it is the only option that supports platform-level forwarders and parent-to-subtenant emission with a single uniform ingestion path, and it keeps the PII-management responsibility cleanly on the platform identity layer rather than smuggling it into the collector. The ingestion contract carries tenant, resource (id + type), source gear, Metric, and optional subject; the PDP authorizes the caller's SecurityContext against this explicit tuple; the core never derives any attribution field from the caller's identity. Subject IDs remain opaque to the collector throughout ingestion, persistence, and query.
 
 ### Consequences
 
 - The ingestion contract on SDK, REST, and Plugin SPI all carry the same explicit attribution tuple; there is no implicit-attribution path to maintain.
 - The PDP receives the full tuple on every ingestion authorization call; PDP policy authors gain full visibility into both the caller and the emission's logical attribution.
-- Forwarder modules and parent-tenant emissions share the same code path with non-forwarded emissions; there is no special-case "on behalf of" mode in the collector.
+- Forwarder gears and parent-tenant emissions share the same code path with non-forwarded emissions; there is no special-case "on behalf of" mode in the collector.
 - The collector cannot prevent a caller from supplying a tenant or subject the PDP grants; the PDP is the single authoritative gate, which reinforces `cpt-cf-usage-collector-adr-pdp-centric-authorization`.
 - Subject identifiers remain opaque strings; the collector does not interpret, redact, or classify them, and the data model carries no PII-sensitive fields beyond opaque identifiers.
 
 ### Confirmation
 
-Compliance is confirmed through (a) the OpenAPI contract and SDK trait definitions showing tenant, resource, source module, Metric, and subject as explicit ingestion fields, (b) authorization tests covering forwarder and parent-to-subtenant emission scenarios with PDP grants and denials, and (c) data-classification review confirming subject and tenant remain opaque strings throughout the ingestion, persistence, and query paths.
+Compliance is confirmed through (a) the OpenAPI contract and SDK trait definitions showing tenant, resource, source gear, Metric, and subject as explicit ingestion fields, (b) authorization tests covering forwarder and parent-to-subtenant emission scenarios with PDP grants and denials, and (c) data-classification review confirming subject and tenant remain opaque strings throughout the ingestion, persistence, and query paths.
 
 ## Pros and Cons of the Options
 

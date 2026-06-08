@@ -1,15 +1,15 @@
-//! Users Info Module
+//! Users Info Gear
 //!
-//! This module provides user management functionality with REST API,
-//! database storage, and inter-module communication via `ClientHub`.
+//! This gear provides user management functionality with REST API,
+//! database storage, and inter-gear communication via `ClientHub`.
 //!
 //! ## Architecture
 //!
-//! This module follows clean architecture with strict layering:
+//! This gear follows clean architecture with strict layering:
 //!
 //! ### Contract Layer (`users-info-sdk`)
 //! - **Location:** `examples/toolkit/users-info/users-info-sdk/`
-//! - **Purpose:** Public API contract for inter-module communication
+//! - **Purpose:** Public API contract for inter-gear communication
 //! - **Contains:**
 //!   - `UsersInfoClient` trait
 //!   - Model types: `User`, `Address`, `City`
@@ -54,11 +54,11 @@
 //! ## Public API
 //!
 //! The public API is defined in the `users-info-sdk` crate and re-exported here:
-//! - `UsersInfoClientV1` - trait for inter-module communication
+//! - `UsersInfoClientV1` - trait for inter-gear communication
 //! - User, Address and City models and their request/patch types
 //! - `UsersInfoError` - error types
 //!
-//! Other modules should use `hub.get::<dyn UsersInfoClientV1>()?` to obtain the client.
+//! Other gears should use `hub.get::<dyn UsersInfoClientV1>()?` to obtain the client.
 //!
 //! ## `OData` Support
 //!
@@ -75,12 +75,12 @@ pub use users_info_sdk::{
 };
 
 // === MODULE DEFINITION ===
-// ToolKit needs access to the module struct for instantiation
-pub mod module;
-pub use module::UsersInfo;
+// ToolKit needs access to the gear struct for instantiation
+pub mod gear;
+pub use gear::UsersInfo;
 
 // === INTERNAL MODULES ===
-// WARNING: These modules are internal implementation details!
+// WARNING: These gears are internal implementation details!
 // They are exposed only for comprehensive testing and should NOT be used by external consumers.
 // Only use the SDK types for stable public APIs.
 #[doc(hidden)]

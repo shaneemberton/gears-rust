@@ -39,7 +39,7 @@ toolkit-http = { workspace = true }
 api_gateway = { package = "cf-gears-api-gateway", path = "../../gears/system/api-gateway" }
 api_egress = { package = "cf-gears-oagw", path = "../../gears/system/oagw/oagw" }
 grpc_hub = { package = "cf-gears-grpc-hub", path = "../../gears/system/grpc-hub" }
-module_orchestrator = { package = "cf-gears-module-orchestrator", path = "../../gears/system/module-orchestrator" }
+gear_orchestrator = { package = "cf-gears-gear-orchestrator", path = "../../gears/system/gear-orchestrator" }
 types_registry = { package = "cf-gears-types-registry", path = "../../gears/system/types-registry/types-registry" }
 tenant-resolver = { package = "cf-gears-tenant-resolver", path = "../../gears/system/tenant-resolver/tenant-resolver" }
 authn-resolver = { package = "cf-gears-authn-resolver", path = "../../gears/system/authn-resolver/authn-resolver" }
@@ -71,17 +71,17 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true }
 
-# Optional mini-chat module
+# Optional mini-chat gear
 mini-chat = { package = "cf-gears-mini-chat", path = "../../gears/mini-chat/mini-chat", optional = true }
 
-# Optional Account Management module
+# Optional Account Management gear
 account_management = { package = "cf-gears-account-management", path = "../../gears/system/account-management/account-management", optional = true }
 static-idp-plugin = { package = "cf-gears-static-idp-plugin", path = "../../gears/system/account-management/plugins/static-idp-plugin", optional = true }
 
 # Optional example module
 users-info = { path = "../../examples/toolkit/users-info/users-info", optional = true }
-calculator-gateway = { path = "../../examples/oop-modules/calculator-gateway/calculator-gateway", optional = true }
-calculator = { path = "../../examples/oop-modules/calculator/calculator", optional = true }
+calculator-gateway = { path = "../../examples/oop-gears/calculator-gateway/calculator-gateway", optional = true }
+calculator = { path = "../../examples/oop-gears/calculator/calculator", optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

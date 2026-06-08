@@ -279,7 +279,7 @@ Before evaluating each checklist item, the expert MUST:
 **Severity**: HIGH
 
 - [ ] Extension points identified
-- [ ] Plugin/module boundaries defined
+- [ ] Plugin/gear boundaries defined
 - [ ] API stability zones identified
 - [ ] Internal vs external interfaces distinguished
 - [ ] Coupling between components minimized
@@ -674,7 +674,7 @@ Before evaluating each checklist item, the expert MUST:
 **Severity**: HIGH
 **Ref**: ISO/IEC 25010:2011 §4.2.7 (Modularity)
 
-- [ ] Module structure documented
+- [ ] Gear structure documented
 - [ ] Package/namespace conventions documented
 - [ ] Layering strategy documented
 - [ ] Dependency injection approach documented

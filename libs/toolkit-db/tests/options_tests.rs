@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-//! Tests for options module functionality.
+//! Tests for options gear functionality.
 
 #[cfg(feature = "pg")]
 #[tokio::test]

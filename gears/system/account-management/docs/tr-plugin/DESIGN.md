@@ -54,7 +54,7 @@ The plugin is **not** a standalone replaceable component. It is Account Manageme
 ```mermaid
 graph LR
     AuthZ["AuthZ Resolver<br>Plugin"] -->|hierarchy & barrier<br>queries| GW["Tenant Resolver<br>Gateway"]
-    GW -->|delegates<br>in-process| TRP["Tenant Resolver<br>Plugin (this module)"]
+    GW -->|delegates<br>in-process| TRP["Tenant Resolver<br>Plugin (this gear)"]
     TRP -->|"read-only role<br>over tenants + tenant_closure"| AMDB[("AM storage")]
     AM["Account<br>Management"] ---|"transactional writer<br>(tree + closure)"| AMDB
 ```
@@ -138,7 +138,7 @@ Barrier state is an integer bitmask column on each closure row (v1 uses bit 0 fo
 
 - [ ] `p1` - **ID**: `cpt-cf-tr-plugin-principle-single-store`
 
-Tenant hierarchy state is never materialized outside AM. The plugin reads it; other platform modules read it through the SDK. There is no second copy, no rebuild, no drift, no freshness window — consistency is the default, not a target.
+Tenant hierarchy state is never materialized outside AM. The plugin reads it; other platform gears read it through the SDK. There is no second copy, no rebuild, no drift, no freshness window — consistency is the default, not a target.
 
 ### 2.2 Constraints
 
@@ -155,9 +155,9 @@ The plugin connects to the same physical database that AM writes to. The origina
 > **Implementation status:** Deferred. The plugin currently reads through
 > AM's writer-grade `Db` handle because `toolkit-db` does not yet expose a
 > connection-pool-per-role abstraction. Read-only behavior is enforced
-> **structurally** by the `tr_plugin` module — every query is a SELECT
+> **structurally** by the `tr_plugin` gear — every query is a SELECT
 > via the secure-extension `find()` / `count()` API, with no `secure_insert`
-> / `secure_update` / `secure_delete` calls anywhere in the module — so a
+> / `secure_update` / `secure_delete` calls anywhere in the gear — so a
 > code-review grep is the operative protection until the per-role pool
 > lands. A startup audit warning under `target = "am.tr_plugin.audit"`
 > records the deviation whenever `tr_plugin.enabled = true`.
@@ -192,7 +192,7 @@ The plugin follows the same compatibility policy as the rest of the platform: no
 
 - [ ] `p3` - **ID**: `cpt-cf-tr-plugin-constraint-scope-exclusions`
 
-The following constraint classes are Not applicable at the plugin layer because the plugin is an in-process backend module holding no user data, no third-party vendor dependency, no regulated payload, and no independent team/budget surface:
+The following constraint classes are Not applicable at the plugin layer because the plugin is an in-process backend gear holding no user data, no third-party vendor dependency, no regulated payload, and no independent team/budget surface:
 
 - **Regulatory constraints** — Not applicable: the plugin stores no credentials, no user PII, and no tokens; regulated-data controls (GDPR / HIPAA / PCI DSS / SOX) are inherited from the platform posture and AM's data-governance stance.
 - **Vendor / licensing constraints** — Not applicable: the plugin's technology choices (Rust + ToolKit + SecureConn + AM-owned relational storage) are platform-standard; no plugin-local vendor or licensing dependency exists beyond AM's.
@@ -289,7 +289,7 @@ Any rename, removal, or type change to these columns requires a coordinated AM +
 
 ### 3.4 Internal Dependencies
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear    | Interface Used | Purpose |
 |-------------------|----------------|---------|
 | [Tenant Resolver SDK](../../../tenant-resolver/tenant-resolver-sdk/) | `TenantResolverPluginClient` trait + models | Public contract implemented by the plugin. |
 | [Tenant Resolver (gateway)](../../../tenant-resolver/) | Plugin registration via `ClientHub` under the plugin's GTS instance scope | Delegation target for the gateway. |
@@ -329,9 +329,9 @@ Any rename, removal, or type change to these columns requires a coordinated AM +
 | Cache behavior | The plugin holds no cache of these mappings. `TypesRegistryClient` owns a bounded TTL-aware local cache; the plugin issues a (batched) lookup on every call and lets the registry client absorb repeated reads. |
 | Failure handling | If the mapping cannot be resolved, the plugin fails the request deterministically with `TenantResolverError::Internal`; it must not return raw UUIDs in place of public `tenant_type`. |
 
-#### Account Management (in-process module)
+#### Account Management (in-process gear)
 
-The plugin does not consume `AccountManagementClient` on the SDK path. AM is a peer module in the same process and the same database; the plugin's only dependency on AM is the shared schema.
+The plugin does not consume `AccountManagementClient` on the SDK path. AM is a peer gear in the same process and the same database; the plugin's only dependency on AM is the shared schema.
 
 ### 3.6 Interactions & Sequences
 
@@ -525,8 +525,8 @@ The plugin returns SDK errors through `Result<_, TenantResolverError>`. Error su
 | Tenant type validation | No | GTS Types Registry via AM. |
 | Tenant type reverse hydration | Yes | Plugin resolves `tenant_type_uuid` through `TypesRegistryClient`; caching for that mapping lives inside the registry client (the plugin holds no parallel cache). |
 | Authorization decisions | No | AuthZ Resolver Plugin. |
-| Subtree-membership integration for consuming policy modules | No | Deployment-specific integration owned by the consuming stack; AM's `tenant_closure` is the canonical surface. |
-| Resource Group / User Group hierarchy | No | Resource Group module. |
+| Subtree-membership integration for consuming policy gears | No | Deployment-specific integration owned by the consuming stack; AM's `tenant_closure` is the canonical surface. |
+| Resource Group / User Group hierarchy | No | Resource Group gear. |
 | Token validation, session revocation | No | Platform AuthN + IdP. |
 
 ### 4.2 Security Architecture
@@ -613,7 +613,7 @@ Per-query observability is emitted via structured logs and OpenTelemetry spans c
 - **Types Registry amortization**: caching for the `tenant_type_uuid → tenant_type` mapping lives inside `TypesRegistryClient` (bounded TTL-aware LRU per `cpt-cf-tr-plugin-contract-types-registry-reverse-lookup`), so steady-state reads do not pull Types Registry into the response path. The plugin maintains no parallel cache and emits no plugin-side cache-miss metric — observability for the registry-client cache is owned by Types Registry.
 - **Budget delegation**: infrastructure and database cost are owned by AM's capacity budget under `cpt-cf-account-management-nfr-production-scale`. The plugin's local cost surface is the SecureConn pool size, which is tuned against the gateway's concurrency profile rather than owned as an independent budget line.
 - **Cost-optimization patterns**: Not applicable as plugin-local patterns — the plugin holds no storage, no caches for hierarchy data, and no egress surface. The deliberate absence of a plugin-side hierarchy cache (see [§4.3 Known Limitations & Technical Debt](#known-limitations--technical-debt)) is an architectural choice anchored in `cpt-cf-tr-plugin-principle-single-store`; caching would be introduced only if measured DB load forced it and an invalidation contract from AM were available.
-- **Time-to-market**: the plugin is pre-GA; go-live is gated on the PRD's Success criteria table ([PRD §1.3](PRD.md#13-goals-business-outcomes) — Module GA + Pre-GA soak / security / scale gates), not on an independent delivery timeline.
+- **Time-to-market**: the plugin is pre-GA; go-live is gated on the PRD's Success criteria table ([PRD §1.3](PRD.md#13-goals-business-outcomes) — Gear GA + Pre-GA soak / security / scale gates), not on an independent delivery timeline.
 
 #### Feature Telemetry
 
@@ -683,7 +683,7 @@ Every bullet below is an explicit "Not applicable because…" statement; it bind
 **Performance architecture (PERF)**
 
 - *Horizontal scaling approach, vertical scaling limits, load balancing, queue/broker strategy, user session management* — Not applicable as plugin-local concerns: horizontal scaling tracks Tenant Resolver gateway replicas (each replica carries one plugin instance with its own SecureConn pool); vertical scaling is bounded by `pool_max_connections` and database connection limits; load balancing is upstream at the gateway; there is no async / queue surface; there are no user sessions.
-- *CDN strategy, edge computing* — Not applicable because the plugin is an in-process backend module with no external network surface.
+- *CDN strategy, edge computing* — Not applicable because the plugin is an in-process backend gear with no external network surface.
 - *CPU efficiency, storage efficiency, network-bandwidth efficiency* — Not applicable beyond the DB round-trip and SerDe cost that already dominate the latency budget: the plugin holds no storage, emits only OpenTelemetry signals + per-call log lines, and performs no plugin-local computation beyond filter-predicate application and SDK projection.
 
 **Reliability architecture (REL)**
@@ -707,7 +707,7 @@ Every bullet below is an explicit "Not applicable because…" statement; it bind
 **Operations architecture (OPS)**
 
 - *Container / VM strategy, orchestration, environment-promotion strategy, secret management* — Container/VM strategy and orchestration are inherited from the Tenant Resolver gateway's deployment (plugin is in-process, not independently deployed). Environment promotion rides the platform release pipeline. The plugin's DB-role credentials are provisioned via the platform secret-management policy (see [§4.2 Threat Catalog — credential-leak mitigation](#threat-modeling)); the plugin never logs, echoes, or serializes credentials.
-- *Infrastructure-as-code, environment parity, immutable infrastructure, auto-scaling configuration, resource tagging* — Not applicable at the plugin scope: the plugin ships as an in-process module; IaC + environment parity + immutable-infra posture are inherited from the Tenant Resolver gateway's deployment and the platform's central IaC repository.
+- *Infrastructure-as-code, environment parity, immutable infrastructure, auto-scaling configuration, resource tagging* — Not applicable at the plugin scope: the plugin ships as an in-process gear; IaC + environment parity + immutable-infra posture are inherited from the Tenant Resolver gateway's deployment and the platform's central IaC repository.
 
 **Maintainability architecture (MAINT)**
 
@@ -723,7 +723,7 @@ Every bullet below is an explicit "Not applicable because…" statement; it bind
 
 **User-facing architecture (UX)**
 
-- *Frontend architecture, state management, responsive design, progressive enhancement, offline support* — Not applicable because the plugin is an in-process backend module with no end-user UI. User-facing surfaces (if any) are owned by consumers of the Tenant Resolver gateway, not by this plugin.
+- *Frontend architecture, state management, responsive design, progressive enhancement, offline support* — Not applicable because the plugin is an in-process backend gear with no end-user UI. User-facing surfaces (if any) are owned by consumers of the Tenant Resolver gateway, not by this plugin.
 
 **Compliance (COMPL)**
 

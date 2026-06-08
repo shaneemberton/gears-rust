@@ -8,7 +8,7 @@ use toolkit_security::SecurityContext;
 use users_info_sdk::odata::CitySchema;
 use users_info_sdk::{CitiesStreamingClientV1, City, UsersInfoError};
 
-use crate::module::ConcreteAppServices;
+use crate::gear::ConcreteAppServices;
 
 #[domain_model]
 pub(crate) struct LocalCitiesStreamingClient {

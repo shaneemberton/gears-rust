@@ -1,6 +1,6 @@
 //! Secure redirect policy for HTTP clients
 //!
-//! This module provides a security-hardened redirect policy that protects against:
+//! This gear provides a security-hardened redirect policy that protects against:
 //! - SSRF (Server-Side Request Forgery) via cross-origin redirects
 //! - Credential leakage via `Authorization` header forwarding
 //! - HTTPS downgrade attacks

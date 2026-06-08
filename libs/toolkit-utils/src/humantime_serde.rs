@@ -73,7 +73,7 @@ where
 }
 
 pub mod option {
-    //! Convenience module to allow serialization via `humantime_serde` for `Option`
+    //! Convenience gear to allow serialization via `humantime_serde` for `Option`
     //!
     //! # Example
     //!

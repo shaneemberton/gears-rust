@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/domain/service.rs
+// simulated_dir=/cf-gears/gears/some_gear/domain/service.rs
 // Test file for DE0308: Good domain code - no HTTP types
 #![allow(unused_imports)]
 #![allow(dead_code)]

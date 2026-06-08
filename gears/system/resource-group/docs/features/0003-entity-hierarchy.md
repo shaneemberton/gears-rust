@@ -34,13 +34,13 @@
   - [REST API Test Coverage](#rest-api-test-coverage)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 - [7. Unit Test Plan](#7-unit-test-plan)
-  - [Module-Level Summary](#module-level-summary)
+  - [Gear-Level Summary](#gear-level-summary)
   - [Coverage Summary](#coverage-summary)
   - [Entity Hierarchy Test Cases](#entity-hierarchy-test-cases)
   - [Group `metadata` — Barrier as Data](#group-metadata--barrier-as-data)
   - [REST-level metadata serialization](#rest-level-metadata-serialization)
   - [Invalid / Non-GTS Input Tests](#invalid--non-gts-input-tests)
-  - [ADR-001 Hierarchy Reproduction in RG Module](#adr-001-hierarchy-reproduction-in-rg-module)
+  - [ADR-001 Hierarchy Reproduction in RG Gear](#adr-001-hierarchy-reproduction-in-rg-gear)
   - [metadata Validation Against Type's metadata_schema](#metadata-validation-against-types-metadata_schema)
   - [REST API Layer](#rest-api-layer)
   - [Priority Matrix](#priority-matrix)
@@ -88,7 +88,7 @@ Groups are the core nodes of the resource group hierarchy. This feature implemen
 - **Design**: [DESIGN.md](../DESIGN.md) — sections 3.1, 3.2 (Entity Service, Hierarchy Service), 3.6 (sequences), 3.7 (resource_group, resource_group_closure), 3.8 (Query Profile)
 - **DECOMPOSITION**: [DECOMPOSITION.md](../DECOMPOSITION.md) entry 2.3
 - **Dependencies**: Feature 0002 — type validation for parent-child compatibility
-- **Not applicable**: UX (backend API — no user interface); COMPL (internal platform module — no regulatory data handling); OPS observability and rollout are managed at the module infrastructure level (DESIGN §3.7 and platform runbooks); PERF targets are set at the system level in PRD.md NFR section.
+- **Not applicable**: UX (backend API — no user interface); COMPL (internal platform gear — no regulatory data handling); OPS observability and rollout are managed at the gear infrastructure level (DESIGN §3.7 and platform runbooks); PERF targets are set at the system level in PRD.md NFR section.
 
 ## 2. Actor Flows (CDSL)
 
@@ -445,17 +445,17 @@ REST-level tests for endpoints not covered by existing `api_rest_test.rs`:
 
 > General testing philosophy, patterns, and infrastructure: [`docs/toolkit_unified_system/12_unit_testing.md`](../../../../../docs/toolkit_unified_system/12_unit_testing.md).
 
-### Module-Level Summary
+### Gear-Level Summary
 
 ~325 tests (308 in `cf-gears-resource-group` + 17 in `cf-gears-resource-group-sdk`). Fast (< 5s total). Zero sleeps. Every test atomic.
 
 Unit tests guard **deterministic domain logic** — the same logic that runs identically regardless of whether it's called via HTTP or directly in Rust. If a test needs a real PostgreSQL or a real HTTP connection, it belongs in Feature 0007 (E2E), not here.
 
-This feature covers the unit and integration test plan for the `resource-group` module. The current test suite contains 318 tests (302 in `cf-gears-resource-group` across 10 test files + inline `#[cfg(test)]` modules, 16 in `cf-gears-resource-group-sdk`) totaling ~9,400 lines of test code. All tests pass with 0 failures.
+This feature covers the unit and integration test plan for the `resource-group` gear. The current test suite contains 318 tests (302 in `cf-gears-resource-group` across 10 test files + inline `#[cfg(test)]` gears, 16 in `cf-gears-resource-group-sdk`) totaling ~9,400 lines of test code. All tests pass with 0 failures.
 
 The plan was originally based on a gap analysis against acceptance criteria defined in features 0001-0005 and ADR-001 (GTS Type System). The analysis incorporates:
 - Acceptance criteria from features 0001-0005 and ADR-001
-- Testing patterns from other project modules (`nodes-registry`, `types-registry`, `api-gateway`)
+- Testing patterns from other project gears (`nodes-registry`, `types-registry`, `api-gateway`)
 - ADR-001 metadata validation requirements (`additionalProperties: false`, field types, maxLength constraints)
 
 **Scope**: Domain service tests with SQLite in-memory, in-source `#[cfg(test)]` for pure logic, metadata validation against `metadata_schema`.
@@ -520,7 +520,7 @@ The plan was originally based on a gap analysis against acceptance criteria defi
 | ~~RG3~~ | ~~CRITICAL~~ | ~~REST: Error Mapping~~ | ✅ **CLOSED** — TC-REST-10 added to `api_rest_test.rs`: verifies Content-Type `application/problem+json` and correct status codes (404, 409, 400) + no internal leak fields | |
 | ~~RG4~~ | ~~HIGH~~ | ~~REST: Response DTO Serialization~~ | ✅ **CLOSED** — 7 inline DTO tests (TC-DTO-01..07) in `dto.rs` cover all `From` impls, serde attributes, and field conversion. 2 REST tests (`rest_group_response_omits_null_metadata`, `rest_type_response_omits_null_metadata_schema`) verify `skip_serializing_if` null omission at HTTP level. | |
 | ~~RG5~~ | ~~HIGH~~ | ~~Infrastructure: Repositories~~ | **ACCEPTED** — repository logic is thoroughly covered indirect via 55 group service, 45 type service, 15 membership service, and 12 seeding tests that exercise every repo method through real SQLite DB. Direct repo unit tests would duplicate this coverage without additional value. | |
-| ~~RG6~~ | ~~MEDIUM~~ | ~~Module Init~~ | **ACCEPTED** — `module.rs` initialization is integration-level wiring (OnceLock, ClientHub, capability registration) that cannot be meaningfully tested without a full server bootstrap. Covered by E2E tests (0007 S1-S10) which exercise the real initialized module. | |
+| ~~RG6~~ | ~~MEDIUM~~ | ~~gear init~~ | **ACCEPTED** — `gear.rs` initialization is integration-level wiring (OnceLock, ClientHub, capability registration) that cannot be meaningfully tested without a full server bootstrap. Covered by E2E tests (0007 S1-S10) which exercise the real initialized gear. | |
 | ~~RG7~~ | ~~MEDIUM~~ | ~~REST: Route Registration~~ | ✅ **CLOSED** — `rest_route_smoke_all_endpoints_registered` test verifies all 14 endpoints (5 type + 6 group + 3 membership) respond non-405 via `Router::oneshot`. | |
 
 ### Entity Hierarchy Test Cases
@@ -827,7 +827,7 @@ Test setup: SQLite in-memory + TypeService + GroupService with configurable Quer
 - `{"code": "...", "can_be_root": true, "unknown_field": 42}`
 - **Assert**: Verify behavior — serde default is ignore (200) or reject?
 
-### ADR-001 Hierarchy Reproduction in RG Module
+### ADR-001 Hierarchy Reproduction in RG Gear
 
 Reproduce the full ADR example hierarchy (T1→D2→B3, T7→D8, T9) with correct types, parents, and metadata — entirely through RG service layer.
 
@@ -887,7 +887,7 @@ GTS-level validation (33 tests in `rg_gts_type_system_tests.rs`) validates at sc
 
 > **Note**: As of current implementation, this validation is **missing** in code — `group_service.rs` stores metadata as-is without validation. These tests will initially fail and serve as acceptance criteria for implementing the validation.
 >
-> **Implementation**: Use `TypesRegistryClient` (types-registry-sdk, already used by `credstore` module) + `gts` crate (v0.8.4, already in workspace). The GTS type system validates instance data (including `metadata` sub-object) against the chained RG type schema registered in types-registry. RG module should resolve the group's GTS type via `TypesRegistryClient`, then validate the incoming metadata against the type's inline `metadata` schema (which includes `additionalProperties: false`, field types, `maxLength`). This follows the same pattern as `credstore` module which uses `TypesRegistryClient` from ClientHub for GTS-level validation. Do NOT use raw `jsonschema` crate directly — validation must go through the GTS layer to respect `x-gts-traits`, `allOf` composition, and the metadata sub-object schema.
+> **Implementation**: Use `TypesRegistryClient` (types-registry-sdk, already used by `credstore` gear) + `gts` crate (v0.8.4, already in workspace). The GTS type system validates instance data (including `metadata` sub-object) against the chained RG type schema registered in types-registry. RG gear should resolve the group's GTS type via `TypesRegistryClient`, then validate the incoming metadata against the type's inline `metadata` schema (which includes `additionalProperties: false`, field types, `maxLength`). This follows the same pattern as `credstore` gear which uses `TypesRegistryClient` from ClientHub for GTS-level validation. Do NOT use raw `jsonschema` crate directly — validation must go through the GTS layer to respect `x-gts-traits`, `allOf` composition, and the metadata sub-object schema.
 
 ##### Tenant metadata (`self_managed: boolean`, `custom_domain: hostname`)
 
@@ -1167,7 +1167,7 @@ These test domain invariants that prevent data corruption or violate core busine
 - [x] ~~RG3~~: Error HTTP status + Content-Type tests added (TC-REST-10)
 - [x] ~~RG4~~: DTO serialization covered by 7 inline tests + 2 REST null-omission tests
 - [x] ~~RG5~~: Accepted — indirect coverage via 127 service-level tests is sufficient
-- [x] ~~RG6~~: Accepted — module init is integration-level, covered by E2E (feature 0005, S3)
+- [x] ~~RG6~~: Accepted — gear init is integration-level, covered by E2E (feature 0005, S3)
 - [x] ~~RG7~~: Route smoke test added — all 14 endpoints verified non-405
 
 ### Closure Table Assertions (`resource_group_closure`)

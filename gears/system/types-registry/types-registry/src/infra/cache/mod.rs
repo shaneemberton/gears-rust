@@ -1,4 +1,4 @@
-//! Cache infrastructure for the Types Registry module.
+//! Cache infrastructure for the Types Registry gear.
 
 #[allow(clippy::module_inception)]
 mod cache;

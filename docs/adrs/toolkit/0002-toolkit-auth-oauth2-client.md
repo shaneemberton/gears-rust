@@ -1,9 +1,9 @@
-# Outbound OAuth2 Client Credentials for ToolKit modules
+# Outbound OAuth2 Client Credentials for ToolKit gears
 
 ## Context
 
-ToolKit modules call internal vendor REST services secured with OAuth2 Client Credentials.
-Each module gets:
+ToolKit gears call internal vendor REST services secured with OAuth2 Client Credentials.
+Each gear gets:
 
 - `client_id`, `client_secret`
 - `token_endpoint` or `issuer_url`
@@ -22,7 +22,7 @@ The platform HTTP client is `toolkit-http::HttpClient` (hyper + tower), which al
 
 ## Decision
 
-Use an in-house `token_watcher` module (`oauth2/token_watcher.rs`) for token lifecycle management — background refresh with jitter, exponential backoff, and lock-free reads via `ArcSwap`. This replaces the earlier `aliri_tokens` dependency, which was removed to eliminate its transitive `ring` dependency (see [ADR 0005 — FIPS Dependency Policy](../../security/fips/adrs/0005-fips-dependency-policy.md)).
+Use an in-house `token_watcher` gear (`oauth2/token_watcher.rs`) for token lifecycle management — background refresh with jitter, exponential backoff, and lock-free reads via `ArcSwap`. This replaces the earlier `aliri_tokens` dependency, which was removed to eliminate its transitive `ring` dependency (see [ADR 0005 — FIPS Dependency Policy](../../security/fips/adrs/0005-fips-dependency-policy.md)).
 
 OAuth2 Client Credentials exchange is implemented as a custom token source that uses `toolkit-http::HttpClient` with `HttpClientConfig::token_endpoint()`. Outbound HTTP composition is hyper + tower. Authentication is implemented as a tower layer that composes with the existing `HttpClient` layer stack.
 
@@ -48,9 +48,9 @@ OAuth2 Client Credentials exchange is implemented as a custom token source that 
 
 All components are implemented in `libs/toolkit-auth/src/oauth2/` and `libs/toolkit-http/src/builder.rs`.
 
-### Modules and public API
+### Gears and public API
 
-| Module | Path | Public type | Description |
+| Gear | Path | Public type | Description |
 |--------|------|-------------|-------------|
 | `config` | `oauth2/config.rs` | `OAuthClientConfig` | Configuration struct with `token_endpoint` / `issuer_url` (mutually exclusive), credentials, scopes, refresh policy, and optional `HttpClientConfig` override. `Debug` redacts `client_secret`. |
 | `types` | `oauth2/types.rs` | `ClientAuthMethod`, `SecretString` | Auth method enum (`Basic` / `Form`). `SecretString` re-exported from `toolkit-utils` (backed by `Zeroizing<String>`). |

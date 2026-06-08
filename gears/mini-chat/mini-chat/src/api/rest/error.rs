@@ -1,4 +1,4 @@
-//! REST error mapping for the mini-chat module.
+//! REST error mapping for the mini-chat gear.
 //!
 //! Maps domain-layer errors (`DomainError`, `MutationError`, `StreamError`)
 //! to canonical errors (`toolkit-canonical-errors`) following the same pattern

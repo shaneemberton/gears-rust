@@ -1,12 +1,12 @@
 //! Query implementations for `PluginImpl` SDK methods.
 //!
-//! Every function in this module:
+//! Every function in this gear:
 //!
 //! - Takes a borrowed `Arc<dyn TenantHierarchyReadPort>` (the seam --
 //!   see [`crate::domain::tenant::hierarchy_read_port`]) and resolves
 //!   reads through it. The port's adapter centralizes the
 //!   `AccessScope::allow_all()` trust elevation at a single named
-//!   call site so this module no longer carries that concern.
+//!   call site so this gear no longer carries that concern.
 //! - Hydrates the public `tenant_type` field through
 //!   [`TypesRegistryClient`] using either a single
 //!   `get_type_schema_by_uuid` (single-row results) or a batched

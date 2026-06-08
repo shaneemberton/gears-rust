@@ -131,7 +131,7 @@ pub async fn seed_groups<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait>(
     let mut result = SeedResult::default();
     // @cpt-begin:cpt-cf-resource-group-algo-entity-hier-seed-groups:p1:inst-seed-groups-2
     for seed in seeds {
-        // Seeding runs at module init, before any caller `SecurityContext`
+        // Seeding runs at gear init, before any caller `SecurityContext`
         // exists; using `SecurityContext::anonymous()` would gate this path
         // on whether anonymous subjects are allowed to read/create groups,
         // which is brittle and outright fails in locked-down deployments.

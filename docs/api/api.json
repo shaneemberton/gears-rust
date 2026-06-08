@@ -836,7 +836,7 @@
         "type": "object"
       },
       "DeploymentModeDto": {
-        "description": "Deployment mode of a module",
+        "description": "Deployment mode of a gear",
         "enum": [
           "compiled_in",
           "out_of_process"
@@ -1625,8 +1625,8 @@
         ],
         "type": "object"
       },
-      "ModuleInstanceDto": {
-        "description": "Response DTO for a running module instance",
+      "GearInstanceDto": {
+        "description": "Response DTO for a running gear instance",
         "properties": {
           "grpc_services": {
             "additionalProperties": {
@@ -1648,7 +1648,7 @@
             "type": "string"
           },
           "version": {
-            "description": "Module version (if reported during registration)",
+            "description": "Gear version (if reported during registration)",
             "type": [
               "string",
               "null"
@@ -10475,10 +10475,10 @@
         ]
       }
     },
-    "/module-orchestrator/v1/modules": {
+    "/gear-orchestrator/v1/gears": {
       "get": {
-        "description": "Returns a list of all compiled-in and out-of-process modules with their capabilities, dependencies, running instances, and deployment mode.",
-        "operationId": "module_orchestrator.list_modules",
+        "description": "Returns a list of all compiled-in and out-of-process gears with their capabilities, dependencies, running instances, and deployment mode.",
+        "operationId": "gear_orchestrator.list_gears",
         "responses": {
           "200": {
             "content": {
@@ -10488,7 +10488,7 @@
                 }
               }
             },
-            "description": "List of registered modules"
+            "description": "List of registered gears"
           },
           "400": {
             "content": {
@@ -10566,9 +10566,9 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List all registered modules",
+        "summary": "List all registered gears",
         "tags": [
-          "Module Orchestrator"
+          "Gear Orchestrator"
         ]
       }
     },

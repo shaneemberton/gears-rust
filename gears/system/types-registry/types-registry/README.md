@@ -1,15 +1,15 @@
-# Types Registry Module
+# Types Registry Gear
 
 GTS entity registration, storage, validation, and REST API endpoints for Gears.
 
 ## Overview
 
-The `types-registry` module provides:
+The `types-registry` gear provides:
 
 - **Two-phase registration**: Configuration phase (no validation) → Production phase (full validation)
 - **GTS entity storage**: In-memory storage using `gts-rust` (Phase 1–2). Phase 3: own DB-backed persistent storage with saga coordination with RG for hierarchy rules (see [RG DESIGN.md](../../resource-group/docs/DESIGN.md#architecture-evolution-rg-as-persistent-storage-for-types-registry))
 - **REST API**: Endpoints for registering, listing, and retrieving GTS entities
-- **ClientHub integration**: Other modules access via `hub.get::<dyn TypesRegistryClient>()?`
+- **ClientHub integration**: Other gears access via `hub.get::<dyn TypesRegistryClient>()?`
 
 ## Usage
 
@@ -72,14 +72,14 @@ types_registry:
 
 ## Core GTS Types
 
-The types-registry module automatically registers core GTS types during initialization.
-These are framework-level types that other modules depend on:
+The types-registry gear automatically registers core GTS types during initialization.
+These are framework-level types that other gears depend on:
 
 | GTS ID | Description |
 |--------|-------------|
 | `gts.cf.toolkit.plugins.plugin.v1~` | Base plugin schema for all plugin systems |
 
-This ensures that when modules register their derived schemas (e.g., plugin-specific types),
+This ensures that when gears register their derived schemas (e.g., plugin-specific types),
 the base types are already available for validation.
 
 ## Two-Phase Registration
@@ -88,11 +88,11 @@ the base types are already available for validation.
 2. **Production Phase**: Call `switch_to_production()` to validate all entities and move to persistent storage
 
 ```rust
-// During module initialization (configuration phase)
+// During gear initialization (configuration phase)
 registry.register(&ctx, entities).await?;
 
 // When ready for production
-module.switch_to_production()?;
+gear.switch_to_production()?;
 ```
 
 ## Testing

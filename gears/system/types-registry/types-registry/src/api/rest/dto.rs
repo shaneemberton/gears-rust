@@ -1,4 +1,4 @@
-//! REST DTOs for the Types Registry module.
+//! REST DTOs for the Types Registry gear.
 
 use uuid::Uuid;
 

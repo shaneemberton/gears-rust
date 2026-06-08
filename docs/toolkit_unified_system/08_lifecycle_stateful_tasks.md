@@ -1,20 +1,20 @@
 # Lifecycle and Stateful Tasks
 
-ToolKit provides lifecycle management for modules with background tasks, graceful shutdown, and cancellation support.
+ToolKit provides lifecycle management for gears with background tasks, graceful shutdown, and cancellation support.
 
 ## Core invariants
 
 - **Rule**: Use `CancellationToken` for coordinated shutdown across the entire process tree.
-- **Rule**: Use `WithLifecycle<T>` for stateful modules with background tasks.
+- **Rule**: Use `WithLifecycle<T>` for stateful gears with background tasks.
 - **Rule**: Pass child tokens to background tasks for cooperative shutdown.
 - **Rule**: Implement `RunnableCapability` for custom lifecycle (rare).
 
-## Declarative lifecycle with `#[toolkit::module(...)]`
+## Declarative lifecycle with `#[toolkit::gear(...)]`
 
-### Module with lifecycle
+### Gear with lifecycle
 
 ```rust
-#[toolkit::module(
+#[toolkit::gear(
     name = "api-gateway",
     capabilities = [rest_host, rest, stateful],
     lifecycle(entry = "serve", stop_timeout = "30s", await_ready)
@@ -91,11 +91,11 @@ impl ApiGateway {
 ```rust
 // In main()
 let root_cancel = CancellationToken::new();
-let mut runtime = ModuleRuntime::builder()
+let mut runtime = GearRuntime::builder()
     .with_cancellation_token(root_cancel.clone())
     .build();
 
-// Modules receive child tokens automatically
+// Gears receive child tokens automatically
 ```
 
 ### Child tokens for background tasks
@@ -253,12 +253,12 @@ impl WorkQueueProcessor {
 ```rust
 use toolkit::lifecycle::{RunnableCapability, RunnableHandle};
 
-pub struct CustomModule {
+pub struct CustomGear {
     // Fields
 }
 
 #[async_trait]
-impl RunnableCapability for CustomModule {
+impl RunnableCapability for CustomGear {
     async fn run(
         self: Arc<Self>,
         cancel: CancellationToken,
@@ -278,7 +278,7 @@ impl RunnableCapability for CustomModule {
 ### Clean shutdown sequence
 
 ```rust
-impl MyModule {
+impl MyGear {
     async fn shutdown_gracefully(&self) -> Result<(), DomainError> {
         // 1. Stop accepting new work
         self.accepting_work.store(false, Ordering::SeqCst);
@@ -300,7 +300,7 @@ impl MyModule {
 ### Shutdown timeout handling
 
 ```rust
-impl MyModule {
+impl MyGear {
     async fn serve(
         self: Arc<Self>,
         cancel: CancellationToken,
@@ -336,14 +336,14 @@ impl MyModule {
 #[tokio::test]
 async fn test_lifecycle_shutdown() {
     let cancel = CancellationToken::new();
-    let module = Arc::new(MyModule::new());
+    let gear =  Arc::new(MyGear::new());
 
-    // Start the module
+    // Start the gear
     let handle = tokio::spawn({
-        let module = module.clone();
+        let gear =  gear.clone();
         let cancel = cancel.clone();
         async move {
-            module.serve(cancel, ReadySignal::new()).await
+            gear.serve(cancel, ReadySignal::new()).await
         }
     });
 
@@ -397,7 +397,7 @@ async fn test_background_task_cancellation() {
 
 ## Quick checklist
 
-- [ ] Add `lifecycle(entry = "...")` to `#[toolkit::module(...)]` for background tasks.
+- [ ] Add `lifecycle(entry = "...")` to `#[toolkit::gear(...)]` for background tasks.
 - [ ] Use `CancellationToken` for shutdown coordination.
 - [ ] Pass child tokens to background tasks.
 - [ ] Call `ready.notify()` after setup when using `await_ready`.

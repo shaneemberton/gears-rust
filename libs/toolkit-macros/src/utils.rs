@@ -14,7 +14,7 @@ pub struct TraitMethodInfo {
 #[allow(dead_code)]
 pub fn parse_trait_methods(_trait_path: &Path) -> Vec<TraitMethodInfo> {
     // In a procedural macro context, we can't directly load and parse the trait
-    // at compile time from another module. Instead, we expect the trait to be
+    // at compile time from another gear. Instead, we expect the trait to be
     // in scope and we'll generate code that will fail to compile if methods don't match.
     //
     // For validation purposes in this implementation, we return empty with a note

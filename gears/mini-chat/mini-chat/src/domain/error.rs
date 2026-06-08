@@ -5,7 +5,7 @@ use toolkit_db::secure::ScopeError;
 use toolkit_macros::domain_model;
 use uuid::Uuid;
 
-/// Domain-specific errors for the mini-chat module.
+/// Domain-specific errors for the mini-chat gear.
 #[domain_model]
 #[derive(Error, Debug)]
 pub enum DomainError {

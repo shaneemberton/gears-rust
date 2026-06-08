@@ -9,8 +9,8 @@ The `cf-gears-toolkit-db` crate provides:
 - Typed database configuration / connection options
 - SQLx backend support (SQLite / Postgres / MySQL via features)
 - SeaORM integration
-- Secure-by-default ORM wrapper (see `secure` module)
-- Per-module migration runner (see `migration_runner` module)
+- Secure-by-default ORM wrapper (see `secure` gear)
+- Per-gear migration runner (see `migration_runner` gear)
 
 ## Features
 
@@ -18,7 +18,7 @@ The `cf-gears-toolkit-db` crate provides:
 
 ## Security Model
 
-Modules cannot access raw database connections. All database operations go through
+Gears cannot access raw database connections. All database operations go through
 the `SecureConn` API which enforces tenant isolation at compile time. Migrations
 are provided as definitions and executed by the runtime with a privileged connection.
 

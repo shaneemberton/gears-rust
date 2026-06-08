@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/contract/
+// simulated_dir=/cf-gears/gears/some_gear/contract/
 #[allow(dead_code)]
 // Should trigger DE0101 - Serde in contract
 #[derive(Debug, Clone, serde::Serialize)]

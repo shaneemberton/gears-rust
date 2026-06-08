@@ -4,9 +4,9 @@
 
 ### 1.1 Architectural Vision
 
-Mini Chat provides a multi-tenant AI chat experience with SSE streaming, conversation history, document-aware question answering, and web search. Users interact through a REST/SSE API backed by the Responses API with File Search (OpenAI or Azure OpenAI - see [Provider API Mapping](#provider-api-mapping)). The system maintains strict tenant isolation via per-chat vector stores and enforces cost control through token budgets, usage quotas, and file search limits. Authorization decisions are delegated to the platform's AuthZ Resolver (PDP), which returns query-level constraints compiled to `AccessScope` objects by the mini-chat module acting as the Policy Enforcement Point (PEP).
+Mini Chat provides a multi-tenant AI chat experience with SSE streaming, conversation history, document-aware question answering, and web search. Users interact through a REST/SSE API backed by the Responses API with File Search (OpenAI or Azure OpenAI - see [Provider API Mapping](#provider-api-mapping)). The system maintains strict tenant isolation via per-chat vector stores and enforces cost control through token budgets, usage quotas, and file search limits. Authorization decisions are delegated to the platform's AuthZ Resolver (PDP), which returns query-level constraints compiled to `AccessScope` objects by the mini-chat gear acting as the Policy Enforcement Point (PEP).
 
-Mini Chat is implemented as a ToolKit module (`mini-chat`) following the DDD-light pattern. The module's domain service layer orchestrates all request processing - context assembly, LLM invocation, streaming relay, and persistence. It owns the full request lifecycle from receiving a user message to persisting the assistant response and usage metrics. External LLM calls route exclusively through the platform's Outbound API Gateway (OAGW), which handles credential injection and egress control. Mini Chat calls the LLM provider directly via OAGW rather than through `cf-llm-gateway`, because it relies on provider-specific features (Responses API, Files API, File Search with vector stores) that the generic gateway does not abstract. Both OpenAI and Azure OpenAI expose a compatible Responses API surface; OAGW routes to the configured provider and injects the appropriate credentials (API key header for OpenAI, `api-key` header or Entra ID bearer token for Azure OpenAI).
+Mini Chat is implemented as a ToolKit gear (`mini-chat`) following the DDD-light pattern. The gear's domain service layer orchestrates all request processing - context assembly, LLM invocation, streaming relay, and persistence. It owns the full request lifecycle from receiving a user message to persisting the assistant response and usage metrics. External LLM calls route exclusively through the platform's Outbound API Gateway (OAGW), which handles credential injection and egress control. Mini Chat calls the LLM provider directly via OAGW rather than through `cf-llm-gateway`, because it relies on provider-specific features (Responses API, Files API, File Search with vector stores) that the generic gateway does not abstract. Both OpenAI and Azure OpenAI expose a compatible Responses API surface; OAGW routes to the configured provider and injects the appropriate credentials (API key header for OpenAI, `api-key` header or Entra ID bearer token for Azure OpenAI).
 
 Mini Chat supports multimodal Responses API input (text + image) using the provider Files API for image storage. Images are uploaded as attachments, referenced by file ID in the Responses API content array, and are not indexed in vector stores.
 
@@ -18,7 +18,7 @@ Long conversations are managed via thread summaries - a Level 1 compression stra
 
 | Requirement | Phase | Design Response |
 |-------------|-------|-----------------|
-| `cpt-cf-mini-chat-fr-chat-streaming` | `p1` | SSE streaming via the mini-chat module's domain service -> OAGW -> Responses API (OpenAI: `POST /v1/responses`; Azure OpenAI: `POST /openai/v1/responses`) |
+| `cpt-cf-mini-chat-fr-chat-streaming` | `p1` | SSE streaming via the mini-chat gear's domain service -> OAGW -> Responses API (OpenAI: `POST /v1/responses`; Azure OpenAI: `POST /openai/v1/responses`) |
 | `cpt-cf-mini-chat-fr-conversation-history` | `p1` | Postgres (infra/storage) persists all messages; `GET /v1/chats/{id}/messages` with cursor pagination + OData query for history retrieval |
 | `cpt-cf-mini-chat-fr-file-upload` | `p1` | Upload via OAGW -> Files API (OpenAI: `POST /v1/files`; Azure OpenAI: `POST /openai/files`); metadata persisted via infra/storage repositories; file added to the chat's vector store. P1 uses `purpose="assistants"` for both providers (OpenAI also supports `purpose="user_data"`, but we use `assistants` to keep parity and because the files are used with Vector Stores / File Search). |
 | `cpt-cf-mini-chat-fr-image-upload` | `p1` | Image upload via OAGW -> Files API; metadata persisted via infra/storage repositories; NOT added to vector store. Images referenced as multimodal input (file ID) in Responses API calls. Model capability checked before outbound call; defensive `unsupported_media` error if model lacks image support (unreachable under P1 catalog invariant where all models include `VISION_INPUT`). |
@@ -45,13 +45,13 @@ Long conversations are managed via thread summaries - a Level 1 compression stra
 
 | NFR ID | NFR Summary | Allocated To | Design Response | Verification Approach |
 |--------|-------------|--------------|-----------------|----------------------|
-| `cpt-cf-mini-chat-nfr-tenant-isolation` | Tenant data must never leak across tenants | mini-chat module (domain + infra layers) | Per-chat vector store; all queries scoped via `AccessScope` (owner_col + tenant_col); no provider identifiers (`provider_file_id`, `vector_store_id`) exposed or accepted in API | Integration tests with multi-tenant scenarios |
-| `cpt-cf-mini-chat-nfr-authz-alignment` | Authorization must follow platform PDP/PEP model | mini-chat module (PEP via PolicyEnforcer) | AuthZ Resolver evaluates every data-access operation; constraints compiled to `AccessScope` objects applied via secure ORM; fail-closed on PDP errors | Integration tests with mock PDP; fail-closed verification tests |
-| `cpt-cf-mini-chat-nfr-cost-control` | Predictable and bounded LLM costs | mini-chat module (domain service + quota_service) | Credit-based rate limits per tier across multiple periods (daily, monthly) tracked in real-time; credits are computed from provider-reported tokens using model credit multipliers; premium models have stricter limits, standard-tier models have separate, higher limits; two-tier downgrade cascade (premium → standard); file search and web search call limits; token budget per request | Usage metrics dashboard; budget alert tests |
-| `cpt-cf-mini-chat-nfr-streaming-latency` | Low time-to-first-token for chat responses | mini-chat module (domain service), OAGW | Direct SSE relay without buffering; cancellation propagation on disconnect | TTFT benchmarks under load; **Disconnect test**: open SSE -> receive 1-2 tokens -> disconnect -> assert provider request closed within 200 ms and active-generation counter decrements; **TTFT delta test**: measure `t_first_token_ui - t_first_byte_from_provider` -> assert platform overhead < 50 ms p99 |
-| `cpt-cf-mini-chat-nfr-data-retention` | Deleted chats purged from provider; temporary chat cleanup (P2) | mini-chat module (domain + infra layers) | Scheduled cleanup job; cascade delete to provider files and chat vector stores (OpenAI Files API / Azure OpenAI Files API) | Retention policy compliance tests |
-| `cpt-cf-mini-chat-nfr-observability-supportability` | Operational visibility for on-call, SRE, and cost governance | mini-chat module (domain service + quota_service) | `mini_chat_*` Prometheus metrics on all critical paths; stable `request_id` tracing per turn; structured audit events; turn state API (`GET /v1/chats/{chat_id}/turns/{request_id}`) | Metric series presence tests; request_id propagation tests; alert rule validation |
-| `cpt-cf-mini-chat-nfr-rag-scalability` | Bounded RAG costs and stable retrieval quality | mini-chat module (domain service + infra/storage) | Per-chat document count, file size, and chunk limits; configurable retrieval-k and max retrieved tokens per turn; per-chat dedicated vector stores | Per-chat limit enforcement tests; retrieval latency p95 benchmarks; `mini_chat_retrieval_latency_ms` within threshold |
+| `cpt-cf-mini-chat-nfr-tenant-isolation` | Tenant data must never leak across tenants | mini-chat gear (domain + infra layers) | Per-chat vector store; all queries scoped via `AccessScope` (owner_col + tenant_col); no provider identifiers (`provider_file_id`, `vector_store_id`) exposed or accepted in API | Integration tests with multi-tenant scenarios |
+| `cpt-cf-mini-chat-nfr-authz-alignment` | Authorization must follow platform PDP/PEP model | mini-chat gear (PEP via PolicyEnforcer) | AuthZ Resolver evaluates every data-access operation; constraints compiled to `AccessScope` objects applied via secure ORM; fail-closed on PDP errors | Integration tests with mock PDP; fail-closed verification tests |
+| `cpt-cf-mini-chat-nfr-cost-control` | Predictable and bounded LLM costs | mini-chat gear (domain service + quota_service) | Credit-based rate limits per tier across multiple periods (daily, monthly) tracked in real-time; credits are computed from provider-reported tokens using model credit multipliers; premium models have stricter limits, standard-tier models have separate, higher limits; two-tier downgrade cascade (premium → standard); file search and web search call limits; token budget per request | Usage metrics dashboard; budget alert tests |
+| `cpt-cf-mini-chat-nfr-streaming-latency` | Low time-to-first-token for chat responses | mini-chat gear (domain service), OAGW | Direct SSE relay without buffering; cancellation propagation on disconnect | TTFT benchmarks under load; **Disconnect test**: open SSE -> receive 1-2 tokens -> disconnect -> assert provider request closed within 200 ms and active-generation counter decrements; **TTFT delta test**: measure `t_first_token_ui - t_first_byte_from_provider` -> assert platform overhead < 50 ms p99 |
+| `cpt-cf-mini-chat-nfr-data-retention` | Deleted chats purged from provider; temporary chat cleanup (P2) | mini-chat gear (domain + infra layers) | Scheduled cleanup job; cascade delete to provider files and chat vector stores (OpenAI Files API / Azure OpenAI Files API) | Retention policy compliance tests |
+| `cpt-cf-mini-chat-nfr-observability-supportability` | Operational visibility for on-call, SRE, and cost governance | mini-chat gear (domain service + quota_service) | `mini_chat_*` Prometheus metrics on all critical paths; stable `request_id` tracing per turn; structured audit events; turn state API (`GET /v1/chats/{chat_id}/turns/{request_id}`) | Metric series presence tests; request_id propagation tests; alert rule validation |
+| `cpt-cf-mini-chat-nfr-rag-scalability` | Bounded RAG costs and stable retrieval quality | mini-chat gear (domain service + infra/storage) | Per-chat document count, file size, and chunk limits; configurable retrieval-k and max retrieved tokens per turn; per-chat dedicated vector stores | Per-chat limit enforcement tests; retrieval latency p95 benchmarks; `mini_chat_retrieval_latency_ms` within threshold |
 
 #### Key Decisions (ADRs)
 
@@ -68,7 +68,7 @@ Long conversations are managed via thread summaries - a Level 1 compression stra
 │  Presentation (api_gateway - platform)                │
 │  REST + SSE endpoints, AuthN middleware               │
 ├───────────────────────────────────────────────────────┤
-│  mini-chat module  [#[toolkit::module]]                │
+│  mini-chat gear  [#[toolkit::gear]]                │
 │  ┌─────────────────────────────────────────────────┐  │
 │  │ API Layer (api/rest/)                           │  │
 │  │ Handlers, routes, DTOs, error→Problem mapping   │  │
@@ -92,7 +92,7 @@ Long conversations are managed via thread summaries - a Level 1 compression stra
 └───────────────────────────────────────────────────────┘
 ```
 
-**Naming note**: "the domain service" in this document refers to the module's domain service layer (business logic and PEP orchestration). "infra/storage" refers to the persistence layer (SeaORM entities with `#[derive(Scopable)]` + ORM repository implementations).
+**Naming note**: "the domain service" in this document refers to the gear's domain service layer (business logic and PEP orchestration). "infra/storage" refers to the persistence layer (SeaORM entities with `#[derive(Scopable)]` + ORM repository implementations).
 
 **Terminology (normative)**:
 
@@ -134,7 +134,7 @@ The system favors compressed summaries over unbounded message history. Old messa
 
 - [ ] `p1` - **ID**: `cpt-cf-mini-chat-principle-streaming-first`
 
-All LLM responses are streamed. The primary delivery path is SSE from LLM provider (OpenAI / Azure OpenAI) → OAGW → mini-chat module → api_gateway → UI. Non-streaming responses are not supported for chat completion. Both providers use an identical SSE event format for the Responses API.
+All LLM responses are streamed. The primary delivery path is SSE from LLM provider (OpenAI / Azure OpenAI) → OAGW → mini-chat gear → api_gateway → UI. Non-streaming responses are not supported for chat completion. Both providers use an identical SSE event format for the Responses API.
 
 #### Linear Conversation Model
 
@@ -265,7 +265,7 @@ If a user wants a different model, they create a new chat.
 
 All product-level quota decisions (block, downgrade, limit) MUST be made in the domain service before any request reaches OAGW. OAGW never makes user-level or tenant-level quota decisions — it is transport + credential broker only. Only the domain service has the business context needed for quota decisions: tenant, user, license tier, model tier, two-tier downgrade cascade, file_search call limits. OAGW sees an opaque HTTP request with no business semantics.
 
-Model selection and lifecycle rules (P1) are defined in the model catalog (deployment configuration) and applied at the module boundary:
+Model selection and lifecycle rules (P1) are defined in the model catalog (deployment configuration) and applied at the gear boundary:
 
 - The model catalog, downgrade cascade, and per-tier thresholds MUST be defined in deployment configuration (P1) and are expected to be owned by a platform Settings Service / License Manager layer as the long-term system of record.
 - The domain service / `quota_service` is the enforcement point: it MUST deterministically choose the effective model before the outbound call using the two-tier downgrade cascade (premium → standard). All tiers have token-based rate limits across daily and monthly periods; premium models have stricter limits, standard-tier models have separate, higher limits. When any tier's period quota is exhausted, the system downgrades to the next available tier. When all tiers are exhausted, the system MUST reject with `quota_exceeded` (HTTP 429). The chosen model MUST be surfaced via metrics (`{model}` and `{tier}` labels) and audit.
@@ -321,7 +321,7 @@ graph TB
     AuthN["authn (platform)"]
     LM["license_manager (platform)"]
     AuthZ["authz_resolver (platform, PDP)"]
-    CS["mini-chat module (PEP)"]
+    CS["mini-chat gear (PEP)"]
     QS["quota_service"]
     AS["audit_service (platform)"]
     DB["Postgres (infra/storage)"]
@@ -346,7 +346,7 @@ graph TB
 
 - [ ] `p1` - **ID**: `cpt-cf-mini-chat-component-chat-service`
 
-- **mini-chat module** — A ToolKit module (`#[toolkit::module(name = "mini-chat", deps = ["authz-resolver"], capabilities = [db, rest])]`). The domain service layer is the core orchestrator and Policy Enforcement Point (PEP): receives user messages, evaluates authorization via AuthZ Resolver (PolicyEnforcer → AccessScope), builds context plan, invokes LLM via `llm_provider`, relays streaming tokens, persists messages and usage via infra/storage repositories, and evaluates the thread summary trigger during request processing using the assembled context/token estimate. When the trigger fires, thread-summary outbox work is transactionally enqueued in the transaction that durably persists or finalizes the causing turn; chat-deletion cleanup outbox work is transactionally enqueued in the transaction that durably applies chat soft-delete.
+- **mini-chat gear** — A ToolKit gear (`#[toolkit::gear(name = "mini-chat", deps = ["authz-resolver"], capabilities = [db, rest])]`). The domain service layer is the core orchestrator and Policy Enforcement Point (PEP): receives user messages, evaluates authorization via AuthZ Resolver (PolicyEnforcer → AccessScope), builds context plan, invokes LLM via `llm_provider`, relays streaming tokens, persists messages and usage via infra/storage repositories, and evaluates the thread summary trigger during request processing using the assembled context/token estimate. When the trigger fires, thread-summary outbox work is transactionally enqueued in the transaction that durably persists or finalizes the causing turn; chat-deletion cleanup outbox work is transactionally enqueued in the transaction that durably applies chat soft-delete.
 
 - [ ] `p1` - **ID**: `cpt-cf-mini-chat-component-chat-store`
 
@@ -354,7 +354,7 @@ graph TB
 
 - [ ] `p1` - **ID**: `cpt-cf-mini-chat-component-llm-provider`
 
-- **llm_provider** — Library residing in `infra/llm/` within the module (not a standalone service). Builds requests for the Responses API (OpenAI or Azure OpenAI — both expose a compatible surface), parses SSE streams, maps errors. Propagates tenant/user metadata via `user` and `metadata` fields on every request (see section 4: Provider Request Metadata). Handles both streaming chat and non-streaming calls (summary generation, doc summary). The library is provider-agnostic at the API contract level; OAGW handles endpoint routing and credential injection per configured provider.
+- **llm_provider** — Library residing in `infra/llm/` within the gear (not a standalone service). Builds requests for the Responses API (OpenAI or Azure OpenAI — both expose a compatible surface), parses SSE streams, maps errors. Propagates tenant/user metadata via `user` and `metadata` fields on every request (see section 4: Provider Request Metadata). Handles both streaming chat and non-streaming calls (summary generation, doc summary). The library is provider-agnostic at the API contract level; OAGW handles endpoint routing and credential injection per configured provider.
 
 - [ ] `p1` - **ID**: `cpt-cf-mini-chat-component-quota-service`
 
@@ -513,7 +513,7 @@ For automatic thread summary work, the serialized thread-summary outbox payload 
 
 - [ ] `p1` - **ID**: `cpt-cf-mini-chat-component-authz-integration`
 
-- **authz_resolver (PDP)** — Platform AuthZ Resolver module. The mini-chat domain service calls it (via PolicyEnforcer) before every data-access operation to obtain authorization decisions and SQL-compilable constraints. See section 3.8.
+- **authz_resolver (PDP)** — Platform AuthZ Resolver gear. The mini-chat domain service calls it (via PolicyEnforcer) before every data-access operation to obtain authorization decisions and SQL-compilable constraints. See section 3.8.
 
 - [ ] `p1` - **ID**: `cpt-cf-mini-chat-component-orphan-watchdog`
 
@@ -684,7 +684,7 @@ Standard errors: 403 (license/permissions), 404 (attachment not found or not acc
 
 **Streaming Contract** (`POST /v1/chats/{id}/messages:stream`) — **ID**: `cpt-cf-mini-chat-contract-sse-streaming`:
 
-The SSE protocol below is the **stable public contract** between the mini-chat module and UI clients. Provider-specific streaming events (OpenAI/Azure OpenAI Responses API) are translated internally by `llm_provider` / the domain service and are never exposed to clients. See [Provider Event Translation](#provider-event-translation).
+The SSE protocol below is the **stable public contract** between the mini-chat gear and UI clients. Provider-specific streaming events (OpenAI/Azure OpenAI Responses API) are translated internally by `llm_provider` / the domain service and are never exposed to clients. See [Provider Event Translation](#provider-event-translation).
 
 **Error model (Option A)**: If request validation, authorization, or quota preflight fails before any streaming begins, the system MUST return a normal JSON error response with the appropriate HTTP status and MUST NOT open an SSE stream. If a failure occurs after streaming has started, the system MUST terminate the stream with a terminal `event: error`.
 
@@ -1234,7 +1234,7 @@ Idempotent: returns `204` whether or not a reaction existed.
 
 ### 3.4 Internal Dependencies
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear    | Interface Used | Purpose |
 |-------------------|----------------|---------|
 | api_gateway (platform) | Axum router / middleware | HTTP request handling, SSE transport |
 | authn (platform) | Middleware (JWT/opaque token) | Extract `user_id` + `tenant_id` from request |
@@ -1244,9 +1244,9 @@ Idempotent: returns `204` whether or not a reaction existed.
 | outbound_gateway (platform) | Internal HTTP | Egress to LLM provider (OpenAI / Azure OpenAI) with credential injection |
 
 **Dependency Rules**:
-- The mini-chat module never calls the LLM provider (OpenAI / Azure OpenAI) directly; all external calls go through OAGW
+- The mini-chat gear never calls the LLM provider (OpenAI / Azure OpenAI) directly; all external calls go through OAGW
 - `SecurityContext` (user_id, tenant_id) propagated through all in-process calls
-- `license_manager` runs as middleware before the module is invoked
+- `license_manager` runs as middleware before the gear is invoked
 - The domain service calls `authz_resolver` (via PolicyEnforcer) before every database query; on PDP denial or PDP unreachable, fail-closed (deny access)
 - The domain service emits audit events to `audit_service` after each turn; mini-chat does not store audit data locally
 
@@ -1302,7 +1302,7 @@ sequenceDiagram
     participant UI
     participant AG as api_gateway
     participant AuthZ as authz_resolver (PDP)
-    participant CS as mini-chat module (PEP)
+    participant CS as mini-chat gear (PEP)
     participant DB as Postgres
     participant OG as outbound_gateway
     participant OAI as OpenAI / Azure OpenAI
@@ -1377,7 +1377,7 @@ sequenceDiagram
 sequenceDiagram
     participant UI
     participant AG as api_gateway
-    participant CS as mini-chat module
+    participant CS as mini-chat gear
     participant DB as Postgres
     participant OG as outbound_gateway
     participant OAI as OpenAI / Azure OpenAI
@@ -1461,7 +1461,7 @@ Attachment kind is derived from `content_type`: MIME types matching `image/png`,
 sequenceDiagram
     participant UI
     participant AG as api_gateway
-    participant CS as mini-chat module
+    participant CS as mini-chat gear
     participant LP as llm_provider
     participant OG as outbound_gateway
     participant OAI as OpenAI / Azure OpenAI
@@ -1494,7 +1494,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant CS as mini-chat module
+    participant CS as mini-chat gear
     participant DB as Postgres
     participant OB as shared outbox
     participant OG as outbound_gateway
@@ -1692,7 +1692,7 @@ Observability (P2+):
 sequenceDiagram
     participant UI
     participant AG as api_gateway
-    participant CS as mini-chat module
+    participant CS as mini-chat gear
     participant DB as Postgres
     participant OB as shared outbox
     participant OG as outbound_gateway
@@ -1722,7 +1722,7 @@ sequenceDiagram
     end
 ```
 
-**Description**: Chat deletion is a two-phase operation: synchronous soft-delete (immediate 204 response) followed by asynchronous cleanup of external provider resources. Cleanup of provider files and provider vector stores for soft-deleted chats MUST be driven by the shared transactional outbox. Mini Chat MUST rely on the shared outbox for durable enqueue, partitioned ordering, retries with backoff, lease/reclaim, dead-letter handling, and reconciliation. Mini Chat MUST NOT define a second module-local polling or claim/reclaim worker for this cleanup path.
+**Description**: Chat deletion is a two-phase operation: synchronous soft-delete (immediate 204 response) followed by asynchronous cleanup of external provider resources. Cleanup of provider files and provider vector stores for soft-deleted chats MUST be driven by the shared transactional outbox. Mini Chat MUST rely on the shared outbox for durable enqueue, partitioned ordering, retries with backoff, lease/reclaim, dead-letter handling, and reconciliation. Mini Chat MUST NOT define a second gear-local polling or claim/reclaim worker for this cleanup path.
 
 ##### Cleanup responsibility boundaries
 
@@ -2046,7 +2046,7 @@ Before that point, the chat has no `thread_summaries` row and its summary fronti
 
 It MUST NOT be used as the sole storage for pending or in-flight summary work.
 
-Pending and in-flight automatic summary work MUST be represented by the shared outbox message plus the durable frontier state in `thread_summaries` and `messages`. Mini Chat MUST NOT create a second module-local claim/reclaim table solely to duplicate shared outbox execution semantics.
+Pending and in-flight automatic summary work MUST be represented by the shared outbox message plus the durable frontier state in `thread_summaries` and `messages`. Mini Chat MUST NOT create a second gear-local claim/reclaim table solely to duplicate shared outbox execution semantics.
 
 **Secure ORM**: No independent `#[secure]` — accessed through parent chat.
 
@@ -2251,7 +2251,7 @@ Alternative naming (NOT in P1):
 
 Mini Chat does NOT require the `tenant_closure` local projection table for chat content access in P1. Chat content is owner-only and requires exact `owner_tenant_id` + `user_id` predicates.
 
-The `tenant_closure` projection table exists in the platform authorization model for modules that use hierarchical tenant scoping, but it is unused for Mini Chat content operations.
+The `tenant_closure` projection table exists in the platform authorization model for gears that use hierarchical tenant scoping, but it is unused for Mini Chat content operations.
 
 Schema is defined in the [Authorization Design](../../../docs/arch/authorization/DESIGN.md#table-schemas-local-projections).
 
@@ -2679,7 +2679,7 @@ Chat content may contain PII or sensitive data. Mini Chat treats messages and su
 
 **Audit content handling (P1)**:
 - Audit events include the minimal content required for security and incident response.
-- The mini-chat module MUST redact secret patterns (tokens, keys, credentials) before sending content to `audit_service`.
+- The mini-chat gear MUST redact secret patterns (tokens, keys, credentials) before sending content to `audit_service`.
 - Redaction is **best-effort and pattern-based**: it catches known patterns (see rule table below) but does NOT guarantee detection of all sensitive data. Novel or obfuscated secrets may pass through.
 - Redaction MUST be testable and based on a bounded allowlist of rule classes.
 - Audit payloads that contain customer content MUST be treated as sensitive data for storage and access-control purposes by `audit_service`.
@@ -3216,7 +3216,7 @@ Rate limiting and quota enforcement are split into three ownership tiers with st
 | **Provider rate limit** | OAGW | Provider 429 handling, `Retry-After` respect, circuit breaker, global concurrency cap | "OpenAI 429 -> wait `Retry-After` -> retry once -> propagate 429 upstream" |
 
 **Key rules**:
-- Product quota decisions happen BEFORE the request reaches OAGW. If quota is exhausted, the request never leaves the module.
+- Product quota decisions happen BEFORE the request reaches OAGW. If quota is exhausted, the request never leaves the gear.
 - OAGW does NOT know about tenants, users, licenses, or premium status. It handles only provider-level concerns (retry, circuit breaker, concurrency cap).
 - Provider 429 from OAGW is propagated to the domain service, which maps it to `rate_limited` (429) for the client with a meaningful error message.
 - Mid-stream quota abort is NOT supported — quota is checked at preflight only. Mid-stream abort is only triggered by: user cancel, provider error, or infrastructure limits (see `cpt-cf-mini-chat-constraint-quota-before-outbound`).
@@ -3850,7 +3850,7 @@ Long-running turns with recent `last_progress_at` updates MUST NOT be classified
 6. Only if `rows_affected = 1`, enqueue the corresponding Mini-Chat usage message with `outcome = "aborted"` and `settlement_method = "estimated"` (see section 5.7 turn finalization contract). The orphan watchdog uses billing outcome `"aborted"` (not `"failed"`) because the stream ended without a provider-issued terminal event — consistent with the ABORTED billing state (section 5.8).
 7. `mini_chat_orphan_finalized_total{reason="stale_progress"}` MUST be emitted only after this conditional update succeeds.
 
-**Scheduling**: the watchdog runs as a periodic task within the module (e.g. every 60 seconds). It MUST use leader election to ensure exactly one active watchdog instance per environment.
+**Scheduling**: the watchdog runs as a periodic task within the gear (e.g. every 60 seconds). It MUST use leader election to ensure exactly one active watchdog instance per environment.
 
 Each watchdog scan SHOULD record `mini_chat_orphan_scan_duration_seconds`.
 
@@ -4207,7 +4207,7 @@ Mini Chat MUST NOT require synchronous CCM calls on the hot path (turn preflight
 - PolicySnapshot MUST be cached in memory.
 - PolicySnapshot MUST be persisted in DB keyed by `policy_version`.
 - The in-memory cache MUST be bounded (LRU or equivalent eviction strategy).
-- Cache capacity MUST be configurable via module configuration.
+- Cache capacity MUST be configurable via gear configuration.
 - Persisted snapshots MUST survive process restart (DB is the durable store).
 - On cache miss, Mini Chat MUST load the snapshot from DB before falling back to a CCM fetch.
 
@@ -4216,7 +4216,7 @@ Mini Chat MUST NOT require synchronous CCM calls on the hot path (turn preflight
 - UserLimits MAY be cached in memory for hot-path performance.
 - Cache key: `(tenant_id, user_id, policy_version)`.
 - The cache MUST be bounded (LRU or equivalent eviction strategy).
-- Cache capacity MUST be configurable via module configuration.
+- Cache capacity MUST be configurable via gear configuration.
 - Cache entries SHOULD have a configurable TTL.
 - All cache entries for a previous `policy_version` MUST be invalidated when `current_policy_version` changes.
 - UserLimits MUST NOT be required to be persisted in DB for P1.
@@ -6539,11 +6539,11 @@ Legend:
 - **Hardcoded** — compile-time constant or framework default
 - **n/a** — no known external source; must be defined at deployment time or is not yet materialised
 
-## B.1 Module config (ToolKit config)
+## B.1 Gear config (ToolKit config)
 
 | Parameter | Type | Default | Source | Notes |
 |-----------|------|---------|--------|-------|
-| `mini-chat.url_prefix` | `string` | `/mini-chat` | ConfigMap | ToolKit module config, no CCM API equivalent |
+| `mini-chat.url_prefix` | `string` | `/mini-chat` | ConfigMap | ToolKit gear config, no CCM API equivalent |
 
 ## B.2 Policy / Models / Limits (via `mini-chat-model-policy-plugin`)
 

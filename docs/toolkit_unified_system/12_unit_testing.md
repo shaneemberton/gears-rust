@@ -3,7 +3,7 @@
 
 # Unit & Integration Testing Guide
 
-This document defines the philosophy, infrastructure, and patterns for unit and integration tests across all ToolKit modules. Module-specific test plans (which test cases to add, gap analysis, domain-specific assertions) live in each module's `docs/features/` folder.
+This document defines the philosophy, infrastructure, and patterns for unit and integration tests across all ToolKit gears. Gear-specific test plans (which test cases to add, gap analysis, domain-specific assertions) live in each gear's `docs/features/` folder.
 
 ---
 
@@ -47,7 +47,7 @@ Every test must pass all three:
 | **Domain services** | Entity CRUD, lifecycle operations, business invariants | `#[tokio::test]` with SQLite `:memory:` + mocked AuthZ |
 | **Domain validation** | Format validation, invariant enforcement, field length limits | `#[test]` pure logic, no DB |
 | **Value objects** | Parsing, normalization, serde round-trip | `#[cfg(test)]` in-source |
-| **Error chains** | `DomainError` → module error → RFC 9457 `Problem`, external error → `DomainError` | `#[test]` pure logic |
+| **Error chains** | `DomainError` → gear error → RFC 9457 `Problem`, external error → `DomainError` | `#[test]` pure logic |
 | **DTO conversions** | `From` impls, serde attributes (`rename`, `skip_serializing_if`, `default`, `camelCase`) | `#[cfg(test)]` in-source |
 | **OData fields** | `FilterField` name/kind mapping, OData mapper field→column | `#[cfg(test)]` in-source |
 | **Seeding** | Idempotent bootstrap logic: create/skip/update semantics | `#[tokio::test]` with DB assertion |
@@ -192,7 +192,7 @@ fn value_object_invalid_cases() {
 
 ### Shared Test Helpers (`tests/common/mod.rs`)
 
-Extract duplicated setup code into a shared module:
+Extract duplicated setup code into a shared gear:
 
 ```rust
 // tests/common/mod.rs
@@ -207,7 +207,7 @@ pub fn make_ctx(tenant_id: Uuid) -> SecurityContext { ... }
 pub fn make_enforcer() -> PolicyEnforcer { ... }
 ```
 
-Module-specific helpers (e.g., `create_root_group`, `assert_closure_rows`) live alongside the shared helpers in `tests/common/`.
+Gear-specific helpers (e.g., `create_root_group`, `assert_closure_rows`) live alongside the shared helpers in `tests/common/`.
 
 ### Naming Convention
 
@@ -225,10 +225,10 @@ value_object_rejects_empty_string
 
 ```
 # In-source unit tests (pure logic, #[test] only — instant)
-<module>-sdk/src/models.rs              # Value object validation, serde round-trip, SDK model shape
-<module>-sdk/src/odata/<entity>.rs      # FilterField name/kind correctness
-<module>/src/api/rest/dto.rs            # DTO From impls, serde rename, camelCase, skip_serializing_if
-<module>/src/infra/storage/odata_mapper.rs  # OData mapper field→column mapping
+<gear>-sdk/src/models.rs              # Value object validation, serde round-trip, SDK model shape
+<gear>-sdk/src/odata/<entity>.rs      # FilterField name/kind correctness
+<gear>/src/api/rest/dto.rs            # DTO From impls, serde rename, camelCase, skip_serializing_if
+<gear>/src/infra/storage/odata_mapper.rs  # OData mapper field→column mapping
 
 # Integration tests (SQLite :memory: DB, #[tokio::test])
 tests/
@@ -378,12 +378,12 @@ For error-path REST tests via `Router::oneshot`:
 
 ## Priority Matrix
 
-Use P1/P2/P3 to prioritize test implementation in module-specific plans:
+Use P1/P2/P3 to prioritize test implementation in gear-specific plans:
 
 ### P1 — Critical (business invariants)
 
 Tests that prevent data corruption or violate core business rules:
-- All domain invariants from module acceptance criteria
+- All domain invariants from gear acceptance criteria
 - Every error path that prevents illegal state (e.g., cascade, duplicate, constraint violation)
 - Value object validation (empty, invalid format, boundary)
 - Serde round-trip for SDK models (incorrect wire format breaks API clients silently)
@@ -408,10 +408,10 @@ Tests that add confidence without blocking delivery:
 
 ---
 
-## Acceptance Criteria (module test suite)
+## Acceptance Criteria (gear test suite)
 
-- All unit tests pass (`cargo test -p <module> -p <module>-sdk`) — 0 failed
+- All unit tests pass (`cargo test -p <gear> -p <gear>-sdk`) — 0 failed
 - Full suite completes in < 5 seconds
 - Zero `sleep`, `timeout`, or `tokio::time` usage in tests
-- Every domain invariant from module acceptance criteria is covered by at least one test
+- Every domain invariant from gear acceptance criteria is covered by at least one test
 - `make all` (or `make fmt && make lint && make test`) passes with zero errors

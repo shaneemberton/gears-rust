@@ -1,6 +1,6 @@
 //! Secure ORM layer for scoped database access.
 //!
-//! This module provides a type-safe wrapper around `SeaORM` that enforces
+//! This gear provides a type-safe wrapper around `SeaORM` that enforces
 //! access control scoping at compile time using the typestate pattern.
 //!
 //! # Basic Example
@@ -100,9 +100,9 @@
 //! | Resources only | Filter by ID column |
 //! | Both | AND them together |
 //!
-//! See the [docs module](docs) for comprehensive examples and usage patterns.
+//! See the [docs gear](docs) for comprehensive examples and usage patterns.
 
-// Module declarations
+// Gear declarations
 mod cond;
 mod db;
 mod db_ops;

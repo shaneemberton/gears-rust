@@ -1,6 +1,6 @@
 //! Account Management SDK — public contract surface.
 //!
-//! This crate publishes the inter-module client trait
+//! This crate publishes the inter-gear client trait
 //! ([`AccountManagementClient`]) and its data types. The public error
 //! envelope is [`AccountManagementError`] — a flat enum mirroring the
 //! AIP-193 categories AM raises; this SDK does **not** depend on
@@ -11,7 +11,7 @@
 //! `toolkit_canonical_errors::CanonicalError` at the REST boundary.
 //!
 //! External consumers — plugin authors, dashboards, integration tests,
-//! sibling modules calling AM via `ClientHub` — depend on **this**
+//! sibling gears calling AM via `ClientHub` — depend on **this**
 //! crate, never on the impl crate, so impl-side churn (sea-orm
 //! migrations, axum wiring, tokio runtime) does not propagate as a
 //! contract break.

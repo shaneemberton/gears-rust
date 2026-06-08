@@ -6,7 +6,7 @@ import signal
 import time
 from pathlib import Path
 
-# Add mock_server module to path
+# Add mock_server gear to path
 sys.path.insert(0, '/app')
 
 from mock_server import MockHTTPServer
@@ -18,18 +18,18 @@ def main():
     testdata_dir = Path('/app/testdata')
     server = MockHTTPServer(testdata_dir, host='0.0.0.0', port=8080)
     server.start()
-    
+
     # Setup signal handlers for graceful shutdown
     def shutdown_handler(signum, frame):
         print("Shutting down mock server...", flush=True)
         server.stop()
         sys.exit(0)
-    
+
     signal.signal(signal.SIGTERM, shutdown_handler)
     signal.signal(signal.SIGINT, shutdown_handler)
-    
+
     print("Mock HTTP server ready", flush=True)
-    
+
     # Keep the process running
     try:
         while True:

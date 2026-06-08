@@ -35,7 +35,7 @@ Updated:  2026-03-06 by Constructor Tech
 
 ### 1.1 Architectural Vision
 
-Chat Engine is designed as a service that decouples conversational infrastructure from message processing logic. The system follows a **hub-and-spoke architecture** where Chat Engine acts as the central hub managing session state, message history, and routing, while Backend Plugin modules serve as spokes implementing custom message processing logic.
+Chat Engine is designed as a service that decouples conversational infrastructure from message processing logic. The system follows a **hub-and-spoke architecture** where Chat Engine acts as the central hub managing session state, message history, and routing, while Backend Plugin gears serve as spokes implementing custom message processing logic.
 
 The architecture emphasizes **separation of concerns**: Chat Engine handles persistence, routing, and message tree management, while backend plugins focus solely on message processing. This enables flexible experimentation with different backend implementations, processing strategies, and conversation patterns without requiring changes to client applications or infrastructure.
 
@@ -44,7 +44,7 @@ The architecture emphasizes **separation of concerns**: Chat Engine handles pers
 - **Streaming-First**: All plugin responses stream through Chat Engine to clients with minimal latency overhead
 - **Plugin-Driven Capabilities**: Session capabilities are provided by backend plugins via `on_session_created()`, not hardcoded in Chat Engine
 - **Stateless Routing**: Chat Engine instances can scale horizontally as all session state is persisted in the database
-- **Plugin System**: Backend plugins are internal code modules implementing `ChatEngineBackendPlugin` trait; each plugin is referenced by `plugin_instance_id` in session type config (`cpt-cf-chat-engine-adr-plugin-backend-integration`)
+- **Plugin System**: Backend plugins are internal code gears implementing `ChatEngineBackendPlugin` trait; each plugin is referenced by `plugin_instance_id` in session type config (`cpt-cf-chat-engine-adr-plugin-backend-integration`)
 
 The system supports both **linear conversations** (traditional chat) and **non-linear conversations** (branching, variants, regeneration), enabling advanced use cases like conversation exploration, A/B testing of different backends, and human-in-the-loop workflows.
 
@@ -453,7 +453,7 @@ flowchart TB
 
 **System Architecture**:
 
-Chat Engine handles all chat-related operations. It is deployed as a unified monolithic service, not as separate microservices. Each instance includes an HTTP server with chunked streaming support for client connections and provides the following core functionality through internal modules.
+Chat Engine handles all chat-related operations. It is deployed as a unified monolithic service, not as separate microservices. Each instance includes an HTTP server with chunked streaming support for client connections and provides the following core functionality through internal gears.
 
 **Core Functionality**:
 
@@ -530,7 +530,7 @@ Chat Engine allows users to react to messages with simple like/dislike feedback.
 
 ### 3.2.1 Component Model
 
-Chat Engine is deployed as a unified monolithic service. All functionality is implemented as internal modules within the same deployment unit. See Section 3.2 Architecture Overview for detailed module descriptions.
+Chat Engine is deployed as a unified monolithic service. All functionality is implemented as internal gears within the same deployment unit. See Section 3.2 Architecture Overview for detailed gear descriptions.
 
 #### Chat Engine Service
 
@@ -550,47 +550,47 @@ Content moderation, AI processing, and summarization logic belong to backend plu
 
 ##### Related components (by ID)
 
-- `cpt-cf-chat-engine-actor-backend-plugin` — processes messages; called by Plugin Integration module
-- `cpt-cf-chat-engine-actor-file-storage` — stores file content; called by Conversation Export module
+- `cpt-cf-chat-engine-actor-backend-plugin` — processes messages; called by Plugin Integration gear
+- `cpt-cf-chat-engine-actor-file-storage` — stores file content; called by Conversation Export gear
 - `cpt-cf-chat-engine-actor-database` — persists all session and message state
 
-#### Session Management Module
+#### Session Management Gear
 
 - [x] `p1` - **ID**: `cpt-cf-chat-engine-component-session-management`
 
 Session lifecycle operations: create, delete, retrieve, type switching, share token generation. Invokes backend plugin with `on_session_created` trait method.
 
-#### Message Processing Module
+#### Message Processing Gear
 
 - [x] `p1` - **ID**: `cpt-cf-chat-engine-component-message-processing`
 
 Message tree management: creation, persistence, parent validation, variant_index assignment, tree constraints. **ADRs**: `cpt-cf-chat-engine-adr-message-tree-structure`, `cpt-cf-chat-engine-adr-message-variants`, `cpt-cf-chat-engine-adr-message-recreation`.
 
-#### Plugin Integration Module
+#### Plugin Integration Gear
 
 - [ ] `p1` - **ID**: `cpt-cf-chat-engine-component-webhook-integration`
 
 Plugin registry and trait dispatch: resolves `dyn ChatEngineBackendPlugin` by `plugin_instance_id`, invokes trait methods (`on_session_created`, `on_session_updated`, `on_message`, etc.), delegates all transport/auth/retry to the plugin implementation. The first-party `webhook-compat` plugin wraps legacy HTTP webhook backends. **ADRs**: `cpt-cf-chat-engine-adr-plugin-backend-integration`, `cpt-cf-chat-engine-adr-routing-layer`.
 
-#### Response Streaming Module
+#### Response Streaming Gear
 
 - [ ] `p1` - **ID**: `cpt-cf-chat-engine-component-response-streaming`
 
 HTTP chunked streaming: plugin-to-client pipe, backpressure control, connection cancellation, partial response saving. **ADRs**: `cpt-cf-chat-engine-adr-streaming-architecture`, `cpt-cf-chat-engine-adr-streaming-cancellation`, `cpt-cf-chat-engine-adr-backpressure-handling`.
 
-#### Conversation Export Module
+#### Conversation Export Gear
 
 - [x] `p3` - **ID**: `cpt-cf-chat-engine-component-conversation-export`
 
 Message tree traversal, format rendering (JSON/Markdown/TXT), file storage upload. Supports active path and full tree export.
 
-#### Message Search Module
+#### Message Search Gear
 
 - [ ] `p3` - **ID**: `cpt-cf-chat-engine-component-message-search`
 
 Full-text search across messages: session-scoped and cross-session search, ranking, pagination, context window retrieval. **ADRs**: `cpt-cf-chat-engine-adr-search-strategy`.
 
-#### Message Reactions Module
+#### Message Reactions Gear
 
 - [x] `p2` - **ID**: `cpt-cf-chat-engine-component-message-reactions`
 
@@ -624,7 +624,7 @@ For complete endpoint definitions, request/response schemas, and examples, see t
 
 **Interface**: `dyn ChatEngineBackendPlugin` (Rust trait, `chat-engine-sdk` crate)
 
-**Discovery**: Plugin implementations are internal code modules registered in Chat Engine's plugin registry at startup by `plugin_instance_id`.
+**Discovery**: Plugin implementations are internal code gears registered in Chat Engine's plugin registry at startup by `plugin_instance_id`.
 
 **Plugin methods**:
 - `on_session_type_configured(ctx)` → `Vec<Capability>` — optional static capabilities stored as `SessionType.available_capabilities`; plugins may return empty and defer resolution to session creation
@@ -640,12 +640,12 @@ For complete endpoint definitions, request/response schemas, and examples, see t
 
 ### 3.3.1 Internal Dependencies
 
-Chat Engine depends on the following internal modules at runtime.
+Chat Engine depends on the following internal gears at runtime.
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear    | Interface Used | Purpose |
 |-------------------|----------------|---------|
 | Plugin Registry | Internal registry | Resolve `ChatEngineBackendPlugin` implementations by `plugin_instance_id` at startup and on session type configuration |
-| Backend Plugin modules | `dyn ChatEngineBackendPlugin` (chat-engine-sdk) | Internal trait implementations that process messages, provide capabilities, and generate summaries |
+| Backend Plugin gears | `dyn ChatEngineBackendPlugin` (chat-engine-sdk) | Internal trait implementations that process messages, provide capabilities, and generate summaries |
 
 ### 3.3.2 External Dependencies
 

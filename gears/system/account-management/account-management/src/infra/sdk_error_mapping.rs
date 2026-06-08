@@ -2,7 +2,7 @@
 //! public error envelopes AM emits:
 //!
 //! * [`AccountManagementError`] (`account-management-sdk`) — the
-//!   typed error surface inter-module Rust callers see through
+//!   typed error surface inter-gear Rust callers see through
 //!   [`account_management_sdk::AccountManagementClient`] (resolved
 //!   via `ClientHub`). Variant-per-failure shape (mirrors `mini-chat`
 //!   convention) — each enum case names the failure semantically.

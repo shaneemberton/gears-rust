@@ -55,7 +55,7 @@ The per-backend analysis was originally captured during the cluster design revie
 
 ## Decision Drivers
 
-- **Correctness under failure must be a startup-time check, not a runtime surprise.** Misconfigured leader election should fail loudly at module boot.
+- **Correctness under failure must be a startup-time check, not a runtime surprise.** Misconfigured leader election should fail loudly at gear boot.
 - **Performance and correctness are independent axes.** ADR-001 picks backends on perf grounds; this ADR validates them on correctness grounds. Both must agree for a backend to ship.
 - **The hybrid (mixed-backend) profile is the platform's existing answer to "Redis cache + correct leader election".** Operators who want Redis for cache route leader election separately to a linearizable backend. Capability validation enforces this at startup (per ADR-007).
 - **Opt-out must be explicit and high-friction.** A consumer who genuinely accepts the risk (testing, transient deployments, dev environments) should be able to proceed, but the API shape must make accidental misuse impossible.
@@ -154,7 +154,7 @@ The shape evolved to Option 3 because three legitimate use cases for opt-in emer
 2. **Single-replica development deployments** (Redis without Sentinel, single-node NATS) where the operator knows the deployment cannot fail over and the cache's "weak" classification is technically true but operationally moot.
 3. **Consumer-controlled fallback paths** — a consumer that has its own application-level idempotency layer (CAS on its own state) may genuinely not need linearizable leader election; the leader-election watch is informational.
 
-Option 3 keeps the protection (default-safe construction) and the audit trail (warning log) while allowing these three to proceed without forking the cluster module. The friction of typing `new_allow_weak_consistency` instead of `new` is sufficient to prevent accidental use.
+Option 3 keeps the protection (default-safe construction) and the audit trail (warning log) while allowing these three to proceed without forking the cluster gear. The friction of typing `new_allow_weak_consistency` instead of `new` is sufficient to prevent accidental use.
 
 ### Recommended deployments
 

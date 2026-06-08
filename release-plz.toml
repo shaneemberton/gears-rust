@@ -178,7 +178,7 @@ changelog_update = false
 git_release_enable = false
 
 [[package]]
-name = "cf-gears-module-orchestrator"
+name = "cf-gears-gear-orchestrator"
 changelog_update = false
 git_release_enable = false
 

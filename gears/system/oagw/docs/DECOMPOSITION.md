@@ -22,7 +22,7 @@
 
 ## 1. Overview
 
-The OAGW design is decomposed into eight features organized along functional boundaries with high cohesion and minimal coupling. The decomposition follows the Control Plane / Data Plane separation established in the DESIGN, with a shared foundation layer providing domain model, storage, SDK, and module wiring.
+The OAGW design is decomposed into eight features organized along functional boundaries with high cohesion and minimal coupling. The decomposition follows the Control Plane / Data Plane separation established in the DESIGN, with a shared foundation layer providing domain model, storage, SDK, and gear wiring.
 
 **Decomposition strategy**:
 
@@ -47,14 +47,14 @@ The OAGW design is decomposed into eight features organized along functional bou
 
 - [ ] `p1` - **ID**: `cpt-cf-oagw-feature-domain-foundation`
 
-- **Purpose**: Establish domain model entities, database schema, ToolKit module wiring, SDK crate, and GTS type provisioning — the shared foundation all other features depend on.
+- **Purpose**: Establish domain model entities, database schema, ToolKit gear wiring, SDK crate, and GTS type provisioning — the shared foundation all other features depend on.
 
 - **Depends On**: None
 
 - **Scope**:
   - Domain entities: Upstream, Route, Plugin, ServerConfig, Endpoint
   - All `oagw_*` database tables and migrations
-  - ToolKit module wiring (`module.rs`, `config.rs`, `OagwConfig`)
+  - ToolKit gear wiring (`gear.rs`, `config.rs`, `OagwConfig`)
   - SDK crate (`oagw-sdk`): `ServiceGatewayClientV1` trait, SDK models, `ServiceGatewayError`
   - GTS type provisioning (`type_provisioning.rs`): schema and instance registration
   - DDD-Light layering setup (`domain/`, `infra/`, `api/rest/`)

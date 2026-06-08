@@ -32,7 +32,7 @@ pub(super) fn classify(snap: &Snapshot) -> Vec<Violation> {
         // walk completes acyclically. A cycle / cap / orphan break
         // means an earlier classifier already owns the violation, and
         // emitting a gap here on the way to that anomaly produces a
-        // double-report. See module doc and the cycle classifier.
+        // double-report. See gear doc and the cycle classifier.
         let mut pending_gaps: Vec<Uuid> = Vec::new();
         let mut abort = false;
         while let Some(anc) = cursor {

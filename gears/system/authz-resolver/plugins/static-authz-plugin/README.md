@@ -29,7 +29,7 @@ This ensures that the Secure ORM receives the tenant scope it needs for queries,
 ## Configuration
 
 ```yaml
-modules:
+gears:
   static_authz_plugin:
     config:
       vendor: "constructorfabric"

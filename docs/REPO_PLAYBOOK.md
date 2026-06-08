@@ -14,7 +14,7 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 
 | Item | Status / Phase / ID | Implemented (where) | Planned |
 |---|---|---|---|
-| Project vision | [x] `p1` | [README.md](../README.md), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md) | Keep aligned with module-level PRDs |
+| Project vision | [x] `p1` | [README.md](../README.md), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md) | Keep aligned with gear-level PRDs |
 | Goals | [x] `p1` | [README.md](../README.md) | Add measurable annual goals in roadmap artifact |
 | Non-goals | [x] `p1` | [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md) | Link each non-goal to ADR when changed |
 | Design principles | [x] `p1` | [README.md](../README.md), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md) | Consolidate into single “principles” page |
@@ -26,11 +26,11 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 
 | Item | Status / Phase / ID | Implemented (where) | Planned |
 |---|---|---|---|
-| System overview | [x] `p1` | [README.md](../README.md), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md) | Keep synced with modules inventory |
+| System overview | [x] `p1` | [README.md](../README.md), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md) | Keep synced with gears inventory |
 | Architecture overview | [x] `p1` | [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md), [docs/GEARS.md ](./GEARS.md ) | Add “current vs target” split blocks |
 | System diagrams | [x] `p1` | [docs/img/](./img), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md), [docs/GEARS.md ](./GEARS.md ) | Add ownership + update cadence per diagram |
-| Component responsibilities | [x] `p1` | [docs/GEARS.md ](./GEARS.md ), [docs/toolkit_unified_system/README.md](./toolkit_unified_system/README.md) | Add per-module responsibility cards |
-| Module boundaries | [x] `p1` | [docs/GEARS.md ](./GEARS.md ), [docs/toolkit_unified_system/](./toolkit_unified_system/README.md), [tools/dylint_lints/README.md](../tools/dylint_lints/README.md) | Expand lint coverage for boundary rules |
+| Component responsibilities | [x] `p1` | [docs/GEARS.md ](./GEARS.md ), [docs/toolkit_unified_system/README.md](./toolkit_unified_system/README.md) | Add per-gear responsibility cards |
+| Gear boundaries | [x] `p1` | [docs/GEARS.md ](./GEARS.md ), [docs/toolkit_unified_system/](./toolkit_unified_system/README.md), [tools/dylint_lints/README.md](../tools/dylint_lints/README.md) | Expand lint coverage for boundary rules |
 | Technology choices | [x] `p1` | [README.md](../README.md), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md), [guidelines/DEPENDENCIES.md](../guidelines/DEPENDENCIES.md) | Add technology decision registry page |
 | Data flow | [x] `p2` | [docs/GEARS.md ](./GEARS.md ) and [docs/spec-templates/gears-sdlc/DESIGN/template.md](./spec-templates/gears-sdlc/DESIGN/template.md) | Add dedicated sequence-diagram doc set |
 
@@ -40,10 +40,10 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 |---|---|---|---|
 | Repository structure | [x] `p1` | [README.md](../README.md), [docs/ARCHITECTURE_MANIFEST.md](./ARCHITECTURE_MANIFEST.md), [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Keep in sync with workspace changes |
 | Folder conventions | [x] `p1` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add root-level `REPO_STRUCTURE.md` |
-| Naming conventions | [x] `p1` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md), [tools/scripts/validate_module_names.py](../tools/scripts/validate_module_names.py), [tools/dylint_lints/](../tools/dylint_lints) | Expand naming rules beyond modules |
+| Naming conventions | [x] `p1` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md), [tools/scripts/validate_gear_names.py](../tools/scripts/validate_gear_names.py), [tools/dylint_lints/](../tools/dylint_lints) | Expand naming rules beyond gears |
 | Code organization rules | [x] `p1` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md), [docs/toolkit_unified_system/README.md](./toolkit_unified_system/README.md) | Add short “golden-path skeleton” page |
 | Dependency policies | [x] `p1` | [guidelines/DEPENDENCIES.md](../guidelines/DEPENDENCIES.md), [docs/security/SECURITY.md](./security/SECURITY.md) | Add explicit approval policy for new deps |
-| File naming rules | [x] `p2` | [docs/spec-templates/README.md](./spec-templates/README.md) (ADR/feature naming), module file layout in [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add global naming matrix |
+| File naming rules | [x] `p2` | [docs/spec-templates/README.md](./spec-templates/README.md) (ADR/feature naming), gear file layout in [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add global naming matrix |
 
 ## 4) Coding Standards & Static Quality
 
@@ -55,9 +55,9 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 | Formatting rules | [x] `p1` | [Makefile](../Makefile), [tools/scripts/ci.py](../tools/scripts/ci.py) | Add editor setup snippets |
 | Documentation standards | [x] `p1` | [docs/spec-templates/README.md](./spec-templates/README.md), [docs/checklists/README.md](./checklists/README.md) | Add docs style/lint enforcement rules |
 | Static analysis rules | [x] `p2` | [docs/security/SECURITY.md](./security/SECURITY.md), [tools/dylint_lints/](../tools/dylint_lints), [.github/workflows/codeql.yml](../.github/workflows/codeql.yml) | Add local static-analysis quickstart |
-| Code complexity rules | [x] `p2` | Clippy `cognitive_complexity` (threshold: 20) in workspace [Cargo.toml](../Cargo.toml), [clippy.toml](../clippy.toml) | Add per-module complexity budget |
+| Code complexity rules | [x] `p2` | Clippy `cognitive_complexity` (threshold: 20) in workspace [Cargo.toml](../Cargo.toml), [clippy.toml](../clippy.toml) | Add per-gear complexity budget |
 | Commenting rules | [ ] `p3` | Partial conventions in existing guidelines | Add explicit comment policy document |
-| README standards | [ ] `p3` | Implicit via module QUICKSTART guidance in [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add README template + required sections |
+| README standards | [ ] `p3` | Implicit via gear QUICKSTART guidance in [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add README template + required sections |
 
 ## 5) Git Workflow & Reviews
 
@@ -140,7 +140,7 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 | Item | Status / Phase / ID | Implemented (where) | Planned |
 |---|---|---|---|
 | Rust language safety baseline | [x] `p1` | [docs/security/SECURITY.md](./security/SECURITY.md), workspace Rust/clippy settings | Keep baseline aligned with toolchain policy |
-| Authentication & authorization architecture | [x] `p1` | [docs/security/SECURITY.md](./security/SECURITY.md), [docs/arch/authorization/](./arch/authorization/) | Add cross-module authz test matrix |
+| Authentication & authorization architecture | [x] `p1` | [docs/security/SECURITY.md](./security/SECURITY.md), [docs/arch/authorization/](./arch/authorization/) | Add cross-gear authz test matrix |
 | Security practices | [x] `p1` | [SECURITY.md](../SECURITY.md), [guidelines/SECURITY.md](../guidelines/SECURITY.md), [docs/security/SECURITY.md](./security/SECURITY.md) | Expand secure coding examples |
 | Dependency security rules | [x] `p1` | [docs/security/SECURITY.md](./security/SECURITY.md), [Makefile](../Makefile), `cargo deny` | Add allow/deny decision log |
 | Vulnerability response | [x] `p1` | [SECURITY.md](../SECURITY.md) | Add incident severity matrix |
@@ -164,7 +164,7 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 | Optimization guidelines | [x] `p2` | Rust + clippy guidance in [README.md](../README.md), [docs/security/SECURITY.md](./security/SECURITY.md) | Add hotspot optimization playbook |
 | Caching strategies | [ ] `p3` | Scattered examples only | Add standard caching guidance |
 | Performance standards | [ ] `p3` | Partially in architecture manifest/perf checks | Add explicit performance SLO policy |
-| Performance budgets | [ ] `p4` | Not formalized | Add endpoint/module budgets |
+| Performance budgets | [ ] `p4` | Not formalized | Add endpoint/gear budgets |
 | Benchmarking rules | [ ] `p4` | Not centralized | Add benchmark harness + reporting standard |
 | Token / compute budgets | [ ] `p4` | Not formalized | Add GenAI token/compute governance |
 
@@ -198,11 +198,11 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 | Templates (overall) | [x] `p1` | [docs/spec-templates/README.md](./spec-templates/README.md), [docs/checklists/README.md](./checklists/README.md), [docs/pr-review/README.md](./pr-review/README.md) | Expand reusable template index |
 | PR checklist | [x] `p1` | [CONTRIBUTING.md](../CONTRIBUTING.md), [docs/checklists/CODING.md](./checklists/CODING.md) | Add enforceable checklist bot |
 | Documentation templates | [x] `p1` | [docs/spec-templates/README.md](./spec-templates/README.md) and template files | Add docs template quick-selector |
-| Examples | [x] `p1` | [examples/](../examples), [docs/QUICKSTART_GUIDE.md](./QUICKSTART_GUIDE.md) | Expand reference examples per module type |
-| Code templates | [x] `p2` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) module skeletons/patterns | Add dedicated starter templates folder |
+| Examples | [x] `p1` | [examples/](../examples), [docs/QUICKSTART_GUIDE.md](./QUICKSTART_GUIDE.md) | Expand reference examples per gear type |
+| Code templates | [x] `p2` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) gear skeletons/patterns | Add dedicated starter templates folder |
 | PR templates | [x] `p2` | [CONTRIBUTING.md](../CONTRIBUTING.md) PR description template, [docs/pr-review/code-review-template.md](./pr-review/code-review-template.md) | Add `.github/PULL_REQUEST_TEMPLATE.md` |
-| Reference implementations | [x] `p2` | [examples/toolkit](../examples/toolkit), [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Curate “golden reference modules” list |
-| Good examples | [x] `p2` | Lint/module examples in [tools/dylint_lints/README.md](../tools/dylint_lints/README.md), [examples/](../examples) | Add explicit tagged good examples index |
+| Reference implementations | [x] `p2` | [examples/toolkit](../examples/toolkit), [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Curate “golden reference gears” list |
+| Good examples | [x] `p2` | Lint/gear examples in [tools/dylint_lints/README.md](../tools/dylint_lints/README.md), [examples/](../examples) | Add explicit tagged good examples index |
 | Bad examples | [x] `p2` | Dylint bad patterns in [tools/dylint_lints/README.md](../tools/dylint_lints/README.md) + UI tests | Add cross-domain anti-pattern examples |
 | Release checklist | [ ] `p3` | Partial in [docs/RELEASING.md](./RELEASING.md) | Add explicit release checklist doc |
 | Debug checklist | [ ] `p3` | Not formalized | Add debug triage checklist |
@@ -217,15 +217,15 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 | Contract rules | [x] `p1` | Dylint DE01xx/DE02xx/DE03xx in [tools/dylint_lints/README.md](../tools/dylint_lints/README.md) | Expand contract lint set |
 | Error handling standards | [x] `p1` | [docs/toolkit_unified_system/05_errors_rfc9457.md](./toolkit_unified_system/05_errors_rfc9457.md), [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add repository-wide error taxonomy |
 | Configuration management | [x] `p1` | [README.md](../README.md) config section, [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add config schema validation policy |
-| Data model conventions | [x] `p2` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md), [docs/toolkit_unified_system/02_module_layout_and_sdk_pattern.md](./toolkit_unified_system/02_module_layout_and_sdk_pattern.md) | Add canonical model naming matrix |
+| Data model conventions | [x] `p2` | [docs/toolkit_unified_system/](./toolkit_unified_system/README.md), [docs/toolkit_unified_system/02_gear_layout_and_sdk_pattern.md](./toolkit_unified_system/02_gear_layout_and_sdk_pattern.md) | Add canonical model naming matrix |
 | Schema rules | [x] `p2` | GTS + OData + OpenAPI references in ToolKit docs and dylint DE09xx | Add schema compatibility checklist |
-| Migration rules | [x] `p2` | Secure ORM and module infra patterns in ToolKit docs + [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add explicit DB migration policy doc |
+| Migration rules | [x] `p2` | Secure ORM and gear infra patterns in ToolKit docs + [docs/toolkit_unified_system/](./toolkit_unified_system/README.md) | Add explicit DB migration policy doc |
 | Environment configs | [x] `p2` | [README.md](../README.md) env overrides, [docs/TRACING_SETUP.md](./TRACING_SETUP.md) | Add per-environment config matrix |
 | Feature flags | [ ] `p3` | Mentioned as target in architecture docs | Add standard feature-flag framework |
 
 ## 17) Deployment & Operations
 
-> Gears is a collection of libraries and modules, not a standalone deployable component. Deployment, rollback, cost management, and resource limits are the responsibility of downstream applications that consume these libraries.
+> Gears is a collection of libraries and gears, not a standalone deployable component. Deployment, rollback, cost management, and resource limits are the responsibility of downstream applications that consume these libraries.
 
 | Item | Status / Phase / ID | Implemented (where) | Planned |
 |---|---|---|---|
@@ -247,7 +247,7 @@ Purpose: one concise map of repository artifacts that improve developer + AI pro
 | Contribution guidelines | [x] `p1` | [CONTRIBUTING.md](../CONTRIBUTING.md) | Keep aligned with CI/review changes |
 | Contributor expectations | [x] `p1` | [CONTRIBUTING.md](../CONTRIBUTING.md) | Add expected turnaround/SLA guidance |
 | Decision records (ADR) | [x] `p1` | [docs/spec-templates/gears-sdlc/ADR/template.md](./spec-templates/gears-sdlc/ADR/template.md), [docs/adrs/](./adrs) | Add ADR index by domain |
-| Design documents | [x] `p1` | [docs/spec-templates/gears-sdlc/DESIGN/template.md](./spec-templates/gears-sdlc/DESIGN/template.md), module docs | Add quality gates for design docs |
+| Design documents | [x] `p1` | [docs/spec-templates/gears-sdlc/DESIGN/template.md](./spec-templates/gears-sdlc/DESIGN/template.md), gear docs | Add quality gates for design docs |
 | Common workflows | [x] `p2` | [Makefile](../Makefile), [tools/scripts/ci.py](../tools/scripts/ci.py), [docs/pr-review/README.md](./pr-review/README.md) | Add workflow cookbook |
 | Anti-patterns | [x] `p2` | [docs/checklists/](./checklists), [tools/dylint_lints/README.md](../tools/dylint_lints/README.md) | Add unified anti-pattern catalog |
 | Common mistakes | [x] `p2` | [tools/dylint_lints/AGENTS.md](../tools/dylint_lints/AGENTS.md) pitfalls, checklists | Add “top mistakes” short guide |

@@ -50,7 +50,7 @@ Field names use the canonical snake_case names from the logical tables in
 `DESIGN.md` section 3.7. Rust implementations may wrap these fields in newtype
 or enum types, but must preserve the domain semantics documented here.
 
-Identifiers such as `tenant_id`, `resource_id`, `subject_id`, `source_module`,
+Identifiers such as `tenant_id`, `resource_id`, `subject_id`, `source_gear`,
 and `gts_id` are opaque platform identifiers. The Usage Collector stores and
 compares them but does not parse, classify, or derive identity information from
 them.
@@ -74,7 +74,7 @@ source systems do not maintain subject-type taxonomies.
 Traceability: `cpt-cf-usage-collector-entity-usage-record`
 
 A `UsageRecord` is one accepted measurement of resource consumption attributed
-to a tenant, resource, optional subject, source module, and Metric (resolved
+to a tenant, resource, optional subject, source gear, and Metric (resolved
 against the metric catalog, managed via the Plugin SPI and persisted in the
 active storage plugin's database; see ADR 0012 at
 `./ADR/0012-unified-plugin-catalog-and-gts-id-reference.md`).
@@ -87,7 +87,7 @@ from `active` to `inactive`.
 | `tenant_id`       | Yes                  | Opaque tenant identifier | Caller-supplied tenant attribution. PDP authorization decides whether the caller may emit or read this tenant scope.                                                                                                                                                                                                                                                                                                             |
 | `resource`        | Yes                  | `ResourceRef`            | Caller-supplied resource attribution. Both `resource_id` and `resource_type` are mandatory.                                                                                                                                                                                                                                                                                                                                      |
 | `subject`         | No                   | `SubjectRef`             | Optional caller-supplied subject attribution. When present, `subject_id` is mandatory and `subject_type` is optional.                                                                                                                                                                                                                                                                                                            |
-| `source_module`   | Yes                  | Opaque module identifier | Identity of the emitting source module used in PDP emit authorization and downstream diagnostics.                                                                                                                                                                                                                                                                                                                                |
+| `source_gear`   | Yes                  | Opaque gear identifier | Identity of the emitting source gear used in PDP emit authorization and downstream diagnostics.                                                                                                                                                                                                                                                                                                                                |
 | `metric_gts_id`   | Yes                  | GTS identifier           | Reference to a `Metric.gts_id` present in the metric catalog (managed via the Plugin SPI, persisted in the active storage plugin's database). The same `gts_id` string that identifies the metric in the catalog is the value stored on every usage record that references it — no UUID derivation. Unknown Metrics are rejected before persistence. See ADR 0012 (`./ADR/0012-unified-plugin-catalog-and-gts-id-reference.md`). |
 | `value`           | Yes                  | Numeric                  | Measurement value. Permitted sign depends jointly on `MetricKind` and `entry_type` per the four-cell validation matrix in this section.                                                                                                                                                                                                                                                                                          |
 | `entry_type`      | Yes                  | `EntryType`              | Discriminator separating ordinary usage (`usage`) from counter value-reversal (`compensation`). Default `usage`. See §2.2 `EntryType` and the four-cell validation matrix below.                                                                                                                                                                                                                                                 |
@@ -110,7 +110,7 @@ persistence:
 
 Invariants:
 
-- `tenant_id`, `resource`, `source_module`, `metric_gts_id`, `value`,
+- `tenant_id`, `resource`, `source_gear`, `metric_gts_id`, `value`,
   `timestamp`, `idempotency_key`, and `status` are never null on an accepted
   record.
 - `timestamp` is event time, not ingestion time, and is not validated against
@@ -130,11 +130,11 @@ Invariants:
   same `gts_id` string used as the catalog primary key (no UUID derivation;
   see ADR 0012).
 - Deduplication is unique on `(tenant_id, metric_gts_id, idempotency_key)`.
-  `source_module` is intentionally not part of that key; multiple source
-  modules authorized for the same tenant and Metric must coordinate key
+  `source_gear` is intentionally not part of that key; multiple source
+  gears authorized for the same tenant and Metric must coordinate key
   allocation. On a collision the outcome is decided by exact equality of the
   caller-supplied canonical fields (`value`, `timestamp`, `resource`,
-  `subject`, `source_module`, `metadata`; the match-key tuple and the
+  `subject`, `source_gear`, `metadata`; the match-key tuple and the
   server-owned `id` and `status` are excluded): an exact-equality retry is
   silently deduplicated, and any differing canonical field — including a
   metadata-only difference — is a Conflict that is rejected, not absorbed.
@@ -146,7 +146,7 @@ idempotency_key)` uniqueness is permanent. The active plugin must preserve
 - Accepted records are immutable except for the `status` transition performed
   by the deactivation path.
 - Deactivation does not mutate `tenant_id`, `resource`, `subject`,
-  `source_module`, `metric_gts_id`, `value`, `timestamp`, `idempotency_key`, or
+  `source_gear`, `metric_gts_id`, `value`, `timestamp`, `idempotency_key`, or
   `metadata`.
 - `entry_type` defaults to `usage` on every ingestion and is never mutated
   after acceptance.
@@ -341,7 +341,7 @@ Invariants:
   the `ON DELETE RESTRICT` FK established on `gts_id`. The plugin returns a
   structured `metric_referenced` error that the gateway surfaces as a
   deterministic REST / SDK error response.
-- The collector does not store source-module-to-Metric authorization
+- The collector does not store source-gear-to-Metric authorization
   mappings; those policies belong to the PDP.
 
 ### 2.6 MetricKind
@@ -361,8 +361,8 @@ accumulation semantics derived from that prefix.
 
 | Value     | Semantics                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `counter` | Source modules submit non-negative gross usage deltas as `entry_type = usage` (`value >= 0`). The cumulative total per `(tenant_id, metric_gts_id)` is the signed `SUM` over both `usage` and `compensation` entries: append-only compensation rows (`entry_type = compensation`, `value < 0`) reduce that total. `SUM` is therefore not monotonically increasing in the presence of compensation, and the plugin MUST NOT impose monotonicity checks across entry types. |
-| `gauge`   | Source modules submit point-in-time readings as `entry_type = usage` that may rise or fall. Values are stored as-is without monotonicity checks or delta accumulation. `gauge` Metrics do not admit `entry_type = compensation`: a gauge already expresses down-movement directly, and a compensation row on a gauge Metric is rejected before persistence.                                                                                                               |
+| `counter` | Source gears submit non-negative gross usage deltas as `entry_type = usage` (`value >= 0`). The cumulative total per `(tenant_id, metric_gts_id)` is the signed `SUM` over both `usage` and `compensation` entries: append-only compensation rows (`entry_type = compensation`, `value < 0`) reduce that total. `SUM` is therefore not monotonically increasing in the presence of compensation, and the plugin MUST NOT impose monotonicity checks across entry types. |
+| `gauge`   | Source gears submit point-in-time readings as `entry_type = usage` that may rise or fall. Values are stored as-is without monotonicity checks or delta accumulation. `gauge` Metrics do not admit `entry_type = compensation`: a gauge already expresses down-movement directly, and a compensation row on a gauge Metric is rejected before persistence.                                                                                                               |
 
 Invariants:
 
@@ -389,7 +389,7 @@ Invariants:
 - A same-key submission with the same `(tenant_id, metric_gts_id,
 idempotency_key)` is resolved by exact equality of the caller-supplied
   canonical fields (`value`, `timestamp`, `resource`, `subject`,
-  `source_module`, `metadata`; the match-key tuple and the server-owned `id`
+  `source_gear`, `metadata`; the match-key tuple and the server-owned `id`
   and `status` are excluded). An exact-equality retry is silently
   deduplicated; any differing canonical field — including a metadata-only
   difference — is a Conflict that is rejected fail-closed (surfaced on the wire
@@ -400,7 +400,7 @@ idempotency_key)` is resolved by exact equality of the caller-supplied
   record bodies are purged or archived by retention; a retention purge must not
   free a dedup key.
 - The same key may legitimately appear under a different tenant or Metric.
-- Source modules sharing the same tenant and Metric namespace must coordinate
+- Source gears sharing the same tenant and Metric namespace must coordinate
   key prefixes or another allocation convention.
 
 ### 2.8 RecordMetadata
@@ -464,7 +464,7 @@ persist it on usage records.
 | `principal`           | Yes                    | Opaque principal reference | Authenticated caller identity as provided by the platform identity layer.                                               |
 | `tenant_scope_claims` | Platform-owned         | Opaque claims              | Tenant-scope claims available to PDP evaluation. The collector does not infer authorization from these claims directly. |
 | `auxiliary_claims`    | Platform-owned         | Opaque claims              | Additional platform claims passed through to PDP evaluation when available.                                             |
-| `correlation_id`      | Yes for API operations | Opaque request identifier  | Identifier propagated through gateway, PDP decision logs, module logs, and platform audit trail.                        |
+| `correlation_id`      | Yes for API operations | Opaque request identifier  | Identifier propagated through gateway, PDP decision logs, gear logs, and platform audit trail.                        |
 
 Invariants:
 
@@ -525,7 +525,7 @@ exactly; declared-key names are taken verbatim from the metric's
 | `tenant`        | `tenant_id` on §2.1 | `eq`, `in`                         |
 | `resource`      | `ResourceRef` §2.3  | `eq`, `in`                         |
 | `subject`       | `SubjectRef` §2.4   | `eq`, `in`                         |
-| `source_module` | §2.1                | `eq`, `in`                         |
+| `source_gear` | §2.1                | `eq`, `in`                         |
 | `timestamp`     | §2.1                | `eq`, `ne`, `lt`, `le`, `gt`, `ge` |
 | `status`        | §2.10               | `eq`, `ne`, `lt`, `le`, `gt`, `ge` |
 
@@ -552,7 +552,7 @@ only.
 Invariants:
 
 - The fixed-field opaque identifiers (`tenant`, `resource`, `subject`,
-  `source_module`) accept only `eq` and `in`; ordering and range operators
+  `source_gear`) accept only `eq` and `in`; ordering and range operators
   are rejected as a structural validation error.
 - `timestamp` and `status` accept the full comparison operator set
   (`eq`, `ne`, `lt`, `le`, `gt`, `ge`).
@@ -632,7 +632,7 @@ to the Plugin SPI after PDP constraints are applied.
 | `tenant_id`     | No       | Opaque tenant identifier | User-supplied narrowing filter applied after PDP constraints.                                                                                                       |
 | `resource`      | No       | `ResourceRef`            | Optional resource narrowing filter.                                                                                                                                 |
 | `subject`       | No       | `SubjectRef`             | Optional subject narrowing filter.                                                                                                                                  |
-| `source_module` | No       | Opaque module identifier | Optional source-module narrowing filter.                                                                                                                            |
+| `source_gear` | No       | Opaque gear identifier | Optional source-gear narrowing filter.                                                                                                                            |
 | `group_by`      | No       | List of dimensions       | Any combination of the **fixed fields** in §2.11 plus every key in the queried metric's **`metadata_fields`** (resolved per request from `metric_gts_id`).          |
 | `$filter`       | No       | OData filter expression  | Restricted to the union of fixed fields (§2.11) and every key in the queried metric's `metadata_fields`, with the per-field operator allowances in §2.11.           |
 
@@ -761,7 +761,7 @@ decision. It is applied before user-supplied filters.
 | `resource_refs`  | PDP-owned | Set of `ResourceRef` values | Optional authorized resource scope.      |
 | `subject_refs`   | PDP-owned | Set of `SubjectRef` values  | Optional authorized subject scope.       |
 | `metric_gts_ids` | PDP-owned | Set of GTS identifiers      | Optional authorized Metric scope.        |
-| `source_modules` | PDP-owned | Set of module identifiers   | Optional authorized source-module scope. |
+| `source_gears` | PDP-owned | Set of gear identifiers   | Optional authorized source-gear scope. |
 
 Invariants:
 
@@ -779,9 +779,9 @@ Traceability: `cpt-cf-usage-collector-entity-plugin-binding`
 `Service`'s lazy resolution path: the `GtsInstanceId` cached on first use
 by `GtsPluginSelector::get_or_init`, and the `Arc<dyn
 UsageCollectorPluginV1>` looked up via `ClientHub::try_get_scoped` under
-`ClientScope::gts_id(&instance_id)`. There is no separate "Module
-Orchestrator" component — the host module's own `Service` constructor
-materializes the selector, and the plugin module's `init()` materializes
+`ClientScope::gts_id(&instance_id)`. There is no separate "Gear
+Orchestrator" component — the host gear's own `Service` constructor
+materializes the selector, and the plugin gear's `init()` materializes
 the scoped client. The SPI major version
 is encoded structurally inside `gts_schema_id` (the trailing `.v1~`
 segment of `UsageCollectorPluginSpecV1::gts_schema_id()`) and is not
@@ -790,7 +790,7 @@ materialized as a separate runtime field.
 | Field             | Required | Type                              | Description                                                                                                                                                                                                   |
 | ----------------- | -------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `gts_instance_id` | Yes      | `GtsInstanceId`                   | Scope used to resolve the selected storage plugin; cached by `GtsPluginSelector::get_or_init` on first dispatch and reused for the host `Service`'s lifetime. Encodes the SPI major version as a path suffix. |
-| `client`          | Yes      | `Arc<dyn UsageCollectorPluginV1>` | The bound plugin's scoped trait object — registered by the plugin module's `init()` via `ClientHub::register_scoped` under `ClientScope::gts_id(&instance_id)` and cloned out on each dispatch.               |
+| `client`          | Yes      | `Arc<dyn UsageCollectorPluginV1>` | The bound plugin's scoped trait object — registered by the plugin gear's `init()` via `ClientHub::register_scoped` under `ClientScope::gts_id(&instance_id)` and cloned out on each dispatch.               |
 
 Invariants:
 
@@ -808,7 +808,7 @@ Invariants:
   negotiation.
 - Binding "state" is not modeled as a finite state machine (no
   `Unbound`/`Resolving`/`Bound`/`Refreshing`/`Failed` discriminants exist in
-  the reference modules); it is recomputed on each call from the two
+  the reference gears); it is recomputed on each call from the two
   structural facts above.
 
 ## 6. Surface Mapping
@@ -816,7 +816,7 @@ Invariants:
 | Surface    | Consumes                                                                                                               | Produces                                                                                                                                                                                                                                          |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SDK trait  | Usage submissions, `AggregationQuery`, `RawQuery`, deactivation requests                                               | Per-record acknowledgements, `AggregationResult`, `toolkit_odata::Page<UsageRecord>`, deactivation outcome                                                                                                                                         |
-| REST API   | Same as SDK plus Metric registration, Metric list/get/delete, and health probe requests                                | Same as SDK plus Metric catalog state, health probe payloads, and platform-standard errors. Operational telemetry is pushed via OTLP from ToolKit's `SdkMeterProvider`; no in-module HTTP metrics endpoint is exposed.                             |
+| REST API   | Same as SDK plus Metric registration, Metric list/get/delete, and health probe requests                                | Same as SDK plus Metric catalog state, health probe payloads, and platform-standard errors. Operational telemetry is pushed via OTLP from ToolKit's `SdkMeterProvider`; no in-gear HTTP metrics endpoint is exposed.                             |
 | Plugin SPI | Idempotency-keyed `UsageRecord` persistence commands, query commands, Metric lifecycle commands, deactivation commands | Persistence acknowledgements, dedup outcomes (silently deduplicated on an exact-equality retry, Conflict on a canonical-field mismatch), `AggregationResult`, `toolkit_odata::Page<UsageRecord>`, Metric catalog results, classified plugin errors |
 
 ### 6.1 Error Envelope

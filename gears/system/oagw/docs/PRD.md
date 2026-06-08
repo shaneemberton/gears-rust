@@ -12,7 +12,7 @@
   - [2.1 Human Actors](#21-human-actors)
   - [2.2 System Actors](#22-system-actors)
 - [3. Operational Concept & Environment](#3-operational-concept--environment)
-  - [3.1 Module-Specific Environment Constraints](#31-module-specific-environment-constraints)
+  - [3.1 Gear-Specific Environment Constraints](#31-gear-specific-environment-constraints)
 - [4. Scope](#4-scope)
   - [4.1 In Scope](#41-in-scope)
   - [4.2 Out of Scope](#42-out-of-scope)
@@ -24,7 +24,7 @@
   - [5.5 Configuration Hierarchy](#55-configuration-hierarchy)
   - [5.6 Error Codes](#56-error-codes)
 - [6. Non-Functional Requirements](#6-non-functional-requirements)
-  - [6.1 Module-Specific NFRs](#61-module-specific-nfrs)
+  - [6.1 Gear-Specific NFRs](#61-gear-specific-nfrs)
   - [6.2 NFR Exclusions](#62-nfr-exclusions)
 - [7. Public Library Interfaces](#7-public-library-interfaces)
   - [7.1 Public API Surface](#71-public-api-surface)
@@ -49,7 +49,7 @@ functional capabilities, and quality attributes.
 
 SCOPE:
   ✓ Business goals and success criteria
-  ✓ Actors (users, systems) that interact with this module
+  ✓ Actors (users, systems) that interact with this gear
   ✓ Functional requirements (WHAT, not HOW)
   ✓ Non-functional requirements (quality attributes, SLOs)
   ✓ Scope boundaries (in/out of scope)
@@ -79,11 +79,11 @@ REQUIREMENT LANGUAGE:
 
 The Outbound API Gateway (OAGW) manages all outbound API requests from Gears to external services. It acts as a centralized proxy layer that handles credential injection, rate limiting, header transformation, and security enforcement for every external call made by the platform.
 
-OAGW provides a unified interface for application modules to reach external APIs without managing credentials, connection details, or security policies directly. Modules send requests to OAGW's proxy endpoint, and OAGW resolves the target upstream, injects authentication, applies policies, and forwards the request.
+OAGW provides a unified interface for application gears to reach external APIs without managing credentials, connection details, or security policies directly. Gears send requests to OAGW's proxy endpoint, and OAGW resolves the target upstream, injects authentication, applies policies, and forwards the request.
 
 ### 1.2 Background / Problem Statement
 
-Gears need to communicate with external third-party services (e.g., OpenAI, Stripe, payment gateways). Without a centralized gateway, each module must independently manage credentials, rate limits, error handling, and security policies for outbound calls. This leads to credential sprawl, inconsistent error handling, and no unified observability.
+Gears need to communicate with external third-party services (e.g., OpenAI, Stripe, payment gateways). Without a centralized gateway, each gear must independently manage credentials, rate limits, error handling, and security policies for outbound calls. This leads to credential sprawl, inconsistent error handling, and no unified observability.
 
 OAGW solves these problems by providing a single outbound proxy layer with pluggable authentication, configurable rate limiting, header transformation, and security policies. All external calls flow through OAGW, ensuring consistent credential isolation, audit trails, and policy enforcement across the platform.
 
@@ -109,7 +109,7 @@ OAGW solves these problems by providing a single outbound proxy layer with plugg
 
 ## 2. Actors
 
-> **Note**: Stakeholder needs are managed at project/task level by steering committee. Document **actors** (users, systems) that interact with this module.
+> **Note**: Stakeholder needs are managed at project/task level by steering committee. Document **actors** (users, systems) that interact with this gear.
 
 ### 2.1 Human Actors
 
@@ -156,11 +156,11 @@ OAGW solves these problems by providing a single outbound proxy layer with plugg
 
 ## 3. Operational Concept & Environment
 
-> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and integration patterns defined in root PRD. Document only module-specific deviations here. **Delete this section if no special constraints.**
+> **Note**: Project-wide runtime, OS, architecture, lifecycle policy, and integration patterns defined in root PRD. Document only gear-specific deviations here. **Delete this section if no special constraints.**
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
-None. OAGW follows standard Gears ToolKit module conventions.
+None. OAGW follows standard Gears ToolKit gear conventions.
 
 ## 4. Scope
 
@@ -458,11 +458,11 @@ The system **MUST** return the following error codes for proxy and management op
 
 ## 6. Non-Functional Requirements
 
-> **Global baselines**: Project-wide NFRs (performance, security, reliability, scalability) defined in root PRD and [guidelines/](../guidelines/). Document only module-specific NFRs here: **exclusions** from defaults or **standalone** requirements.
+> **Global baselines**: Project-wide NFRs (performance, security, reliability, scalability) defined in root PRD and [guidelines/](../guidelines/). Document only gear-specific NFRs here: **exclusions** from defaults or **standalone** requirements.
 >
 > **Testing strategy**: NFRs verified via automated benchmarks, security scans, and monitoring unless otherwise specified.
 
-### 6.1 Module-Specific NFRs
+### 6.1 Gear-Specific NFRs
 
 #### Low Latency
 
@@ -546,7 +546,7 @@ All resources (upstreams, routes, plugins) **MUST** be tenant-scoped. Tenant iso
 
 ### 6.2 NFR Exclusions
 
-None. All project-default NFRs apply to this module.
+None. All project-default NFRs apply to this gear.
 
 ## 7. Public Library Interfaces
 
@@ -576,8 +576,8 @@ None. All project-default NFRs apply to this module.
 
 - **Type**: Rust trait (`ServiceGatewayClientV1` in `oagw-sdk` crate)
 - **Stability**: unstable
-- **Description**: Public Rust trait for inter-module communication. Exposes upstream and route management operations and proxy invocation for in-process callers.
-- **Breaking Change Policy**: Trait changes require coordinated release of all dependent modules
+- **Description**: Public Rust trait for inter-gear communication. Exposes upstream and route management operations and proxy invocation for in-process callers.
+- **Breaking Change Policy**: Trait changes require coordinated release of all dependent gears
 
 ### 7.2 External Integration Contracts
 
@@ -740,9 +740,9 @@ None. All project-default NFRs apply to this module.
 
 ## 11. Assumptions
 
-- Gears `cred_store` module is available and supports UUID-based secret retrieval
-- ToolKit framework provides module lifecycle, dependency injection, and REST API hosting
-- Tenant hierarchy is resolved by the platform (tenant-resolver module); OAGW receives tenant_id from SecurityContext
+- Gears `cred_store` gear is available and supports UUID-based secret retrieval
+- ToolKit framework provides gear lifecycle, dependency injection, and REST API hosting
+- Tenant hierarchy is resolved by the platform (tenant-resolver gear); OAGW receives tenant_id from SecurityContext
 - External upstream services are reachable via HTTP/HTTPS from the Gears deployment environment
 
 ## 12. Risks

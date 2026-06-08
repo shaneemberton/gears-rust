@@ -1,6 +1,6 @@
 //! Centralized error mapping for Axum
 //!
-//! Converts framework and module errors into `CanonicalError`. Wire rendering
+//! Converts framework and gear errors into `CanonicalError`. Wire rendering
 //! (RFC 9457 `application/problem+json`), `instance`, and `trace_id` are
 //! attached by `IntoResponse for CanonicalError` plus the
 //! `canonical_error_middleware` (`crate::api::canonical_error_layer`).
@@ -38,7 +38,7 @@ pub fn extract_trace_id(headers: &HeaderMap) -> Option<String> {
 
 /// Centralized downcast-based error mapping.
 ///
-/// Converts known framework and module error types into `CanonicalError`. The
+/// Converts known framework and gear error types into `CanonicalError`. The
 /// descriptive detail for `Internal`-category mappings flows into the
 /// canonical's `ctx.description` (recoverable via `diagnostic()`) so the
 /// `canonical_error_middleware` can log it server-side without leaking onto
@@ -51,30 +51,30 @@ pub fn map_error_to_canonical(error: &dyn Any) -> CanonicalError {
 
     if let Some(config_err) = error.downcast_ref::<ConfigError>() {
         let detail = match config_err {
-            ConfigError::ModuleNotFound { module } => {
-                format!("Module '{module}' configuration not found")
+            ConfigError::GearNotFound { gear } => {
+                format!("Gear '{gear}' configuration not found")
             }
-            ConfigError::InvalidModuleStructure { module } => {
-                format!("Module '{module}' has invalid configuration structure")
+            ConfigError::InvalidGearStructure { gear } => {
+                format!("Gear '{gear}' has invalid configuration structure")
             }
-            ConfigError::MissingConfigSection { module } => {
-                format!("Module '{module}' is missing required config section")
+            ConfigError::MissingConfigSection { gear } => {
+                format!("Gear '{gear}' is missing required config section")
             }
-            ConfigError::InvalidConfig { module, .. } => {
-                format!("Module '{module}' has invalid configuration")
+            ConfigError::InvalidConfig { gear, .. } => {
+                format!("Gear '{gear}' has invalid configuration")
             }
-            ConfigError::VarExpand { module, source } => {
+            ConfigError::VarExpand { gear, source } => {
                 // The `source` carries the failing env-var name. It is logged
                 // locally for operators but intentionally NOT placed into the
                 // canonical's diagnostic — `diagnostic()` is exposed through
                 // `canonical_error_middleware` and we keep the env-var name
                 // out of any path that could reach a downstream consumer.
                 tracing::error!(
-                    module = %module,
+                    gear =  %gear,
                     error = %source,
-                    "Environment variable expansion failed in module config"
+                    "Environment variable expansion failed in gear config"
                 );
-                format!("Module '{module}' has invalid environment-backed configuration")
+                format!("Gear '{gear}' has invalid environment-backed configuration")
             }
         };
         return CanonicalError::internal(detail).create();
@@ -133,24 +133,24 @@ mod tests {
     }
 
     #[test]
-    fn config_module_not_found_preserves_diagnostic() {
-        let canonical = ConfigError::ModuleNotFound {
-            module: "test_module".to_owned(),
+    fn config_gear_not_found_preserves_diagnostic() {
+        let canonical = ConfigError::GearNotFound {
+            gear: "test_gear".to_owned(),
         }
         .into_canonical();
 
         assert_eq!(canonical.status_code(), 500);
         assert!(canonical.gts_type().contains("internal"));
 
-        // Module name reaches `diagnostic()` (logged by middleware) but never
+        // Gear name reaches `diagnostic()` (logged by middleware) but never
         // the wire `detail` (which stays the canonical opaque string).
         let diag = canonical.diagnostic().expect("Internal carries diagnostic");
-        assert!(diag.contains("test_module"), "diagnostic was {diag:?}");
+        assert!(diag.contains("test_gear"), "diagnostic was {diag:?}");
 
         let problem = Problem::from(canonical);
         assert!(
-            !problem.detail.contains("test_module"),
-            "wire detail leaked module name: {}",
+            !problem.detail.contains("test_gear"),
+            "wire detail leaked gear name: {}",
             problem.detail
         );
     }
@@ -170,7 +170,7 @@ mod tests {
             source: std::env::VarError::NotPresent,
         };
         let canonical = ConfigError::VarExpand {
-            module: "my_mod".to_owned(),
+            gear: "my_mod".to_owned(),
             source,
         }
         .into_canonical();
@@ -178,7 +178,7 @@ mod tests {
         assert_eq!(canonical.status_code(), 500);
 
         // The env-var name and the source error message MUST NOT reach either
-        // the wire or the diagnostic — only the module name is allowed
+        // the wire or the diagnostic — only the gear name is allowed
         // through, and only via `diagnostic()`.
         let diag = canonical.diagnostic().expect("Internal carries diagnostic");
         assert!(
@@ -191,7 +191,7 @@ mod tests {
         );
         assert!(
             diag.contains("my_mod"),
-            "diagnostic dropped module name: {diag}"
+            "diagnostic dropped gear name: {diag}"
         );
 
         let problem = Problem::from(canonical);

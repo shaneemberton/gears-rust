@@ -378,7 +378,7 @@ pre_init → DB migration → init → post_init(barrier)
 
 ## Gear categories
 
-![w:800 h:550](../img/gear_categories.drawio.png)
+![w:800 h:550](../img/gears_categories.drawio.png)
 
 *API Ingress · Business Logic · GenAI · Serverless · Core Functionality ·
 Core Platform Integration · Core Platform Services.* See `docs/GEARS.md`.

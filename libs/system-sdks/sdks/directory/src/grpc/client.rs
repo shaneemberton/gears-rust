@@ -1,6 +1,6 @@
 //! gRPC client implementation of Directory API
 //!
-//! This client allows remote modules to discover and resolve services via gRPC.
+//! This client allows remote gears to discover and resolve services via gRPC.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -29,7 +29,7 @@ impl DirectoryGrpcClient {
     /// Connect to a directory service using default configuration with retries.
     ///
     /// Uses exponential backoff retry logic for reliable connection establishment.
-    /// This is the recommended method for `OoP` modules connecting to the master host.
+    /// This is the recommended method for `OoP` gears connecting to the master host.
     ///
     /// # Errors
     /// It will return an error when it fails
@@ -113,10 +113,10 @@ impl DirectoryClient for DirectoryGrpcClient {
         Ok(ServiceEndpoint::new(proto_response.endpoint_uri))
     }
 
-    async fn list_instances(&self, module: &str) -> Result<Vec<ServiceInstanceInfo>> {
+    async fn list_instances(&self, gear: &str) -> Result<Vec<ServiceInstanceInfo>> {
         let mut client = self.inner.clone();
         let request = tonic::Request::new(ListInstancesRequest {
-            module_name: module.to_owned(),
+            gear_name: gear.to_owned(),
         });
 
         let response = client
@@ -131,7 +131,7 @@ impl DirectoryClient for DirectoryGrpcClient {
             .instances
             .into_iter()
             .map(|proto_inst| ServiceInstanceInfo {
-                module: proto_inst.module_name,
+                gear: proto_inst.gear_name,
                 instance_id: proto_inst.instance_id,
                 endpoint: ServiceEndpoint::new(proto_inst.endpoint_uri),
                 version: if proto_inst.version.is_empty() {
@@ -159,7 +159,7 @@ impl DirectoryClient for DirectoryGrpcClient {
             .collect();
 
         let req = RegisterInstanceRequest {
-            module_name: info.module,
+            gear_name: info.gear,
             instance_id: info.instance_id,
             grpc_services,
             version: info.version.unwrap_or_default(),
@@ -173,11 +173,11 @@ impl DirectoryClient for DirectoryGrpcClient {
         Ok(())
     }
 
-    async fn deregister_instance(&self, module: &str, instance_id: &str) -> Result<()> {
+    async fn deregister_instance(&self, gear: &str, instance_id: &str) -> Result<()> {
         let mut client = self.inner.clone();
 
         let req = DeregisterInstanceRequest {
-            module_name: module.to_owned(),
+            gear_name: gear.to_owned(),
             instance_id: instance_id.to_owned(),
         };
 
@@ -189,11 +189,11 @@ impl DirectoryClient for DirectoryGrpcClient {
         Ok(())
     }
 
-    async fn send_heartbeat(&self, module: &str, instance_id: &str) -> Result<()> {
+    async fn send_heartbeat(&self, gear: &str, instance_id: &str) -> Result<()> {
         let mut client = self.inner.clone();
 
         let req = HeartbeatRequest {
-            module_name: module.to_owned(),
+            gear_name: gear.to_owned(),
             instance_id: instance_id.to_owned(),
         };
 

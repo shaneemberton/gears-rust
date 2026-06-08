@@ -1,6 +1,6 @@
-"""Module test environment orchestrator.
+"""Gear test environment orchestrator.
 
-Each test module declares its infrastructure needs via a `ModuleTestEnv`.
+Each test gear declares its infrastructure needs via a `GearTestEnv`.
 The `test_env` session fixture reads it, starts sidecars, builds/configures/
 starts the server, and yields a `RunningTestEnv` for tests to use.
 """
@@ -36,18 +36,18 @@ class SidecarProtocol(Protocol):
     def stop(self) -> None: ...
 
 
-# ── ModuleTestEnv ─────────────────────────────────────────────────────────
+# ── GearTestEnv ─────────────────────────────────────────────────────────
 
 @dataclass
-class ModuleTestEnv:
-    """Declarative description of what a test module needs from the server."""
+class GearTestEnv:
+    """Declarative description of what a test gear needs from the server."""
 
     # Binary — path or name. Resolved via E2E_BINARY env var, then this field.
     binary: str = "cf-gears-example-server"
 
     # Config
     config_path: Path | None = None  # None = config/e2e-local.yaml
-    config_patch: Callable[[str, "ModuleTestEnv"], str] | None = None
+    config_patch: Callable[[str, "GearTestEnv"], str] | None = None
 
     # Server
     port: int = 8086
@@ -68,7 +68,7 @@ class ModuleTestEnv:
 class RunningTestEnv:
     """Yielded by the test_env fixture — provides access to the running server."""
     base_url: str
-    env: ModuleTestEnv
+    env: GearTestEnv
     sidecars: dict[str, Any]  # name -> sidecar handle
 
 
@@ -93,7 +93,7 @@ def _stop_own_server() -> None:
 atexit.register(_stop_own_server)
 
 
-def _resolve_binary(env: ModuleTestEnv) -> Path:
+def _resolve_binary(env: GearTestEnv) -> Path:
     """Resolve the server binary path.
 
     Priority:
@@ -130,7 +130,7 @@ def _resolve_binary(env: ModuleTestEnv) -> Path:
     )
 
 
-def _prepare_config(env: ModuleTestEnv) -> Path:
+def _prepare_config(env: GearTestEnv) -> Path:
     """Load config, apply patches, write to temp file."""
     config_src = env.config_path or DEFAULT_CONFIG
     if not config_src.exists():
@@ -149,7 +149,7 @@ def _prepare_config(env: ModuleTestEnv) -> Path:
     return Path(tmp.name)
 
 
-def _log_path(env: ModuleTestEnv) -> Path:
+def _log_path(env: GearTestEnv) -> Path:
     """Derive log file path — uses port to avoid collisions between parallel runs."""
     logs_dir = PROJECT_ROOT / "testing" / "e2e" / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -157,7 +157,7 @@ def _log_path(env: ModuleTestEnv) -> Path:
     return logs_dir / f"cf-gears-e2e-{env.port}{suffix}.log"
 
 
-def _start_server(binary: Path, config: Path, env: ModuleTestEnv) -> subprocess.Popen:
+def _start_server(binary: Path, config: Path, env: GearTestEnv) -> subprocess.Popen:
     """Start the server process."""
     global _server_proc
 
@@ -177,7 +177,7 @@ def _start_server(binary: Path, config: Path, env: ModuleTestEnv) -> subprocess.
     return proc
 
 
-def _wait_healthy(env: ModuleTestEnv) -> None:
+def _wait_healthy(env: GearTestEnv) -> None:
     """Poll health endpoint until success or timeout."""
     import httpx
 
@@ -208,8 +208,8 @@ def _wait_healthy(env: ModuleTestEnv) -> None:
 # ── test_env fixture ──────────────────────────────────────────────────────
 
 @pytest.fixture(scope="session")
-def test_env(module_test_env: ModuleTestEnv):
-    """Orchestrate the full server lifecycle for a test module.
+def test_env(gear_test_env: GearTestEnv):
+    """Orchestrate the full server lifecycle for a test gear.
 
     1. Start sidecars (so ports are known)
     2. Prepare config (with sidecar ports injected via config_patch)
@@ -219,7 +219,7 @@ def test_env(module_test_env: ModuleTestEnv):
     6. Yield RunningTestEnv
     7. Teardown: stop server, stop sidecars
     """
-    env = module_test_env
+    env = gear_test_env
 
     # 1. Start sidecars
     sidecar_handles: dict[str, Any] = {}
@@ -252,6 +252,6 @@ def test_env(module_test_env: ModuleTestEnv):
 
 
 @pytest.fixture(scope="session")
-def module_test_env() -> ModuleTestEnv:
-    """Default module test environment. Override in module conftest for custom needs."""
-    return ModuleTestEnv()
+def gear_test_env() -> GearTestEnv:
+    """Default gear test environment. Override in gear conftest for custom needs."""
+    return GearTestEnv()

@@ -239,7 +239,7 @@ mod tests {
     const INSTANCE_PREFIX: &str = "gts.cf.toolkit.authz.permission.v1~cf.mini_chat._.";
 
     /// Expected set of permission instance ids for mini-chat. One entry per
-    /// `(resource, action)` tuple the module exposes at PEP call-sites.
+    /// `(resource, action)` tuple the gear exposes at PEP call-sites.
     const EXPECTED_PERMISSION_IDS: &[&str] = &[
         "gts.cf.toolkit.authz.permission.v1~cf.mini_chat._.chat_create.v1",
         "gts.cf.toolkit.authz.permission.v1~cf.mini_chat._.chat_read.v1",
@@ -351,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn actions_are_drawn_from_domain_actions_module() {
+    fn actions_are_drawn_from_domain_actions_gear() {
         let domain_actions: std::collections::BTreeSet<&'static str> = [
             actions::CREATE,
             actions::READ,

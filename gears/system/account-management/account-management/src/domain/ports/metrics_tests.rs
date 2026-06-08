@@ -14,7 +14,7 @@ use super::*;
 use std::sync::Arc;
 
 /// All six traits are object-safe and shareable via `Arc<dyn ...>`
-/// — this is the shape the module wire-up uses when handing
+/// — this is the shape the gear wire-up uses when handing
 /// per-trait views to services. The assertions are pure
 /// compile-time: a `?Sized` bound on `T` fails to monomorphise if
 /// the trait is not object-safe.

@@ -5,7 +5,7 @@ Usage:
     python scripts/gh_stats.py [--since YYYY-MM-DD] [--until YYYY-MM-DD] \
         [--exclude-labels pr-issue,wontfix] \
         [--tracked-team-file PATH] [--tracked-team-login LOGIN1,LOGIN2,...] \
-        [--tracked-team-name NAME] [--min-module-net-loc N] \
+        [--tracked-team-name NAME] [--min-gear-net-loc N] \
         [--skip-review-turnaround] [owner/repo]
 
 Default repo: constructorfabric/gears-rust
@@ -464,7 +464,7 @@ def build_email_to_login(repo: str) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# LOC stats — net delta (added lines - deleted lines) per module
+# LOC stats — net delta (added lines - deleted lines) per gear
 # ---------------------------------------------------------------------------
 
 def normalize_rename_path(path: str) -> str:
@@ -474,7 +474,7 @@ def normalize_rename_path(path: str) -> str:
 
     Limitation: this is a regex-based heuristic over git numstat output.
     Exotic rename patterns (e.g. paths containing literal ' => ' or nested
-    braces) may not parse correctly. For typical Rust module paths this works.
+    braces) may not parse correctly. For typical Rust gear paths this works.
     """
     # Pattern: prefix{old => new}suffix
     result = re.sub(r"(.*?)\{[^ ]* => ([^}]*)\}(.*)", lambda m: f"{m.group(1)}{m.group(2)}{m.group(3)}", path)
@@ -485,9 +485,9 @@ def normalize_rename_path(path: str) -> str:
 
 
 def classify_rs_path(path: str) -> str:
-    """Classify a .rs file path into a bucket: module name or '_shared'."""
+    """Classify a .rs file path into a bucket: gear name or '_shared'."""
     path = normalize_rename_path(path)
-    m = re.match(r"^modules/([^/]+)/", path)
+    m = re.match(r"^gears/([^/]+)/", path)
     if m:
         return m.group(1)
     return "_shared"
@@ -587,7 +587,7 @@ def md_table_loc(
     title: str,
     stats: dict[str, dict[str, int]] | None,
     tracked_team_name: str,
-    min_module_net_loc: int,
+    min_gear_net_loc: int,
     has_tracked_team: bool = True,
 ) -> str:
     """Render net LOC delta table. Does not mutate the input stats dict.
@@ -602,22 +602,22 @@ def md_table_loc(
     stats_copy = dict(stats)
     shared = stats_copy.pop("_shared", {"tracked": 0, "others": 0})
 
-    # Filter out modules with small absolute net total (hidden for readability).
-    # Use --min-module-net-loc to configure the threshold (default 10).
-    modules = [
+    # Filter out gears with small absolute net total (hidden for readability).
+    # Use --min-gear-net-loc to configure the threshold (default 10).
+    gears = [
         (name, m) for name, m in stats_copy.items()
-        if abs(m["tracked"] + m["others"]) > min_module_net_loc
+        if abs(m["tracked"] + m["others"]) > min_gear_net_loc
     ]
-    modules.sort(key=lambda x: x[1]["tracked"] + x[1]["others"], reverse=True)
+    gears.sort(key=lambda x: x[1]["tracked"] + x[1]["others"], reverse=True)
 
-    total_tracked = shared["tracked"] + sum(m["tracked"] for _, m in modules)
-    total_others = shared["others"] + sum(m["others"] for _, m in modules)
+    total_tracked = shared["tracked"] + sum(m["tracked"] for _, m in gears)
+    total_others = shared["others"] + sum(m["others"] for _, m in gears)
     grand_total = total_tracked + total_others
 
     lines = [
         f"## {title}\n",
         f"Net LOC delta = added lines − deleted lines (net change, not authored volume).\n",
-        f"Modules with |net delta| ≤ {min_module_net_loc} lines hidden for readability.\n",
+        f"Gears with |net delta| ≤ {min_gear_net_loc} lines hidden for readability.\n",
     ]
 
     if not has_tracked_team:
@@ -628,9 +628,9 @@ def md_table_loc(
         ])
         s_total = shared["tracked"] + shared["others"]
         lines.append(f"| **Shared code** | {s_total:,} |")
-        for name, m in modules:
+        for name, m in gears:
             m_total = m["tracked"] + m["others"]
-            lines.append(f"| modules/{name} | {m_total:,} |")
+            lines.append(f"| gears/{name} | {m_total:,} |")
         lines.append(f"| **Total** | **{grand_total:,}** |")
         lines.append("")
         return "\n".join(lines)
@@ -650,10 +650,10 @@ def md_table_loc(
         f"| {s_total:,} | {pct(shared['tracked'], s_total)} |"
     )
 
-    for name, m in modules:
+    for name, m in gears:
         m_total = m["tracked"] + m["others"]
         lines.append(
-            f"| modules/{name} | {m['tracked']:,} | {m['others']:,} "
+            f"| gears/{name} | {m['tracked']:,} | {m['others']:,} "
             f"| {m_total:,} | {pct(m['tracked'], m_total)} |"
         )
 
@@ -1064,11 +1064,11 @@ def parse_args() -> argparse.Namespace:
         help="Display name for the tracked team in report output (default: 'Tracked team')",
     )
     p.add_argument(
-        "--min-module-net-loc",
+        "--min-gear-net-loc",
         type=int,
         default=10,
         help=(
-            "Hide modules with |net LOC delta| ≤ this threshold "
+            "Hide gears with |net LOC delta| ≤ this threshold "
             "in the LOC table for readability (default: 10)"
         ),
     )
@@ -1136,7 +1136,7 @@ def main():
     )
 
     tracked_team_name = args.tracked_team_name
-    min_module_net_loc = args.min_module_net_loc
+    min_gear_net_loc = args.min_gear_net_loc
 
     date_label = ""
     if args.since or args.until:
@@ -1288,7 +1288,7 @@ def main():
     out.append(md_issue_lifetime("Issue Lifetime (issues closed in period)", issue_lifetime))
 
     loc_title = f"Rust Net LOC Delta by {tracked_team_name}" if tracked_team else "Rust Net LOC Delta"
-    out.append(md_table_loc(loc_title, loc_stats, tracked_team_name, min_module_net_loc,
+    out.append(md_table_loc(loc_title, loc_stats, tracked_team_name, min_gear_net_loc,
                              has_tracked_team=bool(tracked_team)))
 
     # Unmapped email notice in report

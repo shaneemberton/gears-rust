@@ -1,4 +1,4 @@
-//! REST route registration for the Types Registry module.
+//! REST route registration for the Types Registry gear.
 
 use std::sync::Arc;
 
@@ -25,7 +25,7 @@ impl AsRef<str> for License {
 
 impl LicenseFeature for License {}
 
-/// Registers all REST routes for the Types Registry module.
+/// Registers all REST routes for the Types Registry gear.
 #[allow(clippy::needless_pass_by_value)]
 pub fn register_routes(
     mut router: Router,

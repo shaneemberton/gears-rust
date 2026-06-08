@@ -141,7 +141,7 @@ impl ODataFieldMapping<TenantInfoFilterField> for TenantODataMapper {
 /// Pagination limits for the tenant-children listing surface. Mirrors
 /// [`super::metadata::METADATA_LIMIT_CFG`] so the platform-wide cap is
 /// uniform across AM listing surfaces (`default = 50`,
-/// `max = 200`). The module-config `listing.max_top` accessor remains
+/// `max = 200`). The gear-config `listing.max_top` accessor remains
 /// for future REST handlers that want to surface the per-deployment
 /// cap, but the repo seam itself uses this constant to defend against
 /// builders that forget to clamp.

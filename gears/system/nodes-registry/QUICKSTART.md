@@ -15,7 +15,7 @@ Tracks and reports information about all Gears server instances in your deployme
 
 Full API documentation: <http://127.0.0.1:8087/cf/docs>
 
-The example server uses the gateway prefix `/cf`. This comes from `modules.api-gateway.config.prefix_path` and is configurable.
+The example server uses the gateway prefix `/cf`. This comes from `gears.api-gateway.config.prefix_path` and is configurable.
 
 ## Examples
 

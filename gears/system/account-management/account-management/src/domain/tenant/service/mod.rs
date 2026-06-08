@@ -128,7 +128,7 @@ pub const MAX_IDP_METADATA_BYTES: usize = 64 * 1024;
 /// the caller-supplied input and on the plugin-returned blob) and by
 /// the platform-bootstrap saga.
 ///
-/// `pub(crate)` so the bootstrap module shares the same cap without
+/// `pub(crate)` so the bootstrap gear shares the same cap without
 /// duplicating the const + serde-roundtrip logic.
 pub(crate) fn check_idp_metadata_size(
     label: &'static str,
@@ -200,7 +200,7 @@ mod scope_util;
 
 impl<R: TenantRepo> TenantService<R> {
     /// Construct a fully-wired service. Production wiring lives in the
-    /// AM module entry-point ([`crate::module::AccountManagementModule`]):
+    /// AM gear entry-point ([`crate::gear::AccountManagementGear`]):
     /// `types-registry` and `resource-group` are declared as hard `deps`,
     /// so the entry-point hard-resolves `TypesRegistryClient` (passes
     /// [`crate::infra::types_registry::GtsTenantTypeChecker`]) and
@@ -233,7 +233,7 @@ impl<R: TenantRepo> TenantService<R> {
     /// back to its chained GTS id when lowering [`TenantModel`] to
     /// [`Tenant`] on public CRUD return values. Without this the
     /// service still works — `Tenant.tenant_type` is just left as
-    /// `None`. Production wiring (`module.rs`) calls this from
+    /// `None`. Production wiring (`gear.rs`) calls this from
     /// `init` after the registry client resolves from `ClientHub`;
     /// tests (which usually pin an inert tenant-type checker) leave
     /// it unset.
@@ -461,14 +461,14 @@ impl<R: TenantRepo> TenantService<R> {
     /// to avoid re-cloning the registration `Vec` on every row in the
     /// batch. A hook registered while a tick is in flight therefore
     /// takes effect on the **next** tick, not the current one. In
-    /// practice all hooks are registered at module-init time before
+    /// practice all hooks are registered at gear-init time before
     /// the first tick fires, so the window is empty in production.
     pub fn register_hard_delete_hook(&self, hook: TenantHardDeleteHook) {
         self.hooks.lock().push(hook);
     }
 
     /// Borrow the configured retention tick interval (used by the
-    /// module `serve` lifecycle entry).
+    /// gear `serve` lifecycle entry).
     #[must_use]
     pub fn retention_tick(&self) -> Duration {
         Duration::from_secs(self.cfg.retention.tick_secs)
@@ -1691,7 +1691,7 @@ impl<R: TenantRepo> TenantService<R> {
         // state is bootstrap-owned and must not flip from the
         // public `/suspend` or `/unsuspend` endpoints. Without this
         // guard, any admin token could suspend the root (every
-        // downstream module that branches on `root.status` would
+        // downstream gear that branches on `root.status` would
         // hit an unexpected path) or "unsuspend" it back without
         // audit attribution. Root is identified by
         // `parent_id.is_none()`, same shape as `delete_tenant`'s
@@ -1893,7 +1893,7 @@ impl<R: TenantRepo> TenantService<R> {
     /// the in-process scheduler with no caller `SecurityContext` and
     /// hardcodes [`AccessScope::allow_all`]. Exposing this method as
     /// `pub` would let the first admin REST handler or sibling
-    /// module that reuses it bypass authorization by construction.
+    /// gear that reuses it bypass authorization by construction.
     /// REST exposure lands together with the `InTenantSubtree`
     /// predicate (gears-rust#1813) and will go through a
     /// privileged-context wrapper at that point.

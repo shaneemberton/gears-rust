@@ -167,7 +167,7 @@ pub async fn delete_tenant(
 /// `POST /tenants/{tenant_id}:suspend`, but axum 0.8.x pins
 /// `matchit = "=0.8.4"` which cannot split `{param}:suffix` in a
 /// single segment. The sub-resource form below is the in-tree fallback
-/// pattern (mirrors `modules/mini-chat/.../routes/turns.rs` —
+/// pattern (mirrors `gears/mini-chat/.../routes/turns.rs` —
 /// `{request_id}/retry`); the cutover is tracked alongside axum's
 /// matchit bump (PR <https://github.com/tokio-rs/axum/pull/3702>) and
 /// the upstream routing issue

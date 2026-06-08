@@ -43,7 +43,7 @@
 //! primitive. It is NOT safe under the full multi-replica failure
 //! model (no fence-in-tx for the repair commit, no renewal
 //! heartbeat with takeover signal, no forensic `attempts` counter).
-//! See `infra::storage::integrity::lock` module docs for the gap.
+//! See `infra::storage::integrity::lock` gear docs for the gap.
 //! Migration to `toolkit-coord` (`LeaseManager` +
 //! `Guard::with_ack_in_tx`) is tracked in
 //! <https://github.com/constructorfabric/gears-rust/issues/1873>.
@@ -71,7 +71,7 @@ pub(super) async fn run_integrity_check(
     scope: &AccessScope,
 ) -> Result<Vec<(IntegrityCategory, Violation)>, DomainError> {
     // 3-transaction lifecycle (acquire / snapshot+classify / release);
-    // see integrity::lock module docs. Release runs on both happy and
+    // see integrity::lock gear docs. Release runs on both happy and
     // error paths so a snapshot-tx failure does not block on
     // MAX_LOCK_AGE.
     let worker_id = Uuid::new_v4();

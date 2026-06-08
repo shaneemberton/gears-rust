@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 #![cfg(feature = "db")]
 
-//! Comprehensive tests for the #[module] macro with the new registry/builder
+//! Comprehensive tests for the #[gear] macro with the new registry/builder
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -10,25 +10,25 @@ use uuid::Uuid;
 
 use std::sync::Arc;
 use toolkit::{
-    ModuleCtx,
+    GearCtx,
     config::ConfigProvider,
     contracts::{
-        ApiGatewayCapability, DatabaseCapability, Module, OpenApiRegistry, RestApiCapability,
+        ApiGatewayCapability, DatabaseCapability, Gear, OpenApiRegistry, RestApiCapability,
         RunnableCapability,
     },
-    module,
+    gear,
 };
 
 // Helper for tests
 struct EmptyConfigProvider;
 impl ConfigProvider for EmptyConfigProvider {
-    fn get_module_config(&self, _module_name: &str) -> Option<&serde_json::Value> {
+    fn get_gear_config(&self, _gear_name: &str) -> Option<&serde_json::Value> {
         None
     }
 }
 
-fn test_module_ctx(cancel: tokio_util::sync::CancellationToken) -> ModuleCtx {
-    ModuleCtx::new(
+fn test_gear_ctx(cancel: tokio_util::sync::CancellationToken) -> GearCtx {
+    GearCtx::new(
         "test",
         Uuid::new_v4(),
         Arc::new(EmptyConfigProvider),
@@ -57,38 +57,38 @@ impl OpenApiRegistry for TestOpenApiRegistry {
     }
 }
 
-// ---------- Test modules (must be at module scope for `inventory`) ----------
+// ---------- Test gears (must be at gear scope for `inventory`) ----------
 
 #[derive(Default)]
-#[module(name = "basic")]
-struct BasicModule;
+#[gear(name = "basic")]
+struct BasicGear;
 
 #[async_trait]
-impl Module for BasicModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for BasicGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
 #[derive(Default)]
-#[module(name = "full-featured", capabilities = [db, rest, stateful])]
-struct FullFeaturedModule;
+#[gear(name = "full-featured", capabilities = [db, rest, stateful])]
+struct FullFeaturedGear;
 
 #[async_trait]
-impl Module for FullFeaturedModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for FullFeaturedGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
-impl DatabaseCapability for FullFeaturedModule {
+impl DatabaseCapability for FullFeaturedGear {
     fn migrations(&self) -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
         vec![]
     }
 }
-impl RestApiCapability for FullFeaturedModule {
+impl RestApiCapability for FullFeaturedGear {
     fn register_rest(
         &self,
-        _ctx: &toolkit::context::ModuleCtx,
+        _ctx: &toolkit::context::GearCtx,
         router: axum::Router,
         _openapi: &dyn OpenApiRegistry,
     ) -> Result<axum::Router> {
@@ -96,7 +96,7 @@ impl RestApiCapability for FullFeaturedModule {
     }
 }
 #[async_trait]
-impl RunnableCapability for FullFeaturedModule {
+impl RunnableCapability for FullFeaturedGear {
     async fn start(&self, _t: CancellationToken) -> Result<()> {
         Ok(())
     }
@@ -106,63 +106,63 @@ impl RunnableCapability for FullFeaturedModule {
 }
 
 #[derive(Default)]
-#[module(name = "dependent", deps = ["basic", "full-featured"])]
-struct DependentModule;
+#[gear(name = "dependent", deps = ["basic", "full-featured"])]
+struct DependentGear;
 
 #[async_trait]
-impl Module for DependentModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for DependentGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
 #[derive(Default)]
-#[module(name = "custom-ctor", ctor = CustomCtorModule::create())]
-struct CustomCtorModule {
+#[gear(name = "custom-ctor", ctor = CustomCtorGear::create())]
+struct CustomCtorGear {
     value: i32,
 }
 
-impl CustomCtorModule {
+impl CustomCtorGear {
     fn create() -> Self {
         Self { value: 42 }
     }
 }
 
 #[async_trait]
-impl Module for CustomCtorModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for CustomCtorGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
 #[derive(Default)]
-#[module(name = "db-only", capabilities = [db])]
-struct DbOnlyModule;
+#[gear(name = "db-only", capabilities = [db])]
+struct DbOnlyGear;
 #[async_trait]
-impl Module for DbOnlyModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for DbOnlyGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
-impl DatabaseCapability for DbOnlyModule {
+impl DatabaseCapability for DbOnlyGear {
     fn migrations(&self) -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
         vec![]
     }
 }
 
 #[derive(Default)]
-#[module(name = "rest-only", capabilities = [rest])]
-struct RestOnlyModule;
+#[gear(name = "rest-only", capabilities = [rest])]
+struct RestOnlyGear;
 #[async_trait]
-impl Module for RestOnlyModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for RestOnlyGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
-impl RestApiCapability for RestOnlyModule {
+impl RestApiCapability for RestOnlyGear {
     fn register_rest(
         &self,
-        _ctx: &toolkit::context::ModuleCtx,
+        _ctx: &toolkit::context::GearCtx,
         router: axum::Router,
         _openapi: &dyn OpenApiRegistry,
     ) -> Result<axum::Router> {
@@ -171,22 +171,22 @@ impl RestApiCapability for RestOnlyModule {
 }
 
 #[derive(Default)]
-#[module(name = "rest-host", capabilities = [rest_host])]
-struct TestApiGatewayModule {
+#[gear(name = "rest-host", capabilities = [rest_host])]
+struct TestApiGatewayGear {
     registry: TestOpenApiRegistry,
 }
 
 #[async_trait]
-impl Module for TestApiGatewayModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for TestApiGatewayGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
-impl ApiGatewayCapability for TestApiGatewayModule {
+impl ApiGatewayCapability for TestApiGatewayGear {
     fn rest_prepare(
         &self,
-        _ctx: &toolkit::context::ModuleCtx,
+        _ctx: &toolkit::context::GearCtx,
         router: axum::Router,
     ) -> anyhow::Result<axum::Router> {
         Ok(router)
@@ -194,7 +194,7 @@ impl ApiGatewayCapability for TestApiGatewayModule {
 
     fn rest_finalize(
         &self,
-        _ctx: &toolkit::context::ModuleCtx,
+        _ctx: &toolkit::context::GearCtx,
         router: axum::Router,
     ) -> anyhow::Result<axum::Router> {
         Ok(router)
@@ -206,16 +206,16 @@ impl ApiGatewayCapability for TestApiGatewayModule {
 }
 
 #[derive(Default)]
-#[module(name = "stateful-only", capabilities = [stateful])]
-struct StatefulOnlyModule;
+#[gear(name = "stateful-only", capabilities = [stateful])]
+struct StatefulOnlyGear;
 #[async_trait]
-impl Module for StatefulOnlyModule {
-    async fn init(&self, _ctx: &toolkit::context::ModuleCtx) -> Result<()> {
+impl Gear for StatefulOnlyGear {
+    async fn init(&self, _ctx: &toolkit::context::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 #[async_trait]
-impl RunnableCapability for StatefulOnlyModule {
+impl RunnableCapability for StatefulOnlyGear {
     async fn start(&self, _t: CancellationToken) -> Result<()> {
         Ok(())
     }
@@ -228,55 +228,53 @@ impl RunnableCapability for StatefulOnlyModule {
 
 #[tokio::test]
 async fn test_basic_macro_and_init() {
-    assert_eq!(BasicModule::MODULE_NAME, "basic");
-    let ctx = test_module_ctx(CancellationToken::new());
-    BasicModule.init(&ctx).await.unwrap();
+    assert_eq!(BasicGear::MODULE_NAME, "basic");
+    let ctx = test_gear_ctx(CancellationToken::new());
+    BasicGear.init(&ctx).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_custom_ctor_name_and_value() {
-    assert_eq!(CustomCtorModule::MODULE_NAME, "custom-ctor");
-    let m = CustomCtorModule::create();
+    assert_eq!(CustomCtorGear::MODULE_NAME, "custom-ctor");
+    let m = CustomCtorGear::create();
     assert_eq!(m.value, 42);
 }
 
 #[tokio::test]
 async fn test_full_capabilities() {
-    assert_eq!(FullFeaturedModule::MODULE_NAME, "full-featured");
+    assert_eq!(FullFeaturedGear::MODULE_NAME, "full-featured");
 
-    let ctx = test_module_ctx(CancellationToken::new());
-    FullFeaturedModule.init(&ctx).await.unwrap();
+    let ctx = test_gear_ctx(CancellationToken::new());
+    FullFeaturedGear.init(&ctx).await.unwrap();
 
     // REST sync phase
     let router = axum::Router::new();
     let oas = TestOpenApiRegistry;
-    let _router = FullFeaturedModule
-        .register_rest(&ctx, router, &oas)
-        .unwrap();
+    let _router = FullFeaturedGear.register_rest(&ctx, router, &oas).unwrap();
 
     // Stateful
     let token = CancellationToken::new();
-    FullFeaturedModule.start(token.clone()).await.unwrap();
-    FullFeaturedModule.stop(token).await.unwrap();
+    FullFeaturedGear.start(token.clone()).await.unwrap();
+    FullFeaturedGear.stop(token).await.unwrap();
 }
 
 #[test]
 fn test_capability_trait_markers() {
-    fn assert_module<T: Module>(_: &T) {}
+    fn assert_gear<T: Gear>(_: &T) {}
     fn assert_db<T: DatabaseCapability>(_: &T) {}
     fn assert_rest<T: RestApiCapability>(_: &T) {}
     fn assert_stateful<T: RunnableCapability>(_: &T) {}
 
-    assert_module(&BasicModule);
-    assert_module(&DependentModule);
-    assert_module(&CustomCtorModule::default());
+    assert_gear(&BasicGear);
+    assert_gear(&DependentGear);
+    assert_gear(&CustomCtorGear::default());
 
-    assert_db(&FullFeaturedModule);
-    assert_db(&DbOnlyModule);
+    assert_db(&FullFeaturedGear);
+    assert_db(&DbOnlyGear);
 
-    assert_rest(&FullFeaturedModule);
-    assert_rest(&RestOnlyModule);
+    assert_rest(&FullFeaturedGear);
+    assert_rest(&RestOnlyGear);
 
-    assert_stateful(&FullFeaturedModule);
-    assert_stateful(&StatefulOnlyModule);
+    assert_stateful(&FullFeaturedGear);
+    assert_stateful(&StatefulOnlyGear);
 }

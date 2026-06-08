@@ -1,14 +1,14 @@
-//! Conversion-request domain module.
+//! Conversion-request domain gear.
 //!
 //! Implements FEATURE `managed-self-managed-modes` (see
 //! `gears/system/account-management/docs/features/feature-managed-self-managed-modes.md`).
 //!
-//! This module owns the durable state machine for post-creation tenant
+//! This gear owns the durable state machine for post-creation tenant
 //! mode changes: a `ConversionRequest` carries the dual-consent contract
 //! between an initiator (child or parent side) and the counterparty, and
 //! resolves into one of the four terminal states `approved`, `cancelled`,
 //! `rejected`, `expired`. Each transition is gated by a role-per-transition
-//! rule that this module's pure state-machine guard
+//! rule that this gear's pure state-machine guard
 //! ([`state_machine::validate_transition`]) checks before any DB write.
 //!
 //! Layering:

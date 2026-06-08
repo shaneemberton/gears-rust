@@ -1,7 +1,7 @@
 //! Periodic hierarchy-integrity check loop.
 //!
 //! The loop is driven by [`run_integrity_check_loop`], invoked from
-//! [`crate::module::AccountManagementModule::serve`] alongside the
+//! [`crate::gear::AccountManagementGear::serve`] alongside the
 //! retention + reaper interval loops. The dispatched work is hidden
 //! behind the [`IntegrityChecker`] trait so the lifecycle wiring can
 //! reach the production
@@ -75,7 +75,7 @@ impl<R: TenantRepo + 'static> IntegrityChecker for TenantService<R> {
     }
 }
 
-/// Lifecycle entry point invoked from [`crate::module::AccountManagementModule::serve`].
+/// Lifecycle entry point invoked from [`crate::gear::AccountManagementGear::serve`].
 ///
 /// Returns when `cancel` fires. When `cfg.enabled == false`, the loop
 /// is not entered at all — the function still awaits cancellation so

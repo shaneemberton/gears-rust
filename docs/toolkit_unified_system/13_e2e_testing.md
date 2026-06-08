@@ -3,7 +3,7 @@
 
 # E2E Testing Guide
 
-This document defines the philosophy, infrastructure, and patterns for end-to-end (E2E) tests across all ToolKit modules. Module-specific test plans (which seams to test, actual test implementations) live in each module's `docs/features/` folder and `testing/e2e/gears/<module>/`.
+This document defines the philosophy, infrastructure, and patterns for end-to-end (E2E) tests across all ToolKit gears. Gear-specific test plans (which seams to test, actual test implementations) live in each gear's `docs/features/` folder and `testing/e2e/gears/<gear>/`.
 
 ---
 
@@ -15,22 +15,22 @@ An E2E test is an HTTP request to a **running** `cf-gears-server` with a **real 
 
 This is **not** "another way to verify business logic." Business logic is verified by unit/integration tests (see [`12_unit_testing.md`](12_unit_testing.md)). E2E tests verify the **seams between components**, not the components themselves.
 
-### Scope: Single Module vs. Cross-Module
+### Scope: Single Gear vs. Cross-Gear
 
 E2E tests live at two levels, and both matter:
 
-**Single-module E2E** — verifies that the module's own integration seams work end-to-end: routing, JSON wire format, real AuthZ wiring, PostgreSQL-specific SQL. Each module has its own suite under `testing/e2e/gears/<module>/`. These tests are the baseline.
+**Single-gear E2E** — verifies that the gear's own integration seams work end-to-end: routing, JSON wire format, real AuthZ wiring, PostgreSQL-specific SQL. Each gear has its own suite under `testing/e2e/gears/<gear>/`. These tests are the baseline.
 
-**Cross-module E2E** — verifies that **2–5 modules work correctly together**. This is the primary reason E2E tests exist at all. Unit tests verify each module in isolation (mocking its dependencies). Only an E2E test can catch bugs that appear at the boundary between modules: module A calls module B's SDK, module B reads from a table that module C seeded, the combined result flows through module D's API. None of these seams are visible to any single module's unit tests.
+**Cross-gear E2E** — verifies that **2–5 gears work correctly together**. This is the primary reason E2E tests exist at all. Unit tests verify each gear in isolation (mocking its dependencies). Only an E2E test can catch bugs that appear at the boundary between gears: gear A calls gear B's SDK, gear B reads from a table that gear C seeded, the combined result flows through gear D's API. None of these seams are visible to any single gear's unit tests.
 
-Cross-module tests live in a dedicated folder:
+Cross-gear tests live in a dedicated folder:
 ```
-testing/e2e/cross_module/
+testing/e2e/cross_gear/
 ├── conftest.py
-├── test_<moduleA>_<moduleB>_integration.py
+├── test_<gearA>_<gearB>_integration.py
 ```
 
-The rule still applies: **each cross-module test targets exactly one integration seam** between the modules. Do not write a cross-module test that simultaneously verifies intra-module behavior — that belongs in each module's own unit tests.
+The rule still applies: **each cross-gear test targets exactly one integration seam** between the gears. Do not write a cross-gear test that simultaneously verifies intra-gear behavior — that belongs in each gear's own unit tests.
 
 ### Three Questions Before Adding a Test
 
@@ -52,7 +52,7 @@ E2E tests cover integration seams — points where two independently correct com
 | Seam | What breaks between components | Why unit tests are blind |
 |------|-------------------------------|-------------------------|
 | **Handler ↔ JSON wire** | `#[serde(rename)]` typo, missing field, camelCase mismatch | Unit tests operate on Rust structs, not JSON bytes |
-| **Module init ↔ AuthZ** | `PolicyEnforcer` not created, `AccessScope` not passed to service | Unit tests mock PolicyEnforcer; real wiring only exists in `module.rs` |
+| **Gear init ↔ AuthZ** | `PolicyEnforcer` not created, `AccessScope` not passed to service | Unit tests mock PolicyEnforcer; real wiring only exists in `gear.rs` |
 | **Service ↔ PostgreSQL** | FK enforcement, SERIALIZABLE isolation, domain types | Unit tests run on SQLite — different FK behavior, no domain types |
 | **Error handler ↔ HTTP** | `Content-Type: application/problem+json` not set, stack trace leaked | Unit tests assert `DomainError` variant, not HTTP headers |
 | **Cursor codec ↔ HTTP** | Base64 encode/decode roundtrip, URL-encoding, offset drift | Unit tests test pagination logic; codec only runs in the handler layer |
@@ -84,7 +84,7 @@ Every important API endpoint should be called **at most once** across the entire
 
 **Corner case and edge-case coverage in E2E is only acceptable if it could not be achieved in unit tests.** Before adding an E2E test for an edge case, verify that the same scenario cannot be written as a unit test against SQLite or a mock. If it can — it goes there, not here.
 
-After adding or removing any E2E test, **check the coverage checklist**: verify which HTTP methods (GET, POST, PUT, PATCH, DELETE) are called across all tests in the module suite. If a method is already exercised in test A, test B does not need to call it again. Remove redundant calls without hesitation.
+After adding or removing any E2E test, **check the coverage checklist**: verify which HTTP methods (GET, POST, PUT, PATCH, DELETE) are called across all tests in the gear suite. If a method is already exercised in test A, test B does not need to call it again. Remove redundant calls without hesitation.
 
 ### Priority Order (in case of conflict)
 
@@ -94,7 +94,7 @@ Rules that protect stability:
 - Hard timeout per test (10s) and per request (5s) — fail fast, never hang
 - No `time.sleep()` — if you need to wait for state, restructure the test or use a short poll
 - Each test creates its own data — no dependencies on other tests' state or ordering
-- Session-scoped reachability check — skip the whole module if the server is down, don't generate N failures
+- Session-scoped reachability check — skip the whole gear if the server is down, don't generate N failures
 
 **Priority 2 — Speed.** A standard CRUD E2E test (create + read + assert) should complete in **under 2 seconds** running single-threaded against a local server. This is an important goal, but it is secondary to stability. A test that takes 3 seconds and never flakes is better than a test that takes 1 second and flakes 1-in-50 runs.
 
@@ -135,13 +135,13 @@ Research on large-scale test suites shows the distribution of flake root causes:
 ```python
 # BAD — depends on data from another test or a shared fixture
 async def test_list_returns_entities(client):
-    r = await client.get("/cf/<module>/v1/entities")
+    r = await client.get("/cf/<gear>/v1/entities")
     assert len(r.json()["items"]) > 0  # relies on someone else creating data
 
 # GOOD — test creates its own data, asserts on it specifically
 async def test_list_returns_entities(client, create_entity):
     entity = await create_entity(name=f"test-{uuid.uuid4()}")
-    r = await client.get("/cf/<module>/v1/entities")
+    r = await client.get("/cf/<gear>/v1/entities")
     ids = [i["id"] for i in r.json()["items"]]
     assert entity["id"] in ids
 ```
@@ -203,7 +203,7 @@ pytest --randomly-seed=last  # reproduce a specific failing order
 
 ### 5. Environment Readiness — Skip, Don't Fail
 
-If the server is not up, do not generate N individual test failures. Detect once and skip the entire module.
+If the server is not up, do not generate N individual test failures. Detect once and skip the entire gear.
 
 ```python
 # conftest.py
@@ -213,7 +213,7 @@ async def check_server_reachable(client):
         r = await client.get("/health", timeout=3.0)
         r.raise_for_status()
     except Exception as e:
-        pytest.skip(f"Server not reachable, skipping module: {e}")
+        pytest.skip(f"Server not reachable, skipping gear: {e}")
 ```
 
 ### 6. Timezone and Time Agnosticism
@@ -266,14 +266,14 @@ Never use `pytest-rerunfailures` as a permanent fix. Retrying a flaky test hides
 ### File Layout
 
 ```
-testing/e2e/gears/<module_name>/
+testing/e2e/gears/<gear_name>/
 ├── conftest.py                   ← helpers, timeout config, factory fixtures
 ├── test_authz_tenant_scoping.py  ← AuthZ + tenant isolation seams (if applicable)
 ├── test_mtls_auth.py             ← MTLS certificate verification (if applicable; p2 — deferred, not implemented yet)
-├── test_integration_seams.py     ← Core integration seam tests (per module)
+├── test_integration_seams.py     ← Core integration seam tests (per gear)
 ```
 
-Keep the number of files small. A single `test_integration_seams.py` per module is preferred over splitting into many files.
+Keep the number of files small. A single `test_integration_seams.py` per gear is preferred over splitting into many files.
 
 ### Dependencies
 
@@ -317,7 +317,7 @@ async def assert_response_shape(data: dict, required_fields: list[str]):
         assert field in data, f"Missing field: {field}"
 ```
 
-Module-specific helpers (e.g., `assert_group_shape`, `create_type_fixture`) live in the module's `conftest.py`.
+Gear-specific helpers (e.g., `assert_group_shape`, `create_type_fixture`) live in the gear's `conftest.py`.
 
 ---
 
@@ -413,7 +413,7 @@ The guiding question: *"If I remove this request, does the test still prove the 
 
 **Purpose**: Verify that all endpoints are registered at correct method + path on a real server.
 
-**Why not in unit tests**: Unit tests call service methods directly. If a handler is not registered in `module.rs`, or mounted on the wrong path, unit tests pass but the API is broken.
+**Why not in unit tests**: Unit tests call service methods directly. If a handler is not registered in `gear.rs`, or mounted on the wrong path, unit tests pass but the API is broken.
 
 ```python
 async def test_route_smoke_all_endpoints(client):
@@ -422,8 +422,8 @@ async def test_route_smoke_all_endpoints(client):
     """
     # Each path returns something other than 404/405
     responses = await asyncio.gather(
-        client.head("/cf/<module>/v1/entities"),
-        client.options("/cf/<module>/v1/entities"),
+        client.head("/cf/<gear>/v1/entities"),
+        client.options("/cf/<gear>/v1/entities"),
     )
     for r in responses:
         assert r.status_code not in (404, 405), f"Endpoint not registered: {r.url}"
@@ -438,7 +438,7 @@ async def test_route_smoke_all_endpoints(client):
 ```python
 async def test_dto_roundtrip_json_shape(client, create_entity):
     entity = await create_entity(name="Shape Test")
-    r = await client.get(f"/cf/<module>/v1/entities/{entity['id']}")
+    r = await client.get(f"/cf/<gear>/v1/entities/{entity['id']}")
     assert r.status_code == 200
     data = r.json()
     # Assert exact field names, not just "response is 200"
@@ -453,18 +453,18 @@ async def test_dto_roundtrip_json_shape(client, create_entity):
 
 **Purpose**: Verify the full AuthZ pipeline wiring — SecurityContext → PolicyEnforcer → AccessScope → `WHERE tenant_id IN (...)`.
 
-**Why not in unit tests**: Unit tests mock the PDP and check that `access_scope()` returns the correct scope. They do NOT verify the **real wiring** in `module.rs` where PolicyEnforcer is created from ClientHub and injected into the service.
+**Why not in unit tests**: Unit tests mock the PDP and check that `access_scope()` returns the correct scope. They do NOT verify the **real wiring** in `gear.rs` where PolicyEnforcer is created from ClientHub and injected into the service.
 
 ```python
 async def test_authz_tenant_filter_applied(client):
     """
     Seam: AuthZ → SecureORM full chain — own data visible, scoped correctly.
     """
-    r = await client.post("/cf/<module>/v1/entities", json={"name": "AuthZ Test"})
+    r = await client.post("/cf/<gear>/v1/entities", json={"name": "AuthZ Test"})
     assert r.status_code == 201
     entity_id = r.json()["id"]
 
-    r = await client.get("/cf/<module>/v1/entities")
+    r = await client.get("/cf/<gear>/v1/entities")
     assert r.status_code == 200
     ids = [item["id"] for item in r.json()["items"]]
     assert entity_id in ids
@@ -482,7 +482,7 @@ async def test_error_response_rfc9457(client):
     Seam: Error middleware — DomainError → HTTP status + Content-Type + no internal leaks.
     """
     import uuid
-    r = await client.get(f"/cf/<module>/v1/entities/{uuid.uuid4()}")
+    r = await client.get(f"/cf/<gear>/v1/entities/{uuid.uuid4()}")
     assert r.status_code == 404
     assert "application/problem+json" in r.headers.get("content-type", "")
     body = r.json()
@@ -508,7 +508,7 @@ async def test_pagination_cursor_roundtrip(client, create_entities):
         params = {"$top": 2}
         if cursor:
             params["$skiptoken"] = cursor
-        r = await client.get("/cf/<module>/v1/entities", params=params)
+        r = await client.get("/cf/<gear>/v1/entities", params=params)
         assert r.status_code == 200
         page = r.json()
         all_ids.extend(item["id"] for item in page["items"])
@@ -552,7 +552,7 @@ A test that can be removed without reducing integration confidence should not ex
 
 ---
 
-## Acceptance Criteria (module E2E suite)
+## Acceptance Criteria (gear E2E suite)
 
 **Suite-level:**
 - Core tests in a single file `test_integration_seams.py`

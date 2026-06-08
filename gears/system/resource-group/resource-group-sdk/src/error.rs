@@ -1,8 +1,8 @@
 // Created: 2026-04-16 by Constructor Tech
 // @cpt-dod:cpt-cf-resource-group-dod-sdk-foundation-sdk-errors:p1
-//! Public error types for the resource-group module.
+//! Public error types for the resource-group gear.
 //!
-//! These errors are safe to expose to other modules and consumers.
+//! These errors are safe to expose to other gears and consumers.
 
 use thiserror::Error;
 

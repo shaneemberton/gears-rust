@@ -14,10 +14,10 @@ use crate::infra::url_policy::UrlSecurityPolicy;
 /// Stable plugin instance suffix used by `AuthN` resolver plugin selection.
 pub const INSTANCE_SUFFIX: &str = "cf.builtin.oidc_authn_resolver.plugin.v1";
 
-/// The plugin module configuration.
+/// The plugin gear configuration.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct OidcAuthNModuleConfig {
+pub struct OidcAuthNGearConfig {
     /// Vendor key under which this plugin is discoverable.
     #[serde(default = "default_vendor")]
     pub vendor: String,
@@ -65,28 +65,25 @@ fn default_priority() -> u32 {
     100
 }
 
-impl OidcAuthNModuleConfig {
-    /// Resolve raw module input config into validated runtime config.
+impl OidcAuthNGearConfig {
+    /// Resolve raw gear input config into validated runtime config.
     ///
     /// # Errors
     ///
     /// Returns an error when duration strings are invalid, required
     /// audience configuration is missing, or retry/backoff bounds are invalid.
     #[allow(clippy::cognitive_complexity)]
-    pub fn resolve(self) -> Result<ResolvedModuleConfig> {
+    pub fn resolve(self) -> Result<ResolvedGearConfig> {
         self.resolve_with_url_policy(UrlSecurityPolicy::STRICT)
     }
 
-    /// Resolve raw module input config while permitting HTTP IdP URLs.
+    /// Resolve raw gear input config while permitting HTTP IdP URLs.
     #[doc(hidden)]
-    pub fn resolve_allowing_insecure_http_for_tests(self) -> Result<ResolvedModuleConfig> {
+    pub fn resolve_allowing_insecure_http_for_tests(self) -> Result<ResolvedGearConfig> {
         self.resolve_with_url_policy(UrlSecurityPolicy::allow_insecure_http_for_tests())
     }
 
-    fn resolve_with_url_policy(
-        self,
-        url_policy: UrlSecurityPolicy,
-    ) -> Result<ResolvedModuleConfig> {
+    fn resolve_with_url_policy(self, url_policy: UrlSecurityPolicy) -> Result<ResolvedGearConfig> {
         let Self {
             mut vendor,
             priority,
@@ -246,7 +243,7 @@ impl OidcAuthNModuleConfig {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(ResolvedModuleConfig {
+        Ok(ResolvedGearConfig {
             jwt_validation: JwtValidationConfig {
                 supported_algorithms,
                 clock_skew_leeway_secs,
@@ -521,7 +518,7 @@ impl IssuerTrustConfig {
 
     /// Build test trust config from exact issuer strings.
     ///
-    /// This keeps unit tests concise while runtime callers use the module input
+    /// This keeps unit tests concise while runtime callers use the gear input
     /// schema through [`Self::from_inputs`].
     ///
     /// # Errors
@@ -713,7 +710,7 @@ fn parse_supported_algorithms(inputs: &[String]) -> Result<Vec<Algorithm>> {
         .collect()
 }
 
-/// One `jwt.trusted_issuers` list item from module input config.
+/// One `jwt.trusted_issuers` list item from gear input config.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TrustedIssuerInput {
@@ -955,7 +952,7 @@ impl Default for TokenCacheInput {
 }
 
 #[derive(Debug, Clone)]
-pub struct ResolvedModuleConfig {
+pub struct ResolvedGearConfig {
     /// JWT validation parameters (trusted issuers, cache sizes, audience).
     pub jwt_validation: JwtValidationConfig,
     /// Registration/claim-mapping/circuit-breaker plugin parameters.
@@ -1200,12 +1197,12 @@ mod issuer_trust_config_tests {
 }
 
 #[cfg(test)]
-mod module_input_tests {
+mod gear_input_tests {
     use super::*;
 
     #[test]
     #[allow(clippy::cognitive_complexity)]
-    fn module_config_deserializes_documented_schema() {
+    fn gear_config_deserializes_documented_schema() {
         let json = r#"{
             "vendor": "custom-vendor",
             "priority": 250,
@@ -1237,7 +1234,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("documented config should deserialize");
         let resolved = config
             .resolve()
@@ -1297,7 +1294,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_requires_s2s_default_subject_type() {
+    fn gear_config_requires_s2s_default_subject_type() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1307,7 +1304,7 @@ mod module_input_tests {
                 "discovery_url": "https://oidc/realms/platform"
             }
         }"#;
-        let error = serde_json::from_str::<OidcAuthNModuleConfig>(json)
+        let error = serde_json::from_str::<OidcAuthNGearConfig>(json)
             .expect_err("missing S2S default subject type should fail deserialization");
 
         assert!(
@@ -1319,7 +1316,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_blank_s2s_default_subject_type() {
+    fn gear_config_rejects_blank_s2s_default_subject_type() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1330,7 +1327,7 @@ mod module_input_tests {
                 "default_subject_type": "   "
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("blank string should deserialize before validation");
         let error = config
             .resolve()
@@ -1345,7 +1342,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_blank_custom_ca_certificate_path() {
+    fn gear_config_rejects_blank_custom_ca_certificate_path() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1357,7 +1354,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("blank CA path should deserialize before validation");
         let error = config
             .resolve()
@@ -1372,7 +1369,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_zero_http_client_request_timeout() {
+    fn gear_config_rejects_zero_http_client_request_timeout() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1384,7 +1381,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("zero request timeout should deserialize");
         let error = config
             .resolve()
@@ -1399,7 +1396,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_blank_s2s_discovery_url() {
+    fn gear_config_rejects_blank_s2s_discovery_url() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1410,7 +1407,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("blank string should deserialize before validation");
         let error = config
             .resolve()
@@ -1425,7 +1422,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_http_s2s_discovery_url_by_default() {
+    fn gear_config_rejects_http_s2s_discovery_url_by_default() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1436,7 +1433,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let error = serde_json::from_str::<OidcAuthNModuleConfig>(json)
+        let error = serde_json::from_str::<OidcAuthNGearConfig>(json)
             .expect("config JSON should parse")
             .resolve()
             .expect_err("HTTP S2S discovery URL should fail under default URL policy");
@@ -1448,7 +1445,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_trims_s2s_discovery_url() {
+    fn gear_config_trims_s2s_discovery_url() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1459,7 +1456,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("padded discovery URL should deserialize");
         let resolved = config
             .resolve()
@@ -1472,7 +1469,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_blank_claim_mapping_subject_tenant_id() {
+    fn gear_config_rejects_blank_claim_mapping_subject_tenant_id() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1483,7 +1480,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig = serde_json::from_str(json)
+        let config: OidcAuthNGearConfig = serde_json::from_str(json)
             .expect("blank subject tenant ID should deserialize before validation");
         let error = config
             .resolve()
@@ -1498,7 +1495,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_trims_claim_mapping_subject_tenant_id() {
+    fn gear_config_trims_claim_mapping_subject_tenant_id() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1510,7 +1507,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("padded subject tenant IDs should deserialize");
         let resolved = config
             .resolve()
@@ -1524,7 +1521,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_keeps_expected_audience_when_audience_is_not_required() {
+    fn gear_config_keeps_expected_audience_when_audience_is_not_required() {
         let json = r#"{
             "jwt": {
                 "require_audience": false,
@@ -1537,7 +1534,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("optional audience config should deserialize");
         let resolved = config
             .resolve()
@@ -1551,7 +1548,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_resolves_configured_algorithm_subset_and_clock_skew() {
+    fn gear_config_resolves_configured_algorithm_subset_and_clock_skew() {
         let json = r#"{
             "jwt": {
                 "supported_algorithms": ["RS256"],
@@ -1564,7 +1561,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("algorithm subset config should deserialize");
         let resolved = config
             .resolve()
@@ -1578,7 +1575,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_unsupported_algorithm() {
+    fn gear_config_rejects_unsupported_algorithm() {
         let json = r#"{
             "jwt": {
                 "supported_algorithms": ["HS256"],
@@ -1590,7 +1587,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("unsupported algorithm config should deserialize");
         let error = config
             .resolve()
@@ -1605,7 +1602,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_excessive_clock_skew() {
+    fn gear_config_rejects_excessive_clock_skew() {
         let json = r#"{
             "jwt": {
                 "clock_skew_leeway": "301s",
@@ -1617,7 +1614,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("clock skew config should deserialize");
         let error = config
             .resolve()
@@ -1632,7 +1629,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_stale_ttl_shorter_than_fresh_ttl() {
+    fn gear_config_rejects_stale_ttl_shorter_than_fresh_ttl() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1644,7 +1641,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("stale ttl config should deserialize");
         let error = config
             .resolve()
@@ -1659,7 +1656,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_rejects_zero_circuit_breaker_reset_timeout() {
+    fn gear_config_rejects_zero_circuit_breaker_reset_timeout() {
         for reset_timeout in ["0s", "500ms"] {
             let json = format!(
                 r#"{{
@@ -1674,7 +1671,7 @@ mod module_input_tests {
                     }}
                 }}"#
             );
-            let config: OidcAuthNModuleConfig =
+            let config: OidcAuthNGearConfig =
                 serde_json::from_str(&json).expect("reset timeout config should deserialize");
             let error = config
                 .resolve()
@@ -1690,7 +1687,7 @@ mod module_input_tests {
     }
 
     #[test]
-    fn module_config_allows_zero_stale_ttl_to_disable_stale_fallback() {
+    fn gear_config_allows_zero_stale_ttl_to_disable_stale_fallback() {
         let json = r#"{
             "jwt": {
                 "trusted_issuers": [{ "issuer": "https://oidc/realms/platform" }],
@@ -1702,7 +1699,7 @@ mod module_input_tests {
                 "default_subject_type": "gts.cf.core.security.subject_user.v1~"
             }
         }"#;
-        let config: OidcAuthNModuleConfig =
+        let config: OidcAuthNGearConfig =
             serde_json::from_str(json).expect("zero stale ttl config should deserialize");
         let resolved = config
             .resolve()

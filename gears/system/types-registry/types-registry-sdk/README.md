@@ -1,12 +1,12 @@
 # Types Registry SDK
 
-SDK crate for the Types Registry module, providing the public API contracts for GTS (Global Type System) entity management.
+SDK crate for the Types Registry gear, providing the public API contracts for GTS (Global Type System) entity management.
 
 ## Overview
 
-This crate defines the transport-agnostic interface for the Types Registry module:
+This crate defines the transport-agnostic interface for the Types Registry gear:
 
-- **`TypesRegistryClient`** - Async trait for inter-module communication
+- **`TypesRegistryClient`** - Async trait for inter-gear communication
 - **`GtsEntity`** - Model representing registered GTS entities (types and instances)
 - **`ListQuery`** - Query builder for filtering entity listings
 - **`TypesRegistryError`** - Error types for all operations

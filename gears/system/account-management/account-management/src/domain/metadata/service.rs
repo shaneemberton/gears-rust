@@ -111,8 +111,8 @@ pub(super) mod pep {
     /// [`crate::domain::metadata::type_id::ParsedTypeId::as_str`])
     /// so a PDP rule can match on the exact registered schema rather
     /// than the storage-internal `schema_uuid`. Lives on the AM service
-    /// module rather than [`toolkit_security::pep_properties`] because
-    /// no other module currently carries a per-schema attribute; if a
+    /// gear rather than [`toolkit_security::pep_properties`] because
+    /// no other gear currently carries a per-schema attribute; if a
     /// second consumer appears the const is the natural place to
     /// promote upstream.
     pub const TYPE_ID: &str = "type_id";
@@ -193,7 +193,7 @@ impl MetadataService {
         }
     }
 
-    /// Operator-tunable per-deployment listing cap. The module bootstrap
+    /// Operator-tunable per-deployment listing cap. The gear bootstrap
     /// passes `cfg.listing.max_top` so the metadata listing surface
     /// stays uniform with the tenant / conversion listing caps. Mirrors
     /// [`crate::domain::tenant::service::TenantService::max_list_children_top`].
@@ -755,7 +755,7 @@ impl MetadataService {
         // Reuse the READ action: the resolved value is the caller's
         // effective config for their schema slot, and the inheritance
         // walk is bounded by `self_managed` barriers and the schema's
-        // policy — see the `pep::actions` module docs for why the
+        // policy — see the `pep::actions` gear docs for why the
         // `/resolved` flow does not carry a separate verb.
         let scope = self
             .authorize(ctx, pep::actions::READ, tenant_id, Some(parsed.as_str()))

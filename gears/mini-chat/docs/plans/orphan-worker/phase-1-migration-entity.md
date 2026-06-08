@@ -66,7 +66,7 @@ Design notes:
 
 File: `src/infra/db/migrations/mod.rs`
 
-Add the new module declaration and append the migration to `Migrator::migrations()` vec, after the last existing migration entry.
+Add the new gear declaration and append the migration to `Migrator::migrations()` vec, after the last existing migration entry.
 
 ### 1.3 Update entity
 

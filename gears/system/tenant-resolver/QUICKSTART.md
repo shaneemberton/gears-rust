@@ -17,7 +17,7 @@ Manages multi-tenant hierarchies for data isolation and access control. Tenants 
 
 Full API documentation: <http://127.0.0.1:8087/cf/docs>
 
-The example server uses the gateway prefix `/cf`. This comes from `modules.api-gateway.config.prefix_path` and is configurable.
+The example server uses the gateway prefix `/cf`. This comes from `gears.api-gateway.config.prefix_path` and is configurable.
 
 ## Examples
 

@@ -82,7 +82,7 @@ fn time_with_option() {
 }
 
 #[test]
-fn test_option_module() {
+fn test_option_gear() {
     #[derive(Serialize, Deserialize)]
     struct Foo {
         #[serde(with = "super::option")]

@@ -4,7 +4,7 @@
 //! the `GET /tenants/{id}/users` handler uses to lower a raw
 //! [`toolkit_odata::ODataQuery`] (parsed by the `OData` extractor) into
 //! the SDK-side [`account_management_sdk::ListUsersQuery`]. The seam
-//! lives in the handler module on purpose: it is the one place where
+//! lives in the handler gear on purpose: it is the one place where
 //! boundary validation (unknown `$filter` field, type mismatches,
 //! invalid pagination, cursor encoding) is converted to
 //! [`crate::domain::error::DomainError::Validation`] before the

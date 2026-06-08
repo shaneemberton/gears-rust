@@ -12,7 +12,7 @@ use super::{
     apply_select, created_json, info, no_content, page_to_projected_json,
 };
 use crate::api::rest::dto::CreateUserReq;
-use crate::module::ConcreteAppServices;
+use crate::gear::ConcreteAppServices;
 
 /// List users with cursor-based pagination and optional field projection via $select
 #[tracing::instrument(

@@ -1,6 +1,6 @@
 //! Telemetry utilities for OpenTelemetry integration
 //!
-//! This module provides utilities for setting up and configuring
+//! This gear provides utilities for setting up and configuring
 //! OpenTelemetry tracing layers for distributed tracing.
 
 pub mod config;

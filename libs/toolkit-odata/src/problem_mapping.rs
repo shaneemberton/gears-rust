@@ -4,7 +4,7 @@
 //! `IntoResponse for CanonicalError` (in `toolkit-canonical-errors`) renders the
 //! wire `Problem` and stashes the original error into the response extensions
 //! so the `canonical_error_middleware` (in `toolkit::api`) can log
-//! `diagnostic()` and fill `instance` / `trace_id`. This module is the single
+//! `diagnostic()` and fill `instance` / `trace_id`. This gear is the single
 //! source of truth for `Error → CanonicalError`; it does no logging of its own.
 
 use toolkit_canonical_errors::CanonicalError;

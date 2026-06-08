@@ -11,7 +11,7 @@ Thin wrapper around the workspace binary at `tools/gts-analyze/`. Source code, f
 
 ## How to invoke
 
-1. Parse the user's invocation for a module path (absolute or repo-relative). If absent, ask once.
+1. Parse the user's invocation for a gear path (absolute or repo-relative). If absent, ask once.
 2. Run from the workspace root:
    ```bash
    cargo run --release -p gts-analyze -- <MODULE_PATH> [flags]
@@ -37,5 +37,5 @@ Thin wrapper around the workspace binary at `tools/gts-analyze/`. Source code, f
 ## Tips
 
 - A GTS ID ending with `~` is a **Type**, otherwise an **Instance** (gts-spec §8.1).
-- For doc-heavy modules with hundreds of `.md` references, suggest `--skip-docs` if the user only cares about code usage.
+- For doc-heavy gears with hundreds of `.md` references, suggest `--skip-docs` if the user only cares about code usage.
 - `cargo run` builds on first invocation; if the user is running this often, `cargo build --release -p gts-analyze` once up front avoids latency.

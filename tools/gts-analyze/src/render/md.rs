@@ -13,7 +13,7 @@ pub fn render(rep: &Report) -> String {
 
     push(&mut lines, "# GTS Analysis Report".to_string());
     push(&mut lines, String::new());
-    push(&mut lines, format!("**Module:** `{}`  ", rep.module_root));
+    push(&mut lines, format!("**Gear:** `{}`  ", rep.module_root));
     push(
         &mut lines,
         format!(

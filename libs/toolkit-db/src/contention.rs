@@ -32,7 +32,7 @@
 //! to the correct engine, avoiding false positives from shared SQLSTATE codes
 //! (e.g., `40001` means different things in `MySQL` vs `PostgreSQL`).
 //!
-//! This module provides detection helpers for callers that manage their own
+//! This gear provides detection helpers for callers that manage their own
 //! transaction lifecycle (e.g., the outbox sequencer).
 
 use sea_orm::{DbBackend, DbErr};

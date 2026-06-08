@@ -1,7 +1,7 @@
 //! Periodic hierarchy-integrity check job.
 //!
 //! Spawned once per platform start by
-//! [`crate::module::AccountManagementModule::serve`] when
+//! [`crate::gear::AccountManagementGear::serve`] when
 //! [`config::IntegrityCheckConfig::enabled`] is `true`. Each tick invokes
 //! [`crate::domain::tenant::service::TenantService::check_hierarchy_integrity`],
 //! tolerates the single-flight gate

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::time::{Duration, sleep};
 use toolkit::{
-    Module, ModuleCtx, RestApiCapability,
+    Gear, GearCtx, RestApiCapability,
     api::OperationBuilder,
     config::ConfigProvider,
     contracts::{ApiGatewayCapability, OpenApiRegistry},
@@ -31,14 +31,14 @@ const SERVICE_UNAVAILABLE_TYPE: &str =
     "gts://gts.cf.core.errors.err.v1~cf.core.err.service_unavailable.v1~";
 const PROBLEM_JSON: &str = "application/problem+json";
 
-/// Helper to create a test `ModuleCtx`
+/// Helper to create a test `GearCtx`
 struct TestConfigProvider {
     config: serde_json::Value,
 }
 
 impl ConfigProvider for TestConfigProvider {
-    fn get_module_config(&self, module: &str) -> Option<&serde_json::Value> {
-        if module == "api-gateway" {
+    fn get_gear_config(&self, gear: &str) -> Option<&serde_json::Value> {
+        if gear == "api-gateway" {
             Some(&self.config)
         } else {
             None
@@ -52,11 +52,11 @@ fn wrap_config(config: &serde_json::Value) -> serde_json::Value {
     })
 }
 
-fn create_test_module_ctx_with_config(config: &serde_json::Value) -> ModuleCtx {
+fn create_test_gear_ctx_with_config(config: &serde_json::Value) -> GearCtx {
     let wrapped_config = wrap_config(config);
     let hub = Arc::new(toolkit::ClientHub::new());
 
-    ModuleCtx::new(
+    GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider {
@@ -72,20 +72,20 @@ struct TestResponse {
     message: String,
 }
 
-/// Test module with rate-limited routes
-pub struct RateLimitedModule;
+/// Test gear with rate-limited routes
+pub struct RateLimitedGear;
 
 #[async_trait]
-impl Module for RateLimitedModule {
-    async fn init(&self, _ctx: &toolkit::ModuleCtx) -> Result<()> {
+impl Gear for RateLimitedGear {
+    async fn init(&self, _ctx: &toolkit::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
-impl RestApiCapability for RateLimitedModule {
+impl RestApiCapability for RateLimitedGear {
     fn register_rest(
         &self,
-        _ctx: &toolkit::ModuleCtx,
+        _ctx: &toolkit::GearCtx,
         router: axum::Router,
         openapi: &dyn OpenApiRegistry,
     ) -> Result<axum::Router> {
@@ -161,12 +161,12 @@ async fn test_rate_limit_enforcement() {
     });
 
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_config(&config);
+    let ctx = create_test_gear_ctx_with_config(&config);
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = RateLimitedModule;
+    let gear = RateLimitedGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -188,12 +188,12 @@ async fn test_openapi_includes_rate_limit_extensions() {
     });
 
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_config(&config);
+    let ctx = create_test_gear_ctx_with_config(&config);
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = RateLimitedModule;
+    let gear = RateLimitedGear;
     let router = Router::new();
-    let _router = module
+    let _router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -280,12 +280,12 @@ async fn test_rate_limit_returns_canonical_problem_with_headers() {
     });
 
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_config(&config);
+    let ctx = create_test_gear_ctx_with_config(&config);
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = RateLimitedModule;
+    let gear = RateLimitedGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -375,7 +375,7 @@ async fn test_in_flight_limit_returns_canonical_service_unavailable() {
     });
 
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_config(&config);
+    let ctx = create_test_gear_ctx_with_config(&config);
     api_gateway.init(&ctx).await.expect("Failed to init");
 
     // Register a route that uses the gateway defaults (no per-route override).

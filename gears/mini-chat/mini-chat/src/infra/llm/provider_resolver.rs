@@ -1,6 +1,6 @@
 //! Runtime resolution of LLM provider adapter + OAGW upstream alias.
 //!
-//! Built once at module startup from `MiniChatConfig.providers` after
+//! Built once at gear startup from `MiniChatConfig.providers` after
 //! OAGW upstream registration has stamped `upstream_alias` on each
 //! [`ProviderEntry`] and [`ProviderTenantOverride`].
 //!

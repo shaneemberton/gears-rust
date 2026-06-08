@@ -32,7 +32,7 @@
 //! ## Configuration
 //!
 //! ```yaml
-//! modules:
+//! gears:
 //!   static-idp-plugin:
 //!     config:
 //!       vendor: "constructorfabric"
@@ -42,6 +42,6 @@
 
 pub mod config;
 pub mod domain;
-pub mod module;
+pub mod gear;
 
-pub use module::StaticIdpPlugin;
+pub use gear::StaticIdpPlugin;

@@ -4,7 +4,7 @@ version = "0.2.16"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "AuthN resolver module - discovers and routes to plugins"
+description = "AuthN resolver gear - discovers and routes to plugins"
 repository.workspace = true
 readme = "README.md"
 keywords = ["constructorfabric", "cf-gears"]
@@ -40,7 +40,7 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-# Required by toolkit::module macro
+# Required by toolkit::gear macro
 inventory = { workspace = true }
 
 # Logging

@@ -20,8 +20,8 @@ use uuid::Uuid;
 use crate::domain::events::UserDomainEvent;
 use crate::domain::ports::{AuditPort, EventPublisher, UsersMetricsPort};
 use crate::domain::service::ServiceConfig;
+use crate::gear::ConcreteAppServices;
 use crate::infra::storage::{OrmAddressesRepository, OrmCitiesRepository, OrmUsersRepository};
-use crate::module::ConcreteAppServices;
 
 #[must_use]
 pub fn ctx_allow_tenants(tenants: &[Uuid]) -> SecurityContext {

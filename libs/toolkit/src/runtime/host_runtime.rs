@@ -1,16 +1,16 @@
 //! Host Runtime - orchestrates the full `ToolKit` lifecycle
 //!
-//! This module contains the `HostRuntime` type that owns and coordinates
+//! This gear contains the `HostRuntime` type that owns and coordinates
 //! the execution of all lifecycle phases.
 //!
 //! High-level phase order:
-//! - `pre_init` (system modules only)
-//! - DB migrations (modules with DB capability)
-//! - `init` (all modules)
-//! - `post_init` (system modules only; runs after *all* `init` complete)
-//! - REST wiring (modules with REST capability; requires a single REST host)
-//! - gRPC registration (modules with gRPC capability; requires a single gRPC hub)
-//! - start/stop (stateful modules)
+//! - `pre_init` (system gears only)
+//! - DB migrations (gears with DB capability)
+//! - `init` (all gears)
+//! - `post_init` (system gears only; runs after *all* `init` complete)
+//! - REST wiring (gears with REST capability; requires a single REST host)
+//! - gRPC registration (gears with gRPC capability; requires a single gRPC hub)
+//! - start/stop (stateful gears)
 //! - `OoP` spawn / wait / stop (host-only orchestration)
 
 use axum::Router;
@@ -23,20 +23,20 @@ use uuid::Uuid;
 use crate::backends::OopSpawnConfig;
 use crate::client_hub::ClientHub;
 use crate::config::ConfigProvider;
-use crate::context::ModuleContextBuilder;
+use crate::context::GearContextBuilder;
 use crate::registry::{
-    ApiGatewayCap, GrpcHubCap, ModuleEntry, ModuleRegistry, RegistryError, RestApiCap, RunnableCap,
+    ApiGatewayCap, GearEntry, GearRegistry, GrpcHubCap, RegistryError, RestApiCap, RunnableCap,
     SystemCap,
 };
-use crate::runtime::{GrpcInstallerStore, ModuleManager, OopSpawnOptions, SystemContext};
+use crate::runtime::{GearManager, GrpcInstallerStore, OopSpawnOptions, SystemContext};
 
 #[cfg(feature = "db")]
 use crate::registry::DatabaseCap;
 
-/// How the runtime should provide DBs to modules.
+/// How the runtime should provide DBs to gears.
 #[derive(Clone)]
 pub enum DbOptions {
-    /// No database integration. `ModuleCtx::db()` will be `None`, `db_required()` will error.
+    /// No database integration. `GearCtx::db()` will be `None`, `db_required()` will error.
     None,
     /// Use a `DbManager` to handle database connections with Figment-based configuration.
     #[cfg(feature = "db")]
@@ -52,13 +52,13 @@ pub enum RunMode {
     MigrateOnly,
 }
 
-/// Environment variable name for passing directory endpoint to `OoP` modules.
+/// Environment variable name for passing directory endpoint to `OoP` gears.
 pub const TOOLKIT_DIRECTORY_ENDPOINT_ENV: &str = "TOOLKIT_DIRECTORY_ENDPOINT";
 
-/// Environment variable name for passing rendered module config to `OoP` modules.
+/// Environment variable name for passing rendered gear config to `OoP` gears.
 pub const TOOLKIT_MODULE_CONFIG_ENV: &str = "TOOLKIT_MODULE_CONFIG";
 
-/// Default shutdown deadline for graceful module stop (35 seconds).
+/// Default shutdown deadline for graceful gear stop (35 seconds).
 ///
 /// This is intentionally 5 seconds longer than `WithLifecycle::stop_timeout` (30s default)
 /// to ensure deterministic behavior: the lifecycle's internal timeout fires first,
@@ -67,19 +67,19 @@ pub const DEFAULT_SHUTDOWN_DEADLINE: std::time::Duration = std::time::Duration::
 
 /// `HostRuntime` owns the lifecycle orchestration for `ToolKit`.
 ///
-/// It encapsulates all runtime state and drives modules through the full lifecycle (see module docs).
+/// It encapsulates all runtime state and drives gears through the full lifecycle (see gear docs).
 pub struct HostRuntime {
-    registry: ModuleRegistry,
-    ctx_builder: ModuleContextBuilder,
+    registry: GearRegistry,
+    ctx_builder: GearContextBuilder,
     instance_id: Uuid,
-    module_manager: Arc<ModuleManager>,
+    gear_manager: Arc<GearManager>,
     grpc_installers: Arc<GrpcInstallerStore>,
     #[allow(dead_code)]
     client_hub: Arc<ClientHub>,
     cancel: CancellationToken,
     #[allow(dead_code)]
     db_options: DbOptions,
-    /// `OoP` module spawn configuration and backend
+    /// `OoP` gear spawn configuration and backend
     oop_options: Option<OopSpawnOptions>,
     /// Maximum time allowed for graceful shutdown before hard-stop signal is sent.
     shutdown_deadline: std::time::Duration,
@@ -90,21 +90,21 @@ impl HostRuntime {
     ///
     /// This prepares all runtime components but does not start any lifecycle phases.
     pub fn new(
-        registry: ModuleRegistry,
-        modules_cfg: Arc<dyn ConfigProvider>,
+        registry: GearRegistry,
+        gears_cfg: Arc<dyn ConfigProvider>,
         db_options: DbOptions,
         client_hub: Arc<ClientHub>,
         cancel: CancellationToken,
         instance_id: Uuid,
         oop_options: Option<OopSpawnOptions>,
     ) -> Self {
-        // Create runtime-owned components for system modules
-        let module_manager = Arc::new(ModuleManager::new());
+        // Create runtime-owned components for system gears
+        let gear_manager = Arc::new(GearManager::new());
         let grpc_installers = Arc::new(GrpcInstallerStore::new());
 
-        // Build the context builder that will resolve per-module DbHandles
+        // Build the context builder that will resolve per-gear DbHandles
         let ctx_builder =
-            ModuleContextBuilder::new(instance_id, modules_cfg, client_hub.clone(), cancel.clone());
+            GearContextBuilder::new(instance_id, gears_cfg, client_hub.clone(), cancel.clone());
         #[cfg(feature = "db")]
         let ctx_builder = match &db_options {
             DbOptions::Manager(mgr) => ctx_builder.with_db_manager(mgr.clone()),
@@ -115,7 +115,7 @@ impl HostRuntime {
             registry,
             ctx_builder,
             instance_id,
-            module_manager,
+            gear_manager,
             grpc_installers,
             client_hub,
             cancel,
@@ -125,9 +125,9 @@ impl HostRuntime {
         }
     }
 
-    /// Set a custom shutdown deadline for graceful module stop.
+    /// Set a custom shutdown deadline for graceful gear stop.
     ///
-    /// This is the maximum time the runtime will wait for each module to stop gracefully
+    /// This is the maximum time the runtime will wait for each gear to stop gracefully
     /// before sending the hard-stop signal (cancelling the deadline token).
     ///
     /// # Relationship with `WithLifecycle::stop_timeout`
@@ -146,9 +146,9 @@ impl HostRuntime {
         self
     }
 
-    /// `PRE_INIT` phase: wire runtime internals into system modules.
+    /// `PRE_INIT` phase: wire runtime internals into system gears.
     ///
-    /// This phase runs before init and only for modules with the "system" capability.
+    /// This phase runs before init and only for gears with the "system" capability.
     ///
     /// # Errors
     /// Returns `RegistryError` if system wiring fails.
@@ -157,23 +157,23 @@ impl HostRuntime {
 
         let sys_ctx = SystemContext::new(
             self.instance_id,
-            Arc::clone(&self.module_manager),
+            Arc::clone(&self.gear_manager),
             Arc::clone(&self.grpc_installers),
         );
 
-        for entry in self.registry.modules() {
-            // Check for cancellation before processing each module
+        for entry in self.registry.gears() {
+            // Check for cancellation before processing each gear
             if self.cancel.is_cancelled() {
                 tracing::warn!("Pre-init phase cancelled by signal");
                 return Err(RegistryError::Cancelled);
             }
 
             if let Some(sys_mod) = entry.caps.query::<SystemCap>() {
-                tracing::debug!(module = entry.name, "Running system pre_init");
+                tracing::debug!(gear = entry.name, "Running system pre_init");
                 sys_mod
                     .pre_init(&sys_ctx)
                     .map_err(|e| RegistryError::PreInit {
-                        module: entry.name,
+                        gear: entry.name,
                         source: e,
                     })?;
             }
@@ -182,28 +182,28 @@ impl HostRuntime {
         Ok(())
     }
 
-    /// Helper: resolve context for a module with error mapping.
+    /// Helper: resolve context for a gear with error mapping.
     #[cfg(feature = "db")]
-    async fn module_context(
+    async fn gear_context(
         &self,
-        module_name: &'static str,
-    ) -> Result<crate::context::ModuleCtx, RegistryError> {
+        gear_name: &'static str,
+    ) -> Result<crate::context::GearCtx, RegistryError> {
         self.ctx_builder
-            .for_module(module_name)
+            .for_gear(gear_name)
             .await
             .map_err(|e| RegistryError::DbMigrate {
-                module: module_name,
+                gear: gear_name,
                 source: e,
             })
     }
 
-    /// Helper: extract DB handle and module if both exist.
+    /// Helper: extract DB handle and gear if both exist.
     #[cfg(feature = "db")]
     async fn db_migration_target(
         &self,
-        module_name: &'static str,
-        ctx: &crate::context::ModuleCtx,
-        db_module: Option<Arc<dyn crate::contracts::DatabaseCapability>>,
+        gear_name: &'static str,
+        ctx: &crate::context::GearCtx,
+        db_gear: Option<Arc<dyn crate::contracts::DatabaseCapability>>,
     ) -> Result<
         Option<(
             toolkit_db::Db,
@@ -211,21 +211,21 @@ impl HostRuntime {
         )>,
         RegistryError,
     > {
-        let Some(dbm) = db_module else {
+        let Some(dbm) = db_gear else {
             return Ok(None);
         };
 
         // Important: DB migrations require access to the underlying `Db`, not just `DBProvider`.
-        // `ModuleCtx` intentionally exposes only `DBProvider` for better DX and to reduce mistakes.
+        // `GearCtx` intentionally exposes only `DBProvider` for better DX and to reduce mistakes.
         // So the runtime resolves the `Db` directly from its `DbManager`.
         let db = match &self.db_options {
             DbOptions::None => None,
             #[cfg(feature = "db")]
             DbOptions::Manager(mgr) => {
-                mgr.get(module_name)
+                mgr.get(gear_name)
                     .await
                     .map_err(|e| RegistryError::DbMigrate {
-                        module: module_name,
+                        gear: gear_name,
                         source: e.into(),
                     })?
             }
@@ -235,41 +235,41 @@ impl HostRuntime {
         Ok(db.map(|db| (db, dbm)))
     }
 
-    /// Helper: run migrations for a single module using the new migration runner.
+    /// Helper: run migrations for a single gear using the new migration runner.
     ///
-    /// This collects migrations from the module and executes them via the
-    /// runtime's privileged connection. Modules never see the raw connection.
+    /// This collects migrations from the gear and executes them via the
+    /// runtime's privileged connection. Gears never see the raw connection.
     #[cfg(feature = "db")]
-    async fn migrate_module(
-        module_name: &'static str,
+    async fn migrate_gear(
+        gear_name: &'static str,
         db: &toolkit_db::Db,
-        db_module: Arc<dyn crate::contracts::DatabaseCapability>,
+        db_gear: Arc<dyn crate::contracts::DatabaseCapability>,
     ) -> Result<(), RegistryError> {
-        // Collect migrations from the module
-        let migrations = db_module.migrations();
+        // Collect migrations from the gear
+        let migrations = db_gear.migrations();
 
         if migrations.is_empty() {
-            tracing::debug!(module = module_name, "No migrations to run");
+            tracing::debug!(gear = gear_name, "No migrations to run");
             return Ok(());
         }
 
         tracing::debug!(
-            module = module_name,
+            gear = gear_name,
             count = migrations.len(),
             "Running DB migrations"
         );
 
         // Execute migrations using the migration runner
         let result =
-            toolkit_db::migration_runner::run_migrations_for_module(db, module_name, migrations)
+            toolkit_db::migration_runner::run_migrations_for_gear(db, gear_name, migrations)
                 .await
                 .map_err(|e| RegistryError::DbMigrate {
-                    module: module_name,
+                    gear: gear_name,
                     source: anyhow::Error::new(e),
                 })?;
 
         tracing::info!(
-            module = module_name,
+            gear = gear_name,
             applied = result.applied,
             skipped = result.skipped,
             "DB migrations completed"
@@ -278,39 +278,39 @@ impl HostRuntime {
         Ok(())
     }
 
-    /// DB MIGRATION phase: run migrations for all modules with DB capability.
+    /// DB MIGRATION phase: run migrations for all gears with DB capability.
     ///
-    /// Runs before init, with system modules processed first.
+    /// Runs before init, with system gears processed first.
     ///
-    /// Modules provide migrations via `DatabaseCapability::migrations()`.
-    /// The runtime executes them with a privileged connection that modules
-    /// never receive directly. Each module gets a separate migration history
-    /// table, preventing cross-module interference.
+    /// Gears provide migrations via `DatabaseCapability::migrations()`.
+    /// The runtime executes them with a privileged connection that gears
+    /// never receive directly. Each gear gets a separate migration history
+    /// table, preventing cross-gear interference.
     #[cfg(feature = "db")]
     async fn run_db_phase(&self) -> Result<(), RegistryError> {
         tracing::info!("Phase: db (before init)");
 
-        for entry in self.registry.modules_by_system_priority() {
-            // Check for cancellation before processing each module
+        for entry in self.registry.gears_by_system_priority() {
+            // Check for cancellation before processing each gear
             if self.cancel.is_cancelled() {
                 tracing::warn!("DB migration phase cancelled by signal");
                 return Err(RegistryError::Cancelled);
             }
 
-            let ctx = self.module_context(entry.name).await?;
-            let db_module = entry.caps.query::<DatabaseCap>();
+            let ctx = self.gear_context(entry.name).await?;
+            let db_gear = entry.caps.query::<DatabaseCap>();
 
             match self
-                .db_migration_target(entry.name, &ctx, db_module.clone())
+                .db_migration_target(entry.name, &ctx, db_gear.clone())
                 .await?
             {
                 Some((db, dbm)) => {
-                    Self::migrate_module(entry.name, &db, dbm).await?;
+                    Self::migrate_gear(entry.name, &db, dbm).await?;
                 }
-                None if db_module.is_some() => {
+                None if db_gear.is_some() => {
                     tracing::debug!(
-                        module = entry.name,
-                        "Module has DbModule trait but no DB handle (no config)"
+                        gear = entry.name,
+                        "Gear has DbGear trait but no DB handle (no config)"
                     );
                 }
                 None => {}
@@ -320,58 +320,58 @@ impl HostRuntime {
         Ok(())
     }
 
-    /// INIT phase: initialize all modules in topological order.
+    /// INIT phase: initialize all gears in topological order.
     ///
-    /// System gears initialize first, followed by user modules.
+    /// System gears initialize first, followed by user gears.
     async fn run_init_phase(&self) -> Result<(), RegistryError> {
         tracing::info!("Phase: init");
 
-        for entry in self.registry.modules_by_system_priority() {
+        for entry in self.registry.gears_by_system_priority() {
             let ctx =
                 self.ctx_builder
-                    .for_module(entry.name)
+                    .for_gear(entry.name)
                     .await
                     .map_err(|e| RegistryError::Init {
-                        module: entry.name,
+                        gear: entry.name,
                         source: e,
                     })?;
-            tracing::info!(module = entry.name, "Initializing a module...");
+            tracing::info!(gear = entry.name, "Initializing a gear...");
             entry
                 .core
                 .init(&ctx)
                 .await
                 .map_err(|e| RegistryError::Init {
-                    module: entry.name,
+                    gear: entry.name,
                     source: e,
                 })?;
-            tracing::info!(module = entry.name, "Initialized a module.");
+            tracing::info!(gear = entry.name, "Initialized a gear.");
         }
 
         Ok(())
     }
 
-    /// `POST_INIT` phase: optional hook after ALL modules completed `init()`.
+    /// `POST_INIT` phase: optional hook after ALL gears completed `init()`.
     ///
     /// This provides a global barrier between initialization-time registration
     /// and subsequent phases that may rely on a fully-populated runtime registry.
     ///
-    /// System gears run first, followed by user modules, preserving topo order.
+    /// System gears run first, followed by user gears, preserving topo order.
     async fn run_post_init_phase(&self) -> Result<(), RegistryError> {
         tracing::info!("Phase: post_init");
 
         let sys_ctx = SystemContext::new(
             self.instance_id,
-            Arc::clone(&self.module_manager),
+            Arc::clone(&self.gear_manager),
             Arc::clone(&self.grpc_installers),
         );
 
-        for entry in self.registry.modules_by_system_priority() {
+        for entry in self.registry.gears_by_system_priority() {
             if let Some(sys_mod) = entry.caps.query::<SystemCap>() {
                 sys_mod
                     .post_init(&sys_ctx)
                     .await
                     .map_err(|e| RegistryError::PostInit {
-                        module: entry.name,
+                        gear: entry.name,
                         source: e,
                     })?;
             }
@@ -383,7 +383,7 @@ impl HostRuntime {
     /// REST phase: compose the router against the REST host.
     ///
     /// This is a synchronous phase that builds the final Router by:
-    /// 1. Preparing the host module
+    /// 1. Preparing the host gear
     /// 2. Registering all REST providers
     /// 3. Finalizing with `OpenAPI` endpoints
     async fn run_rest_phase(&self) -> Result<Router, RegistryError> {
@@ -391,10 +391,10 @@ impl HostRuntime {
 
         let mut router = Router::new();
 
-        // Find host(s) and whether any rest modules exist
+        // Find host(s) and whether any rest gears exist
         let host_count = self
             .registry
-            .modules()
+            .gears()
             .iter()
             .filter(|e| e.caps.has::<ApiGatewayCap>())
             .count();
@@ -403,7 +403,7 @@ impl HostRuntime {
             0 => {
                 return if self
                     .registry
-                    .modules()
+                    .gears()
                     .iter()
                     .any(|e| e.caps.has::<RestApiCap>())
                 {
@@ -416,23 +416,23 @@ impl HostRuntime {
             _ => return Err(RegistryError::MultipleRestHosts),
         }
 
-        // Resolve the single host entry and its module context
+        // Resolve the single host entry and its gear context
         let host_idx = self
             .registry
-            .modules()
+            .gears()
             .iter()
             .position(|e| e.caps.has::<ApiGatewayCap>())
             .ok_or(RegistryError::RestHostNotFoundAfterValidation)?;
-        let host_entry = &self.registry.modules()[host_idx];
+        let host_entry = &self.registry.gears()[host_idx];
         let Some(host) = host_entry.caps.query::<ApiGatewayCap>() else {
             return Err(RegistryError::RestHostMissingFromEntry);
         };
         let host_ctx = self
             .ctx_builder
-            .for_module(host_entry.name)
+            .for_gear(host_entry.name)
             .await
             .map_err(|e| RegistryError::RestPrepare {
-                module: host_entry.name,
+                gear: host_entry.name,
                 source: e,
             })?;
 
@@ -443,16 +443,16 @@ impl HostRuntime {
         router =
             host.rest_prepare(&host_ctx, router)
                 .map_err(|source| RegistryError::RestPrepare {
-                    module: host_entry.name,
+                    gear: host_entry.name,
                     source,
                 })?;
 
         // 2) Register all REST providers (in the current discovery order)
-        for e in self.registry.modules() {
+        for e in self.registry.gears() {
             if let Some(rest) = e.caps.query::<RestApiCap>() {
-                let ctx = self.ctx_builder.for_module(e.name).await.map_err(|err| {
+                let ctx = self.ctx_builder.for_gear(e.name).await.map_err(|err| {
                     RegistryError::RestRegister {
-                        module: e.name,
+                        gear: e.name,
                         source: err,
                     }
                 })?;
@@ -460,7 +460,7 @@ impl HostRuntime {
                 router = rest
                     .register_rest(&ctx, router, registry)
                     .map_err(|source| RegistryError::RestRegister {
-                        module: e.name,
+                        gear: e.name,
                         source,
                     })?;
             }
@@ -469,7 +469,7 @@ impl HostRuntime {
         // 3) Host finalize: attach /openapi.json and /docs, persist Router if needed (no server start)
         router = host.rest_finalize(&host_ctx, router).map_err(|source| {
             RegistryError::RestFinalize {
-                module: host_entry.name,
+                gear: host_entry.name,
                 source,
             }
         })?;
@@ -477,7 +477,7 @@ impl HostRuntime {
         Ok(router)
     }
 
-    /// gRPC registration phase: collect services from all grpc modules.
+    /// gRPC registration phase: collect services from all grpc gears.
     ///
     /// Services are stored in the installer store for the `grpc-hub` to consume during start.
     async fn run_grpc_phase(&self) -> Result<(), RegistryError> {
@@ -493,35 +493,32 @@ impl HostRuntime {
             return Err(RegistryError::GrpcRequiresHub);
         }
 
-        // If there's a hub, collect all services grouped by module and hand them off to the installer store
+        // If there's a hub, collect all services grouped by gear and hand them off to the installer store
         if let Some(hub_name) = &self.registry.grpc_hub {
-            let mut modules_data = Vec::new();
+            let mut gears_data = Vec::new();
             let mut seen = HashSet::new();
 
-            // Collect services from all grpc modules
-            for (module_name, service_module) in &self.registry.grpc_services {
-                let ctx = self
-                    .ctx_builder
-                    .for_module(module_name)
-                    .await
-                    .map_err(|err| RegistryError::GrpcRegister {
-                        module: module_name.clone(),
+            // Collect services from all grpc gears
+            for (gear_name, service_gear) in &self.registry.grpc_services {
+                let ctx = self.ctx_builder.for_gear(gear_name).await.map_err(|err| {
+                    RegistryError::GrpcRegister {
+                        gear: gear_name.clone(),
                         source: err,
-                    })?;
+                    }
+                })?;
 
-                let installers =
-                    service_module
-                        .get_grpc_services(&ctx)
-                        .await
-                        .map_err(|source| RegistryError::GrpcRegister {
-                            module: module_name.clone(),
-                            source,
-                        })?;
+                let installers = service_gear
+                    .get_grpc_services(&ctx)
+                    .await
+                    .map_err(|source| RegistryError::GrpcRegister {
+                        gear: gear_name.clone(),
+                        source,
+                    })?;
 
                 for reg in &installers {
                     if !seen.insert(reg.service_name) {
                         return Err(RegistryError::GrpcRegister {
-                            module: module_name.clone(),
+                            gear: gear_name.clone(),
                             source: anyhow::anyhow!(
                                 "Duplicate gRPC service name: {}",
                                 reg.service_name
@@ -530,18 +527,16 @@ impl HostRuntime {
                     }
                 }
 
-                modules_data.push(crate::runtime::ModuleInstallers {
-                    module_name: module_name.clone(),
+                gears_data.push(crate::runtime::GearInstallers {
+                    gear_name: gear_name.clone(),
                     installers,
                 });
             }
 
             self.grpc_installers
-                .set(crate::runtime::GrpcInstallerData {
-                    modules: modules_data,
-                })
+                .set(crate::runtime::GrpcInstallerData { gears: gears_data })
                 .map_err(|source| RegistryError::GrpcRegister {
-                    module: hub_name.clone(),
+                    gear: hub_name.clone(),
                     source,
                 })?;
         }
@@ -549,98 +544,98 @@ impl HostRuntime {
         Ok(())
     }
 
-    /// START phase: start all stateful modules.
+    /// START phase: start all stateful gears.
     ///
-    /// System gears start first, followed by user modules.
+    /// System gears start first, followed by user gears.
     async fn run_start_phase(&self) -> Result<(), RegistryError> {
         tracing::info!("Phase: start");
 
-        for e in self.registry.modules_by_system_priority() {
+        for e in self.registry.gears_by_system_priority() {
             if let Some(s) = e.caps.query::<RunnableCap>() {
                 tracing::debug!(
-                    module = e.name,
+                    gear = e.name,
                     is_system = e.caps.has::<SystemCap>(),
-                    "Starting stateful module"
+                    "Starting stateful gear"
                 );
                 s.start(self.cancel.clone())
                     .await
                     .map_err(|source| RegistryError::Start {
-                        module: e.name,
+                        gear: e.name,
                         source,
                     })?;
-                tracing::info!(module = e.name, "Started module");
+                tracing::info!(gear = e.name, "Started gear");
             }
         }
 
         Ok(())
     }
 
-    /// Stop a single module, logging errors but continuing execution.
-    async fn stop_one_module(entry: &ModuleEntry, cancel: CancellationToken) {
+    /// Stop a single gear, logging errors but continuing execution.
+    async fn stop_one_gear(entry: &GearEntry, cancel: CancellationToken) {
         if let Some(s) = entry.caps.query::<RunnableCap>() {
             match s.stop(cancel).await {
                 Err(err) => {
-                    tracing::warn!(module = entry.name, error = %err, "Failed to stop module");
+                    tracing::warn!(gear =  entry.name, error = %err, "Failed to stop gear");
                 }
                 _ => {
-                    tracing::info!(module = entry.name, "Stopped module");
+                    tracing::info!(gear = entry.name, "Stopped gear");
                 }
             }
         }
     }
 
-    /// STOP phase: stop all stateful modules in reverse order.
+    /// STOP phase: stop all stateful gears in reverse order.
     ///
     /// # Two-Phase Shutdown Contract
     ///
-    /// This phase implements a proper two-phase shutdown for **each module**:
+    /// This phase implements a proper two-phase shutdown for **each gear**:
     ///
-    /// 1. **Graceful stop request**: Each module's `stop(deadline_token)` is called with a
-    ///    *fresh* cancellation token (not the already-cancelled root token). Modules should
+    /// 1. **Graceful stop request**: Each gear's `stop(deadline_token)` is called with a
+    ///    *fresh* cancellation token (not the already-cancelled root token). Gears should
     ///    interpret this as "please stop gracefully".
     ///
-    /// 2. **Hard-stop deadline**: After `shutdown_deadline` expires **for that module**,
-    ///    its `deadline_token` is cancelled. Modules should interpret this as "abort immediately".
+    /// 2. **Hard-stop deadline**: After `shutdown_deadline` expires **for that gear**,
+    ///    its `deadline_token` is cancelled. Gears should interpret this as "abort immediately".
     ///
-    /// Each module gets its own independent deadline — if module A takes 25s to stop,
-    /// module B still gets the full `shutdown_deadline` for its graceful shutdown.
+    /// Each gear gets its own independent deadline — if gear A takes 25s to stop,
+    /// gear B still gets the full `shutdown_deadline` for its graceful shutdown.
     ///
-    /// This allows modules to implement real graceful shutdown:
+    /// This allows gears to implement real graceful shutdown:
     /// - Request cooperative shutdown of child tasks
     /// - Wait for them to finish gracefully
     /// - If `deadline_token` fires, switch to hard-abort mode
     ///
     /// Errors are logged but do not fail the shutdown process.
-    /// Note: `OoP` modules are stopped automatically by the backend when the
+    /// Note: `OoP` gears are stopped automatically by the backend when the
     /// cancellation token is triggered.
     async fn run_stop_phase(&self) -> Result<(), RegistryError> {
         tracing::info!("Phase: stop");
 
         let deadline = self.shutdown_deadline;
 
-        // Stop all modules in reverse order, each with its own independent deadline
-        for e in self.registry.modules().iter().rev() {
-            let module_name = e.name;
+        // Stop all gears in reverse order, each with its own independent deadline
+        for e in self.registry.gears().iter().rev() {
+            let gear_name = e.name;
 
-            // Create a fresh deadline token for THIS module
-            // Each module gets the full shutdown_deadline independently
+            // Create a fresh deadline token for THIS gear
+            // Each gear gets the full shutdown_deadline independently
             let deadline_token = CancellationToken::new();
             let deadline_token_for_timeout = deadline_token.clone();
 
-            // Spawn a task to cancel this module's deadline token after shutdown_deadline
+            // Spawn a task to cancel this gear's deadline token after shutdown_deadline
             let deadline_task = tokio::spawn(async move {
                 tokio::time::sleep(deadline).await;
                 tracing::warn!(
-                    module = module_name,
+                    gear = gear_name,
                     deadline_secs = deadline.as_secs(),
-                    "Module shutdown deadline reached, sending hard-stop signal"
+                    "Gear shutdown deadline reached, sending hard-stop signal"
                 );
                 deadline_token_for_timeout.cancel();
             });
 
-            // Stop this module with its own deadline token
-            // The module can observe the token transition from uncancelled→cancelled
-            Self::stop_one_module(e, deadline_token).await;
+            // Stop this gear with its own deadline token
+            // The gear can observe the token transition from uncancelled→cancelled
+            Self::stop_one_gear(e, deadline_token).await;
 
             // Cancel the deadline task and await it to ensure full cleanup
             deadline_task.abort();
@@ -651,13 +646,13 @@ impl HostRuntime {
         Ok(())
     }
 
-    /// `OoP` SPAWN phase: spawn out-of-process modules after start phase.
+    /// `OoP` SPAWN phase: spawn out-of-process gears after start phase.
     ///
     /// This phase runs after `grpc-hub` is already listening, so we can pass
-    /// the real directory endpoint to `OoP` modules.
+    /// the real directory endpoint to `OoP` gears.
     async fn run_oop_spawn_phase(&self) -> Result<(), RegistryError> {
         let oop_opts = match &self.oop_options {
-            Some(opts) if !opts.modules.is_empty() => opts,
+            Some(opts) if !opts.gears.is_empty() => opts,
             _ => return Ok(()),
         };
 
@@ -666,27 +661,27 @@ impl HostRuntime {
         // Wait for grpc_hub to publish its endpoint (it runs async in start phase)
         let directory_endpoint = self.wait_for_grpc_hub_endpoint().await;
 
-        for module_cfg in &oop_opts.modules {
+        for gear_cfg in &oop_opts.gears {
             // Build environment with directory endpoint and rendered config
             // Note: User controls --config via execution.args in master config
-            let mut env = module_cfg.env.clone();
+            let mut env = gear_cfg.env.clone();
             env.insert(
                 TOOLKIT_MODULE_CONFIG_ENV.to_owned(),
-                module_cfg.rendered_config_json.clone(),
+                gear_cfg.rendered_config_json.clone(),
             );
             if let Some(ref endpoint) = directory_endpoint {
                 env.insert(TOOLKIT_DIRECTORY_ENDPOINT_ENV.to_owned(), endpoint.clone());
             }
 
             // Use args from execution config as-is (user controls --config via args)
-            let args = module_cfg.args.clone();
+            let args = gear_cfg.args.clone();
 
             let spawn_config = OopSpawnConfig {
-                module_name: module_cfg.module_name.clone(),
-                binary: module_cfg.binary.clone(),
+                gear_name: gear_cfg.gear_name.clone(),
+                binary: gear_cfg.binary.clone(),
                 args,
                 env,
-                working_directory: module_cfg.working_directory.clone(),
+                working_directory: gear_cfg.working_directory.clone(),
             };
 
             oop_opts
@@ -694,14 +689,14 @@ impl HostRuntime {
                 .spawn(spawn_config)
                 .await
                 .map_err(|e| RegistryError::OopSpawn {
-                    module: module_cfg.module_name.clone(),
+                    gear: gear_cfg.gear_name.clone(),
                     source: e,
                 })?;
 
             tracing::info!(
-                module = %module_cfg.module_name,
+                gear =  %gear_cfg.gear_name,
                 directory_endpoint = ?directory_endpoint,
-                "Spawned OoP module via backend"
+                "Spawned OoP gear via backend"
             );
         }
 
@@ -710,7 +705,7 @@ impl HostRuntime {
 
     /// Wait for `grpc-hub` to publish its bound endpoint.
     ///
-    /// Polls the `GrpcHubModule::bound_endpoint()` with a short interval until available or timeout.
+    /// Polls the `GrpcHubGear::bound_endpoint()` with a short interval until available or timeout.
     /// Returns None if no `grpc-hub` is running or if it times out.
     async fn wait_for_grpc_hub_endpoint(&self) -> Option<String> {
         const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(10);
@@ -719,7 +714,7 @@ impl HostRuntime {
         // Find grpc_hub in registry
         let grpc_hub = self
             .registry
-            .modules()
+            .gears()
             .iter()
             .find_map(|e| e.caps.query::<GrpcHubCap>());
 
@@ -748,15 +743,15 @@ impl HostRuntime {
         }
     }
 
-    /// Run the full module lifecycle (all phases).
+    /// Run the full gear lifecycle (all phases).
     ///
     /// This is the standard entry point for normal application execution.
     /// It runs all phases from pre-init through shutdown.
     ///
     /// # Errors
     ///
-    /// Returns an error if any module phase fails during execution.
-    pub async fn run_module_phases(self) -> anyhow::Result<()> {
+    /// Returns an error if any gear phase fails during execution.
+    pub async fn run_gear_phases(self) -> anyhow::Result<()> {
         self.run_phases_internal(RunMode::Full).await
     }
 
@@ -773,10 +768,10 @@ impl HostRuntime {
         self.run_phases_internal(RunMode::MigrateOnly).await
     }
 
-    /// Internal implementation that runs module phases based on the mode.
+    /// Internal implementation that runs gear phases based on the mode.
     ///
     /// This private method contains the actual phase execution logic and is called
-    /// by both `run_module_phases()` and `run_migration_phases()`.
+    /// by both `run_gear_phases()` and `run_migration_phases()`.
     ///
     /// # Modes
     ///
@@ -785,16 +780,16 @@ impl HostRuntime {
     ///
     /// # Phases (Full Mode)
     ///
-    /// 1. Pre-init (system modules only)
-    /// 2. DB migration (all modules with database capability)
-    /// 3. Init (all modules)
-    /// 4. Post-init (system modules only)
-    /// 5. REST (modules with REST capability)
-    /// 6. gRPC (modules with gRPC capability)
-    /// 7. Start (runnable modules)
-    /// 8. `OoP` spawn (out-of-process modules)
+    /// 1. Pre-init (system gears only)
+    /// 2. DB migration (all gears with database capability)
+    /// 3. Init (all gears)
+    /// 4. Post-init (system gears only)
+    /// 5. REST (gears with REST capability)
+    /// 6. gRPC (gears with gRPC capability)
+    /// 7. Start (runnable gears)
+    /// 8. `OoP` spawn (out-of-process gears)
     /// 9. Wait for cancellation
-    /// 10. Stop (runnable modules in reverse order)
+    /// 10. Stop (runnable gears in reverse order)
     async fn run_phases_internal(self, mode: RunMode) -> anyhow::Result<()> {
         // Log execution mode
         match mode {
@@ -806,10 +801,10 @@ impl HostRuntime {
             }
         }
 
-        // 1. Pre-init phase (before init, only for system modules)
+        // 1. Pre-init phase (before init, only for system gears)
         self.run_pre_init_phase()?;
 
-        // 2. DB migration phase (system modules first)
+        // 2. DB migration phase (system gears first)
         #[cfg(feature = "db")]
         {
             self.run_db_phase().await?;
@@ -825,10 +820,10 @@ impl HostRuntime {
             return Ok(());
         }
 
-        // 3. Init phase (system modules first)
+        // 3. Init phase (system gears first)
         self.run_init_phase().await?;
 
-        // 4. Post-init phase (barrier after ALL init; system modules only)
+        // 4. Post-init phase (barrier after ALL init; system gears only)
         self.run_post_init_phase().await?;
 
         // 5. REST phase (synchronous router composition)
@@ -876,8 +871,8 @@ impl HostRuntime {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
-    use crate::context::ModuleCtx;
-    use crate::contracts::{Module, RunnableCapability, SystemCapability};
+    use crate::context::GearCtx;
+    use crate::contracts::{Gear, RunnableCapability, SystemCapability};
     use crate::registry::RegistryBuilder;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -887,8 +882,8 @@ mod tests {
     #[allow(dead_code)]
     struct DummyCore;
     #[async_trait::async_trait]
-    impl Module for DummyCore {
-        async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+    impl Gear for DummyCore {
+        async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
             Ok(())
         }
     }
@@ -909,8 +904,8 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl Module for StopOrderTracker {
-        async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+    impl Gear for StopOrderTracker {
+        async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
             Ok(())
         }
     }
@@ -922,11 +917,7 @@ mod tests {
         }
         async fn stop(&self, _cancel: CancellationToken) -> anyhow::Result<()> {
             let order = self.stop_order.fetch_add(1, Ordering::SeqCst);
-            tracing::info!(
-                my_order = self.my_order,
-                stop_order = order,
-                "Module stopped"
-            );
+            tracing::info!(my_order = self.my_order, stop_order = order, "Gear stopped");
             Ok(())
         }
     }
@@ -936,24 +927,24 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let stop_order = Arc::new(AtomicUsize::new(0));
 
-        let module_a = Arc::new(StopOrderTracker::new(&counter, stop_order.clone()));
-        let module_b = Arc::new(StopOrderTracker::new(&counter, stop_order.clone()));
-        let module_c = Arc::new(StopOrderTracker::new(&counter, stop_order.clone()));
+        let gear_a = Arc::new(StopOrderTracker::new(&counter, stop_order.clone()));
+        let gear_b = Arc::new(StopOrderTracker::new(&counter, stop_order.clone()));
+        let gear_c = Arc::new(StopOrderTracker::new(&counter, stop_order.clone()));
 
         let mut builder = RegistryBuilder::default();
-        builder.register_core_with_meta("a", &[], module_a.clone() as Arc<dyn Module>);
-        builder.register_core_with_meta("b", &["a"], module_b.clone() as Arc<dyn Module>);
-        builder.register_core_with_meta("c", &["b"], module_c.clone() as Arc<dyn Module>);
+        builder.register_core_with_meta("a", &[], gear_a.clone() as Arc<dyn Gear>);
+        builder.register_core_with_meta("b", &["a"], gear_b.clone() as Arc<dyn Gear>);
+        builder.register_core_with_meta("c", &["b"], gear_c.clone() as Arc<dyn Gear>);
 
-        builder.register_stateful_with_meta("a", module_a.clone() as Arc<dyn RunnableCapability>);
-        builder.register_stateful_with_meta("b", module_b.clone() as Arc<dyn RunnableCapability>);
-        builder.register_stateful_with_meta("c", module_c.clone() as Arc<dyn RunnableCapability>);
+        builder.register_stateful_with_meta("a", gear_a.clone() as Arc<dyn RunnableCapability>);
+        builder.register_stateful_with_meta("b", gear_b.clone() as Arc<dyn RunnableCapability>);
+        builder.register_stateful_with_meta("c", gear_c.clone() as Arc<dyn RunnableCapability>);
 
         let registry = builder.build_topo_sorted().unwrap();
 
-        // Verify module order is a -> b -> c
-        let module_names: Vec<_> = registry.modules().iter().map(|m| m.name).collect();
-        assert_eq!(module_names, vec!["a", "b", "c"]);
+        // Verify gear order is a -> b -> c
+        let gear_names: Vec<_> = registry.gears().iter().map(|m| m.name).collect();
+        assert_eq!(gear_names, vec!["a", "b", "c"]);
 
         let client_hub = Arc::new(ClientHub::new());
         let cancel = CancellationToken::new();
@@ -972,28 +963,28 @@ mod tests {
         // Run stop phase
         runtime.run_stop_phase().await.unwrap();
 
-        // Verify modules stopped in reverse order: c (stop_order=0), b (stop_order=1), a (stop_order=2)
-        // Module order is: a=0, b=1, c=2
+        // Verify gears stopped in reverse order: c (stop_order=0), b (stop_order=1), a (stop_order=2)
+        // Gear order is: a=0, b=1, c=2
         // Stop order should be: c=0, b=1, a=2
         assert_eq!(stop_order.load(Ordering::SeqCst), 3);
     }
 
     #[tokio::test]
     async fn test_stop_phase_continues_on_error() {
-        struct FailingModule {
+        struct FailingGear {
             should_fail: bool,
             stopped: Arc<AtomicUsize>,
         }
 
         #[async_trait::async_trait]
-        impl Module for FailingModule {
-            async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+        impl Gear for FailingGear {
+            async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
                 Ok(())
             }
         }
 
         #[async_trait::async_trait]
-        impl RunnableCapability for FailingModule {
+        impl RunnableCapability for FailingGear {
             async fn start(&self, _cancel: CancellationToken) -> anyhow::Result<()> {
                 Ok(())
             }
@@ -1007,27 +998,27 @@ mod tests {
         }
 
         let stopped = Arc::new(AtomicUsize::new(0));
-        let module_a = Arc::new(FailingModule {
+        let gear_a = Arc::new(FailingGear {
             should_fail: false,
             stopped: stopped.clone(),
         });
-        let module_b = Arc::new(FailingModule {
+        let gear_b = Arc::new(FailingGear {
             should_fail: true,
             stopped: stopped.clone(),
         });
-        let module_c = Arc::new(FailingModule {
+        let gear_c = Arc::new(FailingGear {
             should_fail: false,
             stopped: stopped.clone(),
         });
 
         let mut builder = RegistryBuilder::default();
-        builder.register_core_with_meta("a", &[], module_a.clone() as Arc<dyn Module>);
-        builder.register_core_with_meta("b", &["a"], module_b.clone() as Arc<dyn Module>);
-        builder.register_core_with_meta("c", &["b"], module_c.clone() as Arc<dyn Module>);
+        builder.register_core_with_meta("a", &[], gear_a.clone() as Arc<dyn Gear>);
+        builder.register_core_with_meta("b", &["a"], gear_b.clone() as Arc<dyn Gear>);
+        builder.register_core_with_meta("c", &["b"], gear_c.clone() as Arc<dyn Gear>);
 
-        builder.register_stateful_with_meta("a", module_a.clone() as Arc<dyn RunnableCapability>);
-        builder.register_stateful_with_meta("b", module_b.clone() as Arc<dyn RunnableCapability>);
-        builder.register_stateful_with_meta("c", module_c.clone() as Arc<dyn RunnableCapability>);
+        builder.register_stateful_with_meta("a", gear_a.clone() as Arc<dyn RunnableCapability>);
+        builder.register_stateful_with_meta("b", gear_b.clone() as Arc<dyn RunnableCapability>);
+        builder.register_stateful_with_meta("c", gear_c.clone() as Arc<dyn RunnableCapability>);
 
         let registry = builder.build_topo_sorted().unwrap();
 
@@ -1045,16 +1036,16 @@ mod tests {
             None,
         );
 
-        // Run stop phase - should not fail even though module_b fails
+        // Run stop phase - should not fail even though gear_b fails
         runtime.run_stop_phase().await.unwrap();
 
-        // All modules should have attempted to stop
+        // All gears should have attempted to stop
         assert_eq!(stopped.load(Ordering::SeqCst), 3);
     }
 
     struct EmptyConfigProvider;
     impl ConfigProvider for EmptyConfigProvider {
-        fn get_module_config(&self, _module_name: &str) -> Option<&serde_json::Value> {
+        fn get_gear_config(&self, _gear_name: &str) -> Option<&serde_json::Value> {
             None
         }
     }
@@ -1068,8 +1059,8 @@ mod tests {
         }
 
         #[async_trait::async_trait]
-        impl Module for TrackHooks {
-            async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+        impl Gear for TrackHooks {
+            async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
                 self.events.lock().await.push(format!("init:{}", self.name));
                 Ok(())
             }
@@ -1105,9 +1096,9 @@ mod tests {
         });
 
         let mut builder = RegistryBuilder::default();
-        builder.register_core_with_meta("sys_a", &[], sys_a.clone() as Arc<dyn Module>);
-        builder.register_core_with_meta("user_b", &["sys_a"], user_b.clone() as Arc<dyn Module>);
-        builder.register_core_with_meta("user_c", &["user_b"], user_c.clone() as Arc<dyn Module>);
+        builder.register_core_with_meta("sys_a", &[], sys_a.clone() as Arc<dyn Gear>);
+        builder.register_core_with_meta("user_b", &["sys_a"], user_b.clone() as Arc<dyn Gear>);
+        builder.register_core_with_meta("user_c", &["user_b"], user_c.clone() as Arc<dyn Gear>);
         builder.register_system_with_meta("sys_a", sys_a.clone() as Arc<dyn SystemCapability>);
 
         let registry = builder.build_topo_sorted().unwrap();
@@ -1126,7 +1117,7 @@ mod tests {
             None,
         );
 
-        // Run init phase for all modules, then post_init as a separate barrier phase.
+        // Run init phase for all gears, then post_init as a separate barrier phase.
         runtime.run_init_phase().await.unwrap();
         runtime.run_post_init_phase().await.unwrap();
 
@@ -1158,20 +1149,20 @@ mod tests {
     async fn test_stop_phase_provides_fresh_deadline_token() {
         use std::sync::atomic::AtomicBool;
 
-        struct TokenCheckModule {
+        struct TokenCheckGear {
             stop_was_called: AtomicBool,
             token_was_cancelled_on_entry: AtomicBool,
         }
 
         #[async_trait::async_trait]
-        impl Module for TokenCheckModule {
-            async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+        impl Gear for TokenCheckGear {
+            async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
                 Ok(())
             }
         }
 
         #[async_trait::async_trait]
-        impl RunnableCapability for TokenCheckModule {
+        impl RunnableCapability for TokenCheckGear {
             async fn start(&self, _cancel: CancellationToken) -> anyhow::Result<()> {
                 Ok(())
             }
@@ -1185,15 +1176,15 @@ mod tests {
             }
         }
 
-        let module = Arc::new(TokenCheckModule {
+        let gear = Arc::new(TokenCheckGear {
             stop_was_called: AtomicBool::new(false),
             // Default to true to detect if stop() was never called
             token_was_cancelled_on_entry: AtomicBool::new(true),
         });
 
         let mut builder = RegistryBuilder::default();
-        builder.register_core_with_meta("test", &[], module.clone() as Arc<dyn Module>);
-        builder.register_stateful_with_meta("test", module.clone() as Arc<dyn RunnableCapability>);
+        builder.register_core_with_meta("test", &[], gear.clone() as Arc<dyn Gear>);
+        builder.register_stateful_with_meta("test", gear.clone() as Arc<dyn RunnableCapability>);
 
         let registry = builder.build_topo_sorted().unwrap();
         let client_hub = Arc::new(ClientHub::new());
@@ -1215,14 +1206,14 @@ mod tests {
 
         // First, verify stop() was actually called (guards against silent registration failures)
         assert!(
-            module.stop_was_called.load(Ordering::SeqCst),
-            "stop() was never called - module may not have been registered correctly"
+            gear.stop_was_called.load(Ordering::SeqCst),
+            "stop() was never called - gear may not have been registered correctly"
         );
 
         // The token should NOT have been cancelled when stop() was called
-        // This is the key fix: modules get a fresh token, not the already-cancelled root token
+        // This is the key fix: gears get a fresh token, not the already-cancelled root token
         assert!(
-            !module.token_was_cancelled_on_entry.load(Ordering::SeqCst),
+            !gear.token_was_cancelled_on_entry.load(Ordering::SeqCst),
             "deadline_token should NOT be cancelled when stop() is called - this enables graceful shutdown"
         );
     }
@@ -1232,20 +1223,20 @@ mod tests {
         use std::sync::atomic::AtomicBool;
         use std::time::Duration;
 
-        struct GracefulModule {
+        struct GracefulGear {
             graceful_completed: AtomicBool,
             deadline_fired: AtomicBool,
         }
 
         #[async_trait::async_trait]
-        impl Module for GracefulModule {
-            async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+        impl Gear for GracefulGear {
+            async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
                 Ok(())
             }
         }
 
         #[async_trait::async_trait]
-        impl RunnableCapability for GracefulModule {
+        impl RunnableCapability for GracefulGear {
             async fn start(&self, _cancel: CancellationToken) -> anyhow::Result<()> {
                 Ok(())
             }
@@ -1263,21 +1254,21 @@ mod tests {
             }
         }
 
-        let module = Arc::new(GracefulModule {
+        let gear = Arc::new(GracefulGear {
             graceful_completed: AtomicBool::new(false),
             deadline_fired: AtomicBool::new(false),
         });
 
         let mut builder = RegistryBuilder::default();
-        builder.register_core_with_meta("test", &[], module.clone() as Arc<dyn Module>);
-        builder.register_stateful_with_meta("test", module.clone() as Arc<dyn RunnableCapability>);
+        builder.register_core_with_meta("test", &[], gear.clone() as Arc<dyn Gear>);
+        builder.register_stateful_with_meta("test", gear.clone() as Arc<dyn RunnableCapability>);
 
         let registry = builder.build_topo_sorted().unwrap();
         let client_hub = Arc::new(ClientHub::new());
         let cancel = CancellationToken::new();
         let config_provider: Arc<dyn ConfigProvider> = Arc::new(EmptyConfigProvider);
 
-        // Use a long deadline (5s) - module should complete gracefully before this
+        // Use a long deadline (5s) - gear should complete gracefully before this
         let runtime = HostRuntime::new(
             registry,
             config_provider,
@@ -1293,35 +1284,35 @@ mod tests {
 
         // Graceful shutdown should have completed
         assert!(
-            module.graceful_completed.load(Ordering::SeqCst),
+            gear.graceful_completed.load(Ordering::SeqCst),
             "graceful shutdown should complete"
         );
-        // Deadline should NOT have fired (module finished before deadline)
+        // Deadline should NOT have fired (gear finished before deadline)
         assert!(
-            !module.deadline_fired.load(Ordering::SeqCst),
+            !gear.deadline_fired.load(Ordering::SeqCst),
             "deadline should not fire when graceful shutdown completes quickly"
         );
     }
 
     #[tokio::test]
-    async fn test_stop_phase_deadline_fires_for_slow_module() {
+    async fn test_stop_phase_deadline_fires_for_slow_gear() {
         use std::sync::atomic::AtomicBool;
         use std::time::Duration;
 
-        struct SlowModule {
+        struct SlowGear {
             graceful_completed: AtomicBool,
             deadline_fired: AtomicBool,
         }
 
         #[async_trait::async_trait]
-        impl Module for SlowModule {
-            async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+        impl Gear for SlowGear {
+            async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
                 Ok(())
             }
         }
 
         #[async_trait::async_trait]
-        impl RunnableCapability for SlowModule {
+        impl RunnableCapability for SlowGear {
             async fn start(&self, _cancel: CancellationToken) -> anyhow::Result<()> {
                 Ok(())
             }
@@ -1339,21 +1330,21 @@ mod tests {
             }
         }
 
-        let module = Arc::new(SlowModule {
+        let gear = Arc::new(SlowGear {
             graceful_completed: AtomicBool::new(false),
             deadline_fired: AtomicBool::new(false),
         });
 
         let mut builder = RegistryBuilder::default();
-        builder.register_core_with_meta("test", &[], module.clone() as Arc<dyn Module>);
-        builder.register_stateful_with_meta("test", module.clone() as Arc<dyn RunnableCapability>);
+        builder.register_core_with_meta("test", &[], gear.clone() as Arc<dyn Gear>);
+        builder.register_stateful_with_meta("test", gear.clone() as Arc<dyn RunnableCapability>);
 
         let registry = builder.build_topo_sorted().unwrap();
         let client_hub = Arc::new(ClientHub::new());
         let cancel = CancellationToken::new();
         let config_provider: Arc<dyn ConfigProvider> = Arc::new(EmptyConfigProvider);
 
-        // Use a short deadline (100ms) - module should be interrupted by deadline
+        // Use a short deadline (100ms) - gear should be interrupted by deadline
         let runtime = HostRuntime::new(
             registry,
             config_provider,
@@ -1369,13 +1360,13 @@ mod tests {
 
         // Graceful shutdown should NOT have completed (deadline fired first)
         assert!(
-            !module.graceful_completed.load(Ordering::SeqCst),
+            !gear.graceful_completed.load(Ordering::SeqCst),
             "graceful shutdown should not complete when deadline fires first"
         );
         // Deadline should have fired
         assert!(
-            module.deadline_fired.load(Ordering::SeqCst),
-            "deadline should fire for slow modules"
+            gear.deadline_fired.load(Ordering::SeqCst),
+            "deadline should fire for slow gears"
         );
     }
 }

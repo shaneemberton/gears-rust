@@ -18,7 +18,7 @@ database:
       pool:
         max_conns: 5
 
-modules:
+gears:
   api-gateway:
     config:
       bind_addr: "127.0.0.1:8087"

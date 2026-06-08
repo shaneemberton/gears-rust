@@ -21,6 +21,6 @@
 
 pub mod config;
 pub mod domain;
-pub mod module;
+pub mod gear;
 
-pub use module::SingleTenantTrPlugin;
+pub use gear::SingleTenantTrPlugin;

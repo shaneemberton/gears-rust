@@ -1,8 +1,8 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 // === MODULE DEFINITION ===
-pub mod module;
-pub use module::MiniChatModule;
+pub mod gear;
+pub use gear::MiniChatGear;
 
 // === PLUGIN MODULES ===
 pub use infra::plugins::StaticMiniChatAuditPlugin;
@@ -19,6 +19,6 @@ pub mod domain;
 #[doc(hidden)]
 pub mod infra;
 
-/// Link-time GTS content shipped by the mini-chat module (permission
+/// Link-time GTS content shipped by the mini-chat gear (permission
 /// instances today; future content goes here too).
 pub(crate) mod gts;

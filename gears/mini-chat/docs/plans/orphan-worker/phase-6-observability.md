@@ -119,7 +119,7 @@ fn record_orphan_scan_duration_seconds(&self, seconds: f64) {
 }
 ```
 
-Add `REASON` constant to `key` module in `metric_labels.rs` if not already present:
+Add `REASON` constant to `key` gear in `metric_labels.rs` if not already present:
 ```rust
 pub const REASON: &str = "reason";
 ```

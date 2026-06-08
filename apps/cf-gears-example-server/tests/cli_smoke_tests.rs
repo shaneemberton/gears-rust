@@ -190,7 +190,7 @@ logging:
 
 // Note: test_cli_run_command_with_mock_database was removed because:
 // 1. The --mock flag doesn't exist in the cf-gears-server CLI
-// 2. All modules in registered_modules.rs are always linked, making it difficult
+// 2. All gears in registered_gears.rs are always linked, making it difficult
 //    to test server startup without all required features (e.g., SQLite)
 // 3. Other tests already cover CLI functionality adequately
 
@@ -342,7 +342,7 @@ server:
         eprintln!("STDOUT: {stdout}");
     }
 
-    // Should succeed even without database config (modules can run without DB)
+    // Should succeed even without database config (gears can run without DB)
     assert!(
         output.status.success(),
         "Should succeed without database config"
@@ -436,72 +436,68 @@ async fn test_cli_no_arguments() {
 }
 
 // ============================================================================
-// Tests for module configuration dump CLI flags
+// Tests for gear configuration dump CLI flags
 // ============================================================================
 
 #[test]
-fn test_cli_list_modules() {
+fn test_cli_list_gears() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config_path = temp_dir.path().join("test_config.yaml");
 
-    // Write configuration with multiple modules
+    // Write configuration with multiple gears
     let config_content = r#"
 database:
   servers:
     test_db:
       dsn: "sqlite::memory:"
 
-modules:
-  module_alpha:
+gears:
+  gear_alpha:
     config:
       enabled: true
-  module_beta:
+  gear_beta:
     config:
       enabled: false
-  module_gamma:
+  gear_gamma:
     config:
       setting: "value"
 "#;
 
     std::fs::write(&config_path, config_content).expect("Failed to write config file");
 
-    let output =
-        run_cf_gears_server(&["--config", config_path.to_str().unwrap(), "--list-modules"]);
+    let output = run_cf_gears_server(&["--config", config_path.to_str().unwrap(), "--list-gears"]);
 
-    assert!(
-        output.status.success(),
-        "List modules command should succeed"
-    );
+    assert!(output.status.success(), "List gears command should succeed");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // Should contain header
     assert!(
-        stdout.contains("Configured modules"),
-        "Should contain module list header"
+        stdout.contains("Configured gears"),
+        "Should contain gear list header"
     );
 
-    // Should list all modules in alphabetical order
-    assert!(stdout.contains("module_alpha"), "Should list module_alpha");
-    assert!(stdout.contains("module_beta"), "Should list module_beta");
-    assert!(stdout.contains("module_gamma"), "Should list module_gamma");
+    // Should list all gears in alphabetical order
+    assert!(stdout.contains("gear_alpha"), "Should list gear_alpha");
+    assert!(stdout.contains("gear_beta"), "Should list gear_beta");
+    assert!(stdout.contains("gear_gamma"), "Should list gear_gamma");
 
     // Verify alphabetical ordering
-    let alpha_pos = stdout.find("module_alpha").unwrap();
-    let beta_pos = stdout.find("module_beta").unwrap();
-    let gamma_pos = stdout.find("module_gamma").unwrap();
+    let alpha_pos = stdout.find("gear_alpha").unwrap();
+    let beta_pos = stdout.find("gear_beta").unwrap();
+    let gamma_pos = stdout.find("gear_gamma").unwrap();
     assert!(
         alpha_pos < beta_pos && beta_pos < gamma_pos,
-        "Modules should be in alphabetical order"
+        "Gears should be in alphabetical order"
     );
 }
 
 #[test]
-fn test_cli_list_modules_empty() {
+fn test_cli_list_gears_empty() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config_path = temp_dir.path().join("empty_config.yaml");
 
-    // Write configuration with no modules
+    // Write configuration with no gears
     let config_content = r#"
 database:
   servers:
@@ -511,27 +507,26 @@ database:
 
     std::fs::write(&config_path, config_content).expect("Failed to write config file");
 
-    let output =
-        run_cf_gears_server(&["--config", config_path.to_str().unwrap(), "--list-modules"]);
+    let output = run_cf_gears_server(&["--config", config_path.to_str().unwrap(), "--list-gears"]);
 
     assert!(
         output.status.success(),
-        "List modules command should succeed even with no modules"
+        "List gears command should succeed even with no gears"
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Configured modules") && stdout.contains("(0)"),
-        "Should indicate zero modules configured"
+        stdout.contains("Configured gears") && stdout.contains("(0)"),
+        "Should indicate zero gears configured"
     );
 }
 
 #[test]
-fn test_cli_dump_modules_config_yaml() {
+fn test_cli_dump_gears_config_yaml() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config_path = temp_dir.path().join("test_config.yaml");
 
-    // Write configuration with a module that has database
+    // Write configuration with a gear that has database
     let config_content = r#"
 database:
   servers:
@@ -542,8 +537,8 @@ database:
       password: "testpass"
       dbname: "testdb"
 
-modules:
-  test_module:
+gears:
+  test_gear:
     database:
       server: "test_db"
     config:
@@ -557,7 +552,7 @@ modules:
     let output = run_cf_gears_server(&[
         "--config",
         config_path.to_str().unwrap(),
-        "--dump-modules-config-yaml",
+        "--dump-gears-config-yaml",
     ]);
 
     assert!(output.status.success(), "Dump YAML command should succeed");
@@ -565,10 +560,7 @@ modules:
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // Should be valid YAML format
-    assert!(
-        stdout.contains("test_module:"),
-        "Should contain module name"
-    );
+    assert!(stdout.contains("test_gear:"), "Should contain gear name");
     assert!(stdout.contains("config:"), "Should contain config section");
     assert!(
         stdout.contains("my_setting: my_value"),
@@ -607,11 +599,11 @@ modules:
 }
 
 #[test]
-fn test_cli_dump_modules_config_json() {
+fn test_cli_dump_gears_config_json() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config_path = temp_dir.path().join("test_config.yaml");
 
-    // Write configuration with a module
+    // Write configuration with a gear
     let config_content = r#"
 database:
   servers:
@@ -622,8 +614,8 @@ database:
       password: "secret123"
       dbname: "testdb"
 
-modules:
-  test_module:
+gears:
+  test_gear:
     database:
       server: "test_db"
     config:
@@ -636,7 +628,7 @@ modules:
     let output = run_cf_gears_server(&[
         "--config",
         config_path.to_str().unwrap(),
-        "--dump-modules-config-json",
+        "--dump-gears-config-json",
     ]);
 
     assert!(output.status.success(), "Dump JSON command should succeed");
@@ -645,8 +637,8 @@ modules:
 
     // Should be valid JSON format
     assert!(
-        stdout.contains("\"test_module\""),
-        "Should contain module name in JSON"
+        stdout.contains("\"test_gear\""),
+        "Should contain gear name in JSON"
     );
     assert!(
         stdout.contains("\"config\""),
@@ -680,28 +672,25 @@ modules:
     if let Ok(json) = parsed {
         assert!(json.is_object(), "Root should be an object");
         let obj = json.as_object().unwrap();
-        assert!(
-            obj.contains_key("test_module"),
-            "Should have test_module key"
-        );
+        assert!(obj.contains_key("test_gear"), "Should have test_gear key");
     }
 }
 
 #[test]
-fn test_cli_dump_modules_config_multiple_modules() {
+fn test_cli_dump_gears_config_multiple_gears() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
-    let config_path = temp_dir.path().join("multi_module_config.yaml");
+    let config_path = temp_dir.path().join("multi_gear_config.yaml");
 
-    // Write configuration with multiple modules
+    // Write configuration with multiple gears
     let config_content = r#"
-modules:
-  module_one:
+gears:
+  gear_one:
     config:
       setting_one: "value1"
-  module_two:
+  gear_two:
     config:
       setting_two: "value2"
-  module_three:
+  gear_three:
     config:
       setting_three: "value3"
 "#;
@@ -711,29 +700,26 @@ modules:
     let output = run_cf_gears_server(&[
         "--config",
         config_path.to_str().unwrap(),
-        "--dump-modules-config-json",
+        "--dump-gears-config-json",
     ]);
 
-    assert!(output.status.success(), "Should handle multiple modules");
+    assert!(output.status.success(), "Should handle multiple gears");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Should be valid JSON");
-    let modules = parsed.as_object().expect("Should be an object");
+    let gears = parsed.as_object().expect("Should be an object");
 
-    // All modules should be present
-    assert_eq!(modules.len(), 3, "Should have all three modules");
-    assert!(modules.contains_key("module_one"), "Should have module_one");
-    assert!(modules.contains_key("module_two"), "Should have module_two");
-    assert!(
-        modules.contains_key("module_three"),
-        "Should have module_three"
-    );
+    // All gears should be present
+    assert_eq!(gears.len(), 3, "Should have all three gears");
+    assert!(gears.contains_key("gear_one"), "Should have gear_one");
+    assert!(gears.contains_key("gear_two"), "Should have gear_two");
+    assert!(gears.contains_key("gear_three"), "Should have gear_three");
 }
 
 #[test]
 fn test_cli_dump_flags_require_config() {
     // Test that dump flags fail gracefully without config
-    let output = run_cf_gears_server(&["--list-modules"]);
+    let output = run_cf_gears_server(&["--list-gears"]);
 
     // Should fail or show error about missing config
     // The actual behavior depends on whether config is optional

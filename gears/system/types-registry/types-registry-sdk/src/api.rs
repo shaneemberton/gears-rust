@@ -1,6 +1,6 @@
 //! `TypesRegistryClient` trait definition.
 //!
-//! This trait defines the public API for the `types-registry` module.
+//! This trait defines the public API for the `types-registry` gear.
 //! GTS type-schemas and instances are global resources, so no security context
 //! is required.
 
@@ -12,9 +12,9 @@ use uuid::Uuid;
 use crate::error::TypesRegistryError;
 use crate::models::{GtsInstance, GtsTypeSchema, InstanceQuery, RegisterResult, TypeSchemaQuery};
 
-/// Public API trait for the `types-registry` module.
+/// Public API trait for the `types-registry` gear.
 ///
-/// This trait can be consumed by other modules via `ClientHub`:
+/// This trait can be consumed by other gears via `ClientHub`:
 /// ```ignore
 /// let client = hub.get::<dyn TypesRegistryClient>()?;
 /// let schema = client.get_type_schema("gts.acme.core.events.user.v1~").await?;

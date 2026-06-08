@@ -16,8 +16,8 @@ use utoipa::ToSchema;
 use super::messages::SseRelay;
 use crate::api::rest::error::MiniChatChatError;
 use crate::domain::stream_events::StreamEvent;
+use crate::gear::AppServices;
 use crate::infra::db::entity::chat_turn::TurnState;
-use crate::module::AppServices;
 
 // ════════════════════════════════════════════════════════════════════════════
 // GET turn status

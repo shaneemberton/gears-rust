@@ -1,7 +1,7 @@
 """
 Mock HTTP server for E2E URL-based parsing tests.
 
-This module provides:
+This gear provide:
 - A simple HTTP server that serves static files and provides test endpoints
 - Automatic port detection and management
 - Docker/local mode detection

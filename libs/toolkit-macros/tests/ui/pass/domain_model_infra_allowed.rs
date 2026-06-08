@@ -1,6 +1,6 @@
 use toolkit_macros::domain_model;
 
-// Mock infra module to ensure the type resolves
+// Mock infra gear to ensure the type resolves
 mod infra {
     pub struct UserRepository;
 }

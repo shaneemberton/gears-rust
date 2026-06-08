@@ -1037,7 +1037,7 @@ multiple = false
 [[artifacts.UPSTREAM_REQS.headings]]
 id = "upstream-reqs-overview-requesting-modules"
 level = 3
-pattern = "Requesting Modules"
+pattern = "Requesting Gears"
 description = "Table of modules requesting this future module."
 required = true
 multiple = false

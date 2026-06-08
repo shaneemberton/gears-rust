@@ -87,9 +87,9 @@ One generic flow models how a domain failure surfaces from any AM feature's code
 
 **Steps**:
 
-> At every REST handler, SDK boundary, and inter-module ClientHub contract, the SecurityContext gate **MUST** run before any domain logic: a missing or invalid context short-circuits with the platform-standard auth error, so domain errors are never raised, classified, or mapped for unauthenticated callers.
+> At every REST handler, SDK boundary, and inter-gear ClientHub contract, the SecurityContext gate **MUST** run before any domain logic: a missing or invalid context short-circuits with the platform-standard auth error, so domain errors are never raised, classified, or mapped for unauthenticated callers.
 
-1. [ ] - `p1` - Validate caller's `SecurityContext` via `algo-security-context-gate` at the entry point (REST handler, SDK boundary, or inter-module ClientHub contract) before any domain logic executes - `inst-flow-errsurf-securitycontext-gate`
+1. [ ] - `p1` - Validate caller's `SecurityContext` via `algo-security-context-gate` at the entry point (REST handler, SDK boundary, or inter-gear ClientHub contract) before any domain logic executes - `inst-flow-errsurf-securitycontext-gate`
 2. [ ] - `p1` - Feature code path raises a domain error (e.g., `TenantHasChildren`, `PendingExists`, `IdPUnavailable`) - `inst-flow-errsurf-raise`
 3. [ ] - `p1` - Classify the domain error and map to Problem Details envelope via `algo-error-to-problem-mapping` - `inst-flow-errsurf-classify-and-map`
 4. [ ] - `p1` - Emit domain metric via `algo-metric-emission` using the appropriate metric family for the failure mode (e.g., `dependency_health`, `hierarchy_depth_exceedance`, `cross_tenant_denial`) - `inst-flow-errsurf-metric-emit`
@@ -156,7 +156,7 @@ One generic flow models how a domain failure surfaces from any AM feature's code
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-algo-errors-observability-audit-emission`
 
-**Input**: Audit event kind, actor attribution (`actor=<tenant-scoped-identity>` or `actor=system` for module-owned background transitions), tenant identity, and structured payload
+**Input**: Audit event kind, actor attribution (`actor=<tenant-scoped-identity>` or `actor=system` for gear-owned background transitions), tenant identity, and structured payload
 
 **Output**: Audit record persisted through the platform audit sink; no return value to the caller
 
@@ -179,7 +179,7 @@ One generic flow models how a domain failure surfaces from any AM feature's code
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-algo-errors-observability-security-context-gate`
 
-**Input**: Inbound request or inter-module invocation at an AM entry point (REST handler, SDK boundary, or ClientHub contract)
+**Input**: Inbound request or inter-gear invocation at an AM entry point (REST handler, SDK boundary, or ClientHub contract)
 
 **Output**: Either authorization to proceed into domain logic, or a short-circuit platform-standard auth rejection
 
@@ -202,7 +202,7 @@ One generic flow models how a domain failure surfaces from any AM feature's code
 
 **PR1 scope**: `DomainError` enum + `From<DomainError> for CanonicalError` (AIP-193 boundary mapping) ship in `domain/error.rs`. The RFC 9457 `Problem` envelope rendering at the REST handler boundary uses [`toolkit_canonical_errors::Problem`](../../../../../libs/toolkit-canonical-errors/) directly and arrives with the REST surface in a later PR.
 
-The module **MUST** map every domain failure to one of the AIP-193 canonical categories enumerated in PRD §5.8 / DESIGN §3.8 — `InvalidArgument`, `NotFound`, `FailedPrecondition`, `Aborted`, `AlreadyExists`, `PermissionDenied`, `ResourceExhausted`, `ServiceUnavailable`, `Unimplemented`, `Internal` — and **MUST NOT** mint AM-private categories or override the AIP-193 HTTP-status table. Fine-grained discriminators ride inside the canonical envelope as `reason` tokens on field/precondition/quota violations or in `resource_type` / `resource_name`. Unclassified domain errors **MUST** fall through to `CanonicalError::Internal` rather than leaking new public categories.
+The gear **MUST** map every domain failure to one of the AIP-193 canonical categories enumerated in PRD §5.8 / DESIGN §3.8 — `InvalidArgument`, `NotFound`, `FailedPrecondition`, `Aborted`, `AlreadyExists`, `PermissionDenied`, `ResourceExhausted`, `ServiceUnavailable`, `Unimplemented`, `Internal` — and **MUST NOT** mint AM-private categories or override the AIP-193 HTTP-status table. Fine-grained discriminators ride inside the canonical envelope as `reason` tokens on field/precondition/quota violations or in `resource_type` / `resource_name`. Unclassified domain errors **MUST** fall through to `CanonicalError::Internal` rather than leaking new public categories.
 
 The authoritative AIP-193 mapping is documented in [DESIGN.md §3.8 Error Codes Reference](../DESIGN.md#38-error-codes-reference); the table below records only the discriminators added or refined by this feature. Discriminators contributed by sibling features (tenant-hierarchy-management, mode-conversion, tenant-metadata, etc.) are documented in their own feature files.
 
@@ -218,7 +218,7 @@ The authoritative AIP-193 mapping is documented in [DESIGN.md §3.8 Error Codes 
 **Touches**:
 
 - Contract: RFC 9457 Problem schema in `account-management-v1.yaml`
-- Modules: every feature's error boundary; this DoD is consumed transitively
+- Gears: every feature's error boundary; this DoD is consumed transitively
 
 ### Observability Metric Catalog
 
@@ -226,7 +226,7 @@ The authoritative AIP-193 mapping is documented in [DESIGN.md §3.8 Error Codes 
 
 **PR1 scope**: metric-name constants (`AM_DEPENDENCY_HEALTH`, …, 11 total) live in `domain/metrics.rs` with no-op `emit_metric` shells; the cardinality guards and OTel meter-provider plumbing land alongside the observability port wiring in a later PR.
 
-The module **MUST** export the 7 domain-specific metric families required by PRD §5.9 (dependency health, metadata resolution, bootstrap lifecycle, tenant-retention, conversion lifecycle, hierarchy-depth threshold exceedance, cross-tenant denials) plus the `serializable_retry` operational family added by this FEATURE (8 families total in the catalog table below). Metric names **MUST** align with platform observability naming conventions; label sets **MUST** be documented and cardinality-guarded so no metric exposes unbounded per-tenant or per-user dimensions without an explicit hashing policy.
+The gear **MUST** export the 7 domain-specific metric families required by PRD §5.9 (dependency health, metadata resolution, bootstrap lifecycle, tenant-retention, conversion lifecycle, hierarchy-depth threshold exceedance, cross-tenant denials) plus the `serializable_retry` operational family added by this FEATURE (8 families total in the catalog table below). Metric names **MUST** align with platform observability naming conventions; label sets **MUST** be documented and cardinality-guarded so no metric exposes unbounded per-tenant or per-user dimensions without an explicit hashing policy.
 
 | Family ID | Canonical family name | Kind(s) | Allowed labels | Cardinality guard | SLO / alert class | Runbook linkage |
 |-----------|-----------------------|---------|----------------|-------------------|-------------------|-----------------|
@@ -251,9 +251,9 @@ The module **MUST** export the 7 domain-specific metric families required by PRD
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-dod-errors-observability-audit-contract`
 
-**PR1 scope**: `AuditActor` / `AuditEvent` / `AuditEventKind` shapes ship in the impl crate at `cf-gears-account-management::domain::audit` with `serde` `camelCase` wire format. The downstream public surface for these shapes is the `cf-gears-account-management-sdk` SDK crate (`account_management_sdk::audit`, exported once consumers stabilize); module-internal callers may import from the impl-crate path until the SDK re-exports land. The `AuditEmitter` runtime, sinks, and the per-call-site `emit_audit` invocations land with the audit-classifier set in a later PR.
+**PR1 scope**: `AuditActor` / `AuditEvent` / `AuditEventKind` shapes ship in the impl crate at `cf-gears-account-management::domain::audit` with `serde` `camelCase` wire format. The downstream public surface for these shapes is the `cf-gears-account-management-sdk` SDK crate (`account_management_sdk::audit`, exported once consumers stabilize); gear-internal callers may import from the impl-crate path until the SDK re-exports land. The `AuditEmitter` runtime, sinks, and the per-call-site `emit_audit` invocations land with the audit-classifier set in a later PR.
 
-The module **MUST** emit platform audit records for every AM-owned state-changing operation with actor identity and tenant identity preserved, and **MUST** emit `actor=system` records for the AM-owned background transitions enumerated in `nfr-audit-completeness` (bootstrap completion, conversion expiry, provisioning-reaper compensation, hard-delete / tenant-deprovision cleanup). Audit storage, retention, and tamper resistance are inherited platform controls and are **not** owned by AM.
+The gear **MUST** emit platform audit records for every AM-owned state-changing operation with actor identity and tenant identity preserved, and **MUST** emit `actor=system` records for the AM-owned background transitions enumerated in `nfr-audit-completeness` (bootstrap completion, conversion expiry, provisioning-reaper compensation, hard-delete / tenant-deprovision cleanup). Audit storage, retention, and tamper resistance are inherited platform controls and are **not** owned by AM.
 
 **Implements**:
 
@@ -262,13 +262,13 @@ The module **MUST** emit platform audit records for every AM-owned state-changin
 **Touches**:
 
 - Platform audit sink (inherited control)
-- Modules: bootstrap feature, conversion feature, retention jobs, hard-delete job
+- Gears: bootstrap feature, conversion feature, retention jobs, hard-delete job
 
 ### SecurityContext Gate at Every Entry Point
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-dod-errors-observability-security-context-gate`
 
-Every AM entry point (REST handler, SDK boundary, inter-module ClientHub contract) **MUST** require or propagate a validated platform `SecurityContext` before dispatching into domain logic. Bootstrap and internally-owned background jobs are exempt and **MUST** attach `actor=system` explicitly. AM **MUST NOT** validate bearer tokens, mint session credentials, or perform AuthZ evaluation — those are platform concerns inherited per DESIGN §4.2.
+Every AM entry point (REST handler, SDK boundary, inter-gear ClientHub contract) **MUST** require or propagate a validated platform `SecurityContext` before dispatching into domain logic. Bootstrap and internally-owned background jobs are exempt and **MUST** attach `actor=system` explicitly. AM **MUST NOT** validate bearer tokens, mint session credentials, or perform AuthZ evaluation — those are platform concerns inherited per DESIGN §4.2.
 
 **Implements**:
 
@@ -331,7 +331,7 @@ AM **MUST** inherit the platform core infrastructure SLA (target 99.9% uptime). 
 
 - [ ] `p2` - **ID**: `cpt-cf-account-management-dod-errors-observability-ops-metrics-treatment`
 
-The module **MUST** define which of the 8 documented metric families (the 7 PRD §5.9 domain-specific families plus `serializable_retry`) back SLO / alert rules and on-call escalation paths, and **MUST** provide the naming alignment contract with the platform metric catalog so downstream dashboards and alert-rule authoring can consume the families without renaming. The metric-catalog table in §5.2 is the authoritative source for the canonical metric-family names consumed by `algo-metric-emission`; sibling features' concrete emit instances (e.g., `bootstrap.attempts`, `bootstrap.outcome`) MUST reconcile against the name-alignment entries registered here. Specific alert rules, dashboard panels, and threshold values are deployment-specific and live outside this FEATURE; this DoD defines the integration surface, not the deployed alerts.
+The gear **MUST** define which of the 8 documented metric families (the 7 PRD §5.9 domain-specific families plus `serializable_retry`) back SLO / alert rules and on-call escalation paths, and **MUST** provide the naming alignment contract with the platform metric catalog so downstream dashboards and alert-rule authoring can consume the families without renaming. The metric-catalog table in §5.2 is the authoritative source for the canonical metric-family names consumed by `algo-metric-emission`; sibling features' concrete emit instances (e.g., `bootstrap.attempts`, `bootstrap.outcome`) MUST reconcile against the name-alignment entries registered here. Specific alert rules, dashboard panels, and threshold values are deployment-specific and live outside this FEATURE; this DoD defines the integration surface, not the deployed alerts.
 
 **Implements**:
 
@@ -345,7 +345,7 @@ The module **MUST** define which of the 8 documented metric families (the 7 PRD 
 
 - [ ] `p2` - **ID**: `cpt-cf-account-management-dod-errors-observability-vendor-licensing`
 
-AM **MUST** depend only on platform-approved open-source libraries reached through ToolKit (SeaORM, Axum, OpenTelemetry, and their transitive closures per the platform dependency policy). No proprietary or copyleft-licensed dependencies **MUST** be introduced at the module level. Vendor lock-in **MUST** remain scoped to the pluggable IdP provider contract, never to AM's own compile-time dependencies. An SBOM **MUST** be exported as part of the AM build and the license of every runtime dependency **MUST** appear on the platform allowlist.
+AM **MUST** depend only on platform-approved open-source libraries reached through ToolKit (SeaORM, Axum, OpenTelemetry, and their transitive closures per the platform dependency policy). No proprietary or copyleft-licensed dependencies **MUST** be introduced at the gear level. Vendor lock-in **MUST** remain scoped to the pluggable IdP provider contract, never to AM's own compile-time dependencies. An SBOM **MUST** be exported as part of the AM build and the license of every runtime dependency **MUST** appear on the platform allowlist.
 
 **Implements**:
 
@@ -365,7 +365,7 @@ AM **MUST** depend only on platform-approved open-source libraries reached throu
 - [ ] Public `Problem` responses never contain domain-diagnostic internals beyond the canonical envelope; unclassified errors return `CanonicalError::Internal` (HTTP 500) with a generic body while the full diagnostic is recoverable through the audit trail.
 - [ ] All 8 documented metric families (7 PRD §5.9 + `serializable_retry`) are emitted by AM at runtime; each family's label set is documented and cardinality-guarded; dashboards and alert rules can subscribe to them by platform-aligned canonical names.
 - [ ] `actor=system` audit records are emitted for bootstrap completion, conversion expiry, provisioning-reaper compensation, and hard-delete / tenant-deprovision cleanup; tenant-scoped audit records carry the caller's `SecurityContext` identity and tenant identity.
-- [ ] Every REST handler, SDK boundary, and inter-module ClientHub contract rejects or refuses to dispatch invocations without a valid `SecurityContext` before invoking domain logic; bootstrap and background jobs attach `actor=system` explicitly and are the only caller-less exemptions.
+- [ ] Every REST handler, SDK boundary, and inter-gear ClientHub contract rejects or refuses to dispatch invocations without a valid `SecurityContext` before invoking domain logic; bootstrap and background jobs attach `actor=system` explicitly and are the only caller-less exemptions.
 - [ ] Breaking changes to the OpenAPI `Problem` schema, SDK contract, or IdP integration trait are blocked by contract-version review; path-based versioning is enforced on published REST endpoints. A SemVer-check CI job diffs `account-management-v1.yaml`, the SDK contract crate, and the IdP integration trait file between tagged versions and fails the build if any existing field is removed or retyped, or any required field is added, without a new contract version header.
 - [ ] During a synthetic IdP outage, AM tenant reads, children listing, status reads, and metadata resolution continue to succeed while IdP-dependent operations fail cleanly with `CanonicalError::ServiceUnavailable` (HTTP 503).
 - [ ] A classification-mapping artifact enumerates every AM-persisted data category (tenant hierarchy, tenant mode, conversion-request state, opaque identity references, per-schema metadata) with its classification tier (Internal / Confidential / PII-adjacent / per-GTS-schema). A schema-migration lint fails if any AM-owned table gains a column that holds IdP-issued credentials or IdP-sourced profile PII.
@@ -376,7 +376,7 @@ AM **MUST** depend only on platform-approved open-source libraries reached throu
 
 The following concerns are explicitly **not** addressed by this FEATURE. Each is recorded so reviewers can distinguish intentional exclusion (author considered and excluded with reasoning) from accidental omission.
 
-- **UX / portal workflows** — *Not applicable.* AM exposes REST and SDK contracts only per DESIGN §4.1; the rendering of error envelopes and metric dashboards is a portal / operator-tooling concern outside the module.
+- **UX / portal workflows** — *Not applicable.* AM exposes REST and SDK contracts only per DESIGN §4.1; the rendering of error envelopes and metric dashboards is a portal / operator-tooling concern outside the gear.
 - **Audit storage, retention, tamper resistance, security-monitoring integration** — *Inherited platform controls* (DESIGN §4.1). This FEATURE only defines the emission contract; the sink is platform-owned.
 - **Dashboards and alert-rule authoring** — *Downstream / deployment-specific.* This FEATURE defines the metric catalog and the naming-alignment contract (`dod-ops-metrics-treatment`); which panels to show, which alert thresholds to set, and how to route paging is a deployment / SRE concern.
 - **Token validation, session renewal, federation, MFA** — *Inherited from platform AuthN.* AM trusts the normalized `SecurityContext` and never validates bearer tokens itself (DESIGN §4.2).

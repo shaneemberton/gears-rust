@@ -1,6 +1,6 @@
 //! GTS schema definitions for `AuthN` resolver plugins.
 //!
-//! This module defines the GTS type for `AuthN` resolver plugin instances.
+//! This gear defines the GTS type for `AuthN` resolver plugin instances.
 //! Plugins register instances of this type with the types-registry to be
 //! discovered by the gateway.
 

@@ -4,7 +4,7 @@ date: 2026-02-09
 decision-makers: Constructor Fabric Steering Committee
 ---
 
-# Component Architecture — Single Module with Trait-Based Service Isolation
+# Component Architecture — Single Gear with Trait-Based Service Isolation
 
 
 <!-- toc -->
@@ -14,13 +14,13 @@ decision-makers: Constructor Fabric Steering Committee
 - [Considered Options](#considered-options)
 - [Decision Outcome](#decision-outcome)
   - [Internal Services](#internal-services)
-  - [Module Structure](#module-structure)
+  - [Gear Structure](#gear-structure)
   - [Internal Communication](#internal-communication)
   - [Consequences](#consequences)
   - [Confirmation](#confirmation)
 - [Pros and Cons of the Options](#pros-and-cons-of-the-options)
   - [Multi-crate architecture](#multi-crate-architecture)
-  - [Single module with internal trait-based service isolation](#single-module-with-internal-trait-based-service-isolation)
+  - [Single gear with internal trait-based service isolation](#single-gear-with-internal-trait-based-service-isolation)
   - [Monolithic single-service design](#monolithic-single-service-design)
 - [More Information](#more-information)
 - [Related ADRs](#related-adrs)
@@ -31,13 +31,13 @@ decision-makers: Constructor Fabric Steering Committee
 
 **ID**: `cpt-cf-oagw-adr-component-architecture`
 
-**Superseded By**: Single-module implementation with internal trait-based service isolation (2026-02-17). The original multi-crate design was simplified during implementation to a single `oagw` crate with DDD-Light layering (`domain/infra/api`). The CP/DP separation is preserved as internal domain traits, not separate crates.
+**Superseded By**: Single-gear implementation with internal trait-based service isolation (2026-02-17). The original multi-crate design was simplified during implementation to a single `oagw` crate with DDD-Light layering (`domain/infra/api`). The CP/DP separation is preserved as internal domain traits, not separate crates.
 
 ## Context and Problem Statement
 
 OAGW is being designed as a greenfield project without existing code. We need to establish the architectural foundation for how components are organized and how separation of concerns is achieved.
 
-OAGW needs a component architecture that separates concerns between configuration management (Control Plane) and request processing (Data Plane) while remaining practical to implement within Gears' modular monolith architecture. The question is whether to use separate crates or a single module with internal isolation.
+OAGW needs a component architecture that separates concerns between configuration management (Control Plane) and request processing (Data Plane) while remaining practical to implement within Gears' modular monolith architecture. The question is whether to use separate crates or a single gear with internal isolation.
 
 **Key Requirements**:
 
@@ -58,12 +58,12 @@ OAGW needs a component architecture that separates concerns between configuratio
 ## Considered Options
 
 * Multi-crate architecture with separate `oagw-cp` and `oagw-dp` crates
-* Single module with internal trait-based service isolation
+* Single gear with internal trait-based service isolation
 * Monolithic single-service design (no CP/DP separation)
 
 ## Decision Outcome
 
-Chosen option: "Single module with internal trait-based service isolation", because it provides clean separation via Rust traits without the overhead of multi-crate dependency management.
+Chosen option: "Single gear with internal trait-based service isolation", because it provides clean separation via Rust traits without the overhead of multi-crate dependency management.
 
 The architecture uses two domain traits within a single `oagw` crate:
 
@@ -92,12 +92,12 @@ The architecture uses two domain traits within a single `oagw` crate:
 - **Dependencies**: `ControlPlaneService`, `AuthPluginRegistry`, `CredentialRepository`, `reqwest::Client`
 - **Endpoints**: `/api/oagw/v1/proxy/*`
 
-### Module Structure
+### Gear Structure
 
 ```text
 gears/system/oagw/
 ├── oagw-sdk/              # Public API: ServiceGatewayClientV1 trait, models, errors
-└── oagw/                  # Single module crate
+└── oagw/                  # Single gear crate
     └── src/
         ├── api/rest/      # Transport layer (handlers, routes, DTOs)
         ├── domain/        # Business logic (traits, models, errors)
@@ -111,7 +111,7 @@ All services communicate via in-process trait method calls. There is no inter-se
 
 - REST handlers call `ControlPlaneService` or `DataPlaneService` directly
 - `DataPlaneServiceImpl` holds an `Arc<dyn ControlPlaneService>` for config resolution
-- Services are wired together during ToolKit module initialization in `module.rs`
+- Services are wired together during ToolKit gear initialization in `gear.rs`
 
 ### Consequences
 
@@ -150,9 +150,9 @@ Three separate library crates (`oagw`, `oagw-cp`, `oagw-dp`) with shared `oagw-t
 * Bad, because slower iteration during development (cross-crate builds)
 * Bad, because microservice mode not needed for current scale
 
-**Not adopted**: The single-module approach provides the same testability and separation of concerns with less complexity. The trait boundaries are preserved, making future extraction straightforward if needed.
+**Not adopted**: The single-gear approach provides the same testability and separation of concerns with less complexity. The trait boundaries are preserved, making future extraction straightforward if needed.
 
-### Single module with internal trait-based service isolation
+### Single gear with internal trait-based service isolation
 
 Single `oagw` crate with `ControlPlaneService` and `DataPlaneService` traits.
 
@@ -178,7 +178,7 @@ No CP/DP separation; single crate with no CP/DP trait distinction — all logic 
 The CP/DP separation mirrors industry patterns (Envoy, Kong, Istio) where the control plane manages configuration and the data plane handles traffic. In OAGW's case, both run in-process but the trait boundary enables future separation.
 
 Related architectural patterns:
-- Gears ToolKit module conventions (single crate per module)
+- Gears ToolKit gear conventions (single crate per gear)
 - DDD-Light layering (`domain/infra/api`)
 
 ## Related ADRs
@@ -189,7 +189,7 @@ Related architectural patterns:
 
 ## References
 
-- Gears Toolkit framework documentation (module lifecycle and dependency injection)
+- Gears Toolkit framework documentation (gear lifecycle and dependency injection)
 - Gear patterns: `tenant_resolver`, `types_registry`
 
 ## Traceability

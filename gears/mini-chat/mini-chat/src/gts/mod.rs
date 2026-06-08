@@ -2,7 +2,7 @@
 //!
 //! Everything declared here reaches `types-registry` automatically through
 //! the process-wide `toolkit-gts` inventory — no registration code in
-//! [`crate::module::MiniChatModule::init`] is needed for entries below.
+//! [`crate::gear::MiniChatGear::init`] is needed for entries below.
 //!
 //! One file per content kind keeps this directory navigable as more GTS
 //! content accrues (permissions today; future candidates — audit-event

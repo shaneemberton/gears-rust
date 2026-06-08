@@ -2,7 +2,7 @@
 //! [`super::validate_tenant_name_via_gts`].
 //!
 //! Pin the documented failure-mode arms (mirrors the production
-//! module doc on `gts_validation.rs`):
+//! gear doc on `gts_validation.rs`):
 //!
 //! 1. Schema not registered (`TypesRegistryError::GtsTypeSchemaNotFound`):
 //!    * `validate_new_user_payload_via_gts` →

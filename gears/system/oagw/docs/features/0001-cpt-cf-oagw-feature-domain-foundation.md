@@ -10,7 +10,7 @@
   - [1.4 References](#14-references)
   - [1.5 Out of Scope](#15-out-of-scope)
 - [2. Actor Flows (CDSL)](#2-actor-flows-cdsl)
-  - [Module Bootstrap Flow](#module-bootstrap-flow)
+  - [Gear Bootstrap Flow](#gear-bootstrap-flow)
   - [GTS Type Provisioning Flow](#gts-type-provisioning-flow)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Database Migration Execution](#database-migration-execution)
@@ -22,7 +22,7 @@
   - [Implement Database Schema & Migrations](#implement-database-schema--migrations)
   - [Implement SeaORM Entities](#implement-seaorm-entities)
   - [Implement SDK Crate](#implement-sdk-crate)
-  - [Implement ToolKit Module Wiring](#implement-toolkit-module-wiring)
+  - [Implement ToolKit Gear Wiring](#implement-toolkit-gear-wiring)
   - [Implement GTS Type Provisioning](#implement-gts-type-provisioning)
   - [Implement DDD-Light Layering](#implement-ddd-light-layering)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
@@ -39,17 +39,17 @@
 
 ### 1.1 Overview
 
-Establish domain model entities, database schema, ToolKit module wiring, SDK crate, and GTS type provisioning for the OAGW module.
+Establish domain model entities, database schema, ToolKit gear wiring, SDK crate, and GTS type provisioning for the OAGW gear.
 
 ### 1.2 Purpose
 
-Foundation layer that all other OAGW features depend on. Provides the shared domain entities (Upstream, Route, Plugin, ServerConfig, Endpoint), all `oagw_*` database tables with migrations, the `oagw-sdk` public crate (`ServiceGatewayClientV1` trait, SDK models, errors), ToolKit module wiring, and GTS type registration.
+Foundation layer that all other OAGW features depend on. Provides the shared domain entities (Upstream, Route, Plugin, ServerConfig, Endpoint), all `oagw_*` database tables with migrations, the `oagw-sdk` public crate (`ServiceGatewayClientV1` trait, SDK models, errors), ToolKit gear wiring, and GTS type registration.
 
 ### 1.3 Actors
 
 | Actor | Role in Feature |
 |-------|-----------------|
-| `cpt-cf-oagw-actor-platform-operator` | Operates the module; configuration managed via this foundation |
+| `cpt-cf-oagw-actor-platform-operator` | Operates the gear; configuration managed via this foundation |
 | `cpt-cf-oagw-actor-types-registry` | Receives GTS schema/instance registrations during type provisioning |
 
 ### 1.4 References
@@ -72,32 +72,32 @@ Foundation layer that all other OAGW features depend on. Provides the shared dom
 
 ## 2. Actor Flows (CDSL)
 
-### Module Bootstrap Flow
+### Gear Bootstrap Flow
 
-- [x] `p1` - **ID**: `cpt-cf-oagw-flow-domain-module-bootstrap`
+- [x] `p1` - **ID**: `cpt-cf-oagw-flow-domain-gear-bootstrap`
 
 **Actor**: `cpt-cf-oagw-actor-platform-operator`
 
 **Success Scenarios**:
-- Module starts, migrations run, GTS types provisioned, local client registered, module ready to serve
+- Gear starts, migrations run, GTS types provisioned, local client registered, gear ready to serve
 
 **Error Scenarios**:
 - Migration failure (DB connection error, schema conflict)
 - GTS registration failure (types_registry unavailable)
 
 **Steps**:
-1. [x] - `p1` - Platform operator starts cf-gears-server with OAGW module enabled - `inst-boot-1`
-2. [x] - `p1` - ToolKit invokes OAGW `Module::init()` with application context - `inst-boot-2`
+1. [x] - `p1` - Platform operator starts cf-gears-server with OAGW gear enabled - `inst-boot-1`
+2. [x] - `p1` - ToolKit invokes OAGW `Gear::init()` with application context - `inst-boot-2`
 3. [x] - `p1` - Load `OagwConfig` from configuration file (fields defined in `cpt-cf-oagw-design-overview`) - `inst-boot-3`
 4. [x] - `p1` - DB: RUN all `oagw_*` migrations (SeaORM migrator) - `inst-boot-4`
 5. [x] - `p1` - **IF** migration fails - `inst-boot-5`
-   1. [x] - `p1` - Log error and **RETURN** module initialization failure - `inst-boot-5a`
+   1. [x] - `p1` - Log error and **RETURN** gear initialization failure - `inst-boot-5a`
 6. [x] - `p1` - Call GTS type provisioning: register all OAGW schemas and built-in instances - `inst-boot-6`
 7. [x] - `p1` - **IF** GTS registration fails - `inst-boot-7`
-   1. [x] - `p1` - Log error and **RETURN** module initialization failure - `inst-boot-7a`
+   1. [x] - `p1` - Log error and **RETURN** gear initialization failure - `inst-boot-7a`
 8. [x] - `p1` - Register `ServiceGatewayClientV1` local client in ClientHub - `inst-boot-8`
 9. [x] - `p1` - Register REST API routes via OperationBuilder - `inst-boot-9`
-10. [x] - `p1` - **RETURN** module initialized successfully - `inst-boot-10`
+10. [x] - `p1` - **RETURN** gear initialized successfully - `inst-boot-10`
 
 ### GTS Type Provisioning Flow
 
@@ -114,7 +114,7 @@ Foundation layer that all other OAGW features depend on. Provides the shared dom
 - Schema conflicts with existing registrations
 
 **Steps**:
-1. [x] - `p1` - OAGW module calls types_registry client to register schemas - `inst-gts-1`
+1. [x] - `p1` - OAGW gear calls types_registry client to register schemas - `inst-gts-1`
 2. [x] - `p1` - Register upstream schema: `gts.cf.core.oagw.upstream.v1~` - `inst-gts-2`
 3. [x] - `p1` - Register route schema: `gts.cf.core.oagw.route.v1~` - `inst-gts-3`
 4. [x] - `p1` - Register auth plugin schema: `gts.cf.core.oagw.auth_plugin.v1~` - `inst-gts-4`
@@ -128,7 +128,7 @@ Foundation layer that all other OAGW features depend on. Provides the shared dom
     1. [x] - `p1` - **RETURN** provisioning error with failed type identifier - `inst-gts-10a`
 11. [x] - `p1` - **RETURN** all types provisioned successfully - `inst-gts-11`
 
-> **Integration note**: types_registry calls use ToolKit default client timeout. No retry on failure — fail-fast during module startup. Operator must ensure types_registry is available before starting OAGW.
+> **Integration note**: types_registry calls use ToolKit default client timeout. No retry on failure — fail-fast during gear startup. Operator must ensure types_registry is available before starting OAGW.
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -215,7 +215,7 @@ Not applicable — the domain foundation feature establishes schema and wiring b
 The system **MUST** implement Rust domain model types for `Upstream`, `Route`, `Plugin`, `ServerConfig`, and `Endpoint` with all fields defined in `cpt-cf-oagw-design-domain-model`. Domain types **MUST** reside in the `domain/` layer and have no infrastructure dependencies.
 
 **Implements**:
-- `cpt-cf-oagw-flow-domain-module-bootstrap`
+- `cpt-cf-oagw-flow-domain-gear-bootstrap`
 - `cpt-cf-oagw-algo-domain-entity-validation`
 
 **Touches**:
@@ -228,7 +228,7 @@ The system **MUST** implement Rust domain model types for `Upstream`, `Route`, `
 The system **MUST** create SeaORM migrations that establish all `oagw_*` tables (`oagw_upstream`, `oagw_route`, `oagw_route_http_match`, `oagw_route_grpc_match`, `oagw_route_method`, `oagw_upstream_tag`, `oagw_route_tag`, `oagw_plugin`, `oagw_upstream_plugin`, `oagw_route_plugin`) with constraints, indexes, and cascading deletes per `cpt-cf-oagw-adr-storage-schema`. Migrations **MUST** run on PostgreSQL, MySQL, and SQLite.
 
 **Implements**:
-- `cpt-cf-oagw-flow-domain-module-bootstrap`
+- `cpt-cf-oagw-flow-domain-gear-bootstrap`
 - `cpt-cf-oagw-algo-domain-migration`
 
 **Touches**:
@@ -258,23 +258,23 @@ The system **MUST** implement the `oagw-sdk` crate with `ServiceGatewayClientV1`
 **Touches**:
 - Entities: `ServiceGatewayClientV1`, SDK models, `ServiceGatewayError`
 
-### Implement ToolKit Module Wiring
+### Implement ToolKit Gear Wiring
 
 - [x] `p1` - **ID**: `cpt-cf-oagw-dod-domain-toolkit-wiring`
 
-The system **MUST** implement `module.rs` with ToolKit `Module` trait, `config.rs` with `OagwConfig`, and lifecycle hooks (`init`, `start`). Module initialization **MUST** run migrations, provision GTS types, and register local client in ClientHub.
+The system **MUST** implement `gear.rs` with ToolKit `Gear` trait, `config.rs` with `OagwConfig`, and lifecycle hooks (`init`, `start`). gear initialization **MUST** run migrations, provision GTS types, and register local client in ClientHub.
 
 **Implements**:
-- `cpt-cf-oagw-flow-domain-module-bootstrap`
+- `cpt-cf-oagw-flow-domain-gear-bootstrap`
 
 **Touches**:
-- Entities: `OagwModule`, `OagwConfig`
+- Entities: `OagwGear`, `OagwConfig`
 
 ### Implement GTS Type Provisioning
 
 - [x] `p1` - **ID**: `cpt-cf-oagw-dod-domain-gts-provisioning`
 
-The system **MUST** implement `type_provisioning.rs` that registers all OAGW GTS schemas (`upstream.v1~`, `route.v1~`, `auth_plugin.v1~`, `guard_plugin.v1~`, `transform_plugin.v1~`) and built-in plugin instances with `types_registry` during module startup.
+The system **MUST** implement `type_provisioning.rs` that registers all OAGW GTS schemas (`upstream.v1~`, `route.v1~`, `auth_plugin.v1~`, `guard_plugin.v1~`, `transform_plugin.v1~`) and built-in plugin instances with `types_registry` during gear startup.
 
 **Implements**:
 - `cpt-cf-oagw-flow-domain-gts-provisioning`
@@ -289,7 +289,7 @@ The system **MUST** implement `type_provisioning.rs` that registers all OAGW GTS
 The system **MUST** establish the DDD-Light directory structure (`domain/`, `infra/`, `api/rest/`) per `cpt-cf-oagw-design-layers`. Domain layer **MUST** define repository traits (`UpstreamRepository`, `RouteRepository`, `PluginRepository`). Infrastructure layer **MUST** provide stub implementations. Domain layer **MUST NOT** depend on infrastructure.
 
 **Implements**:
-- `cpt-cf-oagw-flow-domain-module-bootstrap`
+- `cpt-cf-oagw-flow-domain-gear-bootstrap`
 - `cpt-cf-oagw-algo-domain-entity-validation`
 
 **Touches**:
@@ -303,8 +303,8 @@ The system **MUST** establish the DDD-Light directory structure (`domain/`, `inf
 - [x] Domain entity types compile and enforce field-level validation per `cpt-cf-oagw-algo-domain-entity-validation`
 - [x] `oagw-sdk` crate exports `ServiceGatewayClientV1` trait, all SDK model types, and `ServiceGatewayError`
 - [x] `oagw-sdk` crate compiles with no dependency on infrastructure or transport crates
-- [x] ToolKit module starts successfully and registers in cf-gears-server
-- [x] GTS schemas and built-in plugin instances are registered during module startup
+- [x] ToolKit gear starts successfully and registers in cf-gears-server
+- [x] GTS schemas and built-in plugin instances are registered during gear startup
 - [ ] Secure ORM scoping is enforced: all repository queries include tenant_id predicate or scoped join
 - [x] Repository traits are defined in domain layer with no infrastructure imports
 - [x] `cargo test` passes for all domain model unit tests and migration tests
@@ -314,7 +314,7 @@ The system **MUST** establish the DDD-Light directory structure (`domain/`, `inf
 - **Performance (PERF)**: Not applicable — this feature establishes schema and wiring only; no runtime hot paths or data processing. Performance-critical proxy paths belong to Feature 4.
 - **Security — Audit Trail (SEC-FDESIGN-005)**: Not applicable — audit logging is scoped to Feature 8 (Observability & Metrics). Foundation layer does not produce auditable user actions.
 - **Security — Data Protection (SEC-FDESIGN-004)**: Not applicable — OAGW does not store credentials directly; secret access is delegated to `cred_store` per `cpt-cf-oagw-design-dependencies`.
-- **Compliance (COMPL)**: Not applicable — internal infrastructure module with no regulatory or privacy obligations.
+- **Compliance (COMPL)**: Not applicable — internal infrastructure gear with no regulatory or privacy obligations.
 - **Usability (UX)**: Not applicable — no user interface; all interaction is programmatic via SDK or REST API (defined in Feature 2).
 - **Operations — Observability (OPS-FDESIGN-001)**: Not applicable — logging, metrics, and tracing are scoped to Feature 8 (Observability & Metrics). Foundation provides structural hooks only.
-- **Operations — Rollout (OPS-FDESIGN-004)**: Not applicable — schema migrations are forward-only and idempotent; re-running module init after partial failure safely resumes from the last unapplied migration.
+- **Operations — Rollout (OPS-FDESIGN-004)**: Not applicable — schema migrations are forward-only and idempotent; re-running gear init after partial failure safely resumes from the last unapplied migration.

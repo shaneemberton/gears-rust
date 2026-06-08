@@ -10,19 +10,19 @@ use tempfile::TempDir;
 use tokio::time::timeout;
 use toolkit_db::manager::DbManager;
 
-fn expected_sqlite_path(temp_dir: &TempDir, module: &str, file: &str) -> PathBuf {
-    temp_dir.path().join(module).join(file)
+fn expected_sqlite_path(temp_dir: &TempDir, gear: &str, file: &str) -> PathBuf {
+    temp_dir.path().join(gear).join(file)
 }
 
-/// Test race condition: two concurrent `get()` calls for the same module.
+/// Test race condition: two concurrent `get()` calls for the same gear.
 /// Both callers should succeed.
 #[tokio::test]
 #[cfg(feature = "sqlite")]
-async fn test_concurrent_get_same_module() {
+async fn test_concurrent_get_same_gear() {
     let file = format!("concurrent_same_{}.db", std::process::id());
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": file,
@@ -35,17 +35,17 @@ async fn test_concurrent_get_same_module() {
     let manager =
         Arc::new(DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap());
 
-    // Launch two concurrent get() calls for the same module
+    // Launch two concurrent get() calls for the same gear
     let manager1 = manager.clone();
     let manager2 = manager.clone();
 
-    let (result1, result2) = tokio::join!(manager1.get("test_module"), manager2.get("test_module"));
+    let (result1, result2) = tokio::join!(manager1.get("test_gear"), manager2.get("test_gear"));
 
     // Both should succeed
     let _db1 = result1.unwrap().expect("First call should return a db");
     let _db2 = result2.unwrap().expect("Second call should return a db");
 
-    let expected = expected_sqlite_path(&temp_dir, "test_module", &file);
+    let expected = expected_sqlite_path(&temp_dir, "test_gear", &file);
     assert!(
         expected.exists(),
         "Expected SQLite file at {}",
@@ -53,21 +53,21 @@ async fn test_concurrent_get_same_module() {
     );
 }
 
-/// Test concurrent `get()` calls for different modules.
+/// Test concurrent `get()` calls for different gears.
 #[tokio::test]
 #[cfg(feature = "sqlite")]
-async fn test_concurrent_get_different_modules() {
-    let file_a = format!("module_a_{}.db", std::process::id());
-    let file_b = format!("module_b_{}.db", std::process::id());
+async fn test_concurrent_get_different_gears() {
+    let file_a = format!("gear_a_{}.db", std::process::id());
+    let file_b = format!("gear_b_{}.db", std::process::id());
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "module_a": {
+        "gears": {
+            "gear_a": {
                 "database": {
                     "engine": "sqlite",
                     "file": file_a,
                 }
             },
-            "module_b": {
+            "gear_b": {
                 "database": {
                     "engine": "sqlite",
                     "file": file_b,
@@ -80,18 +80,18 @@ async fn test_concurrent_get_different_modules() {
     let manager =
         Arc::new(DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap());
 
-    // Launch concurrent get() calls for different modules
+    // Launch concurrent get() calls for different gears
     let manager1 = manager.clone();
     let manager2 = manager.clone();
 
-    let (result1, result2) = tokio::join!(manager1.get("module_a"), manager2.get("module_b"));
+    let (result1, result2) = tokio::join!(manager1.get("gear_a"), manager2.get("gear_b"));
 
     // Both should succeed
     let _db1 = result1.unwrap().expect("First call should return a db");
     let _db2 = result2.unwrap().expect("Second call should return a db");
 
-    let path_a = expected_sqlite_path(&temp_dir, "module_a", &file_a);
-    let path_b = expected_sqlite_path(&temp_dir, "module_b", &file_b);
+    let path_a = expected_sqlite_path(&temp_dir, "gear_a", &file_a);
+    let path_b = expected_sqlite_path(&temp_dir, "gear_b", &file_b);
     assert!(
         path_a.exists(),
         "Expected SQLite file at {}",
@@ -105,14 +105,14 @@ async fn test_concurrent_get_different_modules() {
     assert_ne!(path_a, path_b);
 }
 
-/// Test caching behavior: second call for same module should return cached handle.
+/// Test caching behavior: second call for same gear should return cached handle.
 #[tokio::test]
 #[cfg(feature = "sqlite")]
 async fn test_caching_behavior() {
     let file = format!("caching_test_{}.db", std::process::id());
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": file,
@@ -126,19 +126,19 @@ async fn test_caching_behavior() {
 
     // First call
     let _db1 = manager
-        .get("test_module")
+        .get("test_gear")
         .await
         .unwrap()
         .expect("First call should succeed");
 
     // Second call - should return cached db (exact sharing is an internal detail)
     let _db2 = manager
-        .get("test_module")
+        .get("test_gear")
         .await
         .unwrap()
         .expect("Second call should succeed");
 
-    let expected = expected_sqlite_path(&temp_dir, "test_module", &file);
+    let expected = expected_sqlite_path(&temp_dir, "test_gear", &file);
     assert!(
         expected.exists(),
         "Expected SQLite file at {}",
@@ -146,12 +146,12 @@ async fn test_caching_behavior() {
     );
 }
 
-/// Test behavior on unknown module.
+/// Test behavior on unknown gear.
 #[tokio::test]
-async fn test_unknown_module_behavior() {
+async fn test_unknown_gear_behavior() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "known_module": {
+        "gears": {
+            "known_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": format!("known_{}.db", std::process::id())
@@ -163,18 +163,18 @@ async fn test_unknown_module_behavior() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    // Request unknown module
-    let result = manager.get("unknown_module").await;
+    // Request unknown gear
+    let result = manager.get("unknown_gear").await;
 
     match result {
         Ok(None) => {
             // This is the expected behavior: no config = None return
         }
         Ok(Some(_)) => {
-            panic!("Expected None for unknown module, got Some(handle)");
+            panic!("Expected None for unknown gear, got Some(handle)");
         }
         Err(err) => {
-            panic!("Expected Ok(None) for unknown module, got error: {err:?}");
+            panic!("Expected Ok(None) for unknown gear, got error: {err:?}");
         }
     }
 }
@@ -183,14 +183,14 @@ async fn test_unknown_module_behavior() {
 #[tokio::test]
 async fn test_concurrent_mixed_scenarios() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "valid_module": {
+        "gears": {
+            "valid_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": format!("valid_{}.db", std::process::id())
                 }
             },
-            "invalid_module": {
+            "invalid_gear": {
                 "database": {
                     "engine": "sqlite",
                     "dsn": format!("sqlite:file:mixed_invalid_{}.db", std::process::id()),
@@ -204,35 +204,35 @@ async fn test_concurrent_mixed_scenarios() {
     let manager =
         Arc::new(DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap());
 
-    // Launch concurrent calls for valid and invalid modules
+    // Launch concurrent calls for valid and invalid gears
     let manager1 = manager.clone();
     let manager2 = manager.clone();
     let manager3 = manager.clone();
 
     let (result1, result2, result3) = tokio::join!(
-        manager1.get("valid_module"),
-        manager2.get("invalid_module"),
-        manager3.get("nonexistent_module")
+        manager1.get("valid_gear"),
+        manager2.get("invalid_gear"),
+        manager3.get("nonexistent_gear")
     );
 
-    // Valid module should succeed
+    // Valid gear should succeed
     assert!(result1.is_ok() && result1.as_ref().unwrap().is_some());
 
-    // Invalid module should fail with config conflict
+    // Invalid gear should fail with config conflict
     assert!(result2.is_err());
 
-    // Nonexistent module should return None
+    // Nonexistent gear should return None
     assert!(result3.is_ok() && result3.as_ref().unwrap().is_none());
 }
 
-/// Test performance: many concurrent requests for the same module.
+/// Test performance: many concurrent requests for the same gear.
 #[tokio::test]
 #[cfg(feature = "sqlite")]
 async fn test_concurrent_performance() {
     let file = format!("perf_test_{}.db", std::process::id());
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": file,
@@ -249,7 +249,7 @@ async fn test_concurrent_performance() {
     let mut tasks = Vec::new();
     for _ in 0..50 {
         let manager_clone = manager.clone();
-        let task = tokio::spawn(async move { manager_clone.get("test_module").await });
+        let task = tokio::spawn(async move { manager_clone.get("test_gear").await });
         tasks.push(task);
     }
 
@@ -268,7 +268,7 @@ async fn test_concurrent_performance() {
         assert!(result.as_ref().unwrap().is_some());
     }
 
-    let expected = expected_sqlite_path(&temp_dir, "test_module", &file);
+    let expected = expected_sqlite_path(&temp_dir, "test_gear", &file);
     assert!(
         expected.exists(),
         "Expected SQLite file at {}",
@@ -282,8 +282,8 @@ async fn test_concurrent_performance() {
 async fn test_cache_isolation_across_managers() {
     let file = format!("isolation_test_{}.db", std::process::id());
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": file,
@@ -299,10 +299,10 @@ async fn test_cache_isolation_across_managers() {
     let manager2 = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
     // Get dbs from both managers (separate caches are an internal detail).
-    let _db1 = manager1.get("test_module").await.unwrap().unwrap();
-    let _db2 = manager2.get("test_module").await.unwrap().unwrap();
+    let _db1 = manager1.get("test_gear").await.unwrap().unwrap();
+    let _db2 = manager2.get("test_gear").await.unwrap().unwrap();
 
-    let expected = expected_sqlite_path(&temp_dir, "test_module", &file);
+    let expected = expected_sqlite_path(&temp_dir, "test_gear", &file);
     assert!(
         expected.exists(),
         "Expected SQLite file at {}",
@@ -314,8 +314,8 @@ async fn test_cache_isolation_across_managers() {
 #[tokio::test]
 async fn test_errors_not_cached() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "bad_module": {
+        "gears": {
+            "bad_gear": {
                 "database": {
                     "dsn": format!("sqlite:file:error_test_{}.db", std::process::id()),
                     "host": "localhost"  // Conflict
@@ -328,11 +328,11 @@ async fn test_errors_not_cached() {
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
     // First call should fail
-    let result1 = manager.get("bad_module").await;
+    let result1 = manager.get("bad_gear").await;
     assert!(result1.is_err());
 
     // Second call should also fail (errors should not be cached)
-    let result2 = manager.get("bad_module").await;
+    let result2 = manager.get("bad_gear").await;
     assert!(result2.is_err());
 
     // Both should be the same type of error
@@ -349,8 +349,8 @@ async fn test_errors_not_cached() {
 #[cfg(feature = "sqlite")]
 async fn test_concurrent_slow_initialization() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "slow_module": {
+        "gears": {
+            "slow_gear": {
                 "database": {
                     "engine": "sqlite",
                     "file": format!("slow_test_{}.db", std::process::id()),
@@ -375,9 +375,9 @@ async fn test_concurrent_slow_initialization() {
     let start = std::time::Instant::now();
 
     let (result1, result2, result3) = tokio::join!(
-        manager1.get("slow_module"),
-        manager2.get("slow_module"),
-        manager3.get("slow_module")
+        manager1.get("slow_gear"),
+        manager2.get("slow_gear"),
+        manager3.get("slow_gear")
     );
 
     let elapsed = start.elapsed();

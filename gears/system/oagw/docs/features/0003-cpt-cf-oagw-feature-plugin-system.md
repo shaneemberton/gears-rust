@@ -433,7 +433,7 @@ The system **MUST** mark unlinked custom plugins with `gc_eligible_at = NOW() + 
 
 ### Auth Plugin Credential Resolution
 
-Auth plugins do not store credentials directly. At proxy request time, the auth plugin reads the `secret_ref` from `auth_config` (e.g., `cred://partner-openai-key`) and resolves it via `cred_store`. The `cred_store` module enforces tenant visibility — OAGW receives secret material only if the current tenant has access. If resolution fails, OAGW returns `401 AuthenticationFailed`.
+Auth plugins do not store credentials directly. At proxy request time, the auth plugin reads the `secret_ref` from `auth_config` (e.g., `cred://partner-openai-key`) and resolves it via `cred_store`. The `cred_store` gear enforces tenant visibility — OAGW receives secret material only if the current tenant has access. If resolution fails, OAGW returns `401 AuthenticationFailed`.
 
 ### Scope Boundaries
 
@@ -493,7 +493,7 @@ Plugin operations emit the following observability signals:
 | `oagw.plugin.starlark.timeout_ms` | `100` | 1–10000 | Maximum Starlark execution time per invocation (ms) |
 | `oagw.plugin.starlark.memory_mb` | `10` | 1–256 | Maximum Starlark memory per invocation (MB) |
 
-No spec flags are defined for this feature. All plugin functionality is always-on when the OAGW module is enabled.
+No spec flags are defined for this feature. All plugin functionality is always-on when the OAGW gear is enabled.
 
 ### Known Limitations
 

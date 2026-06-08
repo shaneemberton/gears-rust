@@ -34,8 +34,8 @@ Simple Resource Registry must work across diverse deployment targets — edge de
 * Platform vendors must be able to provide their own storage backends to bridge the registry to existing platform components
 * Multiple backends must coexist simultaneously — different resource types may live in different stores
 * Must align with the established ToolKit plugin pattern used across Gears
-* Plugin implementations must remain thin — security, authorization, and event emission are centralized in the main module
-* Must allow adding new backends without modifying the main module code
+* Plugin implementations must remain thin — security, authorization, and event emission are centralized in the main gear
+* Must allow adding new backends without modifying the main gear code
 
 ## Considered Options
 
@@ -49,7 +49,7 @@ Chosen option: "Plugin-based architecture with GTS-based discovery", because it 
 
 ### Consequences
 
-* Good, because vendors can implement custom backends to bridge existing platform storage without forking the module
+* Good, because vendors can implement custom backends to bridge existing platform storage without forking the gear
 * Good, because multiple backends coexist — relational DB for transactional workloads, search engines for full-text queries, vendor stores for existing data
 * Good, because the same API serves all backends — consumers are unaware of which backend stores their resources
 * Good, because aligns with ToolKit plugin pattern — consistent with other Gears
@@ -59,21 +59,21 @@ Chosen option: "Plugin-based architecture with GTS-based discovery", because it 
 
 ### Confirmation
 
-* Default relational DB plugin ships with the module and passes all acceptance criteria
+* Default relational DB plugin ships with the gear and passes all acceptance criteria
 * Plugin interface is versioned with major-version bumps for breaking changes
-* At least one alternative plugin (search engine) can be wired without modifying the main module
+* At least one alternative plugin (search engine) can be wired without modifying the main gear
 * Code review verifies that security logic (auth, tenant scoping, GTS type checks) is not duplicated in plugins
 
 ## Pros and Cons of the Options
 
 ### Single monolithic storage implementation
 
-One storage implementation compiled into the module; swap the entire implementation per deployment.
+One storage implementation compiled into the gear; swap the entire implementation per deployment.
 
 * Good, because simplest architecture — no plugin discovery, no routing, no trait indirection
 * Good, because all storage logic is co-located and easy to debug
 * Bad, because cannot support multiple backends simultaneously (e.g., relational DB + search engine)
-* Bad, because vendors cannot extend storage without forking the module
+* Bad, because vendors cannot extend storage without forking the gear
 * Bad, because swapping storage requires recompilation and deployment, not configuration
 
 ### Plugin-based architecture with GTS-based discovery
@@ -81,9 +81,9 @@ One storage implementation compiled into the module; swap the entire implementat
 Trait-based plugin interface (`ResourceStoragePluginClient`) with GTS-based plugin discovery via Types Registry and scoped ClientHub registration. Per-resource-type routing directs operations to the configured backend.
 
 * Good, because supports multi-backend coexistence through per-type routing
-* Good, because vendor-extensible — new backends are separate modules registered via GTS
+* Good, because vendor-extensible — new backends are separate gears registered via GTS
 * Good, because aligns with ToolKit plugin pattern (scoped clients, GTS instance IDs)
-* Good, because plugins are thin — main module handles auth, events, audit centrally
+* Good, because plugins are thin — main gear handles auth, events, audit centrally
 * Bad, because plugin interface is a long-term stability contract
 * Bad, because adds routing and discovery overhead per request
 * Bad, because each plugin must implement idempotency independently
@@ -94,7 +94,7 @@ Generic Rust trait for storage, but without GTS-based discovery or ClientHub reg
 
 * Good, because simpler than full plugin architecture — no GTS discovery overhead
 * Good, because compile-time safety for backend wiring
-* Bad, because cannot add new backends without recompiling the main module
+* Bad, because cannot add new backends without recompiling the main gear
 * Bad, because no runtime multi-backend coexistence
 * Bad, because does not align with ToolKit plugin pattern — inconsistent with platform conventions
 
@@ -103,7 +103,7 @@ Generic Rust trait for storage, but without GTS-based discovery or ClientHub reg
 The plugin architecture follows the standard ToolKit plugin pattern documented in `TOOLKIT_PLUGINS.md`:
 
 - Each plugin registers a GTS instance in Types Registry and a scoped client in ClientHub via `ClientScope::gts_id(&instance_id)`
-- The main module discovers plugins via GTS-based lookup and resolves the correct plugin per resource type through a routing configuration
+- The main gear discovers plugins via GTS-based lookup and resolves the correct plugin per resource type through a routing configuration
 - Plugin GTS instance ID pattern: `gts.cf.toolkit.plugins.plugin.v1~cf.core.simple_resource_registry.plugin.v1~<vendor>.<plugin_name>._.plugin.v1`
 
 ## Traceability

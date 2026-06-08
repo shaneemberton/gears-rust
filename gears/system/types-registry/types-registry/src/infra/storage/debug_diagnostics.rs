@@ -1,6 +1,6 @@
 //! Debug diagnostics for GTS entity registration failures.
 //!
-//! This module provides helper functions to emit debug-level logs when
+//! This gear provides helper functions to emit debug-level logs when
 //! GTS entity registration or validation fails. The logs include:
 //! - The complete entity content being registered
 //! - The schema chain for instance validation failures

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-//! GTS type system validation tests for Resource Group module (metadata approach).
+//! GTS type system validation tests for Resource Group gear (metadata approach).
 //!
 //! Validates the ADR-001 type architecture using the in-memory types-registry:
 //! - Base RG contract with x-gts-traits-schema, additionalProperties:false, metadata placeholder
@@ -641,7 +641,7 @@ async fn test_metadata_tenant_unknown_field_rejected() {
 async fn test_top_level_custom_field_passes_gts_but_app_layer_rejects() {
     // NOTE: Base contract is open model (no additionalProperties:false) because
     // GTS OP#12 compatibility check rejects derived schemas that loosen it.
-    // Top-level field isolation is enforced at the application layer (RG module),
+    // Top-level field isolation is enforced at the application layer (RG gear),
     // not at GTS level. GTS only validates metadata sub-object.
     let service = setup_rg_type_system();
     let instance = json!({
@@ -652,7 +652,7 @@ async fn test_top_level_custom_field_passes_gts_but_app_layer_rejects() {
         "depth": 0,
         "self_managed": true
     });
-    // GTS accepts (open model), RG module would strip/reject at app layer
+    // GTS accepts (open model), RG gear would strip/reject at app layer
     assert!(
         service.register(vec![instance])[0].is_ok(),
         "GTS accepts top-level extra fields (open model); app layer enforces isolation"

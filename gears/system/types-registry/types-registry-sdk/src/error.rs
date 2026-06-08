@@ -1,6 +1,6 @@
-//! Public error types for the `types-registry` module.
+//! Public error types for the `types-registry` gear.
 //!
-//! These errors are safe to expose to other modules and consumers. The
+//! These errors are safe to expose to other gears and consumers. The
 //! taxonomy is symmetric across kinds: every kind-specific failure gets a
 //! kind-specific variant (`*GtsTypeSchema*` vs `*GtsInstance*`) so callers
 //! can match on the variant they care about without parsing messages.

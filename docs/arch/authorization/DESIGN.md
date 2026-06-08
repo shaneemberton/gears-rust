@@ -27,9 +27,9 @@
 
 This document describes Gears' approach to authentication (AuthN) and authorization (AuthZ).
 
-**Authentication** verifies the identity of the subject making a request. Gears use the **AuthN Resolver** module to integrate with vendor's Identity Provider (IdP), validate access tokens, and extract subject identity into a `SecurityContext`.
+**Authentication** verifies the identity of the subject making a request. Gears use the **AuthN Resolver** gear to integrate with vendor's Identity Provider (IdP), validate access tokens, and extract subject identity into a `SecurityContext`.
 
-**Authorization** determines what the authenticated subject can do. Gears use the **AuthZ Resolver** module (acting as PDP) to obtain access decisions and query-level constraints. The core challenge: Gears need to enforce authorization at the **query level** (SQL WHERE clauses), not just perform point-in-time access checks.
+**Authorization** determines what the authenticated subject can do. Gears use the **AuthZ Resolver** gear (acting as PDP) to obtain access decisions and query-level constraints. The core challenge: Gears need to enforce authorization at the **query level** (SQL WHERE clauses), not just perform point-in-time access checks.
 
 See [ADR 0001](./ADR/0001-pdp-pep-authorization-model.md) for the authorization model and [ADR 0002](./ADR/0002-split-authn-authz-resolvers.md) for the rationale behind separating AuthN and AuthZ.
 
@@ -43,7 +43,7 @@ This document uses the PDP/PEP authorization model (per NIST SP 800-162):
 In Gears' architecture:
 - **AuthN Resolver** validates tokens and produces SecurityContext (separate concern from PDP)
 - **AuthZ Resolver** (via vendor-specific plugin) serves as the **PDP**
-- **Domain modules** act as **PEPs**, applying constraints to database queries
+- **Domain gears** act as **PEPs**, applying constraints to database queries
 
 ### Core Terms
 
@@ -86,35 +86,35 @@ PDP policies may rely on tenancy only (tenant-wide access) or combine it with su
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Module as Module AuthN Middleware
+    participant Gear as Gear AuthN Middleware
     participant AuthN as AuthN Resolver
-    participant Handler as Module Handler (PEP)
+    participant Handler as Gear Handler (PEP)
     participant AuthZ as AuthZ Resolver<br/>(PDP)
     participant DB as Database
 
-    Client->>Module: Request + Token
-    Module->>AuthN: Validate token
+    Client->>Gear: Request + Token
+    Gear->>AuthN: Validate token
     AuthN->>AuthN: Token validation or introspection
-    AuthN-->>Module: SecurityContext
-    Module->>Handler: Request + SecurityContext
+    AuthN-->>Gear: SecurityContext
+    Gear->>Handler: Request + SecurityContext
     Handler->>AuthZ: AuthZ Request<br/>(subject, action, resource, context)
     AuthZ->>AuthZ: Evaluate policies
     AuthZ-->>Handler: decision + constraints
     Handler->>Handler: Compile constraints to SQL
     Handler->>DB: Query with WHERE clauses
     DB-->>Handler: Filtered results
-    Handler-->>Module: Response
-    Module-->>Client: Response
+    Handler-->>Gear: Response
+    Gear-->>Client: Response
 ```
 
 **Separation of concerns:**
 1. **AuthN Middleware** — calls AuthN Resolver to validate token, produces `SecurityContext`
-2. **Module Handler (PEP)** — receives SecurityContext, builds AuthZ request, compiles constraints to SQL
+2. **Gear Handler (PEP)** — receives SecurityContext, builds AuthZ request, compiles constraints to SQL
 3. **AuthZ Resolver (PDP)** — evaluates policies, returns decision + constraints
 
-### AuthN Resolver and AuthZ Resolver: Module + Plugin Architecture
+### AuthN Resolver and AuthZ Resolver: Gear + Plugin Architecture
 
-Since IdP and PDP are vendor-specific, Gears cannot implement authentication and authorization directly. Instead, we use the **module + plugin** pattern with two separate resolvers:
+Since IdP and PDP are vendor-specific, Gears cannot implement authentication and authorization directly. Instead, we use the **gear + plugin** pattern with two separate resolvers:
 
 - **AuthN Resolver** — a Gear with plugins that defines a unified interface for authentication operations (token validation, introspection, SecurityContext production)
 - **AuthZ Resolver** — a Gear with plugins that defines a unified interface for authorization operations (PDP functionality, policy evaluation, constraint generation)
@@ -181,29 +181,29 @@ flowchart TB
 
     subgraph Gears
         subgraph TenantResolver["Tenant Resolver"]
-            TenantGW["Module"]
+            TenantGW["Gear"]
             TenantPlugin["Plugin"]
         end
 
         subgraph RGResolver["RG Resolver"]
-            RGGW["Module"]
+            RGGW["Gear"]
             RGPlugin["Plugin"]
         end
 
         subgraph AuthNResolver["AuthN Resolver"]
-            AuthNGW["Module"]
+            AuthNGW["Gear"]
             AuthNPlugin["Plugin<br/>(Token Validation)"]
         end
 
         subgraph AuthZResolver["AuthZ Resolver"]
-            AuthZGW["Module"]
+            AuthZGW["Gear"]
             AuthZPlugin["Plugin<br/>(PDP)"]
         end
 
-        subgraph PEP["Domain Module (PEP)"]
+        subgraph PEP["Domain Gear (PEP)"]
             AuthNMiddleware["AuthN Middleware"]
             Handler["Handler"]
-            subgraph ModuleDB["Module Database"]
+            subgraph GearDB["Gear Database"]
                 DomainTables["Domain Tables<br/>(events, ...)"]
                 LocalProj["Local Projections<br/>• tenant_closure<br/>• resource_group_closure"]
             end
@@ -232,20 +232,20 @@ flowchart TB
     %% PEP flow
     AuthNMiddleware -->|SecurityContext| Handler
     Handler -->|access evaluation| AuthZGW
-    Handler -->|constraints to SQL| ModuleDB
+    Handler -->|constraints to SQL| GearDB
 ```
 
 **Communication flow:**
-1. **AuthN Middleware → AuthN Resolver (Module)** — Middleware calls `authenticate(bearer_token)` to validate token and get `AuthenticationResult`
-2. **AuthN Resolver (Module) → AuthN Resolver (Plugin)** — Module delegates to vendor plugin
+1. **AuthN Middleware → AuthN Resolver (Gear)** — Middleware calls `authenticate(bearer_token)` to validate token and get `AuthenticationResult`
+2. **AuthN Resolver (Gear) → AuthN Resolver (Plugin)** — Gear delegates to vendor plugin
 3. **AuthN Resolver (Plugin) → IdP** — Token validation (JWT signature verification or introspection)
 4. **AuthN Middleware → Handler** — Middleware extracts `SecurityContext` from `AuthenticationResult` and passes to handler
-5. **Handler → AuthZ Resolver (Module)** — PEP calls `/access/v1/evaluation` for authorization decisions with `SecurityContext`
-6. **AuthZ Resolver (Module) → AuthZ Resolver (Plugin)** — Module delegates to vendor plugin (PDP)
+5. **Handler → AuthZ Resolver (Gear)** — PEP calls `/access/v1/evaluation` for authorization decisions with `SecurityContext`
+6. **AuthZ Resolver (Gear) → AuthZ Resolver (Plugin)** — Gear delegates to vendor plugin (PDP)
 7. **AuthZ Resolver (Plugin) → Authz Svc** — Policy evaluation
-8. **AuthZ Resolver (Plugin) → Tenant Resolver (Module)** — Tenant hierarchy queries
-9. **AuthZ Resolver (Plugin) → RG Resolver (Module)** — Group hierarchy and membership queries
-10. **Tenant/RG Resolver (Module) → Plugin → Vendor Service** — Module delegates to plugin, plugin syncs from vendor
+8. **AuthZ Resolver (Plugin) → Tenant Resolver (Gear)** — Tenant hierarchy queries
+9. **AuthZ Resolver (Plugin) → RG Resolver (Gear)** — Group hierarchy and membership queries
+10. **Tenant/RG Resolver (Gear) → Plugin → Vendor Service** — Gear delegates to plugin, plugin syncs from vendor
 
 ### Deployment Modes and Trust Model
 
@@ -265,11 +265,11 @@ Both AuthN Resolver and AuthZ Resolver can run in two deployment configurations:
 
 **Trust Boundaries:**
 
-In both modes, AuthZ Resolver (PDP) trusts subject identity data from PEP. The mTLS in out-of-process mode authenticates *which service* is calling, not the validity of subject claims. Subject identity originates from AuthN Resolver (Module) and flows through PEP to AuthZ Resolver.
+In both modes, AuthZ Resolver (PDP) trusts subject identity data from PEP. The mTLS in out-of-process mode authenticates *which service* is calling, not the validity of subject claims. Subject identity originates from AuthN Resolver (Gear) and flows through PEP to AuthZ Resolver.
 
 | Aspect | In-Process | Out-of-Process |
 |--------|------------|----------------|
-| Module → Plugin | implicit | mTLS |
+| Gear → Plugin | implicit | mTLS |
 | Subject identity trust | Same process | Authenticated caller |
 | Network exposure | none | internal network only |
 
@@ -367,26 +367,26 @@ api-gateway:
 
 ### Overview
 
-Authentication is performed by **AuthN middleware** within the module that accepts the request. The middleware:
+Authentication is performed by **AuthN middleware** within the gear that accepts the request. The middleware:
 1. Extracts the bearer token from the request
 2. Calls **AuthN Resolver** to do authentication
 3. Receives `AuthenticationResult` containing validated subject identity
-4. Passes the `SecurityContext` from `AuthenticationResult` to the module's handler (PEP)
+4. Passes the `SecurityContext` from `AuthenticationResult` to the gear's handler (PEP)
 
-Authentication is handled by the **AuthN Resolver** — a module with plugins and a minimalist interface that validates bearer tokens and produces `AuthenticationResult`.
+Authentication is handled by the **AuthN Resolver** — a gear with plugins and a minimalist interface that validates bearer tokens and produces `AuthenticationResult`.
 
-**Module Structure:**
+**Gear Structure:**
 
 - **authn-resolver-sdk** — SDK package containing:
-  - `AuthNResolverClient` trait (public API for other modules)
+  - `AuthNResolverClient` trait (public API for other gears)
   - `AuthNResolverPluginClient` trait (API for plugins)
   - `AuthenticationResult`, `SecurityContext` models
   - `AuthNResolverError` error types
 
-- **authn-resolver** — Main module that:
+- **authn-resolver** — Main gear that:
   - Implements `AuthNResolverClient` trait
   - Discovers and delegates to vendor-specific plugins via GTS types-registry
-  - Registers client in `ClientHub` for consumption by other modules
+  - Registers client in `ClientHub` for consumption by other gears
 
 **Public Client Interface:**
 
@@ -420,7 +420,7 @@ pub trait AuthNResolverPluginClient: Send + Sync {
 
 **Architecture:**
 - **AuthN Middleware** — Extracts bearer token from request headers
-- **AuthN Resolver (Module)** — Delegates to vendor-specific plugin
+- **AuthN Resolver (Gear)** — Delegates to vendor-specific plugin
 - **AuthN Resolver Plugin** — Implements token validation logic (JWT, introspection, custom protocols, etc.)
 - **Output** — `AuthenticationResult` containing `SecurityContext`
 
@@ -430,10 +430,10 @@ pub trait AuthNResolverPluginClient: Send + Sync {
 sequenceDiagram
     participant Client
     participant Middleware as AuthN Middleware
-    participant Resolver as AuthN Resolver<br/>(Module)
+    participant Resolver as AuthN Resolver<br/>(Gear)
     participant Plugin as AuthN Resolver<br/>(Plugin)
     participant IdP as Vendor's IdP
-    participant Handler as Module Handler (PEP)
+    participant Handler as Gear Handler (PEP)
 
     Client->>Middleware: Request + Bearer Token
     Middleware->>Middleware: Extract bearer_token from Authorization header
@@ -623,7 +623,7 @@ All operations (LIST, GET, UPDATE, DELETE) follow the same flow:
 ```mermaid
 sequenceDiagram
     participant Client
-    participant PEP as Module (PEP)
+    participant PEP as Gear (PEP)
     participant AuthZ as AuthZ Resolver (PDP)
     participant DB
 
@@ -718,7 +718,7 @@ Any caching implementation MUST satisfy:
 
 ### API Specifications
 
-> **Note on interface representation:** The Authentication section above uses Rust trait definitions to specify the AuthN Resolver interface, while this Authorization section uses JSON examples (REST API payloads). This is intentional — authorization request/response payloads are more verbose and complex, making JSON more readable for documentation purposes. The Rust trait interface for AuthZ Resolver will be specified in the AuthZ Resolver module design documentation.
+> **Note on interface representation:** The Authentication section above uses Rust trait definitions to specify the AuthN Resolver interface, while this Authorization section uses JSON examples (REST API payloads). This is intentional — authorization request/response payloads are more verbose and complex, making JSON more readable for documentation purposes. The Rust trait interface for AuthZ Resolver will be specified in the AuthZ Resolver gear design documentation.
 
 #### Access Evaluation API (AuthZEN-extended)
 
@@ -756,11 +756,11 @@ All **core entity identifiers** in the authorization API are **UUIDs**:
 | `resource_group_closure` keys | UUID | `ancestor_id`, `descendant_id` |
 | `resource_group_membership` keys | UUID | `resource_id`, `group_id` |
 
-**Domain-specific identifiers** (e.g., `topic_id`) are **exceptions** — they are structured string identifiers from the Global Type System (e.g., `gts.cf.core.events.topic.v1~`), not UUIDs. How a domain module stores GTS IDs internally is up to the module: either as a string as-is, or as a deterministic UUIDv5 computed from the GTS ID string. PDP may return GTS IDs in constraint values (e.g., `topic_id`); PEP is responsible for mapping them to the storage format used by the module.
+**Domain-specific identifiers** (e.g., `topic_id`) are **exceptions** — they are structured string identifiers from the Global Type System (e.g., `gts.cf.core.events.topic.v1~`), not UUIDs. How a domain gear stores GTS IDs internally is up to the gear: either as a string as-is, or as a deterministic UUIDv5 computed from the GTS ID string. PDP may return GTS IDs in constraint values (e.g., `topic_id`); PEP is responsible for mapping them to the storage format used by the gear.
 
 #### Request / Response Example
 
-**Scenario:** Event Broker module handles `GET /events?topic=some_topic` request. The handler:
+**Scenario:** Event Broker gear handles `GET /events?topic=some_topic` request. The handler:
 1. Receives `SecurityContext` from AuthN middleware
 2. Builds AuthZ request from SecurityContext + HTTP request params + handler config
 3. Sends to AuthZ Resolver (PDP)
@@ -792,7 +792,7 @@ Content-Type: application/json
 
   // Resource — handler sets type; id/properties from HTTP request
   "resource": {
-    "type": "gts.cf.core.events.event.v1~",               // handler: module's resource GTS type
+    "type": "gts.cf.core.events.event.v1~",               // handler: gear's resource GTS type
     "id": "e81307e5-5ee8-4c0a-8d1f-bd98a65c517e",   // URL path param (point ops only, absent for list)
     "properties": {
       "topic_id": "gts.cf.core.events.topic.v1~z.app._.some_topic.v1"  // from query param ?topic=...
@@ -811,7 +811,7 @@ Content-Type: application/json
 
     "token_scopes": ["read:events", "write:tasks"],  // SecurityContext.token_scopes
     "require_constraints": true,   // handler config: LIST requires constraints
-    "capabilities": ["tenant_hierarchy"],  // module config: has tenant_closure table
+    "capabilities": ["tenant_hierarchy"],  // gear config: has tenant_closure table
     "supported_properties": ["owner_tenant_id", "topic_id", "id", "owner_id"],  // handler config: properties PEP can map to SQL
     "bearer_token": "eyJhbGciOiJSUzI1NiIs..."  // SecurityContext.bearer_token: Secret<String> (optional, see notes below)
   }
@@ -1054,12 +1054,12 @@ All predicates filter resources based on their properties. The `resource_propert
 
 The Rust SQL compilation library supports **extensible predicate types**:
 
-- **Standard predicates** — Gears' built-in modules use only the standard predicates listed below (`eq`, `in`, `in_tenant_subtree`, `in_group`, `in_group_subtree`)
+- **Standard predicates** — Gears' built-in gears use only the standard predicates listed below (`eq`, `in`, `in_tenant_subtree`, `in_group`, `in_group_subtree`)
 - **Custom predicates** — Vendors can extend the system by:
   1. Registering new predicate types with the SQL compilation library
   2. Providing SQL compilation handlers for these predicates
   3. Returning custom predicates from their AuthZ Resolver Plugin (PDP)
-  4. Using custom predicates in their domain modules
+  4. Using custom predicates in their domain gears
 
 **Example use case:** A vendor with a custom geospatial authorization model could register a `within_geo_boundary` predicate type and implement its SQL compilation handler using PostGIS functions. Their PDP would return constraints like `{ "type": "within_geo_boundary", "resource_property": "location", "boundary": "...geojson..." }`, and the SQL compiler would generate the corresponding PostGIS query.
 
@@ -1201,7 +1201,7 @@ See [RESOURCE_GROUP_MODEL.md](./RESOURCE_GROUP_MODEL.md) for group data model de
 
 The PEP declares its supported properties in every authorization request via `context.supported_properties`. This field contains the list of property names that the PEP can map to SQL columns. The PDP uses this information to validate that returned constraints only reference properties the PEP can enforce.
 
-The `resource_property` in predicates corresponds to `resource.properties` in the request. Each module (PEP) defines a mapping from property names to physical SQL columns. PDP uses property names — **it doesn't know the database schema**.
+The `resource_property` in predicates corresponds to `resource.properties` in the request. Each gear (PEP) defines a mapping from property names to physical SQL columns. PDP uses property names — **it doesn't know the database schema**.
 
 #### Standard Properties
 
@@ -1215,7 +1215,7 @@ PEP maps these to entity columns via the `#[secure(...)]` macro:
 | `id` | Resource primary key (row-level access) | `resource_col = "column"` | Yes (or `no_resource`) |
 | `owner_id` | Subject who owns the resource (e.g. per-user filtering) | `owner_col = "column"` | Yes (or `no_owner`) |
 
-Modules may also declare custom properties via `pep_prop(property_name = "column")`.
+Gears may also declare custom properties via `pep_prop(property_name = "column")`.
 
 #### Example: Event Manager
 
@@ -1276,7 +1276,7 @@ Capabilities declare what predicate types the PEP can enforce locally:
 
 Do not add projections speculatively — each projection creates an additional database and synchronization load.
 
-`group_membership` and `group_hierarchy` capabilities are only available when the membership table is present in the PEP's database (RG module, monolith with shared DB, or an explicit projection). Domain services that choose **not** to project the table rely on PDP capability degradation — PDP expands group memberships to explicit resource IDs and returns `in` predicates.
+`group_membership` and `group_hierarchy` capabilities are only available when the membership table is present in the PEP's database (RG gear, monolith with shared DB, or an explicit projection). Domain services that choose **not** to project the table rely on PDP capability degradation — PDP expands group memberships to explicit resource IDs and returns `in` predicates.
 
 **Predicate type availability by capability:**
 
@@ -1297,7 +1297,7 @@ Do not add projections speculatively — each projection creates an additional d
 
 ### Table Schemas (Local Projections)
 
-These tables are maintained locally by CF/Gears (Tenant Resolver, Resource Group module) and used by PEPs to execute constraint queries efficiently without calling back to the vendor platform.
+These tables are maintained locally by CF/Gears (Tenant Resolver, Resource Group gear) and used by PEPs to execute constraint queries efficiently without calling back to the vendor platform.
 
 **Projectable to domain services:** `tenant_closure`, `resource_group`, `resource_group_closure`, `resource_group_membership` (progressively — see [Capabilities and Projection Tables](#capabilities-and-projection-tables) for guidance on when to project each table).
 
@@ -1314,7 +1314,7 @@ Denormalized closure table for tenant hierarchy. Enables efficient subtree queri
 
 **Notes:**
 - Status is denormalized into closure for query simplicity (avoids JOIN). When a tenant's status changes, all rows where it is `descendant_id` are updated.
-- **Provisioning exclusion:** `tenant_closure` never contains a row for a tenant in `provisioning` state. Closure rows are inserted on the `provisioning → active` transition (end of the tenant-create saga) and removed on hard-deletion; the `0=provisioning` code is therefore not a legal value for `tenant_closure.descendant_status` even though it is legal for `tenants.status`. The database-level enforcement point is `CHECK (descendant_status IN (1, 2, 3))` on the `tenant_closure` table — see [`gears/system/account-management/docs/migration.sql`](../../../gears/system/account-management/docs/migration.sql) for the constraint and column COMMENT, and [AM ADR-0007 — Exclude Provisioning Tenants from `tenant_closure`](../../../gears/system/account-management/docs/ADR/0007-cpt-cf-account-management-adr-provisioning-excluded-from-closure.md) for the decision rationale. Consumers of `tenant_closure` (Tenant Resolver Plugin today, business-module replicas later) therefore do **not** need a provisioning-specific filter — the invisibility is structural.
+- **Provisioning exclusion:** `tenant_closure` never contains a row for a tenant in `provisioning` state. Closure rows are inserted on the `provisioning → active` transition (end of the tenant-create saga) and removed on hard-deletion; the `0=provisioning` code is therefore not a legal value for `tenant_closure.descendant_status` even though it is legal for `tenants.status`. The database-level enforcement point is `CHECK (descendant_status IN (1, 2, 3))` on the `tenant_closure` table — see [`gears/system/account-management/docs/migration.sql`](../../../gears/system/account-management/docs/migration.sql) for the constraint and column COMMENT, and [AM ADR-0007 — Exclude Provisioning Tenants from `tenant_closure`](../../../gears/system/account-management/docs/ADR/0007-cpt-cf-account-management-adr-provisioning-excluded-from-closure.md) for the decision rationale. Consumers of `tenant_closure` (Tenant Resolver Plugin today, business-gear replicas later) therefore do **not** need a provisioning-specific filter — the invisibility is structural.
 - **Barrier semantics:** The `barrier` column is defined over the interval **`(ancestor, descendant]`** — the ancestor endpoint is excluded, the descendant endpoint is included (canonical definition in [TENANT_MODEL.md §Closure Table](./TENANT_MODEL.md#closure-table)). This means when T2 is self_managed, rows with `ancestor_id = T2` have `barrier = 0`, while rows with T2 on the path from another ancestor have `barrier = 1`.
 - The `barrier` column enables simple filtering: `barrier_mode: "all"` adds `AND barrier = 0`, `barrier_mode: "none"` omits the clause.
 - Self-referential rows exist: each tenant has a row where `ancestor_id = descendant_id`.
@@ -1355,8 +1355,8 @@ Association between resources and groups. A resource can belong to multiple grou
 | `group_id` | UUID | No | ID of the group (FK to resource_group_closure) |
 
 **Notes:**
-- The `resource_id` column joins with the resource table's ID column (configurable per module, default `id`).
-- **Predicate mapping:** `in_group` and `in_group_subtree` predicates use this table for the resource-to-group join. These predicates are only executable within the RG module; domain services receive degraded `in` predicates with explicit IDs instead.
+- The `resource_id` column joins with the resource table's ID column (configurable per gear, default `id`).
+- **Predicate mapping:** `in_group` and `in_group_subtree` predicates use this table for the resource-to-group join. These predicates are only executable within the RG gear; domain services receive degraded `in` predicates with explicit IDs instead.
 
 **Example query (in_group_subtree):**
 ```sql
@@ -1382,47 +1382,47 @@ For concrete examples demonstrating the authorization model in practice, see [AU
 
 ### Overview
 
-Platform modules communicate with each other outside the context of an HTTP request — inter-module calls, background processing, scheduled tasks. These interactions require a `SecurityContext` to pass through AuthZ. AuthN Resolver provides S2S authentication via the [OAuth 2.0 Client Credentials Grant (RFC 6749 §4.4)](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4) pattern.
+Platform gears communicate with each other outside the context of an HTTP request — inter-gear calls, background processing, scheduled tasks. These interactions require a `SecurityContext` to pass through AuthZ. AuthN Resolver provides S2S authentication via the [OAuth 2.0 Client Credentials Grant (RFC 6749 §4.4)](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4) pattern.
 
-A module presents its OAuth2 credentials (`client_id`, `client_secret`, optional `scopes`) to AuthN Resolver. The AuthN plugin exchanges them with the vendor's IdP and returns a validated `SecurityContext` — the same `AuthenticationResult` that `authenticate()` returns for bearer tokens.
+A gear presents its OAuth2 credentials (`client_id`, `client_secret`, optional `scopes`) to AuthN Resolver. The AuthN plugin exchanges them with the vendor's IdP and returns a validated `SecurityContext` — the same `AuthenticationResult` that `authenticate()` returns for bearer tokens.
 
 ### How It Works
 
 ```mermaid
 sequenceDiagram
-    participant Module as Calling Module
+    participant Gear as Calling Gear
     participant AuthN as AuthN Resolver
     participant Plugin as AuthN Plugin
     participant IdP as Vendor's IdP
 
-    Module->>AuthN: exchange_client_credentials(client_id, client_secret, scopes)
+    Gear->>AuthN: exchange_client_credentials(client_id, client_secret, scopes)
     AuthN->>Plugin: exchange_client_credentials(request)
     Plugin->>IdP: POST /token (client_credentials grant)
     IdP-->>Plugin: access_token + claims
     Plugin->>Plugin: Map IdP response → SecurityContext
     Plugin-->>AuthN: AuthenticationResult
-    AuthN-->>Module: SecurityContext
-    Module->>Module: Use SecurityContext for inter-module calls
+    AuthN-->>Gear: SecurityContext
+    Gear->>Gear: Use SecurityContext for inter-gear calls
 ```
 
-The calling module knows only its credentials. The plugin owns the token endpoint URL, OAuth2 flow, and identity mapping — analogous to how `authenticate()` accepts only the bearer token while JWKS URL is configured in the plugin or obtained from the IdP's `.well-known` endpoint for the issuer (it's up to the plugin to determine the correct endpoint).
+The calling gear knows only its credentials. The plugin owns the token endpoint URL, OAuth2 flow, and identity mapping — analogous to how `authenticate()` accepts only the bearer token while JWKS URL is configured in the plugin or obtained from the IdP's `.well-known` endpoint for the issuer (it's up to the plugin to determine the correct endpoint).
 
 The returned `SecurityContext` contains the same fields as for bearer token authentication.
 
 ### Relationship to AuthZ
 
-S2S `SecurityContext` flows through the standard AuthZ pipeline unchanged. The target module's PEP evaluates authorization with the S2S subject, PDP applies policies (potentially using `subject_type` for service-specific rules), and constraints are compiled to `AccessScope` as usual. No changes to AuthZ Resolver or PEP are required.
+S2S `SecurityContext` flows through the standard AuthZ pipeline unchanged. The target gear's PEP evaluates authorization with the S2S subject, PDP applies policies (potentially using `subject_type` for service-specific rules), and constraints are compiled to `AccessScope` as usual. No changes to AuthZ Resolver or PEP are required.
 
 ### Key Principles
 
-- **AuthN Resolver is the single owner of `SecurityContext`.** Modules do not construct `SecurityContext` directly. All identity mapping and OAuth2 logic is encapsulated in the plugin.
+- **AuthN Resolver is the single owner of `SecurityContext`.** Gears do not construct `SecurityContext` directly. All identity mapping and OAuth2 logic is encapsulated in the plugin.
 - **The platform does not issue tokens.** The plugin delegates to an external IdP and maps the response.
-- **Credentials and endpoints are separated.** Module configuration contains credentials; plugin configuration contains token endpoint / issuer URL.
+- **Credentials and endpoints are separated.** Gear configuration contains credentials; plugin configuration contains token endpoint / issuer URL.
 
 ### Future Extensions
 
 - **Token lifetime propagation** — Plugin communicates token expiry to enable caller-side caching with proper TTL
-- **Cached SecurityContext provider** — A wrapper that caches the `SecurityContext` and automatically refreshes it on expiry, so modules don't need to manage token lifecycle themselves
+- **Cached SecurityContext provider** — A wrapper that caches the `SecurityContext` and automatically refreshes it on expiry, so gears don't need to manage token lifecycle themselves
 
 ---
 
@@ -1436,7 +1436,7 @@ These questions require further design work.
 
 3. **Local projections sync** - How to keep projection tables (`tenant_closure`, `resource_group_closure`) in sync with vendor's source of truth? Possible approaches: event-based sync (requires event broker), CDC-based (Debezium-like), or periodic polling via Resolver APIs. Each has trade-offs in consistency, latency, and infrastructure complexity. Note: `resource_group_membership` projection is not recommended (see [Capabilities and Projection Tables](#capabilities-and-projection-tables)) but is not forbidden if the use case demands it.
 
-4. **Resource Group Service** - Should Gears have its own Resource Group Service, or is Resource Group Resolver (module bridging to vendor's service) sufficient? Having a Gears-native service has pros and cons. Needs design.
+4. **Resource Group Service** - Should Gears have its own Resource Group Service, or is Resource Group Resolver (gear bridging to vendor's service) sufficient? Having a Gears-native service has pros and cons. Needs design.
 
 5. **Authorization decision caching** - See [Authorization Decision Caching](#authorization-decision-caching) section for detailed open questions: cache key structure, cache-control protocol, invalidation strategy, token expiration handling.
 
@@ -1466,11 +1466,11 @@ These questions require further design work.
       - How do industry multi-tenant platforms (Azure AD Conditional Access, AWS IAM, Google Cloud IAP) handle MFA in the context of delegated authorization?
       - What is the interaction between MFA and token scopes? Should third-party apps be able to request MFA-elevated scopes?
 
-11. **S2S SecurityContext caching** — Modules may call `exchange_client_credentials()` frequently (on every background task iteration, on every inter-module call). Open questions:
+11. **S2S SecurityContext caching** — Gears may call `exchange_client_credentials()` frequently (on every background task iteration, on every inter-gear call). Open questions:
     - **TTL strategy** — What default TTL for cached `SecurityContext`? Static plugin has no token expiry (effectively infinite), production plugins depend on OAuth2 token TTL. Proposal: default 5 min, configurable.
     - **Cache identity** — If credentials and scopes remain request-level inputs, any S2S cache key must include at least `client_id`, normalized scopes, and a non-reversible credential fingerprint. `client_id` alone is insufficient because it can reuse the wrong token across scope or credential changes.
     - **`AuthenticationResult.expires_at`** — Should `AuthenticationResult` include an `expires_at: Option<DateTime>` field so the plugin can communicate token lifetime to the caller? This enables smart caller-side caching without hardcoded TTLs.
-    - **`S2sSecurityContextProvider`** — Should there be a standard cached wrapper in the SDK (`authn-resolver-sdk`) that modules use instead of calling `exchange_client_credentials()` directly? Design: ArcSwap-based cache with TTL from `expires_at`, automatic refresh on expiry.
+    - **`S2sSecurityContextProvider`** — Should there be a standard cached wrapper in the SDK (`authn-resolver-sdk`) that gears use instead of calling `exchange_client_credentials()` directly? Design: ArcSwap-based cache with TTL from `expires_at`, automatic refresh on expiry.
     - **Plugin-level caching** — Production plugins can reuse `toolkit-auth::oauth2::Token` handles with auto-refresh internally. Should this be a requirement or recommendation for plugin implementors?
     - **Cache invalidation** — When credentials are rotated, how does the cached `SecurityContext` get invalidated? Is TTL-based expiry sufficient, or do we need explicit invalidation?
 

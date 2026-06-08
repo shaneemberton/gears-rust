@@ -2,7 +2,7 @@
 //!
 //! Kept in a sibling `_tests.rs` file per the `de1101_tests_in_separate_files`
 //! repo lint. Linked into `error.rs` via `#[path = "error_tests.rs"] mod tests;`,
-//! so the module sees `error.rs` as `super`.
+//! so the gear sees `error.rs` as `super`.
 
 use std::time::Duration;
 

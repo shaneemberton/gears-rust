@@ -16,7 +16,7 @@ Focus only on **framework-specific compliance**, not generic Rust style.
 
 ## Authoritative reference
 
-When a change touches module layout, `@/lib/toolkit`*, plugins, REST wiring, ClientHub, OpenAPI, lifecycle/stateful tasks, SSE, or standardized HTTP errors, consult `docs/toolkit_unified_system/README.md` — the canonical ToolKit architecture document. Findings that contradict it take priority.
+When a change touches gear layout, `@/lib/toolkit`*, plugins, REST wiring, ClientHub, OpenAPI, lifecycle/stateful tasks, SSE, or standardized HTTP errors, consult `docs/toolkit_unified_system/README.md` — the canonical ToolKit architecture document. Findings that contradict it take priority.
 
 ---
 
@@ -40,7 +40,7 @@ Do not repeat generic Rust findings.
 # Severity
 
 CRITICAL – breaks framework security model or architecture invariants
-HIGH – breaks module architecture or integration contracts
+HIGH – breaks gear architecture or integration contracts
 MEDIUM – deviation from recommended ToolKit patterns
 LOW – minor style / best practice
 
@@ -48,42 +48,42 @@ LOW – minor style / best practice
 
 # Core Framework Invariants
 
-These rules apply to all modules.
+These rules apply to all gears.
 
 ---
 
 ## TOOLKIT-CORE-001: SDK Pattern Enforcement
 
-Public module APIs MUST be defined in `<module>-sdk` crates.
+Public gear APIs MUST be defined in `<gear>-sdk` crates.
 
 Check:
 
-- Traits used for inter-module communication are defined in the SDK crate
+- Traits used for inter-gear communication are defined in the SDK crate
 - Public models live in the SDK crate
 - Public error types live in the SDK crate
-- Consumers depend only on `<module>-sdk`
+- Consumers depend only on `<gear>-sdk`
 
 Violation examples:
 
-- Modules importing internal domain types from another module
+- Gears importing internal domain types from another gear
 - SDK leaking REST DTOs or database entities
-- Consumers depending on module implementation crate
+- Consumers depending on gear implementation crate
 
 Why it matters:
 
-ToolKit enforces transport-agnostic APIs and module isolation.
+ToolKit enforces transport-agnostic APIs and gear isolation.
 
 ---
 
-## TOOLKIT-CORE-002: Module Layout Compliance
+## TOOLKIT-CORE-002: Gear Layout Compliance
 
-Modules must follow the canonical structure.
+Gears must follow the canonical structure.
 
 Required structure:
 
 ```
 
-modules/<module>/ <module>-sdk/ <module>/
+gears/<gear>/ <gear>-sdk/ <gear>/
 api/rest
 domain
 infra
@@ -95,7 +95,7 @@ Check:
 - REST DTOs exist only under `api/rest/dto.rs`
 - Business logic lives in `domain/`
 - Storage adapters live in `infra/storage`
-- SDK types are not duplicated in the module crate
+- SDK types are not duplicated in the gear crate
 
 Why it matters:
 
@@ -103,14 +103,14 @@ Ensures separation of API, domain, and infrastructure.
 
 ---
 
-## TOOLKIT-CORE-003: Module Naming Convention
+## TOOLKIT-CORE-003: Gear Naming Convention
 
-Module names must be **kebab-case**.
+Gear names must be **kebab-case**.
 
 Check:
 
 - Folder names
-- `#[toolkit::module(name = "...")]`
+- `#[toolkit::gear(name = "...")]`
 
 Why it matters:
 
@@ -280,22 +280,22 @@ Database safety and migration discipline.
 
 ---
 
-# ClientHub and Modules
+# ClientHub and Gears
 
 ---
 
 ## TOOLKIT-CLIENT-001: ClientHub Resolution
 
-Modules must communicate via ClientHub.
+Gears must communicate via ClientHub.
 
 Check:
 
-- No direct module dependency calls
+- No direct gear dependency calls
 - Clients resolved via:
 
 ```
 
-ctx.client_hub().get::<dyn MyModuleApi>()
+ctx.client_hub().get::<dyn MyGearApi>()
 
 ```
 
@@ -303,11 +303,11 @@ ctx.client_hub().get::<dyn MyModuleApi>()
 
 ## TOOLKIT-CLIENT-002: Plugin Isolation
 
-Regular modules must not depend on plugin modules.
+Regular gears must not depend on plugin gears.
 
 Check:
 
-- Plugins accessed only via main module API
+- Plugins accessed only via main gear API
 - Scoped clients used for plugin resolution
 
 ---
@@ -342,18 +342,18 @@ Check:
 
 ---
 
-# Out-of-Process Modules
+# Out-of-Process Gears
 
 ---
 
 ## TOOLKIT-OOP-001: SDK Pattern for gRPC
 
-Out-of-process modules must expose API via SDK crate.
+Out-of-process gears must expose API via SDK crate.
 
 Check:
 
 - gRPC client defined in SDK
-- server implementation in module crate
+- server implementation in gear crate
 
 ---
 
@@ -361,8 +361,8 @@ Check:
 
 Be suspicious of:
 
-- modules accessing DB directly without SecureConn
-- modules calling other modules directly instead of ClientHub
+- gears accessing DB directly without SecureConn
+- gears calling other gears directly instead of ClientHub
 - REST handlers performing domain logic instead of delegating to services
 - DTO types leaking into SDK
 - entities leaking into REST
@@ -373,7 +373,7 @@ Be suspicious of:
 
 ToolKit prioritizes:
 
-- module isolation
+- gear isolation
 - transport-agnostic APIs
 - secure data access
 - explicit authorization

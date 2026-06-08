@@ -1,23 +1,23 @@
 //! `ToolKit` runtime runner.
 //!
 //! Supported DB modes:
-//!   - `DbOptions::None` — modules get no DB in their contexts.
-//!   - `DbOptions::Manager` — modules use `ModuleContextBuilder` to resolve per-module `DbHandles`.
+//!   - `DbOptions::None` — gears get no DB in their contexts.
+//!   - `DbOptions::Manager` — gears use `GearContextBuilder` to resolve per-gear `DbHandles`.
 //!
 //! Design notes:
-//! - We use **`ModuleContextBuilder`** to resolve per-module `DbHandles` at runtime.
+//! - We use **`GearContextBuilder`** to resolve per-gear `DbHandles` at runtime.
 //! - Phase order is orchestrated by `HostRuntime` (see `runtime/host_runtime.rs` docs).
-//! - Modules receive a fully-scoped `ModuleCtx` with a resolved Option<DbHandle>.
+//! - Gears receive a fully-scoped `GearCtx` with a resolved Option<DbHandle>.
 //! - Shutdown can be driven by OS signals, an external `CancellationToken`,
 //!   or an arbitrary future.
 //! - Pre-registered clients can be injected into the `ClientHub` via `RunOptions::clients`.
-//! - `OoP` modules are spawned after the start phase so that `grpc-hub` is already running
+//! - `OoP` gears are spawned after the start phase so that `grpc-hub` is already running
 //!   and the real directory endpoint is known.
 
 use crate::backends::OopBackend;
 use crate::client_hub::ClientHub;
 use crate::config::ConfigProvider;
-use crate::registry::ModuleRegistry;
+use crate::registry::GearRegistry;
 use crate::runtime::shutdown;
 use crate::runtime::{DbOptions, HostRuntime};
 use std::collections::HashMap;
@@ -29,7 +29,7 @@ use uuid::Uuid;
 /// A type-erased client registration for injecting clients into the `ClientHub`.
 ///
 /// This is used to pass pre-created clients (like gRPC clients) from bootstrap code
-/// into the runtime's `ClientHub` before modules are initialized.
+/// into the runtime's `ClientHub` before gears are initialized.
 pub struct ClientRegistration {
     /// Callback that registers the client into the hub.
     register_fn: Box<dyn FnOnce(&ClientHub) + Send>,
@@ -70,11 +70,11 @@ pub enum ShutdownOptions {
     Future(Pin<Box<dyn Future<Output = ()> + Send>>),
 }
 
-/// Configuration for a single `OoP` module to be spawned.
+/// Configuration for a single `OoP` gear to be spawned.
 #[derive(Clone)]
-pub struct OopModuleSpawnConfig {
-    /// Module name (e.g., "calculator")
-    pub module_name: String,
+pub struct OopGearSpawnConfig {
+    /// Gear name (e.g., "calculator")
+    pub gear_name: String,
     /// Path to the executable
     pub binary: PathBuf,
     /// Command-line arguments (user controls --config via execution.args in master config)
@@ -83,27 +83,27 @@ pub struct OopModuleSpawnConfig {
     pub env: HashMap<String, String>,
     /// Working directory for the process
     pub working_directory: Option<String>,
-    /// Rendered module config JSON (for `TOOLKIT_MODULE_CONFIG` env var)
+    /// Rendered gear config JSON (for `TOOLKIT_MODULE_CONFIG` env var)
     pub rendered_config_json: String,
 }
 
-/// Options for spawning `OoP` modules.
+/// Options for spawning `OoP` gears.
 pub struct OopSpawnOptions {
-    /// List of `OoP` modules to spawn after the start phase
-    pub modules: Vec<OopModuleSpawnConfig>,
-    /// Backend for spawning `OoP` modules (e.g., `LocalProcessBackend`)
+    /// List of `OoP` gears to spawn after the start phase
+    pub gears: Vec<OopGearSpawnConfig>,
+    /// Backend for spawning `OoP` gears (e.g., `LocalProcessBackend`)
     pub backend: Box<dyn OopBackend>,
 }
 
 /// Options for running the `ToolKit` runner.
 pub struct RunOptions {
-    /// Provider of module config sections (raw JSON by module name).
-    pub modules_cfg: Arc<dyn ConfigProvider>,
+    /// Provider of gear config sections (raw JSON by gear name).
+    pub gears_cfg: Arc<dyn ConfigProvider>,
     /// DB strategy: none, or `DbManager`.
     pub db: DbOptions,
     /// Shutdown strategy.
     pub shutdown: ShutdownOptions,
-    /// Pre-registered clients to inject into the `ClientHub` before module initialization.
+    /// Pre-registered clients to inject into the `ClientHub` before gear initialization.
     ///
     /// This is useful for `OoP` bootstrap where clients (like `DirectoryGrpcClient`)
     /// are created before calling `run()` and need to be available in the `ClientHub`.
@@ -111,15 +111,15 @@ pub struct RunOptions {
     /// Process-level instance ID.
     ///
     /// This is a unique identifier for this process instance, generated once at bootstrap
-    /// (either in `run_oop_with_options` for `OoP` modules or in the main host).
-    /// It is propagated to all modules via `ModuleCtx::instance_id()` and `SystemContext::instance_id()`.
+    /// (either in `run_oop_with_options` for `OoP` gears or in the main host).
+    /// It is propagated to all gears via `GearCtx::instance_id()` and `SystemContext::instance_id()`.
     pub instance_id: Uuid,
-    /// `OoP` module spawn configuration.
+    /// `OoP` gear spawn configuration.
     ///
-    /// These modules are spawned after the start phase, once `grpc-hub` is running
+    /// These gears are spawned after the start phase, once `grpc-hub` is running
     /// and the real directory endpoint is known.
     pub oop: Option<OopSpawnOptions>,
-    /// Maximum time allowed for each module's graceful shutdown before hard-stop.
+    /// Maximum time allowed for each gear's graceful shutdown before hard-stop.
     ///
     /// If `None`, uses `DEFAULT_SHUTDOWN_DEADLINE` (30 seconds).
     ///
@@ -176,8 +176,8 @@ pub async fn run(opts: RunOptions) -> anyhow::Result<()> {
         }
     }
 
-    // 3. Discover modules
-    let registry = ModuleRegistry::discover_and_build()?;
+    // 3. Discover gears
+    let registry = GearRegistry::discover_and_build()?;
 
     // 4. Build shared ClientHub
     let hub = Arc::new(ClientHub::default());
@@ -190,7 +190,7 @@ pub async fn run(opts: RunOptions) -> anyhow::Result<()> {
     // 5. Instantiate HostRuntime
     let mut host = HostRuntime::new(
         registry,
-        opts.modules_cfg.clone(),
+        opts.gears_cfg.clone(),
         opts.db,
         hub,
         cancel.clone(),
@@ -204,5 +204,5 @@ pub async fn run(opts: RunOptions) -> anyhow::Result<()> {
     }
 
     // 6. Run full lifecycle
-    host.run_module_phases().await
+    host.run_gear_phases().await
 }

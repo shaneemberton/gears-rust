@@ -1,6 +1,6 @@
 //! Typed `OData` query builder - re-exported from `toolkit-odata`
 //!
-//! This module re-exports the canonical `OData` query building functionality from `toolkit-odata`,
+//! This gear re-exports the canonical `OData` query building functionality from `toolkit-odata`,
 //! along with SDK-specific streaming utilities for cursor-based pagination.
 //!
 //! The SDK re-exports the canonical `QueryBuilder` from `toolkit-odata`.

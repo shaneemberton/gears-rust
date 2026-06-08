@@ -1,7 +1,7 @@
 // Updated: 2026-04-07 by Constructor Tech
 //! Cursor-based pagination with Stream API
 //!
-//! This module provides a reusable cursor-based pager that converts a page-fetching function
+//! This gear provides a reusable cursor-based pager that converts a page-fetching function
 //! into a Stream of pages or items, hiding cursor management from SDK users.
 //!
 //! # Example

@@ -98,7 +98,7 @@ impl Handler {  // ✅ does not trigger (this is not #[test] and not an inline m
 
 - Files ending with `_tests.rs`
 - Files under `tests/` directories
-- Modules listed in `excluded_paths` in `dylint.toml`
+- Gears listed in `excluded_paths` in `dylint.toml`
 
 ## Configuration
 
@@ -113,7 +113,7 @@ excluded_paths = [
 ]
 ```
 
-Each entry is a module path prefix (e.g. `libs/toolkit`, `gears/system/oagw`). Remove entries one by one as modules are migrated.
+Each entry is a module path prefix (e.g. `libs/toolkit`, `gears/system/oagw`). Remove entries one by one as gears are migrated.
 
 ## Relation to Rust Book Guidance
 

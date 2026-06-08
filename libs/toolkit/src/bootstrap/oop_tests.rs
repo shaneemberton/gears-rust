@@ -1,14 +1,14 @@
 //! Tests for `OoP` configuration merge logic
 //!
 //! Tests cover all merge scenarios:
-//! - Database: field-by-field merge (global.servers → module.database in master → module.database in local)
+//! - Database: field-by-field merge (global.servers → gear.database in master → gear.database in local)
 //! - Logging: key-by-key merge (local keys override master keys)
 //! - Config: full replacement (local replaces master if present)
 
 use super::*;
 use crate::bootstrap::config::{
     AppConfig, ConsoleFormat, GlobalDatabaseConfig, LoggingConfig, RenderedDbConfig,
-    RenderedModuleConfig, Section, SectionFile, ServerConfig, default_logging_config,
+    RenderedGearConfig, Section, SectionFile, ServerConfig, default_logging_config,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -80,7 +80,7 @@ mod logging_merge {
                 logging_section(Some(Level::INFO), "logs/master.log"),
             ),
             (
-                "module_a".to_owned(),
+                "gear_a".to_owned(),
                 logging_section(Some(Level::INFO), "logs/a-master.log"),
             ),
         ]
@@ -104,13 +104,13 @@ mod logging_merge {
             result.get("default").unwrap().file().unwrap(),
             "logs/local.log"
         );
-        // Master's module_a preserved
+        // Master's gear_a preserved
         assert_eq!(
-            result.get("module_a").unwrap().console_level,
+            result.get("gear_a").unwrap().console_level,
             Some(Level::INFO)
         );
         assert_eq!(
-            result.get("module_a").unwrap().file().unwrap(),
+            result.get("gear_a").unwrap().file().unwrap(),
             "logs/a-master.log"
         );
     }
@@ -125,7 +125,7 @@ mod logging_merge {
         .into();
 
         let local_logging: LoggingConfig = [(
-            "new_module".to_owned(),
+            "new_gear".to_owned(),
             logging_section(Some(Level::TRACE), "logs/new.log"),
         )]
         .into();
@@ -138,7 +138,7 @@ mod logging_merge {
             Some(Level::INFO)
         );
         assert_eq!(
-            result.get("new_module").unwrap().console_level,
+            result.get("new_gear").unwrap().console_level,
             Some(Level::TRACE)
         );
     }
@@ -358,7 +358,7 @@ mod database_merge {
         }
     }
 
-    fn create_module_db_config() -> DbConnConfig {
+    fn create_gear_db_config() -> DbConnConfig {
         DbConnConfig {
             engine: Some(toolkit_db::config::DbEngineCfg::Sqlite),
             server: Some("sqlite_main".to_owned()),
@@ -368,7 +368,7 @@ mod database_merge {
             user: None,
             password: None,
             dbname: None,
-            file: Some("module.db".to_owned()),
+            file: Some("gear.db".to_owned()),
             path: None,
             params: None,
             pool: None,
@@ -381,7 +381,7 @@ mod database_merge {
         let home_dir = std::env::temp_dir().join("toolkit_test_no_db");
         let local_config = minimal_app_config();
 
-        let result = build_merged_db_options(&home_dir, "test_module", None, &local_config);
+        let result = build_merged_db_options(&home_dir, "test_gear", None, &local_config);
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), DbOptions::None));
@@ -395,13 +395,13 @@ mod database_merge {
 
         let rendered_db = RenderedDbConfig::new(
             Some(create_global_db_config()),
-            Some(create_module_db_config()),
+            Some(create_gear_db_config()),
         );
 
         let local_config = minimal_app_config();
 
         let result =
-            build_merged_db_options(&home_dir, "test_module", Some(&rendered_db), &local_config);
+            build_merged_db_options(&home_dir, "test_gear", Some(&rendered_db), &local_config);
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), DbOptions::Manager(_)));
@@ -415,8 +415,8 @@ mod database_merge {
 
         let mut local_config = minimal_app_config();
         local_config.database = Some(create_global_db_config());
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "database": {
                     "server": "sqlite_main",
@@ -425,7 +425,7 @@ mod database_merge {
             }),
         );
 
-        let result = build_merged_db_options(&home_dir, "test_module", None, &local_config);
+        let result = build_merged_db_options(&home_dir, "test_gear", None, &local_config);
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), DbOptions::Manager(_)));
@@ -439,13 +439,13 @@ mod database_merge {
 
         let rendered_db = RenderedDbConfig::new(
             Some(create_global_db_config()),
-            Some(create_module_db_config()),
+            Some(create_gear_db_config()),
         );
 
         let mut local_config = minimal_app_config();
         // Local overrides pool.max_conns
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "database": {
                     "pool": {
@@ -456,7 +456,7 @@ mod database_merge {
         );
 
         let result =
-            build_merged_db_options(&home_dir, "test_module", Some(&rendered_db), &local_config);
+            build_merged_db_options(&home_dir, "test_gear", Some(&rendered_db), &local_config);
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), DbOptions::Manager(_)));
@@ -470,13 +470,13 @@ mod database_merge {
 
         let rendered_db = RenderedDbConfig::new(
             Some(create_global_db_config()),
-            Some(create_module_db_config()),
+            Some(create_gear_db_config()),
         );
 
         let mut local_config = minimal_app_config();
         // Local overrides file
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "database": {
                     "file": "local_override.db"
@@ -485,7 +485,7 @@ mod database_merge {
         );
 
         let result =
-            build_merged_db_options(&home_dir, "test_module", Some(&rendered_db), &local_config);
+            build_merged_db_options(&home_dir, "test_gear", Some(&rendered_db), &local_config);
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), DbOptions::Manager(_)));
@@ -499,13 +499,13 @@ mod database_merge {
 
         let rendered_db = RenderedDbConfig::new(
             Some(create_global_db_config()),
-            Some(create_module_db_config()),
+            Some(create_gear_db_config()),
         );
 
         let mut local_config = minimal_app_config();
         // Local adds new params
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "database": {
                     "params": {
@@ -516,7 +516,7 @@ mod database_merge {
         );
 
         let result =
-            build_merged_db_options(&home_dir, "test_module", Some(&rendered_db), &local_config);
+            build_merged_db_options(&home_dir, "test_gear", Some(&rendered_db), &local_config);
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), DbOptions::Manager(_)));
@@ -530,7 +530,7 @@ mod database_merge {
 
         let rendered_db = RenderedDbConfig::new(
             Some(create_global_db_config()),
-            Some(create_module_db_config()),
+            Some(create_gear_db_config()),
         );
 
         let mut local_config = minimal_app_config();
@@ -559,7 +559,7 @@ mod database_merge {
         });
 
         let result =
-            build_merged_db_options(&home_dir, "test_module", Some(&rendered_db), &local_config);
+            build_merged_db_options(&home_dir, "test_gear", Some(&rendered_db), &local_config);
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), DbOptions::Manager(_)));
@@ -583,8 +583,8 @@ mod full_oop_config {
             logging_section(Some(Level::DEBUG), "logs/standalone.log"),
         )]
         .into();
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "config": {
                     "setting": "local_value"
@@ -592,14 +592,14 @@ mod full_oop_config {
             }),
         );
 
-        let result = build_oop_config_and_db(&local_config, "test_module", None);
+        let result = build_oop_config_and_db(&local_config, "test_gear", None);
 
         assert!(result.is_ok());
         let (final_config, merged_logging, db_options) = result.unwrap();
 
         // Config should be from local
-        let module_config = final_config.modules.get("test_module").unwrap();
-        assert_eq!(module_config["config"]["setting"], "local_value");
+        let gear_config = final_config.gears.get("test_gear").unwrap();
+        assert_eq!(gear_config["config"]["setting"], "local_value");
 
         // Logging should be from local
         assert_eq!(merged_logging.len(), 1);
@@ -617,7 +617,7 @@ mod full_oop_config {
         // With rendered config from master
         let local_config = minimal_app_config();
 
-        let rendered = RenderedModuleConfig {
+        let rendered = RenderedGearConfig {
             database: None,
             config: json!({"master_setting": "value"}),
             logging: Some(
@@ -630,14 +630,14 @@ mod full_oop_config {
             opentelemetry: None,
         };
 
-        let result = build_oop_config_and_db(&local_config, "test_module", Some(&rendered));
+        let result = build_oop_config_and_db(&local_config, "test_gear", Some(&rendered));
 
         assert!(result.is_ok());
         let (final_config, merged_logging, _) = result.unwrap();
 
         // Config should be from master (local has no config section)
-        let module_config = final_config.modules.get("test_module").unwrap();
-        assert_eq!(module_config["config"]["master_setting"], "value");
+        let gear_config = final_config.gears.get("test_gear").unwrap();
+        assert_eq!(gear_config["config"]["master_setting"], "value");
 
         // Logging from master
         assert_eq!(
@@ -650,8 +650,8 @@ mod full_oop_config {
     fn test_build_oop_config_local_overrides_master_config() {
         // Local config section completely replaces master
         let mut local_config = minimal_app_config();
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "config": {
                     "local_setting": "local_value"
@@ -659,7 +659,7 @@ mod full_oop_config {
             }),
         );
 
-        let rendered = RenderedModuleConfig {
+        let rendered = RenderedGearConfig {
             database: None,
             config: json!({
                 "master_setting": "master_value",
@@ -669,16 +669,16 @@ mod full_oop_config {
             opentelemetry: None,
         };
 
-        let result = build_oop_config_and_db(&local_config, "test_module", Some(&rendered));
+        let result = build_oop_config_and_db(&local_config, "test_gear", Some(&rendered));
 
         assert!(result.is_ok());
         let (final_config, _, _) = result.unwrap();
 
         // Config should be from LOCAL (full replacement)
-        let module_config = final_config.modules.get("test_module").unwrap();
-        assert_eq!(module_config["config"]["local_setting"], "local_value");
+        let gear_config = final_config.gears.get("test_gear").unwrap();
+        assert_eq!(gear_config["config"]["local_setting"], "local_value");
         // Master's settings should NOT be present
-        assert!(module_config["config"].get("master_setting").is_none());
+        assert!(gear_config["config"].get("master_setting").is_none());
     }
 
     #[test]
@@ -697,7 +697,7 @@ mod full_oop_config {
         ]
         .into();
 
-        let rendered = RenderedModuleConfig {
+        let rendered = RenderedGearConfig {
             database: None,
             config: json!({}),
             logging: Some(
@@ -716,7 +716,7 @@ mod full_oop_config {
             opentelemetry: None,
         };
 
-        let result = build_oop_config_and_db(&local_config, "test_module", Some(&rendered));
+        let result = build_oop_config_and_db(&local_config, "test_gear", Some(&rendered));
 
         assert!(result.is_ok());
         let (_, merged_logging, _) = result.unwrap();
@@ -751,55 +751,55 @@ mod full_oop_config {
     fn test_build_oop_config_empty_local_config_section() {
         // When local has empty config section (null), use master's
         let mut local_config = minimal_app_config();
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "config": null
             }),
         );
 
-        let rendered = RenderedModuleConfig {
+        let rendered = RenderedGearConfig {
             database: None,
             config: json!({"master_setting": "value"}),
             logging: None,
             opentelemetry: None,
         };
 
-        let result = build_oop_config_and_db(&local_config, "test_module", Some(&rendered));
+        let result = build_oop_config_and_db(&local_config, "test_gear", Some(&rendered));
 
         assert!(result.is_ok());
         let (final_config, _, _) = result.unwrap();
 
         // Config should be from master since local is null
-        let module_config = final_config.modules.get("test_module").unwrap();
-        assert_eq!(module_config["config"]["master_setting"], "value");
+        let gear_config = final_config.gears.get("test_gear").unwrap();
+        assert_eq!(gear_config["config"]["master_setting"], "value");
     }
 
     #[test]
     fn test_build_oop_config_no_config_section_in_local() {
         // When local has no config section at all, use master's
         let mut local_config = minimal_app_config();
-        local_config.modules.insert(
-            "test_module".to_owned(),
+        local_config.gears.insert(
+            "test_gear".to_owned(),
             json!({
                 "database": {}  // has database but no config
             }),
         );
 
-        let rendered = RenderedModuleConfig {
+        let rendered = RenderedGearConfig {
             database: None,
             config: json!({"master_setting": "value"}),
             logging: None,
             opentelemetry: None,
         };
 
-        let result = build_oop_config_and_db(&local_config, "test_module", Some(&rendered));
+        let result = build_oop_config_and_db(&local_config, "test_gear", Some(&rendered));
 
         assert!(result.is_ok());
         let (final_config, _, _) = result.unwrap();
 
         // Config should be from master
-        let module_config = final_config.modules.get("test_module").unwrap();
-        assert_eq!(module_config["config"]["master_setting"], "value");
+        let gear_config = final_config.gears.get("test_gear").unwrap();
+        assert_eq!(gear_config["config"]["master_setting"], "value");
     }
 }

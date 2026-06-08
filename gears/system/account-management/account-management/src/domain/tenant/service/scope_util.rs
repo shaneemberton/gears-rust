@@ -68,7 +68,7 @@ use toolkit_security::{AccessScope, InTenantSubtreeScopeFilter, ScopeConstraint,
 ///
 /// Intended as a service-layer-only transformation on the
 /// PDP-emitted scope, applied only to the *enumeration* / *fallback
-/// lookup* sub-query of an identity-level read. See the module-level
+/// lookup* sub-query of an identity-level read. See the gear-level
 /// docs for why this must not be expressed as a PDP-side
 /// `BarrierMode::Ignore`.
 #[must_use]

@@ -8,7 +8,7 @@ decision-makers: Constructor Fabric Steering Committee
 
 ## Context and Problem Statement
 
-Gears model its tenants hierarchically. Modules rely on that hierarchy for ownership scoping, subtree queries in the Secure ORM, barrier enforcement, and resolution of "act as" semantics in service-to-service (S2S) flows. Before committing to a particular shape we must choose the canonical topology and record the reasoning.
+Gears model its tenants hierarchically. Gears rely on that hierarchy for ownership scoping, subtree queries in the Secure ORM, barrier enforcement, and resolution of "act as" semantics in service-to-service (S2S) flows. Before committing to a particular shape we must choose the canonical topology and record the reasoning.
 
 Three shapes were considered:
 
@@ -26,7 +26,7 @@ The choice affects several concrete engineering concerns:
 
 - **S2S tenant-scoped OAuth client management** — Minimize the number of OAuth clients required at the vendor IdP for flows that need to act as the top-level tenant.
 - **Unambiguous "act as root" semantics** — There must be exactly one tenant the platform can address as "the root".
-- **Operator mental model** — The topology should be easy to reason about for both platform operators and module authors.
+- **Operator mental model** — The topology should be easy to reason about for both platform operators and gear authors.
 - **Avoid DAG complexity** — Closure-table maintenance, conflicting barriers, and ancestry queries on a DAG add substantial complexity without a concrete use case demanding them today.
 - **Autonomy of business sub-trees** — Multi-tenant deployments must be able to host independent organizations with strong isolation.
 - **Support consumer / single-user deployments** — Products built on Gears for a single end user must not be forced to invent an artificial second tenant just to satisfy topology rules.

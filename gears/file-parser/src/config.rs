@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// Configuration for the `file_parser` module
+/// Configuration for the `file_parser` gear
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileParserConfig {
@@ -11,7 +11,7 @@ pub struct FileParserConfig {
 
     /// Base directory for local file parsing (**required at runtime**). Only
     /// files under this directory (after symlink resolution / canonicalization)
-    /// are allowed.  The module will fail to start if this field is missing or
+    /// are allowed.  The gear will fail to start if this field is missing or
     /// the path cannot be resolved.
     pub allowed_local_base_dir: PathBuf,
 }

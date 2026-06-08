@@ -2,7 +2,7 @@
 //!
 //! A FIPS 140-3 claim is only valid when the running OS version lies inside
 //! the Operational Environment listed on the active Apple corecrypto CMVP
-//! certificate. This module reads the macOS product version at startup and
+//! certificate. This gear reads the macOS product version at startup and
 //! compares it against a major-version whitelist synchronised with the
 //! "Compliance caveat" table in this crate's README.
 //!
@@ -248,7 +248,7 @@ pub fn validate_oe() -> Result<(), OeError> {
 /// Tests that need to verify witness behaviour in non-default states
 /// must exercise the pure-function policy
 /// [`compute_fips_witness`] directly, not `fips_witness_ok` — see the
-/// `compute_fips_witness_*` cases in the module's test section. A
+/// `compute_fips_witness_*` cases in the gear's test section. A
 /// `reset_witness_for_tests()` hook was intentionally not added: it
 /// would require `unsafe` mutation of this `static OnceLock` and would
 /// be unsound under `cargo test --test-threads > 1`.

@@ -1,12 +1,12 @@
 //! Account Management — storage floor crate.
 //!
-//! This crate ships the persistence foundation for the AM module:
+//! This crate ships the persistence foundation for the AM gear:
 //! the stable domain shapes (error taxonomy, idp contract, tenant
 //! model / repo trait, retention types), the SeaORM-backed
 //! `TenantRepoImpl` and migration set, the domain services
 //! ([`crate::domain::tenant::service::TenantService`] with hooks,
-//! retention + reaper pipelines), and the `ToolKit` module entry-point
-//! ([`AccountManagementModule`]) that wires everything together with
+//! retention + reaper pipelines), and the `ToolKit` gear entry-point
+//! ([`AccountManagementGear`]) that wires everything together with
 //! the `AuthZ` resolver, `IdP` provisioner, Resource Group and Types
 //! Registry plugins resolved from `ClientHub`.
 //!
@@ -46,8 +46,8 @@ pub mod api;
 pub mod client;
 pub mod config;
 pub mod domain;
+pub mod gear;
 pub mod infra;
-pub mod module;
 pub(crate) mod tr_plugin;
 
 pub use domain::error::DomainError;
@@ -74,4 +74,4 @@ pub use infra::storage::migrations::Migrator;
 // `infra::storage::repo_impl` path inside the crate.
 
 pub use client::AccountManagementClientImpl;
-pub use module::AccountManagementModule;
+pub use gear::AccountManagementGear;

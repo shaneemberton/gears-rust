@@ -1,17 +1,17 @@
 # AuthN Resolver
 
-Main module for authentication in Gears. Discovers AuthN plugins via GTS types-registry and routes token validation to the selected plugin.
+Main gear for authentication in Gears. Discovers AuthN plugins via GTS types-registry and routes token validation to the selected plugin.
 
 ## Overview
 
-The `cf-gears-authn-resolver` module provides:
+The `cf-gears-authn-resolver` gear provides:
 
 - **Plugin discovery** — Finds AuthN plugins via GTS types-registry
 - **Vendor-based selection** — Selects plugin by vendor and priority
 - **Token validation routing** — Delegates bearer token authentication to the active plugin
-- **ClientHub integration** — Registers `AuthNResolverClient` for inter-module use
+- **ClientHub integration** — Registers `AuthNResolverClient` for inter-gear use
 
-This is a **main module** — it contains no authentication logic itself. All operations are delegated to the active plugin (e.g., `cf-gears-static-authn-plugin` for development, or a custom OIDC/JWT implementation).
+This is a **main gear** — it contains no authentication logic itself. All operations are delegated to the active plugin (e.g., `cf-gears-static-authn-plugin` for development, or a custom OIDC/JWT implementation).
 
 ## Architecture
 
@@ -48,7 +48,7 @@ let security_context = result.security_context;
 
 ## Configuration
 
-The module is configured via the server's YAML config. Plugin selection is automatic based on GTS registration. Use the `static-authn` feature flag to compile in the development plugin.
+The gear is configured via the server's YAML config. Plugin selection is automatic based on GTS registration. Use the `static-authn` feature flag to compile in the development plugin.
 
 ## Writing a Plugin
 

@@ -6,7 +6,7 @@ use toolkit::api::canonical_prelude::*;
 use toolkit_security::SecurityContext;
 
 use crate::api::rest::dto::{ModelDto, ModelListDto};
-use crate::module::AppServices;
+use crate::gear::AppServices;
 
 /// GET /mini-chat/v1/models
 #[tracing::instrument(skip(svc, ctx))]

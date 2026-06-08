@@ -158,7 +158,7 @@ fn closure_row_to_snap(row: &tenant_closure::Model) -> Result<ClosureSnap, Domai
 }
 
 /// Mirror of `repo_impl::map_scope_err` — kept private to the
-/// integrity-check module so loader/lock errors funnel through the
+/// integrity-check gear so loader/lock errors funnel through the
 /// same canonical `From<DbError>` ladder used by the rest of the AM
 /// repo.
 fn map_scope_err(err: toolkit_db::secure::ScopeError) -> DomainError {

@@ -81,49 +81,49 @@ Example prompts for using checklists with an AI agent:
 ### Full Review
 
 ```
-Review @docs/my-module/PRD.md against @docs/checklists/PRD.md checklist.
+Review @docs/my-gear/PRD.md against @docs/checklists/PRD.md checklist.
 Output findings in table format: Domain | Item | Severity | Finding | Recommendation
 ```
 
 ### Domain-Specific Review
 
 ```
-Review @docs/my-module/DESIGN.md for Security (SEC) items only.
+Review @docs/my-gear/DESIGN.md for Security (SEC) items only.
 Use @docs/checklists/DESIGN.md as reference.
 ```
 
 ### Critical Issues Only
 
 ```
-Scan @docs/my-module/FEATURE.md against @docs/checklists/FEATURE.md.
+Scan @docs/my-gear/FEATURE.md against @docs/checklists/FEATURE.md.
 Report only CRITICAL and HIGH severity issues.
 ```
 
 ### Review with Auto-Fix
 
 ```
-Review @docs/my-module/ADR.md against @docs/checklists/ADR.md.
+Review @docs/my-gear/ADR.md against @docs/checklists/ADR.md.
 For each finding, propose a concrete fix. Apply fixes directly if severity is MEDIUM or lower.
 ```
 
 ### Batch Review
 
 ```
-Review all artifacts in @docs/my-module/ against corresponding checklists in @docs/checklists/.
+Review all artifacts in @docs/my-gear/ against corresponding checklists in @docs/checklists/.
 Summarize by artifact, then by domain.
 ```
 
 ### Pre-Commit Check
 
 ```
-I'm about to commit changes to @docs/my-module/PRD.md.
+I'm about to commit changes to @docs/my-gear/PRD.md.
 Quick check against @docs/checklists/PRD.md — any CRITICAL issues?
 ```
 
 ### Generate Missing Content
 
 ```
-Based on @docs/checklists/DESIGN.md, identify missing sections in @docs/my-module/DESIGN.md.
+Based on @docs/checklists/DESIGN.md, identify missing sections in @docs/my-gear/DESIGN.md.
 Generate draft content for missing CRITICAL items.
 ```
 

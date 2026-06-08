@@ -7,14 +7,14 @@ use thiserror::Error;
 // Re-exported contracts are referenced but not defined here.
 use crate::contracts;
 
-/// Type alias for REST host module configuration.
+/// Type alias for REST host gear configuration.
 type RestHostEntry = (&'static str, Arc<dyn contracts::ApiGatewayCapability>);
 
 // ============================================================================
 // Capability System
 // ============================================================================
 
-/// A single capability variant that a module can provide.
+/// A single capability variant that a gear can provide.
 #[derive(Clone)]
 pub enum Capability {
     #[cfg(feature = "db")]
@@ -134,7 +134,7 @@ impl CapTag for GrpcServiceCap {
     }
 }
 
-/// A set of capabilities that a module provides.
+/// A set of capabilities that a gear provides.
 #[derive(Clone)]
 pub struct CapabilitySet {
     caps: Vec<Capability>,
@@ -210,21 +210,21 @@ impl Default for CapabilitySet {
     }
 }
 
-pub struct ModuleEntry {
+pub struct GearEntry {
     pub(crate) name: &'static str,
     pub(crate) deps: &'static [&'static str],
-    pub(crate) core: Arc<dyn contracts::Module>,
+    pub(crate) core: Arc<dyn contracts::Gear>,
     pub(crate) caps: CapabilitySet,
 }
 
-impl ModuleEntry {
-    /// Returns the module name.
+impl GearEntry {
+    /// Returns the gear name.
     #[must_use]
     pub fn name(&self) -> &'static str {
         self.name
     }
 
-    /// Returns the module dependency names.
+    /// Returns the gear dependency names.
     #[must_use]
     pub fn deps(&self) -> &'static [&'static str] {
         self.deps
@@ -237,9 +237,9 @@ impl ModuleEntry {
     }
 }
 
-impl std::fmt::Debug for ModuleEntry {
+impl std::fmt::Debug for GearEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ModuleEntry")
+        f.debug_struct("GearEntry")
             .field("name", &self.name)
             .field("deps", &self.deps)
             .field("has_rest", &self.caps.has::<RestApiCap>())
@@ -260,38 +260,38 @@ pub struct Registrator(pub fn(&mut RegistryBuilder));
 inventory::collect!(Registrator);
 
 /// The final, topo-sorted runtime registry.
-pub struct ModuleRegistry {
-    modules: Vec<ModuleEntry>, // topo-sorted
+pub struct GearRegistry {
+    gears: Vec<GearEntry>, // topo-sorted
     pub grpc_hub: Option<String>,
     pub grpc_services: Vec<(String, Arc<dyn contracts::GrpcServiceCapability>)>,
 }
 
-impl std::fmt::Debug for ModuleRegistry {
+impl std::fmt::Debug for GearRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let names: Vec<&'static str> = self.modules.iter().map(|m| m.name).collect();
-        f.debug_struct("ModuleRegistry")
-            .field("modules", &names)
+        let names: Vec<&'static str> = self.gears.iter().map(|m| m.name).collect();
+        f.debug_struct("GearRegistry")
+            .field("gears", &names)
             .field("has_grpc_hub", &self.grpc_hub.is_some())
             .field("grpc_services_count", &self.grpc_services.len())
             .finish()
     }
 }
 
-impl ModuleRegistry {
+impl GearRegistry {
     #[must_use]
-    pub fn modules(&self) -> &[ModuleEntry] {
-        &self.modules
+    pub fn gears(&self) -> &[GearEntry] {
+        &self.gears
     }
 
-    /// Returns modules ordered by system priority.
-    /// System gears come first, followed by non-system modules.
+    /// Returns gears ordered by system priority.
+    /// System gears come first, followed by non-system gears.
     /// Within each group, the original topological order is preserved.
     #[must_use]
-    pub fn modules_by_system_priority(&self) -> Vec<&ModuleEntry> {
+    pub fn gears_by_system_priority(&self) -> Vec<&GearEntry> {
         let mut system_mods = Vec::new();
         let mut non_system_mods = Vec::new();
 
-        for entry in &self.modules {
+        for entry in &self.gears {
             if entry.caps.has::<SystemCap>() {
                 system_mods.push(entry);
             } else {
@@ -306,7 +306,7 @@ impl ModuleRegistry {
     /// Discover via inventory, have registrators fill the builder, then build & topo-sort.
     ///
     /// # Errors
-    /// Returns `RegistryError` if module discovery or dependency resolution fails.
+    /// Returns `RegistryError` if gear discovery or dependency resolution fails.
     pub fn discover_and_build() -> Result<Self, RegistryError> {
         let mut b = RegistryBuilder::default();
         for r in ::inventory::iter::<Registrator> {
@@ -317,22 +317,22 @@ impl ModuleRegistry {
 
     /// (Optional) quick lookup if you need it.
     #[must_use]
-    pub fn get_module(&self, name: &str) -> Option<Arc<dyn contracts::Module>> {
-        self.modules
+    pub fn get_gear(&self, name: &str) -> Option<Arc<dyn contracts::Gear>> {
+        self.gears
             .iter()
             .find(|e| e.name == name)
             .map(|e| e.core.clone())
     }
 }
 
-/// Type alias for gRPC hub module configuration.
+/// Type alias for gRPC hub gear configuration.
 type GrpcHubEntry = (&'static str, Arc<dyn contracts::GrpcHubCapability>);
 
 /// Internal builder that macro registrators will feed.
-/// Keys are module **names**; uniqueness enforced at build time.
+/// Keys are gear **names**; uniqueness enforced at build time.
 #[derive(Default)]
 pub struct RegistryBuilder {
-    core: HashMap<&'static str, Arc<dyn contracts::Module>>,
+    core: HashMap<&'static str, Arc<dyn contracts::Gear>>,
     deps: HashMap<&'static str, &'static [&'static str]>,
     capabilities: HashMap<&'static str, Vec<Capability>>,
     rest_host: Option<RestHostEntry>,
@@ -352,11 +352,11 @@ impl RegistryBuilder {
         &mut self,
         name: &'static str,
         deps: &'static [&'static str],
-        m: Arc<dyn contracts::Module>,
+        m: Arc<dyn contracts::Gear>,
     ) {
         if self.core.contains_key(name) {
             self.errors
-                .push(format!("Module '{name}' is already registered"));
+                .push(format!("Gear '{name}' is already registered"));
             return;
         }
         self.core.insert(name, m);
@@ -381,7 +381,7 @@ impl RegistryBuilder {
     ) {
         if let Some((existing, _)) = &self.rest_host {
             self.errors.push(format!(
-                "Multiple REST host modules detected: '{existing}' and '{name}'. Only one REST host is allowed."
+                "Multiple REST host gears detected: '{existing}' and '{name}'. Only one REST host is allowed."
             ));
             return;
         }
@@ -429,7 +429,7 @@ impl RegistryBuilder {
     ) {
         if let Some((existing, _)) = &self.grpc_hub {
             self.errors.push(format!(
-                "Multiple gRPC hub modules detected: '{existing}' and '{name}'. Only one gRPC hub is allowed."
+                "Multiple gRPC hub gears detected: '{existing}' and '{name}'. Only one gRPC hub is allowed."
             ));
             return;
         }
@@ -514,13 +514,13 @@ impl RegistryBuilder {
         None
     }
 
-    /// Validate that all capabilities reference known core modules.
+    /// Validate that all capabilities reference known core gears.
     fn validate_capabilities(&self) -> Result<(), RegistryError> {
         // Check rest_host early
         if let Some((host_name, _)) = &self.rest_host
             && !self.core.contains_key(host_name)
         {
-            return Err(RegistryError::UnknownModule((*host_name).to_owned()));
+            return Err(RegistryError::UnknownGear((*host_name).to_owned()));
         }
 
         // Check for configuration errors
@@ -530,10 +530,10 @@ impl RegistryBuilder {
             });
         }
 
-        // Validate all capability module names reference known core modules
+        // Validate all capability gear names reference known core gears
         for name in self.capabilities.keys() {
             if !self.core.contains_key(name) {
-                return Err(RegistryError::UnknownModule((*name).to_owned()));
+                return Err(RegistryError::UnknownGear((*name).to_owned()));
             }
         }
 
@@ -541,13 +541,13 @@ impl RegistryBuilder {
         if let Some((name, _)) = &self.grpc_hub
             && !self.core.contains_key(name)
         {
-            return Err(RegistryError::UnknownModule((*name).to_owned()));
+            return Err(RegistryError::UnknownGear((*name).to_owned()));
         }
 
         Ok(())
     }
 
-    /// Build dependency graph and return module names, adjacency list, and index mapping.
+    /// Build dependency graph and return gear names, adjacency list, and index mapping.
     fn build_dependency_graph(&self) -> Result<DependencyGraph, RegistryError> {
         let names: Vec<&'static str> = self.core.keys().copied().collect();
         let mut idx: HashMap<&'static str, usize> = HashMap::new();
@@ -560,13 +560,13 @@ impl RegistryBuilder {
         for (&n, &deps) in &self.deps {
             let u = *idx
                 .get(n)
-                .ok_or_else(|| RegistryError::UnknownModule(n.to_owned()))?;
+                .ok_or_else(|| RegistryError::UnknownGear(n.to_owned()))?;
             for &d in deps {
                 let v = *idx.get(d).ok_or_else(|| RegistryError::UnknownDependency {
-                    module: n.to_owned(),
+                    gear: n.to_owned(),
                     depends_on: d.to_owned(),
                 })?;
-                // edge d -> n (dep before module)
+                // edge d -> n (dep before gear)
                 adj[v].push(u);
             }
         }
@@ -574,12 +574,12 @@ impl RegistryBuilder {
         Ok((names, adj, idx))
     }
 
-    /// Assemble final module entries in topological order.
+    /// Assemble final gear entries in topological order.
     fn assemble_entries(
         &self,
         order: &[usize],
         names: &[&'static str],
-    ) -> Result<Vec<ModuleEntry>, RegistryError> {
+    ) -> Result<Vec<GearEntry>, RegistryError> {
         let mut entries = Vec::with_capacity(order.len());
         for &i in order {
             let name = names[i];
@@ -594,31 +594,31 @@ impl RegistryBuilder {
                 .cloned()
                 .ok_or_else(|| RegistryError::CoreNotFound(name.to_owned()))?;
 
-            // Build the capability set for this module
+            // Build the capability set for this gear
             let mut caps = CapabilitySet::new();
 
             // Add capabilities from the main capabilities map
-            if let Some(module_caps) = self.capabilities.get(name) {
-                for cap in module_caps {
+            if let Some(gear_caps) = self.capabilities.get(name) {
+                for cap in gear_caps {
                     caps.push(cap.clone());
                 }
             }
 
-            // Add rest_host if this module is the host
-            if let Some((host_name, module)) = &self.rest_host
+            // Add rest_host if this gear is the host
+            if let Some((host_name, gear)) = &self.rest_host
                 && *host_name == name
             {
-                caps.push(Capability::ApiGateway(module.clone()));
+                caps.push(Capability::ApiGateway(gear.clone()));
             }
 
-            // Add grpc_hub if this module is the hub
-            if let Some((hub_name, module)) = &self.grpc_hub
+            // Add grpc_hub if this gear is the hub
+            if let Some((hub_name, gear)) = &self.grpc_hub
                 && *hub_name == name
             {
-                caps.push(Capability::GrpcHub(module.clone()));
+                caps.push(Capability::GrpcHub(gear.clone()));
             }
 
-            let entry = ModuleEntry {
+            let entry = GearEntry {
                 name,
                 deps,
                 core,
@@ -633,7 +633,7 @@ impl RegistryBuilder {
     ///
     /// # Errors
     /// Returns `RegistryError` if validation fails or a dependency cycle is detected.
-    pub fn build_topo_sorted(self) -> Result<ModuleRegistry, RegistryError> {
+    pub fn build_topo_sorted(self) -> Result<GearRegistry, RegistryError> {
         // 1) Validate all capabilities
         self.validate_capabilities()?;
 
@@ -689,100 +689,100 @@ impl RegistryBuilder {
         }
 
         tracing::info!(
-            modules = ?entries.iter().map(|e| e.name).collect::<Vec<_>>(),
-            "Module dependency order resolved (topo)"
+            gears = ?entries.iter().map(|e| e.name).collect::<Vec<_>>(),
+            "Gear dependency order resolved (topo)"
         );
 
-        Ok(ModuleRegistry {
-            modules: entries,
+        Ok(GearRegistry {
+            gears: entries,
             grpc_hub,
             grpc_services,
         })
     }
 }
 
-/// Structured errors for the module registry.
+/// Structured errors for the gear registry.
 #[derive(Debug, Error)]
 pub enum RegistryError {
-    // Phase errors with module context
-    #[error("pre-init failed for module '{module}'")]
+    // Phase errors with gear context
+    #[error("pre-init failed for gear '{gear}'")]
     PreInit {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
-    #[error("initialization failed for module '{module}'")]
+    #[error("initialization failed for gear '{gear}'")]
     Init {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
-    #[error("post-init failed for module '{module}'")]
+    #[error("post-init failed for gear '{gear}'")]
     PostInit {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
-    #[error("start failed for '{module}'")]
+    #[error("start failed for '{gear}'")]
     Start {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
 
-    #[error("DB migration failed for module '{module}'")]
+    #[error("DB migration failed for gear '{gear}'")]
     DbMigrate {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
-    #[error("REST prepare failed for host module '{module}'")]
+    #[error("REST prepare failed for host gear '{gear}'")]
     RestPrepare {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
-    #[error("REST registration failed for module '{module}'")]
+    #[error("REST registration failed for gear '{gear}'")]
     RestRegister {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
-    #[error("REST finalize failed for host module '{module}'")]
+    #[error("REST finalize failed for host gear '{gear}'")]
     RestFinalize {
-        module: &'static str,
+        gear: &'static str,
         #[source]
         source: anyhow::Error,
     },
     #[error(
-        "REST phase requires an gateway host: modules with capability 'rest' found, but no module with capability 'rest_host'"
+        "REST phase requires an gateway host: gears with capability 'rest' found, but no gear with capability 'rest_host'"
     )]
     RestRequiresHost,
-    #[error("multiple 'rest_host' modules detected; exactly one is allowed")]
+    #[error("multiple 'rest_host' gears detected; exactly one is allowed")]
     MultipleRestHosts,
-    #[error("REST host module not found after validation")]
+    #[error("REST host gear not found after validation")]
     RestHostNotFoundAfterValidation,
     #[error("REST host missing from entry")]
     RestHostMissingFromEntry,
 
     // gRPC-related errors
-    #[error("gRPC registration failed for module '{module}'")]
+    #[error("gRPC registration failed for gear '{gear}'")]
     GrpcRegister {
-        module: String,
+        gear: String,
         #[source]
         source: anyhow::Error,
     },
     #[error(
-        "gRPC phase requires a hub: modules with capability 'grpc' found, but no module with capability 'grpc_hub'"
+        "gRPC phase requires a hub: gears with capability 'grpc' found, but no gear with capability 'grpc_hub'"
     )]
     GrpcRequiresHub,
-    #[error("multiple 'grpc_hub' modules detected; exactly one is allowed")]
+    #[error("multiple 'grpc_hub' gears detected; exactly one is allowed")]
     MultipleGrpcHubs,
 
     // OoP spawn errors
-    #[error("OoP spawn failed for module '{module}'")]
+    #[error("OoP spawn failed for gear '{gear}'")]
     OopSpawn {
-        module: String,
+        gear: String,
         #[source]
         source: anyhow::Error,
     },
@@ -792,10 +792,10 @@ pub enum RegistryError {
     Cancelled,
 
     // Build/topo-sort errors
-    #[error("unknown module '{0}'")]
-    UnknownModule(String),
-    #[error("module '{module}' depends on unknown '{depends_on}'")]
-    UnknownDependency { module: String, depends_on: String },
+    #[error("unknown gear '{0}'")]
+    UnknownGear(String),
+    #[error("gear '{gear}' depends on unknown '{depends_on}'")]
+    UnknownDependency { gear: String, depends_on: String },
     #[error("cyclic dependency detected: {}", path.join(" -> "))]
     CycleDetected { path: Vec<&'static str> },
     #[error("missing deps for '{0}'")]
@@ -813,15 +813,15 @@ mod tests {
     use std::sync::Arc;
 
     // Use the real contracts/context APIs from the crate to avoid type mismatches.
-    use crate::context::ModuleCtx;
+    use crate::context::GearCtx;
     use crate::contracts;
 
     /* --------------------------- Test helpers ------------------------- */
     #[derive(Default)]
     struct DummyCore;
     #[async_trait::async_trait]
-    impl contracts::Module for DummyCore {
-        async fn init(&self, _ctx: &ModuleCtx) -> anyhow::Result<()> {
+    impl contracts::Gear for DummyCore {
+        async fn init(&self, _ctx: &GearCtx) -> anyhow::Result<()> {
             Ok(())
         }
     }
@@ -836,7 +836,7 @@ mod tests {
         b.register_core_with_meta("core_b", &["core_a"], Arc::new(DummyCore));
 
         let reg = b.build_topo_sorted().unwrap();
-        let order: Vec<_> = reg.modules().iter().map(|m| m.name).collect();
+        let order: Vec<_> = reg.gears().iter().map(|m| m.name).collect();
         assert_eq!(order, vec!["core_a", "core_b"]);
     }
 
@@ -847,8 +847,8 @@ mod tests {
 
         let err = b.build_topo_sorted().unwrap_err();
         match err {
-            RegistryError::UnknownDependency { module, depends_on } => {
-                assert_eq!(module, "core_a");
+            RegistryError::UnknownDependency { gear, depends_on } => {
+                assert_eq!(gear, "core_a");
                 assert_eq!(depends_on, "missing_dep");
             }
             other => panic!("unexpected error: {other:?}"),
@@ -864,7 +864,7 @@ mod tests {
         let err = b.build_topo_sorted().unwrap_err();
         match err {
             RegistryError::CycleDetected { path } => {
-                // Should contain both modules in the cycle
+                // Should contain both gears in the cycle
                 assert!(path.contains(&"a"));
                 assert!(path.contains(&"b"));
                 assert!(path.len() >= 3); // At least a -> b -> a
@@ -880,17 +880,17 @@ mod tests {
         b.register_core_with_meta("a", &["b"], Arc::new(DummyCore));
         b.register_core_with_meta("b", &["c"], Arc::new(DummyCore));
         b.register_core_with_meta("c", &["a"], Arc::new(DummyCore));
-        // Add an unrelated module to ensure we only detect the actual cycle
+        // Add an unrelated gear to ensure we only detect the actual cycle
         b.register_core_with_meta("d", &[], Arc::new(DummyCore));
 
         let err = b.build_topo_sorted().unwrap_err();
         match err {
             RegistryError::CycleDetected { path } => {
-                // Should contain all modules in the cycle
+                // Should contain all gears in the cycle
                 assert!(path.contains(&"a"));
                 assert!(path.contains(&"b"));
                 assert!(path.contains(&"c"));
-                assert!(!path.contains(&"d")); // Should not include unrelated module
+                assert!(!path.contains(&"d")); // Should not include unrelated gear
                 assert!(path.len() >= 4); // At least a -> b -> c -> a
 
                 // Verify the error message is helpful
@@ -925,15 +925,15 @@ mod tests {
     fn rest_capability_without_core_fails() {
         let mut b = RegistryBuilder::default();
         b.register_core_with_meta("core_a", &[], Arc::new(DummyCore));
-        // Register a rest capability for a module that doesn't exist
-        b.register_rest_with_meta("unknown_module", Arc::new(DummyRest));
+        // Register a rest capability for a gear that doesn't exist
+        b.register_rest_with_meta("unknown_gear", Arc::new(DummyRest));
 
         let err = b.build_topo_sorted().unwrap_err();
         match err {
-            RegistryError::UnknownModule(name) => {
-                assert_eq!(name, "unknown_module");
+            RegistryError::UnknownGear(name) => {
+                assert_eq!(name, "unknown_gear");
             }
-            other => panic!("expected UnknownModule, got: {other:?}"),
+            other => panic!("expected UnknownGear, got: {other:?}"),
         }
     }
 
@@ -942,15 +942,15 @@ mod tests {
     fn db_capability_without_core_fails() {
         let mut b = RegistryBuilder::default();
         b.register_core_with_meta("core_a", &[], Arc::new(DummyCore));
-        // Register a db capability for a module that doesn't exist
-        b.register_db_with_meta("unknown_module", Arc::new(DummyDb));
+        // Register a db capability for a gear that doesn't exist
+        b.register_db_with_meta("unknown_gear", Arc::new(DummyDb));
 
         let err = b.build_topo_sorted().unwrap_err();
         match err {
-            RegistryError::UnknownModule(name) => {
-                assert_eq!(name, "unknown_module");
+            RegistryError::UnknownGear(name) => {
+                assert_eq!(name, "unknown_gear");
             }
-            other => panic!("expected UnknownModule, got: {other:?}"),
+            other => panic!("expected UnknownGear, got: {other:?}"),
         }
     }
 
@@ -958,15 +958,15 @@ mod tests {
     fn stateful_capability_without_core_fails() {
         let mut b = RegistryBuilder::default();
         b.register_core_with_meta("core_a", &[], Arc::new(DummyCore));
-        // Register a stateful capability for a module that doesn't exist
-        b.register_stateful_with_meta("unknown_module", Arc::new(DummyStateful));
+        // Register a stateful capability for a gear that doesn't exist
+        b.register_stateful_with_meta("unknown_gear", Arc::new(DummyStateful));
 
         let err = b.build_topo_sorted().unwrap_err();
         match err {
-            RegistryError::UnknownModule(name) => {
-                assert_eq!(name, "unknown_module");
+            RegistryError::UnknownGear(name) => {
+                assert_eq!(name, "unknown_gear");
             }
-            other => panic!("expected UnknownModule, got: {other:?}"),
+            other => panic!("expected UnknownGear, got: {other:?}"),
         }
     }
 
@@ -974,13 +974,13 @@ mod tests {
     #[cfg(feature = "db")]
     fn capability_query_works() {
         let mut b = RegistryBuilder::default();
-        let module = Arc::new(DummyCore);
-        b.register_core_with_meta("test", &[], module);
+        let gear = Arc::new(DummyCore);
+        b.register_core_with_meta("test", &[], gear);
         b.register_db_with_meta("test", Arc::new(DummyDb));
         b.register_rest_with_meta("test", Arc::new(DummyRest));
 
         let reg = b.build_topo_sorted().unwrap();
-        let entry = &reg.modules()[0];
+        let entry = &reg.gears()[0];
 
         assert!(entry.caps.has::<DatabaseCap>());
         assert!(entry.caps.has::<RestApiCap>());
@@ -995,27 +995,27 @@ mod tests {
     fn rest_host_capability_without_core_fails() {
         let mut b = RegistryBuilder::default();
         b.register_core_with_meta("core_a", &[], Arc::new(DummyCore));
-        // Set rest_host to a module that doesn't exist
+        // Set rest_host to a gear that doesn't exist
         b.register_rest_host_with_meta("unknown_host", Arc::new(DummyRestHost));
 
         let err = b.build_topo_sorted().unwrap_err();
         match err {
-            RegistryError::UnknownModule(name) => {
+            RegistryError::UnknownGear(name) => {
                 assert_eq!(name, "unknown_host");
             }
-            other => panic!("expected UnknownModule, got: {other:?}"),
+            other => panic!("expected UnknownGear, got: {other:?}"),
         }
     }
 
     #[test]
-    fn module_entry_getters_work() {
+    fn gear_entry_getters_work() {
         let mut b = RegistryBuilder::default();
         b.register_core_with_meta("alpha", &[], Arc::new(DummyCore));
         b.register_core_with_meta("beta", &["alpha"], Arc::new(DummyCore));
         b.register_rest_with_meta("beta", Arc::new(DummyRest));
 
         let reg = b.build_topo_sorted().unwrap();
-        let beta = reg.modules().iter().find(|e| e.name() == "beta").unwrap();
+        let beta = reg.gears().iter().find(|e| e.name() == "beta").unwrap();
 
         assert_eq!(beta.name(), "beta");
         assert_eq!(beta.deps(), &["alpha"]);
@@ -1023,8 +1023,8 @@ mod tests {
     }
 
     #[test]
-    fn test_module_registry_builds() {
-        let registry = ModuleRegistry::discover_and_build();
+    fn test_gear_registry_builds() {
+        let registry = GearRegistry::discover_and_build();
         assert!(registry.is_ok(), "Registry should build successfully");
     }
 
@@ -1034,7 +1034,7 @@ mod tests {
     impl contracts::RestApiCapability for DummyRest {
         fn register_rest(
             &self,
-            _ctx: &crate::context::ModuleCtx,
+            _ctx: &crate::context::GearCtx,
             _router: axum::Router,
             _openapi: &dyn crate::api::OpenApiRegistry,
         ) -> anyhow::Result<axum::Router> {
@@ -1069,14 +1069,14 @@ mod tests {
     impl contracts::ApiGatewayCapability for DummyRestHost {
         fn rest_prepare(
             &self,
-            _ctx: &crate::context::ModuleCtx,
+            _ctx: &crate::context::GearCtx,
             router: axum::Router,
         ) -> anyhow::Result<axum::Router> {
             Ok(router)
         }
         fn rest_finalize(
             &self,
-            _ctx: &crate::context::ModuleCtx,
+            _ctx: &crate::context::GearCtx,
             router: axum::Router,
         ) -> anyhow::Result<axum::Router> {
             Ok(router)

@@ -1,7 +1,7 @@
 //! Account Management domain error type.
 //!
-//! Internal-only — never crosses module boundaries. On every boundary
-//! (REST handlers, inter-module SDK callers via `ClientHub`) this type
+//! Internal-only — never crosses gear boundaries. On every boundary
+//! (REST handlers, inter-gear SDK callers via `ClientHub`) this type
 //! is converted to [`toolkit_canonical_errors::CanonicalError`] via
 //! [`From<DomainError> for CanonicalError`], following the AIP-193 error
 //! model. Public HTTP status codes and the stable error-code taxonomy
@@ -76,7 +76,7 @@ pub enum DomainError {
     /// (`POST /suspend` and `POST /unsuspend`). Symmetric with
     /// [`Self::RootTenantCannotDelete`]: AM-internal bootstrap owns
     /// root status; flipping it through the public surface would
-    /// cascade into downstream modules that branch on
+    /// cascade into downstream gears that branch on
     /// `root.status` with no documented recovery path.
     #[error("root tenant status cannot be changed")]
     RootTenantCannotChangeStatus,

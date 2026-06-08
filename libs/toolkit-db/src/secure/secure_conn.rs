@@ -1,9 +1,9 @@
 //! High-level secure database wrapper for ergonomic, type-safe access.
 //!
-//! This module provides `SecureConn`, a wrapper around a private `SeaORM` connection
+//! This gear provides `SecureConn`, a wrapper around a private `SeaORM` connection
 //! that enforces access control policies on all operations.
 //!
-//! Plugin/module developers should never handle raw `DatabaseConnection` or manually
+//! Plugin/gear developers should never handle raw `DatabaseConnection` or manually
 //! apply scopes. Instead, they receive a `SecureConn` instance that guarantees:
 //!
 //! - **Automatic scoping**: All queries are filtered by tenant/resource scope
@@ -81,12 +81,12 @@ impl<'a> SecureTx<'a> {
 
 /// Secure database connection wrapper.
 ///
-/// This is the primary interface for module developers to access the database.
+/// This is the primary interface for gear developers to access the database.
 /// All operations require a `SecurityCtx` parameter for per-request access control.
 ///
 /// # Usage
 ///
-/// Module services receive a `&SecureConn` and provide `SecurityCtx` per-request:
+/// Gear services receive a `&SecureConn` and provide `SecurityCtx` per-request:
 ///
 /// ```ignore
 /// pub struct MyService<'a> {
@@ -108,7 +108,7 @@ impl<'a> SecureTx<'a> {
 /// - Queries are scoped by tenant/resource from the context
 /// - Empty scopes result in deny-all (no data returned)
 /// - Type system prevents unscoped queries from compiling
-/// - Modules cannot access raw database connections
+/// - Gears cannot access raw database connections
 pub struct SecureConn {
     pub(crate) conn: DatabaseConnection,
 }

@@ -1,7 +1,7 @@
 server:
   home_dir: "~/.cf-gears"
 
-modules:
+gears:
   api-gateway:
     config:
       bind_addr: "127.0.0.1:8087"
@@ -16,7 +16,7 @@ modules:
   calculator-gateway:
     config: { }
 
-  module-orchestrator:
+  gear-orchestrator:
     config: { }
 
   calculator:

@@ -63,7 +63,7 @@ between catalog rows and usage rows should be enforced.
 - FK atomicity — delete validation and rejection happen in the same transaction
   as the delete attempt, with no distributed protocol across gateway replicas.
 - Alignment with the platform's hybrid-storage pattern documented in GTS.md §5
-  (Generic Type System), where the consuming module locally persists its own
+  (Generic Type System), where the consuming gear locally persists its own
   `gts_type`-shaped table next to the rows it governs.
 
 ## Considered Options
@@ -74,11 +74,11 @@ between catalog rows and usage rows should be enforced.
   schema lifecycle through the Plugin SPI, and a real `ON DELETE RESTRICT` FK
   protects against orphan creation.
 - Catalog gateway-local without FK (the current ADR-0007 status quo) — the
-  catalog table lives in the gateway module's local database behind a SeaORM
+  catalog table lives in the gateway gear's local database behind a SeaORM
   repo; delete is a local-DB operation only; referencing-records validation is
   not performed; the Plugin SPI carries no catalog methods.
 - Pure types-registry-as-System-of-Record (SoR) — metric definitions are
-  declared upstream in the `types-registry` module as GTS type schemas; the
+  declared upstream in the `types-registry` gear as GTS type schemas; the
   plugin holds no catalog state; UC reads its catalog projection from
   types-registry at boot and on cache refresh.
 
@@ -130,7 +130,7 @@ this catalog substrate).
   gateway gives up a single in-memory source of truth for the catalog; this is
   the honest cost of regaining FK-enforced referential integrity for a
   billing-grade substrate.
-- Migration of catalog ownership from the module-local SeaORM `MetricCatalogRepo`
+- Migration of catalog ownership from the gear-local SeaORM `MetricCatalogRepo`
   introduced by ADR-0007 back to the Plugin SPI is a downstream cascade
   concern; this ADR does not specify the migration mechanics, which are owned
   by the DECOMPOSITION and feature cascades.
@@ -168,7 +168,7 @@ between `usage_records` and the catalog enforces referential integrity natively.
   writes, so it can pre-create indexes or partitions for the typed-dimension
   surface that ADR-0010 introduces.
 - Good, because the structural shape matches the platform's hybrid-storage
-  pattern documented in GTS.md §5 — the consuming module owns a local
+  pattern documented in GTS.md §5 — the consuming gear owns a local
   `gts_type`-shaped table next to the rows it governs.
 - Neutral, because catalog reads on the hot validation path go through a
   gateway-local L1 cache; the plugin remains the SoR but is not consulted on
@@ -183,12 +183,12 @@ between `usage_records` and the catalog enforces referential integrity natively.
 
 ### Catalog gateway-local without FK (the current ADR-0007 status quo)
 
-The catalog table lives in the gateway module's local database behind a SeaORM
+The catalog table lives in the gateway gear's local database behind a SeaORM
 repo; delete is a local-DB operation only; the Plugin SPI carries no catalog
 methods; referencing-records validation is not performed.
 
 - Good, because the Plugin SPI surface is smaller and the gateway aligns with
-  the platform's system-module convention (e.g. `account-management`).
+  the platform's system-gear convention (e.g. `account-management`).
 - Good, because the catalog mutation path has no plugin round-trip and no
   cross-component coordination.
 - Bad, because operators can orphan live billing data by deleting a metric
@@ -204,7 +204,7 @@ methods; referencing-records validation is not performed.
 
 ### Pure types-registry-as-System-of-Record (SoR)
 
-Metric definitions are declared upstream in the `types-registry` module as GTS
+Metric definitions are declared upstream in the `types-registry` gear as GTS
 type schemas; the plugin holds no catalog state; UC reads its catalog
 projection from types-registry at boot and on cache refresh.
 
@@ -214,8 +214,8 @@ projection from types-registry at boot and on cache refresh.
 - Good, because schema lifecycle reuses the platform's existing
   `register_type_schemas` SDK trait surface verified in
   RESEARCH-metadata.md §5.1.
-- Bad, because the types-registry module holds `GtsOps` in-memory only; on
-  restart, runtime-registered entries are lost. In-process modules
+- Bad, because the types-registry gear holds `GtsOps` in-memory only; on
+  restart, runtime-registered entries are lost. In-process gears
   re-register at boot via the `#[gts_type_schema]` link-time inventory, but
   external apps registering metrics over REST would lose their definitions,
   which is unacceptable for a billing-grade substrate
@@ -260,7 +260,7 @@ metric_catalog(type_uuid) ON DELETE RESTRICT` enforced natively inside the
     window; emit-then-delete race closed by the in-database FK).
   - **INT** — addressed (five catalog SPI methods restored on the Plugin SPI:
     `register_metric_type`, `read_metric_type`, `list_metric_types`,
-    `delete_metric_type`, `read_metric_chain`; no new external module
+    `delete_metric_type`, `read_metric_chain`; no new external gear
     integration introduced).
   - **SEC** — Not applicable: catalog placement does not change the auth
     surface; PDP authorization (ADR-0001) and `SecurityContext` propagation
@@ -270,7 +270,7 @@ metric_catalog(type_uuid) ON DELETE RESTRICT` enforced natively inside the
     referencing-rows rejection; the ADR-0007 unconditional-delete stance is
     superseded; declared-catalog immutability semantics are unchanged).
   - **MAINT** — addressed (single source of truth for catalog rows lives with
-    the active storage plugin alongside usage rows; the module-owned migration
+    the active storage plugin alongside usage rows; the gear-owned migration
     ratchet introduced by ADR-0007 is removed; plugin authors own one backend
     transaction shape for both tables).
   - **TEST** — Not applicable in the ADR body: test design belongs in

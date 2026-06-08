@@ -41,7 +41,7 @@ pub enum BarrierMode {
 
 /// Narrow read-only seam between `tr_plugin` and AM storage.
 ///
-/// See module docs for the responsibility split. Impls live in
+/// See gear docs for the responsibility split. Impls live in
 /// `infra/storage/repo_impl/hierarchy_read.rs`.
 #[async_trait]
 pub trait TenantHierarchyReadPort: Send + Sync {

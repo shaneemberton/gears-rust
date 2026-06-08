@@ -68,9 +68,9 @@
 
 ### 1.1 Purpose
 
-The RG module provides a generic hierarchy and membership engine for organizing resources.
+The RG gear provides a generic hierarchy and membership engine for organizing resources.
 
-**Concrete use-cases the module is designed for:**
+**Concrete use-cases the gear is designed for:**
 
 | Domain | Use-case | How RG is used |
 |--------|----------|----------------|
@@ -84,7 +84,7 @@ The RG module provides a generic hierarchy and membership engine for organizing 
 
 A parent tenant may *read* resources of its child tenants for analytical and reporting purposes (e.g. a university admin views course statistics of a branch), but must not establish cross-tenant memberships. For example, an admin of the parent tenant can browse a course catalogue of a child tenant but cannot enroll in that course or assign it to a group in the parent tenant, because the admin is not a user of the child tenant and the course is not a resource of the parent tenant.
 
-The module supports two usage profiles with one API surface:
+The gear supports two usage profiles with one API surface:
 
 - `catalog` profile: store and query arbitrary resource group structures and memberships.
 - `ownership-graph` profile: expose deterministic hierarchy/membership reads that can be consumed by external decision systems (for example AuthZ plugin logic).
@@ -101,7 +101,7 @@ RG is data infrastructure only. It does not evaluate authorization policies and 
 
 ### 1.2 Background / Problem Statement
 
-Gears need one consistent way to model hierarchical ownership and resource grouping. Without a shared module, each domain service re-implements tree logic, cycle prevention, traversal, and membership semantics.
+Gears need one consistent way to model hierarchical ownership and resource grouping. Without a shared gear, each domain service re-implements tree logic, cycle prevention, traversal, and membership semantics.
 
 Authorization flows additionally need a stable source for ownership hierarchy and group membership context. This source must be independent from policy logic and reusable outside AuthZ use cases.
 
@@ -117,8 +117,8 @@ Authorization flows additionally need a stable source for ownership hierarchy an
 
 | Metric | Baseline | Target | Timeframe |
 |--------|----------|--------|-----------|
-| Hierarchy-related code duplication | Each domain service implements own tree logic, cycle prevention, traversal | Single shared module — zero per-service tree implementations | Module GA (Q2 2026) |
-| AuthZ integration effort for new modules | Custom hierarchy wiring per module | Standard `ResourceGroupReadHierarchy` SDK integration — under 1 sprint | Within 2 sprints after GA |
+| Hierarchy-related code duplication | Each domain service implements own tree logic, cycle prevention, traversal | Single shared gear — zero per-service tree implementations | Gear GA (Q2 2026) |
+| AuthZ integration effort for new gears | Custom hierarchy wiring per gear | Standard `ResourceGroupReadHierarchy` SDK integration — under 1 sprint | Within 2 sprints after GA |
 | Hierarchy query latency (p95) | N/A (no unified solution) | ≤ 250 ms for default profile (`max_depth = 10`) | Pre-GA load test gate |
 
 ### 1.4 Non-goals
@@ -166,7 +166,7 @@ Authorization flows additionally need a stable source for ownership hierarchy an
 
 - **Role**: programmatic access to RG via `ResourceGroupClient` SDK — manage types, groups, and memberships; read hierarchy and membership data.
 
-#### AuthZ Resolver Plugin (via AuthZ Resolver module)
+#### AuthZ Resolver Plugin (via AuthZ Resolver gear)
 
 **ID**: `cpt-cf-resource-group-actor-authz-plugin-consumer`
 
@@ -228,7 +228,7 @@ This aligns RG behavior with `docs/arch/authorization/RESOURCE_GROUP_MODEL.md`.
 
 **Each layer is vendor-replaceable.** Vendors can implement custom TR plugins and AuthZ plugins with different barrier semantics.
 
-> For cross-module implementation details (SQL queries, column mappings, terminology mapping, AuthZ flow sequence), see [DESIGN.md §Barrier Tenant Isolation](./DESIGN.md).
+> For cross-gear implementation details (SQL queries, column mappings, terminology mapping, AuthZ flow sequence), see [DESIGN.md §Barrier Tenant Isolation](./DESIGN.md).
 
 #### Barrier Semantics Summary
 
@@ -286,7 +286,7 @@ Caller: platform-admin, barrier_mode: "none"
 - Closure-table-based hierarchy operations.
 - Membership lifecycle and lookup operations (qualified by `resource_type`).
 - Query profile constraints (`max_depth`, `max_width`) and enforcement behavior.
-- Generic read ports consumable by external modules/plugins.
+- Generic read ports consumable by external gears/plugins.
 - REST API endpoints (`/api/resource-group/v1/...` for groups/memberships, `/api/types-registry/v1/...` for types) with OData `$filter` and cursor-based pagination (`cursor`, `limit`).
 - Deterministic type seeding for bootstrapping.
 
@@ -306,7 +306,7 @@ Caller: platform-admin, barrier_mode: "none"
 
 **Actors**: `cpt-cf-resource-group-actor-instance-administrator`, `cpt-cf-resource-group-actor-apps`
 
-The module **MUST** provide API operations to create, list, retrieve, update, and delete resource group types.
+The gear **MUST** provide API operations to create, list, retrieve, update, and delete resource group types.
 
 A type includes:
 
@@ -322,7 +322,7 @@ A type includes:
 
 **Actors**: `cpt-cf-resource-group-actor-instance-administrator`, `cpt-cf-resource-group-actor-apps`
 
-The module **MUST** validate type code format:
+The gear **MUST** validate type code format:
 
 - length `1..63`
 - no whitespace
@@ -379,7 +379,7 @@ Type deletion **MUST** be rejected if at least one entity of that type exists.
 
 **Actors**: `cpt-cf-resource-group-actor-instance-administrator`, `cpt-cf-resource-group-actor-tenant-administrator`, `cpt-cf-resource-group-actor-apps`
 
-The module **MUST** provide API operations for:
+The gear **MUST** provide API operations for:
 
 - create entity
 - retrieve entity by ID
@@ -456,7 +456,7 @@ In `ownership-graph` profile, create/move/membership operations **MUST** reject 
 
 **Actors**: `cpt-cf-resource-group-actor-instance-administrator`, `cpt-cf-resource-group-actor-tenant-administrator`, `cpt-cf-resource-group-actor-apps`
 
-The module **MUST** support add/remove membership links between group entity and resource identifier, qualified by `resource_type`.
+The gear **MUST** support add/remove membership links between group entity and resource identifier, qualified by `resource_type`.
 
 Membership composite key: `(group_id, resource_type, resource_id)`.
 
@@ -472,7 +472,7 @@ Membership does not store `tenant_id` directly — tenant scope is derived from 
 
 - [x] `p1` - **ID**: `cpt-cf-resource-group-fr-query-membership-relations`
 
-The module **MUST** support deterministic membership lookups:
+The gear **MUST** support deterministic membership lookups:
 
 - by resource (`resource_type` + `resource_id`)
 - by group (`group_id`)
@@ -507,7 +507,7 @@ For authz-compatibility projections, `ancestor_id/descendant_id` are exported di
 
 - [x] `p1` - **ID**: `cpt-cf-resource-group-fr-query-group-hierarchy`
 
-The module **MUST** support:
+The gear **MUST** support:
 
 - query all ancestors ordered by depth
 - query all descendants ordered by depth
@@ -516,7 +516,7 @@ The module **MUST** support:
 
 - [x] `p1` - **ID**: `cpt-cf-resource-group-fr-subtree-operations`
 
-The module **MUST** support efficient subtree move/delete operations with closure updates in transaction boundary.
+The gear **MUST** support efficient subtree move/delete operations with closure updates in transaction boundary.
 
 ### 5.5 Query Profile Constraints
 
@@ -562,7 +562,7 @@ Operator is responsible for separate data migration to restore compliance.
 
 **Actors**: `cpt-cf-resource-group-actor-instance-administrator`, `cpt-cf-resource-group-actor-tenant-administrator`, `cpt-cf-resource-group-actor-apps`
 
-The module **MUST** expose REST API endpoints for:
+The gear **MUST** expose REST API endpoints for:
 
 - types: list, create, get, update, delete — under `/api/types-registry/v1/types`
 - groups: list, create, get, update, delete — under `/api/resource-group/v1/groups`
@@ -602,7 +602,7 @@ Group delete endpoint **MUST** support optional `force` query parameter to contr
 
 **Actors**: `cpt-cf-resource-group-actor-authz-plugin-consumer`, `cpt-cf-resource-group-actor-apps`
 
-The module **MUST** expose stable read contracts for hierarchy/membership retrieval that external consumers (including AuthZ plugins) can use.
+The gear **MUST** expose stable read contracts for hierarchy/membership retrieval that external consumers (including AuthZ plugins) can use.
 
 The same public read contract must remain stable across provider strategies:
 
@@ -635,7 +635,7 @@ RG **MUST NOT**:
 
 **Actors**: `cpt-cf-resource-group-actor-apps`, `cpt-cf-resource-group-actor-authz-plugin-consumer`
 
-The module **MUST** map all failures to deterministic categories:
+The gear **MUST** map all failures to deterministic categories:
 
 - `validation`
 - `not_found`
@@ -674,7 +674,7 @@ See DESIGN.md `cpt-cf-resource-group-seq-auth-modes` for detailed sequence diagr
 
 - [x] `p1` - **ID**: `cpt-cf-resource-group-nfr-hierarchy-query-latency`
 
-The module **MUST** support low-latency ancestor/descendant queries for depth up to configured query profile.
+The gear **MUST** support low-latency ancestor/descendant queries for depth up to configured query profile.
 
 - **Threshold**: p95 under 250 ms for nominal default profile (`max_depth = 10`). For custom/unlimited profiles, target is deployment-specific and validated operationally.
 
@@ -682,7 +682,7 @@ The module **MUST** support low-latency ancestor/descendant queries for depth up
 
 - [x] `p1` - **ID**: `cpt-cf-resource-group-nfr-membership-query-latency`
 
-The module **MUST** support low-latency membership reads.
+The gear **MUST** support low-latency membership reads.
 
 - **Threshold**: p95 under 30 ms in nominal conditions.
 
@@ -702,7 +702,7 @@ Entity/membership changes and derived closure updates **MUST** be transactionall
 
 - [x] `p1` - **ID**: `cpt-cf-resource-group-nfr-production-scale`
 
-The module **MUST** be designed and validated for the following projected production volumes:
+The gear **MUST** be designed and validated for the following projected production volumes:
 
 | Dimension | Projected Value |
 |-----------|-----------------|
@@ -720,7 +720,7 @@ Partitioning of `resource_group_membership` by tenant scope is a candidate optim
 
 ### 6.6 Data Classification
 
-RG stores organizational hierarchy structure and opaque resource identifiers. Resource IDs (e.g., user IDs in membership links) may reference PII-containing entities in other modules, but RG treats them as opaque strings with no awareness of their content. Data classification and PII handling obligations are owned by consuming modules that own the referenced resources.
+RG stores organizational hierarchy structure and opaque resource identifiers. Resource IDs (e.g., user IDs in membership links) may reference PII-containing entities in other gears, but RG treats them as opaque strings with no awareness of their content. Data classification and PII handling obligations are owned by consuming gears that own the referenced resources.
 
 ### 6.7 Audit Trail
 
@@ -728,8 +728,8 @@ RG operations **MUST** produce audit events via the platform audit infrastructur
 
 ### 6.8 Reliability
 
-- **Availability**: RG follows platform SLA for core infrastructure modules. No module-specific availability target beyond platform defaults.
-- **Recovery**: RPO/RTO follow platform defaults for stateful services with PostgreSQL persistence. No module-specific recovery requirements.
+- **Availability**: RG follows platform SLA for core infrastructure gears. No gear-specific availability target beyond platform defaults.
+- **Recovery**: RPO/RTO follow platform defaults for stateful services with PostgreSQL persistence. No gear-specific recovery requirements.
 
 ### 6.9 API and SDK Compatibility
 
@@ -745,15 +745,15 @@ REST API **MUST** follow path-based versioning (`/api/resource-group/v1/` for gr
 
 **Actors**: `cpt-cf-resource-group-actor-instance-administrator`
 
-Data lifecycle follows platform defaults. Tenant deprovisioning **MUST** cascade-delete associated groups, memberships, and closure rows. No module-specific retention policy beyond platform defaults. Data archival and purging are handled at platform infrastructure level.
+Data lifecycle follows platform defaults. Tenant deprovisioning **MUST** cascade-delete associated groups, memberships, and closure rows. No gear-specific retention policy beyond platform defaults. Data archival and purging are handled at platform infrastructure level.
 
 ### NFR Exclusions
 
-- **Usability (UX)**: Not applicable — RG is a backend infrastructure module with no user-facing UI. Consumers interact via REST API and SDK traits.
-- **Operations (OPS)**: Not applicable — RG follows standard Gears deployment and monitoring patterns. No module-specific operational requirements beyond platform defaults.
-- **Compliance (COMPL)**: Not applicable — RG does not directly handle PII or regulated data. Compliance requirements are owned by consuming modules and platform-level controls.
-- **Safety (SAFE)**: Not applicable — RG is a data infrastructure module with no physical interaction or safety-critical operations.
-- **Maintainability / Documentation (MAINT)**: Not applicable at PRD level — SDK trait documentation and REST API OpenAPI specification follow platform documentation standards. No module-specific documentation requirements beyond platform defaults.
+- **Usability (UX)**: Not applicable — RG is a backend infrastructure gear with no user-facing UI. Consumers interact via REST API and SDK traits.
+- **Operations (OPS)**: Not applicable — RG follows standard Gears deployment and monitoring patterns. No gear-specific operational requirements beyond platform defaults.
+- **Compliance (COMPL)**: Not applicable — RG does not directly handle PII or regulated data. Compliance requirements are owned by consuming gears and platform-level controls.
+- **Safety (SAFE)**: Not applicable — RG is a data infrastructure gear with no physical interaction or safety-critical operations.
+- **Maintainability / Documentation (MAINT)**: Not applicable at PRD level — SDK trait documentation and REST API OpenAPI specification follow platform documentation standards. No gear-specific documentation requirements beyond platform defaults.
 
 ## 7. Public Library Interfaces
 
@@ -765,7 +765,7 @@ Data lifecycle follows platform defaults. Tenant deprovisioning **MUST** cascade
 
 **Actors**: `cpt-cf-resource-group-actor-apps`, `cpt-cf-resource-group-actor-tenant-administrator`, `cpt-cf-resource-group-actor-instance-administrator`
 
-The module **MUST** expose a stable SDK trait (`ResourceGroupClient`) via ClientHub for type/entity/membership lifecycle and hierarchy queries. See DESIGN.md for full trait definitions and usage examples.
+The gear **MUST** expose a stable SDK trait (`ResourceGroupClient`) via ClientHub for type/entity/membership lifecycle and hierarchy queries. See DESIGN.md for full trait definitions and usage examples.
 
 #### Integration Read Traits
 
@@ -773,9 +773,9 @@ The module **MUST** expose a stable SDK trait (`ResourceGroupClient`) via Client
 
 **Actors**: `cpt-cf-resource-group-actor-authz-plugin-consumer`
 
-The module **MUST** expose a narrow read-only contract (`ResourceGroupReadHierarchy`) via ClientHub for in-process plugin consumers (AuthZ resolver plugin, tenant-resolver RG plugin, and an in-process AuthZ PDP). This trait provides hierarchy traversal, flat group listing, single-group existence lookup (`get_group`), and membership listing (`list_memberships`) — but no write operations. Its reads are resolved unscoped (they bypass `PolicyEnforcer`) so a consumer acting as the PDP does not re-enter policy evaluation. General consumers use `ResourceGroupClient` for both read and write operations.
+The gear **MUST** expose a narrow read-only contract (`ResourceGroupReadHierarchy`) via ClientHub for in-process plugin consumers (AuthZ resolver plugin, tenant-resolver RG plugin, and an in-process AuthZ PDP). This trait provides hierarchy traversal, flat group listing, single-group existence lookup (`get_group`), and membership listing (`list_memberships`) — but no write operations. Its reads are resolved unscoped (they bypass `PolicyEnforcer`) so a consumer acting as the PDP does not re-enter policy evaluation. General consumers use `ResourceGroupClient` for both read and write operations.
 
-Both traits are backed by the same implementation, registered in ClientHub. Module gateway resolves configured provider and either serves from built-in data path or delegates to vendor-selected scoped plugin.
+Both traits are backed by the same implementation, registered in ClientHub. Gear gateway resolves configured provider and either serves from built-in data path or delegates to vendor-selected scoped plugin.
 
 Integration read responses **MUST** be policy-agnostic and SQL-agnostic:
 
@@ -1131,13 +1131,13 @@ See `cpt-cf-resource-group-fr-jwt-auth` in section 5.9 for the implemented JWT a
 | Dependency | Description | Criticality |
 |------------|-------------|-------------|
 | SQL persistence layer (database-agnostic) | durable storage for types/entities/membership/closure; no vendor-specific SQL extensions | p1 |
-| toolkit/client_hub | typed inter-module client registration/discovery | p1 |
-| AuthZ Resolver module | consumer of read contract via plugin path (optional consumer) | p1 |
+| toolkit/client_hub | typed inter-gear client registration/discovery | p1 |
+| AuthZ Resolver gear | consumer of read contract via plugin path (optional consumer) | p1 |
 | Vendor-specific RG provider (optional) | alternative backend behind same read contracts | p2 |
 
 ## 11. Assumptions
 
-- AuthN/AuthZ module contracts remain unchanged and are extended only via plugins/adapters.
+- AuthN/AuthZ gear contracts remain unchanged and are extended only via plugins/adapters.
 - RG consumers depend on stable contracts (`ResourceGroupClient`, `ResourceGroupReadHierarchy`), not on a specific provider implementation.
 - Resource identifiers used in memberships are stable for consumer domain.
 - Operators can run explicit migration scripts when tightening enabled query profile limits.
@@ -1154,7 +1154,7 @@ See `cpt-cf-resource-group-fr-jwt-auth` in section 5.9 for the implemented JWT a
 
 - Should delete behavior support both `leaf-only` and `subtree-cascade` modes in v1? (REST API defines `force` query parameter for cascade control.) **Owner**: platform team. **Target**: resolve before DECOMPOSITION.
 - Should `resource_group_membership` be partitioned for production scale (projected 455M rows, ~110 GB)? Partitioning strategy needs evaluation since tenant scope is derived via group FK, not stored directly. **Owner**: platform team. **Target**: resolve before production deployment.
-- Should RG type `code` and membership `resource_type` be validated against GTS (Global Type System)? Current design: both are free-form strings with no external validation. Proposed alternative: validate that values correspond to registered GTS types at write time (type create/update for `code`, membership add for `resource_type`), keeping all other behavior unchanged (local storage, no runtime GTS dependency for reads). The case is stronger for `resource_type` — it references external domain entities (e.g., "User", "Document") that likely already exist as GTS types, and without validation nothing prevents typos or inconsistent naming. For `code`, the case is weaker — RG defines its own type topology, not referencing external concepts. Trade-offs: GTS validation adds governance and cross-module type consistency, but introduces seed ordering dependency (types-registry must be available before RG writes), and adds a soft dependency on types-registry availability for write operations. Current recommendation: defer until cross-module type reuse creates an actual governance need; `resource_type` validation is a stronger candidate to adopt first. **Owner**: platform team. **Target**: revisit when other modules begin referencing the same type codes or resource types.
+- Should RG type `code` and membership `resource_type` be validated against GTS (Global Type System)? Current design: both are free-form strings with no external validation. Proposed alternative: validate that values correspond to registered GTS types at write time (type create/update for `code`, membership add for `resource_type`), keeping all other behavior unchanged (local storage, no runtime GTS dependency for reads). The case is stronger for `resource_type` — it references external domain entities (e.g., "User", "Document") that likely already exist as GTS types, and without validation nothing prevents typos or inconsistent naming. For `code`, the case is weaker — RG defines its own type topology, not referencing external concepts. Trade-offs: GTS validation adds governance and cross-gear type consistency, but introduces seed ordering dependency (types-registry must be available before RG writes), and adds a soft dependency on types-registry availability for write operations. Current recommendation: defer until cross-gear type reuse creates an actual governance need; `resource_type` validation is a stronger candidate to adopt first. **Owner**: platform team. **Target**: revisit when other gears begin referencing the same type codes or resource types.
 
 ## 14. Traceability
 

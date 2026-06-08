@@ -138,7 +138,7 @@ impl ClientHub {
 
 impl ClientHub {
     /// Register a client under the interface type `T`.
-    /// `T` can be a trait object like `dyn my_module::api::MyClient`.
+    /// `T` can be a trait object like `dyn my_gear::api::MyClient`.
     pub fn register<T>(&self, client: Arc<T>)
     where
         T: ?Sized + Send + Sync + 'static,

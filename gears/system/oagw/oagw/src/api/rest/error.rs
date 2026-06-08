@@ -1,4 +1,4 @@
-//! REST error mapping for the OAGW module.
+//! REST error mapping for the OAGW gear.
 //!
 //! Maps `DomainError` to canonical errors (`toolkit-canonical-errors`) and
 //! provides:
@@ -121,7 +121,7 @@ pub struct OagwTransformPluginError;
 //     so the variable `detail`/`upstream` fields live only in tracing.
 //   * `permission_denied` — the macro contract locks the wire `detail`
 //     and the `reason` field cannot carry user-supplied
-//     origins/methods/principal ids (see module docs above).
+//     origins/methods/principal ids (see gear docs above).
 //   * `unauthenticated` — the variable `detail` is not placed on the wire
 //     (wire context carries only the `reason` discriminator).
 impl From<DomainError> for CanonicalError {

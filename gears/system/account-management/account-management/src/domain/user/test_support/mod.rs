@@ -2,7 +2,7 @@
 //!
 //! Mirrors the layout used by [`crate::domain::tenant::test_support`]
 //! and [`crate::domain::conversion::test_support`]: the fake plugin
-//! lives in its own submodule, the parent re-exports the public
+//! lives in its own subgear, the parent re-exports the public
 //! surface, and tests of the fake itself live alongside the user
 //! service tests.
 //!

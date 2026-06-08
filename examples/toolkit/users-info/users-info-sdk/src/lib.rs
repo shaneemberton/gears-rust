@@ -1,6 +1,6 @@
 //! User Info SDK
 //!
-//! This crate provides the public API for the `user_info` module:
+//! This crate provides the public API for the `user_info` gear:
 //! - `UsersInfoClientV1` trait — feature `odata` (enabled by default)
 //! - `UsersStreamingClientV1` / `CitiesStreamingClientV1` /
 //!   `AddressesStreamingClientV1` streaming facades — feature `odata`

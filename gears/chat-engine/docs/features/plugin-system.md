@@ -61,7 +61,7 @@ Success criteria: Plugins are registered at startup via ClientHub, resolved by `
 ### 1.4 References
 
 - **PRD**: [PRD.md](../PRD.md)
-- **Design**: [DESIGN.md](../DESIGN.md) -- Component Model (Plugin Integration Module), plugin_configs table, Plugin API Contract
+- **Design**: [DESIGN.md](../DESIGN.md) -- Component Model (Plugin Integration Gear), plugin_configs table, Plugin API Contract
 - **ADR**: [ADR-0022](../ADR/0022-plugin-backend-integration.md) -- Internal Plugin Interface for Backend Integration
 - **Dependencies**: `cpt-cf-chat-engine-feature-session-lifecycle`
 

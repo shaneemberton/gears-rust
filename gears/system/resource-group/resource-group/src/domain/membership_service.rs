@@ -103,7 +103,7 @@ impl<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait, MR: MembershipRepository
     /// Add a membership link without `AuthZ` enforcement.
     ///
     /// **Internal API** — never expose this through a REST handler. Used by
-    /// the membership seeding adapter (which runs at module init, before
+    /// the membership seeding adapter (which runs at gear init, before
     /// any caller `SecurityContext` exists). Domain invariants
     /// (group existence, type registration, `allowed_membership_types`
     /// compatibility, tenant scope) still run; only the `PolicyEnforcer`
@@ -349,7 +349,7 @@ impl<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait, MR: MembershipRepository
         resource_type: &str,
         resource_id: &str,
     ) -> Result<(), DomainError> {
-        // Seeding runs at module init, before any caller `SecurityContext`
+        // Seeding runs at gear init, before any caller `SecurityContext`
         // exists; using `SecurityContext::anonymous()` here would gate the
         // path on whether anonymous subjects are allowed to create
         // memberships, which is brittle and outright fails in locked-down

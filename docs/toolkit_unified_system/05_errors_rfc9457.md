@@ -23,12 +23,12 @@ ApiResult<T> = Result<T, Problem>  (handler return type)
 
 | Concern | Type/Concept | File (must define) | Notes |
 |---------|--------------|--------------------|-------|
-| Domain error (business) | `DomainError` | `<module>/src/domain/error.rs` | Pure business errors; no transport details. Variants reflect domain invariants (e.g., `UserNotFound`, `EmailAlreadyExists`, `InvalidEmail`). |
-| SDK error (public) | `<ModuleName>Error` | `<module>-sdk/src/errors.rs` | Transport-agnostic surface for consumers. No `serde` derives. Lives in SDK crate. |
-| Domain → SDK error conversion | `impl From<DomainError> for <Sdk>Error` | `<module>/src/domain/error.rs` | Module crate imports SDK error and provides `From` impl. |
-| REST error mapping | `impl From<DomainError> for Problem` | `<module>/src/api/rest/error.rs` | Centralize RFC-9457 mapping via `From` trait; `Problem` implements `IntoResponse` directly. |
+| Domain error (business) | `DomainError` | `<gear>/src/domain/error.rs` | Pure business errors; no transport details. Variants reflect domain invariants (e.g., `UserNotFound`, `EmailAlreadyExists`, `InvalidEmail`). |
+| SDK error (public) | `<GearName>Error` | `<gear>-sdk/src/errors.rs` | Transport-agnostic surface for consumers. No `serde` derives. Lives in SDK crate. |
+| Domain → SDK error conversion | `impl From<DomainError> for <Sdk>Error` | `<gear>/src/domain/error.rs` | Gear crate imports SDK error and provides `From` impl. |
+| REST error mapping | `impl From<DomainError> for Problem` | `<gear>/src/api/rest/error.rs` | Centralize RFC-9457 mapping via `From` trait; `Problem` implements `IntoResponse` directly. |
 
-## Domain Error (`<module>/src/domain/error.rs`)
+## Domain Error (`<gear>/src/domain/error.rs`)
 
 ```rust
 use toolkit_macros::domain_model;
@@ -60,7 +60,7 @@ pub enum DomainError {
 }
 ```
 
-## SDK Error (`<module>-sdk/src/errors.rs`)
+## SDK Error (`<gear>-sdk/src/errors.rs`)
 
 ```rust
 #[derive(Error, Debug, Clone)]
@@ -89,7 +89,7 @@ impl UsersInfoError {
 }
 ```
 
-## Domain → SDK conversion (`<module>/src/domain/error.rs`)
+## Domain → SDK conversion (`<gear>/src/domain/error.rs`)
 
 ```rust
 impl From<DomainError> for users_info_sdk::UsersInfoError {
@@ -106,7 +106,7 @@ impl From<DomainError> for users_info_sdk::UsersInfoError {
 }
 ```
 
-## REST Problem mapping (`<module>/src/api/rest/error.rs`)
+## REST Problem mapping (`<gear>/src/api/rest/error.rs`)
 
 ```rust
 use toolkit::api::problem::{Problem, ProblemType};
@@ -251,8 +251,8 @@ async fn test_get_user_not_found() {
 ## Quick checklist
 
 - [ ] Define `DomainError` in `domain/error.rs` with `thiserror::Error`.
-- [ ] Define SDK error in `<module>-sdk/src/errors.rs` (transport-agnostic).
-- [ ] Implement `From<DomainError> for <Sdk>Error` in module crate.
+- [ ] Define SDK error in `<gear>-sdk/src/errors.rs` (transport-agnostic).
+- [ ] Implement `From<DomainError> for <Sdk>Error` in gear crate.
 - [ ] Implement `From<DomainError> for Problem` in `api/rest/error.rs`.
 - [ ] Use `ApiResult<T>` in handlers and `?` for error propagation.
 - [ ] Register relevant errors in OperationBuilder (`.error_*` or `.standard_errors()`).

@@ -1,4 +1,4 @@
-//! Domain service for the tenant resolver module.
+//! Domain service for the tenant resolver gear.
 //!
 //! Plugin discovery is lazy: resolved on first API call after
 //! types-registry is ready.
@@ -30,7 +30,7 @@ const UNAVAILABLE_LOG_THROTTLE: Duration = Duration::from_secs(10);
 ///
 /// # Security Context
 ///
-/// The module itself does **not** perform its own access-control checks on the
+/// The gear itself does **not** perform its own access-control checks on the
 /// `SecurityContext`. It passes the context through to the selected plugin,
 /// which is responsible for deciding how (or whether) to enforce
 /// authorization. This is intentional — different plugins may have

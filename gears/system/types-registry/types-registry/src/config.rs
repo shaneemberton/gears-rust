@@ -1,4 +1,4 @@
-//! Configuration for the Types Registry module.
+//! Configuration for the Types Registry gear.
 
 use std::time::Duration;
 
@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::infra::cache::{CacheConfig, DEFAULT_CACHE_CAPACITY, DEFAULT_CACHE_TTL};
 
-/// Configuration for the Types Registry module.
+/// Configuration for the Types Registry gear.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct TypesRegistryConfig {

@@ -220,7 +220,7 @@ impl UserService {
         }
     }
 
-    /// Operator-tunable per-deployment listing cap. The module
+    /// Operator-tunable per-deployment listing cap. The gear
     /// bootstrap passes `cfg.listing.max_top` so the user listing
     /// surface stays uniform with the tenant / conversion / metadata
     /// listing caps.
@@ -287,7 +287,7 @@ impl UserService {
     /// containing group would surface a member that is no longer
     /// a valid user.
     ///
-    /// Production wiring in `module.rs` always invokes this builder;
+    /// Production wiring in `gear.rs` always invokes this builder;
     /// tests that don't exercise the cleanup path skip it and leave
     /// `rg_client = None` so the cleanup branch short-circuits.
     #[must_use]

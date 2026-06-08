@@ -9,7 +9,7 @@ use rustc_lint::{LateContext, LateLintPass, LintContext};
 dylint_linting::declare_late_lint! {
     /// DE0202: DTOs not referenced outside API
     ///
-    /// DTO types must not be imported by contract, domain, or infra modules.
+    /// DTO types must not be imported by contract, domain, or infra gears.
     /// DTOs are API layer implementation details.
     pub DE0202_DTOS_NOT_REFERENCED_OUTSIDE_API,
     Deny,

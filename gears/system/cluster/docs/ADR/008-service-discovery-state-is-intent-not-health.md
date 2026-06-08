@@ -3,7 +3,7 @@ status: accepted
 date: 2026-04-09
 ---
 
-# ADR-008: Service Discovery — Module-declared Serving Intent, Not Health
+# ADR-008: Service Discovery — Gear-declared Serving Intent, Not Health
 
 **ID**: `cpt-cf-clst-adr-sd-state-is-intent-not-health`
 
@@ -34,26 +34,26 @@ date: 2026-04-09
 
 ## Context and Problem Statement
 
-A registered service instance has two questions a discoverer might want answered: "is this instance running?" (liveness) and "is this instance willing to serve traffic right now?" (serving intent). An earlier shape of the cluster's `ServiceDiscovery` API conflated them under a single `HealthStatus { Healthy, Unhealthy }` enum, exposed as `ServiceHandle::set_health(HealthStatus)`. A registered module that wanted to drain traffic before shutdown called `set_health(Unhealthy)`; a discoverer using `discover_healthy(name)` would skip it.
+A registered service instance has two questions a discoverer might want answered: "is this instance running?" (liveness) and "is this instance willing to serve traffic right now?" (serving intent). An earlier shape of the cluster's `ServiceDiscovery` API conflated them under a single `HealthStatus { Healthy, Unhealthy }` enum, exposed as `ServiceHandle::set_health(HealthStatus)`. A registered gear that wanted to drain traffic before shutdown called `set_health(Unhealthy)`; a discoverer using `discover_healthy(name)` would skip it.
 
 This shape is wrong. Self-reported health is unreliable in exactly the failure modes it matters most:
 
-- **A broken module cannot report that it is broken.** Deadlocked, OOM, infinite-loop modules are by definition not running the code path that would call `set_health(Unhealthy)`. The registry continues to report them as healthy.
-- **A partially-broken module has false confidence.** A module returning errors to every request but whose health-update loop is fine will report `Healthy` indefinitely.
-- **Even correct self-reporting has a race.** A module that calls `set_health(Unhealthy)` races against in-flight requests; routing updates lag.
+- **A broken gear cannot report that it is broken.** Deadlocked, OOM, infinite-loop gears are by definition not running the code path that would call `set_health(Unhealthy)`. The registry continues to report them as healthy.
+- **A partially-broken gear has false confidence.** A gear returning errors to every request but whose health-update loop is fine will report `Healthy` indefinitely.
+- **Even correct self-reporting has a race.** A gear that calls `set_health(Unhealthy)` races against in-flight requests; routing updates lag.
 
 Self-reported health is *not health*. It is a statement of intent by the observed party, not an observation by an external observer. Real systems (K8s, Consul, Eureka) all separate observation from declaration: the thing being judged does not get to judge itself. Probes (HTTP `/healthz`, TCP connect, exec) come from outside the observed instance.
 
-Cluster's audience is platform modules running inside Gears, not arbitrary network services. Cluster also does not own a probe runner — building one is significant API surface (probe registration, per-backend probe semantics, health combination rules across multiple probe sources, observability). The right call is to be honest about what the API actually models — *serving intent* — and stop using the word "health".
+Cluster's audience is platform gears running inside Gears, not arbitrary network services. Cluster also does not own a probe runner — building one is significant API surface (probe registration, per-backend probe semantics, health combination rules across multiple probe sources, observability). The right call is to be honest about what the API actually models — *serving intent* — and stop using the word "health".
 
 This ADR captures the rename + semantic clarification + K8s remapping that result. The decision was originally recorded during the cluster design review as APPLIED on 2026-04-09; this ADR promotes it to a versioned ADR so it sits in the durable decision-of-record set alongside the other architectural choices.
 
 ## Decision Drivers
 
-- **Cluster does not own probe infrastructure.** Building a probe runner inside the cluster module is significant new API surface that no current consumer needs.
-- **Self-reported health is structurally unreliable.** Every plausible failure mode either prevents the module from updating its health or makes the update race-prone.
-- **Module-declared *serving intent* is genuinely useful.** A module preparing to shut down legitimately wants to declare "stop sending me new traffic." That is *intent*, not *health*.
-- **Liveness already has a mechanism.** Heartbeat/TTL renewal at the registration layer is how cluster knows an instance is alive. A stuck module disappears from discovery when its TTL expires, regardless of any state field.
+- **Cluster does not own probe infrastructure.** Building a probe runner inside the cluster gear is significant new API surface that no current consumer needs.
+- **Self-reported health is structurally unreliable.** Every plausible failure mode either prevents the gear from updating its health or makes the update race-prone.
+- **Gear-declared *serving intent* is genuinely useful.** A gear preparing to shut down legitimately wants to declare "stop sending me new traffic." That is *intent*, not *health*.
+- **Liveness already has a mechanism.** Heartbeat/TTL renewal at the registration layer is how cluster knows an instance is alive. A stuck gear disappears from discovery when its TTL expires, regardless of any state field.
 - **The cluster's word for "intent" must not be "health".** Reusing the word "health" for serving intent invites consumers to treat it as health and rebuild every failure mode this ADR aims to avoid.
 - **K8s mapping must be honest.** `EndpointSlice` is a probe-driven concept (readiness probes flip endpoints in/out). If cluster doesn't own probes, mapping to `EndpointSlice` is a lie — endpoints would be in/out based on a self-declared bit that K8s users would reasonably assume is probe-derived.
 
@@ -66,7 +66,7 @@ This ADR captures the rename + semantic clarification + K8s remapping that resul
 
 ## Decision Outcome
 
-Chosen option: **Option 3** — rename the field, the enum, the filter, and the setter to use the word "state"; document the field as *module-declared serving intent*; document liveness as a TTL/heartbeat property; map K8s service discovery to `coordination.k8s.io/v1.Lease` per instance, NOT to `EndpointSlice`.
+Chosen option: **Option 3** — rename the field, the enum, the filter, and the setter to use the word "state"; document the field as *gear-declared serving intent*; document liveness as a TTL/heartbeat property; map K8s service discovery to `coordination.k8s.io/v1.Lease` per instance, NOT to `EndpointSlice`.
 
 The concrete renames:
 
@@ -81,18 +81,18 @@ The concrete renames:
 
 ### What `state` means and what it does not mean
 
-`state` is a single bit a registered module can flip on its own registration:
+`state` is a single bit a registered gear can flip on its own registration:
 
-- `Enabled` — the module is willing to receive traffic for this instance under default routing rules.
-- `Disabled` — the module is asking discoverers using primary routing to skip this instance.
+- `Enabled` — the gear is willing to receive traffic for this instance under default routing rules.
+- `Disabled` — the gear is asking discoverers using primary routing to skip this instance.
 
-That is all. `Disabled` does not mean "the module is broken". It does not mean "the module's process is dead". It does not mean "you should not send any traffic". It means "under primary routing, skip me." A discoverer that wants every instance regardless of state passes `StateFilter::Any`; a discoverer that specifically wants disabled instances (e.g., for draining-traffic dashboards) passes `StateFilter::Disabled`.
+That is all. `Disabled` does not mean "the gear is broken". It does not mean "the gear's process is dead". It does not mean "you should not send any traffic". It means "under primary routing, skip me." A discoverer that wants every instance regardless of state passes `StateFilter::Any`; a discoverer that specifically wants disabled instances (e.g., for draining-traffic dashboards) passes `StateFilter::Disabled`.
 
 API documentation MUST frame `state` as *intent*, not health. The word "health" does not appear in the public API surface (struct fields, enum variants, method names, doc comments).
 
 ### Liveness via heartbeat/TTL, not state
 
-A registered instance survives only as long as the registration's TTL is renewed. The plugin's registration-layer background task heartbeats periodically (interval = TTL / `(max_missed_renewals + 1)`). A stuck module fails to heartbeat; the registration's TTL elapses; the instance disappears from discovery. This happens regardless of the instance's `state` field.
+A registered instance survives only as long as the registration's TTL is renewed. The plugin's registration-layer background task heartbeats periodically (interval = TTL / `(max_missed_renewals + 1)`). A stuck gear fails to heartbeat; the registration's TTL elapses; the instance disappears from discovery. This happens regardless of the instance's `state` field.
 
 Failure detection is therefore not the cluster's job. Cluster guarantees that a *crashed*, *deadlocked*, or *partitioned* instance disappears from discovery within roughly one TTL after it stops heartbeating. That is the platform's only liveness contract. If a consumer needs faster failure detection, they layer it on top: circuit breakers, outlier detection, request-time fallbacks. Cluster does not own that surface.
 
@@ -109,7 +109,7 @@ Why not `Service` / `EndpointSlice`:
 
 - `EndpointSlice` is a probe-driven concept. K8s flips endpoints in/out of an `EndpointSlice` based on readiness probes. Cluster does not own probes; mapping a self-declared `Enabled`/`Disabled` bit to a probe-driven endpoint slot would be a lie to anyone reading the K8s manifests.
 - `EndpointSlice` topology (per-zone, per-port) is rigid. Cluster's metadata filtering (`topic-shard`, `region`, `version`) does not project onto `EndpointSlice` fields.
-- IP-keyed traffic routing (the actual purpose of `Service`/`EndpointSlice`) is a separate platform-tier concern from cluster's "discover instances by metadata" use case. Modules wanting K8s-native traffic routing use the K8s platform directly; they don't go through cluster's `ServiceDiscovery`.
+- IP-keyed traffic routing (the actual purpose of `Service`/`EndpointSlice`) is a separate platform-tier concern from cluster's "discover instances by metadata" use case. Gears wanting K8s-native traffic routing use the K8s platform directly; they don't go through cluster's `ServiceDiscovery`.
 
 ### External probes: deferred, not rejected
 
@@ -145,7 +145,7 @@ The default-is-enabled choice keeps consumer code minimal at the common case (`s
 - **Probe-driven observation is a future extension, not part of this contract.** The `state` surface composes cleanly with a future `reachability` surface; nothing in the current API blocks the extension.
 - **`DiscoveryFilter::default()` does the right thing for primary routing.** Consumers who want enabled-only routing don't have to think about it.
 - **No `discover_healthy` convenience method.** The single `discover(name, filter)` method covers all cases. Filter construction is a one-line `DiscoveryFilter::default()` for the common case.
-- **Trade-off**: existing K8s users who expected cluster's `ServiceDiscovery` to feed into K8s `Service` IP routing will be surprised. Documentation must call this out: cluster provides discovery-with-metadata, NOT IP-keyed traffic routing. Modules wanting both ask the platform for both, separately.
+- **Trade-off**: existing K8s users who expected cluster's `ServiceDiscovery` to feed into K8s `Service` IP routing will be surprised. Documentation must call this out: cluster provides discovery-with-metadata, NOT IP-keyed traffic routing. Gears wanting both ask the platform for both, separately.
 
 ### Confirmation
 
@@ -161,7 +161,7 @@ The default-is-enabled choice keeps consumer code minimal at the common case (`s
 - Good, because it matches consumer expectation of "service discovery has a health concept."
 - Bad, because self-reported health is structurally unreliable in every failure mode it matters most.
 - Bad, because the word "health" implies an observation; this is a declaration. Naming mismatch invites consumer-side bugs.
-- Bad, because consumers will reasonably assume probes drive health and will be surprised when a deadlocked module never flips to `Unhealthy`.
+- Bad, because consumers will reasonably assume probes drive health and will be surprised when a deadlocked gear never flips to `Unhealthy`.
 - Bad, because production-grade real systems all separate observation from declaration; following the unreliable pattern would set cluster up to be replaced as soon as anyone noticed.
 
 ### Option 2: Cluster-driven liveness probing
@@ -170,12 +170,12 @@ The default-is-enabled choice keeps consumer code minimal at the common case (`s
 - Bad, because it's significant new API surface: probe registration shape, per-backend probe execution, probe failure threshold semantics, probe-result combination rules, probe observability.
 - Bad, because probe execution is a backend-specific concern (HTTP probe, TCP probe, exec probe). Implementing it inside cluster would require either picking a single probe model (excludes use cases) or building a flexible probe registry (significant complexity).
 - Bad, because no current consumer needs cluster-driven probes. Consumers that do need probes already have them (K8s readiness probes, OAGW upstream health checks).
-- Bad, because probe ownership belongs in the platform's health/observability surface, not in the cluster module. The cluster's job is coordination + discovery, not failure detection.
+- Bad, because probe ownership belongs in the platform's health/observability surface, not in the cluster gear. The cluster's job is coordination + discovery, not failure detection.
 
 ### Option 3: Rename to `InstanceState { Enabled, Disabled }` with honest semantics (CHOSEN)
 
-- Good, because the renamed surface accurately models what the API actually does — module-declared serving intent.
-- Good, because it keeps the useful "drain-traffic" use case intact (a shutting-down module flips `set_enabled(false)` before it stops heartbeating).
+- Good, because the renamed surface accurately models what the API actually does — gear-declared serving intent.
+- Good, because it keeps the useful "drain-traffic" use case intact (a shutting-down gear flips `set_enabled(false)` before it stops heartbeating).
 - Good, because it's clear that liveness comes from heartbeat/TTL, not from `state`. No room for false confidence.
 - Good, because external probes can be added later as a separate, composable signal without breaking the `state` contract.
 - Good, because the K8s `Lease`-per-instance mapping is a clean, native K8s concept that doesn't lie about probe-driven semantics.
@@ -197,14 +197,14 @@ The default-is-enabled choice keeps consumer code minimal at the common case (`s
 
 **Why state is NOT scoped by `scoped(prefix)`.** Per DESIGN.md §3.8, the per-primitive scoping rules namespace the service `name` only — `metadata` keys/values pass through unchanged, and so does `state`. State is a property of an instance, not a coordination namespace.
 
-**Why `ProvisionalHealth` / `Reachable` / similar future variants compose cleanly.** Future probe-driven observation lands as a *separate field*, not as new variants of `InstanceState`. Combining "module says Enabled" AND "external probe says Reachable" is the consumer's choice, expressed as a composed filter. Adding the second field is non-breaking because the structs are `#[non_exhaustive]`.
+**Why `ProvisionalHealth` / `Reachable` / similar future variants compose cleanly.** Future probe-driven observation lands as a *separate field*, not as new variants of `InstanceState`. Combining "gear says Enabled" AND "external probe says Reachable" is the consumer's choice, expressed as a composed filter. Adding the second field is non-breaking because the structs are `#[non_exhaustive]`.
 
 **References:**
 
 - ADR-001 — backend compatibility. The cache-CAS-universal model includes `CacheBasedServiceDiscoveryBackend`, which uses `put(svc/{name}/{instance_id}, metadata, ttl)` and renews TTL — exactly the heartbeat/TTL liveness contract this ADR codifies.
 - ADR-005 — facade + backend trait. `ServiceDiscoveryV1` (facade) wraps `Arc<dyn ServiceDiscoveryBackend>`; the rename is a backend-trait surface change.
 - DESIGN.md §3.1 (`InstanceState` definition), §3.3 (service-discovery contract).
-- PRD.md §5.4 (service discovery requirements: registration with metadata, discovery with state/metadata filtering, topology watch, module-declared serving intent vs health).
+- PRD.md §5.4 (service discovery requirements: registration with metadata, discovery with state/metadata filtering, topology watch, gear-declared serving intent vs health).
 
 ## Traceability
 
@@ -213,7 +213,7 @@ The default-is-enabled choice keeps consumer code minimal at the common case (`s
 
 This decision directly addresses the following requirements and design elements:
 
-- `cpt-cf-clst-fr-sd-state` — `state` is module-declared serving intent (`Enabled`/`Disabled`).
+- `cpt-cf-clst-fr-sd-state` — `state` is gear-declared serving intent (`Enabled`/`Disabled`).
 - `cpt-cf-clst-fr-sd-state` — `DiscoveryFilter::default()` is enabled-only primary routing.
 - `cpt-cf-clst-fr-sd-register` — Heartbeat/TTL renewal is the liveness signal, not state.
 - `cpt-cf-clst-fr-sd-register` — Explicit deregister; no probe-driven endpoint flipping.

@@ -5,20 +5,20 @@ This crate contains the proc-macros used by `toolkit`.
 In most crates you should import macros from `toolkit` (it re-exports them):
 
 ```rust
-use toolkit::{module, lifecycle};
+use toolkit::{gear, lifecycle};
 ```
 
 If you depend on `cf-gears-toolkit-macros` directly, the Rust crate name is `toolkit_macros`:
 
 ```rust
-use toolkit_macros::{module, lifecycle, grpc_client};
+use toolkit_macros::{gear, lifecycle, grpc_client};
 ```
 
 ## Macros
 
-### `#[module(...)]`
+### `#[gear(...)]`
 
-Attribute macro for declaring a ToolKit module and registering it via `inventory`.
+Attribute macro for declaring a ToolKit gear and registering it via `inventory`.
 
 Parameters:
 
@@ -31,7 +31,7 @@ Parameters:
 - **`client = <path::to::Trait>`** (optional)
   - Current behavior: compile-time checks (object-safe + `Send + Sync + 'static`) and defines `MODULE_NAME`.
   - It does not generate ClientHub registration helpers.
-- **`lifecycle(...)`** (optional, used for `stateful` modules)
+- **`lifecycle(...)`** (optional, used for `stateful` gears)
   - `entry = "serve"` (default: `"serve"`)
   - `stop_timeout = "30s"` (default: `"30s"`; supports `ms`, `s`, `m`, `h`)
   - `await_ready` / `await_ready = true|false` (default: `false`)
@@ -39,11 +39,11 @@ Parameters:
 Example (stateful, no ready gating):
 
 ```rust
-use toolkit::module;
+use toolkit::Gear;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Default)]
-#[module(
+#[gear(
     name = "demo",
     capabilities = [stateful],
     lifecycle(entry = "serve", stop_timeout = "1s")
@@ -60,11 +60,11 @@ impl Demo {
 Example (stateful, with ready gating):
 
 ```rust
-use toolkit::module;
+use toolkit::Gear;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Default)]
-#[module(
+#[gear(
     name = "demo_ready",
     capabilities = [stateful],
     lifecycle(entry = "serve", await_ready, stop_timeout = "1s")
@@ -84,7 +84,7 @@ impl DemoReady {
 
 ### `#[lifecycle(...)]`
 
-Attribute macro applied to an `impl` block. It generates a `toolkit::lifecycle::Runnable` impl and an `into_module()` helper.
+Attribute macro applied to an `impl` block. It generates a `toolkit::lifecycle::Runnable` impl and an `into_gear()` helper.
 
 Parameters:
 
@@ -128,4 +128,4 @@ pub struct MyGrpcClient;
 ## See also
 
 - [ToolKit unified system](../../docs/toolkit_unified_system/README.md)
-- [Module layout and SDK pattern](../../docs/toolkit_unified_system/02_module_layout_and_sdk_pattern.md)
+- [Gear layout and SDK pattern](../../docs/toolkit_unified_system/02_gear_layout_and_sdk_pattern.md)

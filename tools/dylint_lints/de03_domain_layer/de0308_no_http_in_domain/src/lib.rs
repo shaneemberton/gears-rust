@@ -45,7 +45,7 @@ dylint_linting::declare_early_lint! {
     /// ```
     pub DE0308_NO_HTTP_IN_DOMAIN,
     Deny,
-    "domain modules should not reference HTTP types or status codes (DE0308)"
+    "domain gears should not reference HTTP types or status codes (DE0308)"
 }
 
 /// HTTP-related patterns forbidden in domain code

@@ -11,7 +11,7 @@
 //! The plugin owns no schema, no migration, no cache, and no REST
 //! surface. It implements the `TenantResolverPluginClient` SDK trait
 //! and registers a scoped binding in `ClientHub` from
-//! [`crate::AccountManagementModule::init`]. Every SDK call resolves
+//! [`crate::AccountManagementGear::init`]. Every SDK call resolves
 //! to one or two indexed reads against AM-owned storage; tenant-type
 //! reverse-hydration is delegated to `TypesRegistryClient` (which owns
 //! the cache for that mapping).

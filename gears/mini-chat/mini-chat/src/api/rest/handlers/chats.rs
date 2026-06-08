@@ -9,7 +9,7 @@ use toolkit_security::SecurityContext;
 use uuid::Uuid;
 
 use crate::api::rest::dto::{ChatDetailDto, CreateChatReq, UpdateChatReq};
-use crate::module::AppServices;
+use crate::gear::AppServices;
 
 /// POST /mini-chat/v1/chats
 #[tracing::instrument(skip(svc, ctx, uri, req_body))]

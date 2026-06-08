@@ -1,7 +1,7 @@
 //! Generic mapping from type-safe `FilterNode`<F> to `SeaORM` Conditions.
 //!
-//! This module provides the core logic for converting DTO-level filter expressions
-//! into `SeaORM` conditions. Concrete modules only need to provide a mapping from
+//! This gear provides the core logic for converting DTO-level filter expressions
+//! into `SeaORM` conditions. Concrete gears only need to provide a mapping from
 //! their DTO field enum to `SeaORM` Column types via the `FieldToColumn` trait.
 
 use crate::secure::{Scoped, SecureSelect};
@@ -81,7 +81,7 @@ pub trait FieldToColumn<F: FilterField> {
     /// allowed set) or when `op` is not supported on the translated
     /// column. The framework wraps the message as
     /// `ODataError::InvalidFilter`; the call site (e.g.
-    /// [`paginate_odata_try`]) maps that to the module's validation
+    /// [`paginate_odata_try`]) maps that to the gear's validation
     /// category.
     fn map_value(_field: F, _op: FilterOp, value: &ODataValue) -> Result<ODataValue, String> {
         Ok(value.clone())
@@ -169,7 +169,7 @@ pub trait ODataFieldMapping<F: FilterField>: FieldToColumn<F> {
 /// Convert a `FilterNode`<F> to a `SeaORM` Condition using a `FieldToColumn` mapping.
 ///
 /// This function provides generic traversal of the `FilterNode` AST and handles
-/// all standard `OData` operations. Concrete modules only need to implement
+/// all standard `OData` operations. Concrete gears only need to implement
 /// `FieldToColumn` to map their DTO fields to database columns.
 ///
 /// # Type Parameters

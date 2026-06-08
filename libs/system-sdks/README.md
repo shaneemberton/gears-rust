@@ -1,6 +1,6 @@
 # System SDKs
 
-Collection crate for system module SDKs.
+Collection crate for system gear SDKs.
 
 ## Overview
 

@@ -1,9 +1,9 @@
-//! Database manager for per-module database connections.
+//! Database manager for per-gear database connections.
 //!
 //! The `DbManager` is responsible for:
 //! - Loading global database configuration from Figment
-//! - Building and caching database handles per module
-//! - Merging global server configurations with module-specific settings
+//! - Building and caching database handles per gear
+//! - Merging global server configurations with gear-specific settings
 
 use crate::config::{DbConnConfig, GlobalDatabaseConfig};
 use crate::options::build_db_handle;
@@ -12,15 +12,15 @@ use dashmap::DashMap;
 use figment::Figment;
 use std::path::{Path, PathBuf};
 
-/// Central database manager that handles per-module database connections.
+/// Central database manager that handles per-gear database connections.
 pub struct DbManager {
     /// Global database configuration loaded from Figment
     global: Option<GlobalDatabaseConfig>,
-    /// Figment instance for reading module configurations
+    /// Figment instance for reading gear configurations
     figment: Figment,
-    /// Base home directory for modules
+    /// Base home directory for gears
     home_dir: PathBuf,
-    /// Cache of secure DB entrypoints per module
+    /// Cache of secure DB entrypoints per gear
     cache: DashMap<String, Db>,
 }
 
@@ -57,22 +57,22 @@ impl DbManager {
         })
     }
 
-    /// Get a database handle for the specified module.
+    /// Get a database handle for the specified gear.
     /// Returns cached handle if available, otherwise builds a new one.
     ///
     /// # Errors
     /// Returns an error if the database connection cannot be established.
-    pub async fn get(&self, module: &str) -> Result<Option<Db>> {
+    pub async fn get(&self, gear: &str) -> Result<Option<Db>> {
         // Check cache first
-        if let Some(db) = self.cache.get(module) {
+        if let Some(db) = self.cache.get(gear) {
             return Ok(Some(db.clone()));
         }
 
         // Build new Db
-        match self.build_for_module(module).await? {
+        match self.build_for_gear(gear).await? {
             Some(db) => {
                 // Use entry API to handle race conditions properly
-                match self.cache.entry(module.to_owned()) {
+                match self.cache.entry(gear.to_owned()) {
                     dashmap::mapref::entry::Entry::Occupied(entry) => {
                         // Another thread beat us to it, return the cached version
                         Ok(Some(entry.get().clone()))
@@ -88,20 +88,20 @@ impl DbManager {
         }
     }
 
-    /// Build a database handle for the specified module.
-    async fn build_for_module(&self, module: &str) -> Result<Option<Db>> {
-        // Read module database configuration from Figment
-        let module_data: serde_json::Value = self
+    /// Build a database handle for the specified gear.
+    async fn build_for_gear(&self, gear: &str) -> Result<Option<Db>> {
+        // Read gear database configuration from Figment
+        let gear_data: serde_json::Value = self
             .figment
             .extract()
             .unwrap_or_else(|_| serde_json::Value::Object(serde_json::Map::new()));
 
-        let Some(db_value) = module_data
-            .get("modules")
-            .and_then(|modules| modules.get(module))
+        let Some(db_value) = gear_data
+            .get("gears")
+            .and_then(|gears| gears.get(gear))
             .and_then(|m| m.get("database"))
         else {
-            tracing::debug!(module = %module, "Module has no database configuration; skipping");
+            tracing::debug!(gear =  %gear, "Gear has no database configuration; skipping");
             return Ok(None);
         };
 
@@ -109,15 +109,15 @@ impl DbManager {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(
-                    module = %module,
+                    gear =  %gear,
                     error = %e,
-                    "Module 'database' key is present but failed to deserialize; ignoring"
+                    "Gear 'database' key is present but failed to deserialize; ignoring"
                 );
                 return Ok(None);
             }
         };
 
-        // If module references a global server, merge configurations
+        // If gear references a global server, merge configurations
         if let Some(server_name) = &cfg.server {
             let server_cfg = self
                 .global
@@ -129,94 +129,94 @@ impl DbManager {
                     ))
                 })?;
 
-            cfg = Self::merge_server_into_module(cfg, server_cfg.clone());
+            cfg = Self::merge_server_into_gear(cfg, server_cfg.clone());
         }
 
         // Finalize SQLite paths if needed
-        let module_home_dir = self.home_dir.join(module);
-        cfg = self.finalize_sqlite_paths(cfg, &module_home_dir)?;
+        let gear_home_dir = self.home_dir.join(gear);
+        cfg = self.finalize_sqlite_paths(cfg, &gear_home_dir)?;
 
         // Build the database handle
         let handle = build_db_handle(cfg, self.global.as_ref()).await?;
 
         tracing::info!(
-            module = %module,
+            gear =  %gear,
             engine = ?handle.engine(),
             dsn = %crate::options::redact_credentials_in_dsn(Some(handle.dsn())),
-            "Built database handle for module"
+            "Built database handle for gear"
         );
 
         Ok(Some(Db::new(handle)))
     }
 
-    /// Merge global server configuration into module configuration.
-    /// Module fields override server fields. Params maps are merged with module taking precedence.
-    fn merge_server_into_module(
-        mut module_cfg: DbConnConfig,
+    /// Merge global server configuration into gear configuration.
+    /// Gear fields override server fields. Params maps are merged with gear taking precedence.
+    fn merge_server_into_gear(
+        mut gear_cfg: DbConnConfig,
         server_cfg: DbConnConfig,
     ) -> DbConnConfig {
-        // Start with server config as base, then apply module overrides
+        // Start with server config as base, then apply gear overrides
 
-        // Engine: module takes precedence (important for field-based configs)
-        if module_cfg.engine.is_none() {
-            module_cfg.engine = server_cfg.engine;
-        }
-
-        // DSN: module takes precedence
-        if module_cfg.dsn.is_none() {
-            module_cfg.dsn = server_cfg.dsn;
+        // Engine: gear takes precedence (important for field-based configs)
+        if gear_cfg.engine.is_none() {
+            gear_cfg.engine = server_cfg.engine;
         }
 
-        // Individual fields: module takes precedence
-        if module_cfg.host.is_none() {
-            module_cfg.host = server_cfg.host;
-        }
-        if module_cfg.port.is_none() {
-            module_cfg.port = server_cfg.port;
-        }
-        if module_cfg.user.is_none() {
-            module_cfg.user = server_cfg.user;
-        }
-        if module_cfg.password.is_none() {
-            module_cfg.password = server_cfg.password;
-        }
-        if module_cfg.dbname.is_none() {
-            module_cfg.dbname = server_cfg.dbname;
+        // DSN: gear takes precedence
+        if gear_cfg.dsn.is_none() {
+            gear_cfg.dsn = server_cfg.dsn;
         }
 
-        // Params: merge maps with module taking precedence
-        match (&mut module_cfg.params, server_cfg.params) {
-            (Some(module_params), Some(server_params)) => {
-                // Merge server params first, then module params (module overrides)
+        // Individual fields: gear takes precedence
+        if gear_cfg.host.is_none() {
+            gear_cfg.host = server_cfg.host;
+        }
+        if gear_cfg.port.is_none() {
+            gear_cfg.port = server_cfg.port;
+        }
+        if gear_cfg.user.is_none() {
+            gear_cfg.user = server_cfg.user;
+        }
+        if gear_cfg.password.is_none() {
+            gear_cfg.password = server_cfg.password;
+        }
+        if gear_cfg.dbname.is_none() {
+            gear_cfg.dbname = server_cfg.dbname;
+        }
+
+        // Params: merge maps with gear taking precedence
+        match (&mut gear_cfg.params, server_cfg.params) {
+            (Some(gear_params), Some(server_params)) => {
+                // Merge server params first, then gear params (gear overrides)
                 for (key, value) in server_params {
-                    module_params.entry(key).or_insert(value);
+                    gear_params.entry(key).or_insert(value);
                 }
             }
             (None, Some(server_params)) => {
-                module_cfg.params = Some(server_params);
+                gear_cfg.params = Some(server_params);
             }
-            _ => {} // Module has params or server has none - keep module params
+            _ => {} // Gear has params or server has none - keep gear params
         }
 
-        // Pool: module takes precedence
-        if module_cfg.pool.is_none() {
-            module_cfg.pool = server_cfg.pool;
+        // Pool: gear takes precedence
+        if gear_cfg.pool.is_none() {
+            gear_cfg.pool = server_cfg.pool;
         }
 
-        // Note: file, path, and server fields are module-only and not merged
+        // Note: file, path, and server fields are gear-only and not merged
 
-        module_cfg
+        gear_cfg
     }
 
     /// Finalize `SQLite` paths by resolving relative file paths to absolute paths.
     fn finalize_sqlite_paths(
         &self,
         mut cfg: DbConnConfig,
-        module_home: &Path,
+        gear_home: &Path,
     ) -> Result<DbConnConfig> {
-        // If file is specified, convert to absolute path under module home
+        // If file is specified, convert to absolute path under gear home
         if let Some(file) = &cfg.file {
-            let absolute_path = module_home.join(file);
+            let absolute_path = gear_home.join(file);
 
             // Check auto_provision setting
             let auto_provision = self
@@ -247,11 +247,11 @@ impl DbManager {
             cfg.file = None; // Clear file since path takes precedence and we can't have both
         }
 
-        // If path is relative, make it absolute relative to module home
+        // If path is relative, make it absolute relative to gear home
         if let Some(path) = &cfg.path
             && path.is_relative()
         {
-            cfg.path = Some(module_home.join(path));
+            cfg.path = Some(gear_home.join(path));
         }
 
         Ok(cfg)

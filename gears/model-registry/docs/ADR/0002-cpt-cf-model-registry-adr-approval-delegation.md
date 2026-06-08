@@ -16,7 +16,7 @@ Model Registry requires approval workflows for tenant-level model access (pendin
 * `cpt-cf-model-registry-fr-model-approval` — Tenant-level model approval workflow
 * `cpt-cf-model-registry-fr-auto-approval` — Automatic approval based on rules
 * PRD scope definition: "Approval workflow engine — Generic Approval Service"
-* Platform consistency — unified approval UX across modules
+* Platform consistency — unified approval UX across gears
 * Separation of concerns — Model Registry focuses on model catalog
 
 ## Considered Options
@@ -32,7 +32,7 @@ Chosen option: "Delegate to Generic Approval Service", because it provides platf
 ### Consequences
 
 * Good, because unified approval UX across the platform
-* Good, because approval logic is reusable by other modules
+* Good, because approval logic is reusable by other gears
 * Good, because Model Registry remains focused on catalog concerns
 * Good, because audit trail handled by Approval Service
 * Bad, because dependency on external service
@@ -69,12 +69,12 @@ Approval Service responsibilities:
 
 ### Build Approval Workflow into Model Registry
 
-Full approval implementation within Model Registry module.
+Full approval implementation within Model Registry gear.
 
 * Good, because full control over implementation
 * Good, because no external dependencies
 * Good, because potentially lower latency
-* Bad, because duplicates logic needed by other modules
+* Bad, because duplicates logic needed by other gears
 * Bad, because inconsistent approval UX across platform
 * Bad, because Model Registry scope creep
 

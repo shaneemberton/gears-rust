@@ -8,7 +8,7 @@
 //!    collectors populated at link time via the `inventory` crate. Any crate
 //!    in the process that uses the macros below contributes to the same
 //!    global inventory. `types-registry` consumes the inventory at startup,
-//!    so there is no per-module registration code for entries known at
+//!    so there is no per-gear registration code for entries known at
 //!    compile time.
 //! 2. **Thin proc-macro wrappers** that delegate to upstream `gts-macros`
 //!    and additionally submit the corresponding inventory entry:
@@ -21,9 +21,9 @@
 //! ## Adding a new entry
 //!
 //! For a new platform base Type Schema, put a `#[gts_type_schema(...)]`-annotated
-//! struct into this crate and add `mod your_module;` below. For a Type Schema
-//! or Instance owned by a specific module, use the same macros from that
-//! module's crate — the inventory is process-global, so entries land in
+//! struct into this crate and add `mod your_gear;` below. For a Type Schema
+//! or Instance owned by a specific gear, use the same macros from that
+//! gear's crate — the inventory is process-global, so entries land in
 //! `types-registry` regardless of which crate declares them.
 //!
 //! [Global Type System]: https://github.com/hypernetix/gts-spec

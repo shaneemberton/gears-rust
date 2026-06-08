@@ -1,6 +1,6 @@
 # CredStore - Quickstart
 
-Stores, retrieves, and deletes secrets scoped to tenants and owners. Secrets are resolved hierarchically — if a secret is not found in the requesting tenant, the module walks up the tenant ancestry and returns the nearest inherited value.
+Stores, retrieves, and deletes secrets scoped to tenants and owners. Secrets are resolved hierarchically — if a secret is not found in the requesting tenant, the gears walks up the tenant ancestry and returns the nearest inherited value.
 
 **Features:**
 - Tenant-scoped secret storage with hierarchical resolution
@@ -15,12 +15,12 @@ Stores, retrieves, and deletes secrets scoped to tenants and owners. Secrets are
 
 Full API documentation: <http://127.0.0.1:8087/cf/docs>
 
-The example server uses the gateway prefix `/cf`. This comes from `modules.api-gateway.config.prefix_path` and is configurable.
+The example server uses the gateway prefix `/cf`. This comes from `gearss.api-gateway.config.prefix_path` and is configurable.
 
 ## Configuration
 
 ```yaml
-modules:
+gears:
   credstore:
     vendor: "constructorfabric"  # Selects backend plugin by vendor name (default: "constructorfabric")
 ```

@@ -1,10 +1,10 @@
 server:
   home_dir: "~/.cf-gears"
 
-# OoP modules receive this config via --config CLI arg or MODULE_CONFIG_PATH env var from master host.
+# OoP gears receive this config via --config CLI arg or MODULE_CONFIG_PATH env var from master host.
 # Directory endpoint is read from the shared config file.
 
-modules:
+gears:
   api-gateway:
     config:
       bind_addr: "127.0.0.1:8087"
@@ -17,7 +17,7 @@ modules:
       # fixed port so the child can find it
       listen_addr: "127.0.0.1:50051"
 
-  module-orchestrator:
+  gear-orchestrator:
     config: { }
 
   calculator-gateway:

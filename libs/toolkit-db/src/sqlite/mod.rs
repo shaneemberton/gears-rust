@@ -1,6 +1,6 @@
 //! SQLite-specific helpers and utilities.
 //!
-//! This module contains SQLite-specific functionality including:
+//! This gear contains SQLite-specific functionality including:
 //! - DSN parsing and cleaning
 //! - PRAGMA parameter handling with typed enums
 //! - Path preparation for `SQLite` databases

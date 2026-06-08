@@ -28,7 +28,7 @@ decision-makers: Constructor Fabric Steering Committee
 
 ## Context and Problem Statement
 
-The platform needs a fast transitive hierarchy read model for tenant traversal, barrier-aware enforcement, and subtree membership checks. Account Management (AM) is the canonical owner of tenant hierarchy state (`id`, `parent_id`, `status`, `self_managed`, tenant type), while Tenant Resolver (TR) is being designed as the hot-path query module consumed by AuthZ and other policy-facing flows.
+The platform needs a fast transitive hierarchy read model for tenant traversal, barrier-aware enforcement, and subtree membership checks. Account Management (AM) is the canonical owner of tenant hierarchy state (`id`, `parent_id`, `status`, `self_managed`, tenant type), while Tenant Resolver (TR) is being designed as the hot-path query gear consumed by AuthZ and other policy-facing flows.
 
 Two platform-level facts frame the problem:
 
@@ -40,7 +40,7 @@ The architectural question is whether to keep a split where TR owns a separate c
 ## Decision Drivers
 
 - Preserve clear ownership of canonical tenant data (`cpt-cf-tr-plugin-principle-query-facade`)
-- Avoid cross-module synchronization boundaries when the underlying data has a single writer
+- Avoid cross-gear synchronization boundaries when the underlying data has a single writer
 - Align with the platform-canonical `tenant_closure` schema defined in `TENANT_MODEL.md`
 - Meet hot-path traversal/query NFRs without introducing projection freshness windows
 - Keep barrier traversal semantics aligned with the Tenant Resolver SDK source of truth
@@ -58,7 +58,7 @@ The architectural question is whether to keep a split where TR owns a separate c
 
 Chosen option: **Option 3 — AM tree + AM canonical closure**.
 
-AM owns both the canonical tenant tree and the platform-canonical `tenant_closure` table `(ancestor_id, descendant_id, barrier, descendant_status)`. Closure maintenance occurs transactionally alongside tenant writes in AM. Tenant Resolver remains a distinct module but is scoped to query facade responsibilities — `BarrierMode` application, ordering guarantees, pagination, and the SDK surface consumed by AuthZ and other clients. Tenant Resolver does not own a derived projection, does not run a `SyncEngine`/`ClosureWriter`, and does not consume a sync-oriented AM capability.
+AM owns both the canonical tenant tree and the platform-canonical `tenant_closure` table `(ancestor_id, descendant_id, barrier, descendant_status)`. Closure maintenance occurs transactionally alongside tenant writes in AM. Tenant Resolver remains a distinct gear but is scoped to query facade responsibilities — `BarrierMode` application, ordering guarantees, pagination, and the SDK surface consumed by AuthZ and other clients. Tenant Resolver does not own a derived projection, does not run a `SyncEngine`/`ClosureWriter`, and does not consume a sync-oriented AM capability.
 
 Two facts support consolidating closure ownership in AM:
 
@@ -74,17 +74,17 @@ The AM tenant write model is favorable to in-AM closure maintenance:
 - **Convert (self_managed toggle)** — O(strict_ancestors(X) × (1 + descendants(X))) updates to the `barrier` column. Bounded by depth and subtree size; convert is a rare dual-consent operation (`cpt-cf-account-management-fr-mode-conversion-approval`).
 - **Subtree move** — not supported in AM; `update_tenant` mutates only `name` and `status` (`cpt-cf-account-management-fr-tenant-update`).
 
-Consolidating closure ownership in AM removes the operational complexity that a split ownership model would require — drift detection, revision tokens, rebuild loops, projection freshness windows, and dual representation of hierarchy state across two modules.
+Consolidating closure ownership in AM removes the operational complexity that a split ownership model would require — drift detection, revision tokens, rebuild loops, projection freshness windows, and dual representation of hierarchy state across two gears.
 
 ### Consequences
 
-- Hierarchy state exists in exactly one module and one database. No cross-module projection, no freshness window between commit and enforcement.
+- Hierarchy state exists in exactly one gear and one database. No cross-gear projection, no freshness window between commit and enforcement.
 - AM owns closure maintenance transactionally with tenant writes. Write amplification is bounded: linear in depth for create/delete/status, bounded by ancestors × subtree size for convert.
 - Tenant Resolver's role narrows to a query facade: `BarrierMode` application, ordering, pagination, SDK contract. It no longer owns a derived projection or a sync loop.
 - Resource Group's co-located tree-plus-closure pattern becomes the uniform platform pattern for hierarchical domains.
 - No AM-exposed sync capability (canonical enumeration + revision/change token) is required. AM's public contract remains request-oriented rather than sync-oriented.
 - Tenant Resolver DESIGN and PRD must be updated: removal of `SyncEngine`, `ClosureWriter`, `tenant_closure` ownership, drift-detection contract, and associated NFRs. AM DESIGN must be updated to introduce the `tenant_closure` table and closure-maintenance responsibilities in `TenantService` and the conversion flow.
-- A future event-driven design (VHP-460) can still be revisited, but its motivation shrinks because the primary driver — cross-module projection lag — no longer exists.
+- A future event-driven design (VHP-460) can still be revisited, but its motivation shrinks because the primary driver — cross-gear projection lag — no longer exists.
 
 ### Confirmation
 
@@ -103,7 +103,7 @@ Consolidating closure ownership in AM removes the operational complexity that a 
 | **AM tree + Tenant Resolver closure** | Dual ownership: AM owns source tree, TR owns derived read model | Medium in TR, low in AM, plus revision-token writes in AM | Strong once projection is fresh | Low-to-medium: AM exposes sync contract only | Poll-driven, bounded by revision-token check + rebuild | TR owns a derived projection and sync loop | Viable, but pays permanent sync overhead |
 | **AM tree + AM generic closure** | AM owns tree and a generic transitive model; TR owns barrier/status/order semantics at query time | Low-medium in AM (closure only, no barrier materialization) | Good, but barrier filtering requires path-joins at query time | Low | Transactional with source writes; no sync lag | TR filters and shapes queries over AM's generic closure | Clean, but diverges from platform-canonical `tenant_closure` schema |
 | **AM tree + AM canonical closure** | Single owner for tree and canonical closure | Bounded: O(depth) for create/delete/status; O(ancestors × subtree) for rare convert; no subtree moves | Strong: platform-canonical barrier-aware closure enables O(1)-JOIN filtering | Low: `barrier` and `status` are canonical tenant data, not resolver-imported concepts | Transactional with source writes; no sync lag | TR becomes a query facade over AM-owned canonical storage | **Best fit** |
-| **AM implements full Tenant Resolver trait logic** | Single owner for tree, closure, and resolver behavior | Highest: AM owns write model, closure, and full resolver semantics | Potentially strong, but pushes hot-path concerns into AM | Very high: AM is directly coupled to the Tenant Resolver SDK contract | Transactional with source writes; no sync lag | TR becomes a compatibility shim or is eliminated | Overreach; collapses useful module boundary |
+| **AM implements full Tenant Resolver trait logic** | Single owner for tree, closure, and resolver behavior | Highest: AM owns write model, closure, and full resolver semantics | Potentially strong, but pushes hot-path concerns into AM | Very high: AM is directly coupled to the Tenant Resolver SDK contract | Transactional with source writes; no sync lag | TR becomes a compatibility shim or is eliminated | Overreach; collapses useful gear boundary |
 
 ## Pros and Cons of the Options
 
@@ -112,7 +112,7 @@ Consolidating closure ownership in AM removes the operational complexity that a 
 - Good, because canonical data ownership and hot-path read-model ownership are explicitly separated.
 - Good, because Tenant Resolver can evolve projection internals independently of AM storage.
 - Bad, because it introduces a permanent synchronization surface — revision tokens, poll loops, rebuild orchestration, drift detection — that has no corresponding business requirement.
-- Bad, because hierarchy state is materialized twice across two modules, doubling the failure surface (projection staleness, rebuild failure, drift).
+- Bad, because hierarchy state is materialized twice across two gears, doubling the failure surface (projection staleness, rebuild failure, drift).
 - Bad, because AM still pays write-side cost (revision-token maintenance on every hierarchy mutation) without gaining a simpler contract.
 - Bad, because the closure projection shape TR would maintain is the platform-canonical shape; splitting its ownership from the source tree is structural duplication rather than separation of concerns.
 
@@ -126,7 +126,7 @@ Consolidating closure ownership in AM removes the operational complexity that a 
 
 ### AM tree plus AM canonical closure
 
-- Good, because AM owns one coherent aggregate — tree, barrier, closure — with transactional consistency and no cross-module sync.
+- Good, because AM owns one coherent aggregate — tree, barrier, closure — with transactional consistency and no cross-gear sync.
 - Good, because the closure shape matches `TENANT_MODEL.md` directly; there is no new or resolver-specific schema to define.
 - Good, because barrier is already an AM-native concept (`cpt-cf-account-management-principle-barrier-as-data`) and AM already runs barrier-aware hierarchy walks on the hot path for metadata inheritance.
 - Good, because the AM write surface is favorable: create/delete/status are O(depth), convert is rare and bounded, subtree moves are not supported.
@@ -138,9 +138,9 @@ Consolidating closure ownership in AM removes the operational complexity that a 
 
 ### AM implements full Tenant Resolver trait logic
 
-- Good, because a single module owns canonical state and traversal behavior with no intermediate abstraction.
+- Good, because a single gear owns canonical state and traversal behavior with no intermediate abstraction.
 - Bad, because AM becomes directly responsible for `TenantResolverPluginClient` semantics — `BarrierMode`, ordering, pagination, hot-path latency — which are genuinely resolver concerns unrelated to administrative correctness.
-- Bad, because it collapses a useful module boundary; AM starts absorbing responsibilities that do not belong to administrative source-of-truth ownership.
+- Bad, because it collapses a useful gear boundary; AM starts absorbing responsibilities that do not belong to administrative source-of-truth ownership.
 - Bad, because Tenant Resolver becomes a redundant abstraction or a legacy compatibility wrapper with no clear independent purpose.
 - Bad, because it is the largest redesign and provides no incremental value over Option 3, where TR retains a meaningful query-facade role.
 

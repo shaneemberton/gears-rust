@@ -72,7 +72,7 @@ Gears fall into a few categories depending on their role in the platform —
 system Gears (resolvers, gateways, registries), domain Gears (business
 capabilities), and plugins:
 
-![Gear categories](../img/gear_categories.drawio.png)
+![Gear categories](../img/gears_categories.drawio.png)
 
 ## Typical REST API Request Trajectory
 

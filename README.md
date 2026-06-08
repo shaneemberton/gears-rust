@@ -1,12 +1,18 @@
 # Constructor Fabric Gears (Rust)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/constructorfabric/gears-rust/badge)](https://scorecard.dev/viewer/?uri=github.com/constructorfabric/gears-rust)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12050/badge)](https://www.bestpractices.dev/projects/12050)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/constructorfabric/gears-rust/badge)](https://scorecard.dev/viewer/?uri=github.com/constructorfabric/gears-rust) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12050/badge)](https://www.bestpractices.dev/projects/12050)
 
-**CF/Gears Rust** is a secure, modular XaaS development framework and middleware developed by the **Constructor Fabric Foundation**. It provides ready-to-use building blocks, domain components, and APIs with defense-in-depth, multi-tenancy, and granular access control built into every layer.
+<p align="center">
+  <img src="docs/img/gears.png" style='max-width: 800px' alt="Constructor Fabric Gears diagram">
+</p>
 
-**Gears** is not a ready-to-use service. Instead, it is a set of well-integrated libraries that XaaS vendors can compose into their own products. Vendors decide which gears to include, how to combine them into services, and where to run them—from edge devices to Kubernetes clusters.
+**Gears** is a secure, modular XaaS framework and middleware, developed in Rust by the [Constructor Fabric Foundation](https://www.constructorfabric.org). It provides composable building blocks, domain components, and APIs with defense-in-depth security, multi-tenancy, and fine-grained access control built into every layer.
 
-Gears span three broad categories: **Core** gears for platform foundations such as API gateway, authentication/authorization, account management, etc; **Serverless** gears for functions, workflows, and event-driven execution; and **GenAI** gears for chat, retrieval, prompt orchestration, and related AI capabilities.
+Gears is not a ready-to-use service. Instead, it is a set of well-integrated libraries that XaaS vendors can compose into their own products. Vendors decide which gears to include, how to combine them into services, and where to run them—from edge devices to Kubernetes clusters.
+
+Gears span three broad categories:
+- **Core** gears for platform foundations such as API gateway, authentication/authorization, account management, etc;
+- **Serverless** gears for functions, workflows, and event-driven execution;
+- **GenAI** gears for chat, retrieval, prompt orchestration, and related AI capabilities.
 
 See [OVERVIEW](docs/slides/1_OVERVIEW.html) HTML slides explaining the key Consructor Fabric Gears concepts.
 See [GEARS](docs/GEARS.md) for gears overview.

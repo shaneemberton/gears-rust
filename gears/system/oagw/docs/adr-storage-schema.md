@@ -296,7 +296,7 @@ Indexes:
 Notes:
 
 - These queries are illustrative for reasoning about indexing and constraints.
-- OAGW implementation must use the secure ORM layer (no raw SQL in module code).
+- OAGW implementation must use the secure ORM layer (no raw SQL in gear code).
 - `:param` denotes a bound parameter. Lists must be expanded safely by the query builder.
 
 ### Resolve upstream by alias across a tenant hierarchy

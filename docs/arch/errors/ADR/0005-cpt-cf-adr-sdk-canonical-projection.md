@@ -9,7 +9,7 @@ date: 2026-05-20
 
 ## Context and Problem Statement
 
-Gears ship per-module SDK crates (`oagw-sdk`, `credstore-sdk`, `tenant-resolver-sdk`, …) that ClientHub consumers use to call other modules in-process. Each SDK historically exposed a hand-rolled error enum (`ServiceGatewayError`, `CredStoreError`, …) that the impl crate populated through a parallel `From<DomainError> for SdkError` ladder, distinct from the `From<DomainError> for CanonicalError` ladder used on the REST boundary.
+Gears ship per-gear SDK crates (`oagw-sdk`, `credstore-sdk`, `tenant-resolver-sdk`, …) that ClientHub consumers use to call other gears in-process. Each SDK historically exposed a hand-rolled error enum (`ServiceGatewayError`, `CredStoreError`, …) that the impl crate populated through a parallel `From<DomainError> for SdkError` ladder, distinct from the `From<DomainError> for CanonicalError` ladder used on the REST boundary.
 
 This caused three concrete problems:
 
@@ -23,12 +23,12 @@ What's the right shape for the SDK error surface?
 
 ## Decision Drivers
 
-* Single authoritative AIP-193 categorization — domain → canonical mapping must live in exactly one place per module
+* Single authoritative AIP-193 categorization — domain → canonical mapping must live in exactly one place per gear
 * Information fidelity at the SDK boundary — projection loss should be a consumer-side opt-in, not a default
 * Stable SDK contract — variant changes in the projection must not be SDK semver-major events
 * Cross-SDK uniformity — consumers using multiple SDKs should see a uniform error type at trait boundaries
 * Ergonomic typed dispatch when consumers want it — flat match arms, typed sub-enums for context discriminators
-* Conformance with `cpt-cf-errors-adr-canonical-error-categories` — finite vocabulary, no module-specific error categories
+* Conformance with `cpt-cf-errors-adr-canonical-error-categories` — finite vocabulary, no gear-specific error categories
 * `cpt-cf-errors-principle-single-error-gateway` — REST path goes through `CanonicalError` unchanged
 
 ## Decision Outcome
@@ -43,7 +43,7 @@ The trait signature is uniform across all SDKs. The projection lives in the SDK 
 ### Consequences
 
 * The SDK trait returns `Result<_, CanonicalError>` for every fallible method. No SDK-specific error type appears in the trait signature.
-* The impl crate keeps **only** `From<DomainError> for CanonicalError` in its REST error module. Any parallel `From<DomainError> for SdkError` is deleted; the facade calls `.map_err(CanonicalError::from)` once per method.
+* The impl crate keeps **only** `From<DomainError> for CanonicalError` in its REST error gear. Any parallel `From<DomainError> for SdkError` is deleted; the facade calls `.map_err(CanonicalError::from)` once per method.
 * SDKs MAY ship a typed `SdkError` projection enum (with `From<CanonicalError>`) as a documented consumer convenience. The projection is **not** part of the trait contract:
    - Adding a variant is non-breaking
    - Refining a variant's payload is breaking only for consumers that destructure that variant
@@ -300,9 +300,9 @@ Skip the projection when consumers do not benefit from either case — typically
 
 ## Non-Canonical Methods
 
-The canonical contract applies to **trait methods whose failures cross or could cross a wire boundary** — i.e., the methods registered in `ClientHub` that another module might call in-process today and dial over HTTP tomorrow.
+The canonical contract applies to **trait methods whose failures cross or could cross a wire boundary** — i.e., the methods registered in `ClientHub` that another gear might call in-process today and dial over HTTP tomorrow.
 
-SDK methods that exist purely for in-process client-side ergonomics (decoder helpers, stream parsers, builder fluents) are not bound by the canonical contract. They MAY return module-specific error types — typically a narrow `thiserror` enum — because those failures will never be projected, deserialized, or transported.
+SDK methods that exist purely for in-process client-side ergonomics (decoder helpers, stream parsers, builder fluents) are not bound by the canonical contract. They MAY return gear-specific error types — typically a narrow `thiserror` enum — because those failures will never be projected, deserialized, or transported.
 
 The OAGW SDK ships `StreamingError` (in `oagw-sdk/src/error.rs`) for SSE and WebSocket decode failures that surface inside the SDK's own client helpers but never traverse an OAGW response. `StreamingError` does not implement `From<CanonicalError>` and does not appear in the `ServiceGatewayClientV1` trait signature.
 
@@ -354,7 +354,7 @@ For the four resolver SDKs at the bottom, the canonical boundary mapping is the 
 
 | Doc | Statement | Conformance |
 |---|---|---|
-| [`ADR 0001`](./0001-cpt-cf-adr-canonical-error-categories.md) §Consequences | *"Every module must migrate its existing ad-hoc error types to one of the 16 canonical categories — no module-specific error categories are allowed."* | **Verbatim.** Trait boundary is `CanonicalError`; the opt-in projection is consumer-side, not a wire or trait contract. |
+| [`ADR 0001`](./0001-cpt-cf-adr-canonical-error-categories.md) §Consequences | *"Every gear must migrate its existing ad-hoc error types to one of the 16 canonical categories — no gear-specific error categories are allowed."* | **Verbatim.** Trait boundary is `CanonicalError`; the opt-in projection is consumer-side, not a wire or trait contract. |
 | [`PRD §6`](../PRD.md) Acceptance Criteria | *"No error reaches API consumers outside the canonical vocabulary."* | **Verbatim.** Consumers receive `CanonicalError` at the trait boundary. |
 | [`DESIGN §3.2`](../DESIGN.md) `principle-single-error-gateway` | *"Every REST error response is produced from a `CanonicalError` via `From<CanonicalError> for Problem`."* | **Verbatim.** REST path is unchanged. |
 | [`DESIGN §3.3`](../DESIGN.md) `cpt-cf-errors-interface-problem-roundtrip` | *"SDK clients deserialize Problem responses back into `CanonicalError`."* | **Implemented.** `TryFrom<Problem> for CanonicalError` landed in `toolkit-canonical-errors`. |

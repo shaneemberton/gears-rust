@@ -111,9 +111,9 @@ The `system_request_id` is `Uuid::new_v4()` generated once at enqueue time.
 
 **Important**: The service currently uses `self.db.conn()` (not a transaction). This must change to `self.db.transaction()` to ensure atomicity of all three operations.
 
-### 2.6 Register chat cleanup queue in module.rs
+### 2.6 Register chat cleanup queue in gear.rs
 
-File: `src/module.rs` (around line 205)
+File: `src/gear.rs` (around line 205)
 
 Add a new queue registration in the outbox builder:
 
@@ -135,7 +135,7 @@ File: `src/domain/service/test_helpers.rs`
 
 - [ ] `ChatCleanupEvent` serializes/deserializes correctly
 - [ ] `delete_chat` atomically: soft-deletes chat, marks attachments pending, enqueues event
-- [ ] Chat cleanup queue is registered in module startup
+- [ ] Chat cleanup queue is registered in gear startup
 - [ ] Existing `delete_chat` tests updated to verify event enqueue
 - [ ] New test: `delete_chat` on chat with attachments → attachments get `cleanup_status = 'pending'`
 - [ ] New test: `delete_chat` on chat with no attachments → event still enqueued (handler handles empty attachment list gracefully)

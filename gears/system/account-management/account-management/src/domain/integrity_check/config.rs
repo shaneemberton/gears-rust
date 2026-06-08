@@ -4,7 +4,7 @@
 //! [`crate::domain::integrity_check::service::run_integrity_check_loop`].
 //! Defaults match the FEATURE doc handoff: hourly cadence, 5-minute
 //! initial delay (so the bootstrap saga in
-//! [`crate::module::AccountManagementModule::init`] can finish before
+//! [`crate::gear::AccountManagementGear::init`] can finish before
 //! the first tick fires), 10% multiplicative jitter to spread load
 //! across replicas without leader-election.
 //!
@@ -29,7 +29,7 @@ use toolkit_macros::domain_model;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct IntegrityCheckConfig {
-    /// When `true` (default), [`crate::module::AccountManagementModule::serve`]
+    /// When `true` (default), [`crate::gear::AccountManagementGear::serve`]
     /// spawns the periodic job. When `false`, the loop is not entered
     /// and only the on-demand SDK method runs the check.
     pub enabled: bool,
@@ -42,10 +42,10 @@ pub struct IntegrityCheckConfig {
     /// in-process loop.
     pub interval_secs: u64,
 
-    /// Delay between [`crate::module::AccountManagementModule::serve`]
+    /// Delay between [`crate::gear::AccountManagementGear::serve`]
     /// reaching this loop and the first tick firing. Designed so the
     /// retention + reaper loops have a chance to settle and
-    /// [`crate::module::AccountManagementModule::init`]'s bootstrap
+    /// [`crate::gear::AccountManagementGear::init`]'s bootstrap
     /// saga has long finished before the first whole-tree snapshot is
     /// taken. Must be `<= interval_secs` so the first tick never lags
     /// more than one interval.

@@ -1,4 +1,4 @@
-//! Domain service for the Types Registry module.
+//! Domain service for the Types Registry gear
 //!
 //! Kind-agnostic: returns the internal [`GtsEntity`] / [`ListQuery`] types.
 //! All kind discrimination, parent resolution, caching, and SDK type

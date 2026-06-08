@@ -254,13 +254,13 @@ tracing:
 > Without this feature, the `with_otel()` method will not be available, and you'll get
 > a compile error.
 
-### In Your Module
+### In Your Gear
 
 ```rust,ignore
 use toolkit_http::{HttpClient, HttpClientBuilder};
 
 #[async_trait]
-impl MyModule {
+impl MyGear {
     async fn call_external_api(&self) -> Result<String> {
         // Build client with OTEL tracing enabled
         let client = HttpClientBuilder::new()

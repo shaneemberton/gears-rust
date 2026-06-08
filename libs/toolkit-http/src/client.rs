@@ -393,7 +393,7 @@ pub async fn try_acquire_buffer_slot(service: &mut BufferedService) -> Result<()
 // constructing clients that accept `http://` URLs. Under `--features fips`
 // the default `HttpClientConfig.transport` is `TlsOnly` and
 // `HttpClientBuilder::build()` rejects `AllowInsecureHttp` outright (see
-// issue #1934), so the whole module cannot compile/run there. The FIPS-mode
+// issue #1934), so the whole gear cannot compile/run there. The FIPS-mode
 // contract is covered by the integration test in
 // `tests/fips_default_transport.rs` and by `tests/no_crypto_provider_fips.rs`.
 //

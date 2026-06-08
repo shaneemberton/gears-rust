@@ -59,7 +59,7 @@ fn parse_rejects_malformed_gts_syntax() {
 #[test]
 fn parse_rejects_wrong_root_segment() {
     // Valid GTS shape (5 tokens per segment), wrong AM-namespace root.
-    let alien = "gts.cf.core.other_module.dataset.v1~vendor.app.foo.bar.v1~";
+    let alien = "gts.cf.core.other_gear.dataset.v1~vendor.app.foo.bar.v1~";
     let err = ParsedTypeId::parse(alien).expect_err("wrong root");
     let detail = match err {
         DomainError::MetadataValidation { detail } => detail,

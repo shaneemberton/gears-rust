@@ -8,7 +8,7 @@ use toolkit_security::SecurityContext;
 use users_info_sdk::odata::AddressSchema;
 use users_info_sdk::{Address, AddressesStreamingClientV1, UsersInfoError};
 
-use crate::module::ConcreteAppServices;
+use crate::gear::ConcreteAppServices;
 
 #[domain_model]
 pub(crate) struct LocalAddressesStreamingClient {

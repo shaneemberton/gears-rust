@@ -119,7 +119,7 @@ impl OidcAuthNPluginBuilder {
 
     /// Build a plugin instance.
     ///
-    /// Metrics registration is performed in the module's `init()` hook, which always
+    /// Metrics registration is performed in the gear's `init()` hook, which always
     /// runs before plugin construction; building the plugin does not register metrics itself.
     #[must_use]
     pub fn build(
@@ -184,7 +184,7 @@ impl OidcAuthNPlugin {
         let client: Arc<dyn AuthNResolverPluginClient> = self.clone();
         // AuthN resolver resolves plugins by GTS instance id and then loads the
         // scoped client by that same id. Keep this scoped registration in sync
-        // with module-level GTS instance metadata.
+        // with gear-level GTS instance metadata.
         let scope = Self::register_instance_client_scope(hub, client);
         Ok(scope)
     }

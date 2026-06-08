@@ -9,7 +9,7 @@ date: 2026-02-28
 
 ## Context and Problem Statement
 
-Gears need a finite error taxonomy that all modules use. The taxonomy must be transport-agnostic (usable for REST, gRPC, SSE) while providing enough granularity for consumers to write reliable error-handling code. How many error categories should the platform define, and which ones?
+Gears need a finite error taxonomy that all gears use. The taxonomy must be transport-agnostic (usable for REST, gRPC, SSE) while providing enough granularity for consumers to write reliable error-handling code. How many error categories should the platform define, and which ones?
 
 ## Decision Drivers
 
@@ -33,15 +33,15 @@ Chosen option: **Option B — Google's 16 canonical error codes**, because it is
 
 * All 16 categories must be defined in the error library with their context types, HTTP status mappings, and GTS identifiers
 * The Google category name `unavailable` is represented in Gears as `service_unavailable` (same semantics, clearer platform naming)
-* Every module must migrate its existing ad-hoc error types to one of the 16 canonical categories — no module-specific error categories are allowed
+* Every gear must migrate its existing ad-hoc error types to one of the 16 canonical categories — no gear-specific error categories are allowed
 * HTTP status codes that fall outside the 16 categories (e.g., 301, 413) must be mapped to the closest canonical category; the mapping rules must be documented in DESIGN
 * Adding a new category in the future is a breaking change (new enum variant) — extensibility rules must be defined separately
-* Modules that need finer granularity within a category must use the structured context payload, not a new category
+* Gears that need finer granularity within a category must use the structured context payload, not a new category
 * Developer onboarding must include the canonical category vocabulary as a prerequisite
 
 ### Confirmation
 
-Design review confirms all 16 categories are documented with HTTP status mappings. Every module error can be classified into exactly one category.
+Design review confirms all 16 categories are documented with HTTP status mappings. Every gear error can be classified into exactly one category.
 
 ## Pros and Cons of the Options
 
@@ -54,7 +54,7 @@ Use all ~70 HTTP status codes (1xx–5xx) as the error taxonomy.
 * Bad, because HTTP status codes are transport-specific — they have no meaning in gRPC, SSE, or event-driven contexts
 * Bad, because many codes are irrelevant to application errors (1xx informational, 3xx redirects)
 * Bad, because the set is too large for exhaustive `match` — developers will use wildcard arms, defeating the purpose
-* Bad, because some codes overlap semantically (400 vs 422, 401 vs 403) leading to inconsistent usage across modules
+* Bad, because some codes overlap semantically (400 vs 422, 401 vs 403) leading to inconsistent usage across gears
 
 ### Option B: Google's 16 Canonical Error Codes
 

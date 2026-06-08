@@ -1,15 +1,15 @@
 // Updated: 2026-04-07 by Constructor Tech
-//! Configuration for the credstore module.
+//! Configuration for the credstore gear.
 
 use serde::Deserialize;
 
-/// Module configuration.
+/// Gear configuration.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct CredStoreConfig {
     /// Vendor selector used to pick a plugin implementation.
     ///
-    /// The module queries types-registry for plugin instances matching
+    /// The gear queries types-registry for plugin instances matching
     /// this vendor and selects the one with lowest priority number.
     pub vendor: String,
 }

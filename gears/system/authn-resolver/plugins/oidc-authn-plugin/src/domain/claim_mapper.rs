@@ -1,6 +1,6 @@
 //! Claim mapping from Oidc claims into `SecurityContext`.
 //!
-//! This module contains the pure, synchronous mapping logic for Story 3
+//! This gear contains the pure, synchronous mapping logic for Story 3
 //! (claim mapping + security context normalization).
 
 use authn_resolver_sdk::AuthNResolverError;

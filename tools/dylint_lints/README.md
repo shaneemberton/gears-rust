@@ -38,7 +38,7 @@ make gts-docs-test       # Run unit tests for GTS validator
 ### Client/gateway Layer (DE05xx)
 - ✅ DE0503: Plugin Client Suffix
 
-### Module structure (DE06xx)
+### Gear structure (DE06xx)
 - TODO
 
 ### Security (DE07xx)
@@ -64,7 +64,7 @@ make gts-docs-test       # Run unit tests for GTS validator
 - ✅ DE1201: Publishable crates must set `package.metadata.docs.rs.all-features = true`
 
 ### Common patterns (DE13xx)
-- ✅ DE1301: No Print/Debug Macros in libraries/modules
+- ✅ DE1301: No Print/Debug Macros in libraries/gears
 - ✅ DE1302: No `.to_string()` in Error From impls (preserve error chain)
 - ✅ DE1303: No `pub type X = primitive`; use newtype for type safety
 
@@ -187,7 +187,7 @@ make dylint-test  # List test cases - compare with your violations
 
 ### Useful Patterns
 
-**Check if in specific module:**
+**Check if in specific gear:**
 
 ```rust
 use crate::utils::is_in_api_rest_folder;
@@ -258,7 +258,7 @@ A standalone CLI tool that validates GTS identifiers in documentation and config
 
 **What it checks:**
 
-- All `.md`, `.json`, `.yaml`, `.yml` files in `docs/`, `modules/`, `libs/`, `examples/`
+- All `.md`, `.json`, `.yaml`, `.yml` files in `docs/`, `gears/`, `libs/`, `examples/`
 - Skips intentionally invalid examples (marked with "bad", "invalid", "❌", etc.)
 - Allows wildcards in pattern/filter contexts
 - Optionally validates vendor consistency with `--vendor` flag
@@ -269,7 +269,7 @@ A standalone CLI tool that validates GTS identifiers in documentation and config
 make gts-docs
 
 # Direct CLI with options
-gts-validator --vendor cf,vendor,example,fabrikam --exclude "target/*" docs modules libs examples
+gts-validator --vendor cf,vendor,example,fabrikam --exclude "target/*" docs gears libs examples
 ```
 
 **Exit codes:**
@@ -288,7 +288,7 @@ Where each segment = vendor.org.package.type.version
 **Examples:**
 ```text
 gts.cf.toolkit.plugins.plugin.v1~                             # Schema (type definition)
-gts.cf.toolkit.plugins.plugin.v1~vendor.pkg.module.plugin.v1  # Instance (chained)
+gts.cf.toolkit.plugins.plugin.v1~vendor.pkg.gear.plugin.v1  # Instance (chained)
 gts.hx.core.errors.err.v1~hx.odata.errors.invalid.v1         # Error code
 ```
 

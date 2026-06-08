@@ -69,7 +69,7 @@ Types define the structural rules for the resource group hierarchy — which par
 - **Design**: [DESIGN.md](../DESIGN.md) — sections 3.1, 3.2 (Type Service), 3.3, 3.7 (gts_type tables)
 - **DECOMPOSITION**: [DECOMPOSITION.md](../DECOMPOSITION.md) entry 2.2
 - **Dependencies**: Feature 0001 — SDK traits, persistence adapter, error mapping
-- **Not applicable**: UX (backend API — no user interface); COMPL (internal platform module — no regulatory data handling); OPS observability and rollout are managed at the module infrastructure level (DESIGN §3.7 and platform runbooks); PERF targets are set at the system level in PRD.md NFR section.
+- **Not applicable**: UX (backend API — no user interface); COMPL (internal platform gear — no regulatory data handling); OPS observability and rollout are managed at the gear infrastructure level (DESIGN §3.7 and platform runbooks); PERF targets are set at the system level in PRD.md NFR section.
 
 ## 2. Actor Flows (CDSL)
 

@@ -11,13 +11,13 @@
 This feature describes the transactional outbox pattern implemented in `toolkit-db` (shared infra table `toolkit_outbox_events`) so that event publishing is reliable and does not add synchronous network calls to the critical execution hot path.
 
 The outbox is a **general-purpose infrastructure mechanism**.
-Modules use it by publishing messages under a dedicated `(namespace, topic)` pair.
+Gears use it by publishing messages under a dedicated `(namespace, topic)` pair.
 
 ### 1.2 Purpose
 
 This feature ensures the **Outbox Completeness Invariant**: for any domain operation that is defined to emit an outbox event, it MUST be impossible for that operation's side effects to commit without the corresponding `toolkit_outbox_events` row being persisted in the same database transaction.
 
-This invariant applies only to domain operations that are defined to emit outbox events (e.g., quota-bearing turn finalization in Mini Chat). It does not apply to read-only operations, pre-reserve validation failures, or state transitions that intentionally produce no event. The set of operations that require outbox emission is defined by each consuming module (see DESIGN.md section 5.7 for the Mini Chat normative list).
+This invariant applies only to domain operations that are defined to emit outbox events (e.g., quota-bearing turn finalization in Mini Chat). It does not apply to read-only operations, pre-reserve validation failures, or state transitions that intentionally produce no event. The set of operations that require outbox emission is defined by each consuming gear (see DESIGN.md section 5.7 for the Mini Chat normative list).
 
 It also ensures events can be delivered asynchronously with at-least-once delivery semantics.
 
@@ -83,7 +83,7 @@ The `tenant_id` column and the `dedupe_key` field serve different roles and MUST
 
 **Dedupe key requiredness by event type (normative):**
 
-The generic outbox library allows `dedupe_key` to be NULL (the partial unique index only applies when `dedupe_key IS NOT NULL`). However, modules MUST follow these rules when enqueuing events:
+The generic outbox library allows `dedupe_key` to be NULL (the partial unique index only applies when `dedupe_key IS NOT NULL`). However, gears MUST follow these rules when enqueuing events:
 
 1. **Quota-bearing / billing events** — MUST have non-null `dedupe_key`
    - Events that result in quota debit, credit, or billing charges
@@ -103,14 +103,14 @@ The generic outbox library allows `dedupe_key` to be NULL (the partial unique in
    - Examples: page view counters, system health heartbeats
    - Rationale: Reduces storage overhead when idempotency is not required
 
-**Mini-Chat-specific convention (not enforced by generic library):** In the Mini Chat domain, the canonical format is `"{tenant_id}/{turn_id}/{request_id}"` (see DESIGN.md section 5.6). Mini Chat domain code MUST validate this format and enforce non-null `dedupe_key` for all quota-bearing events before calling `enqueue`. The validation is the caller's responsibility, not the outbox library's. Mini Chat downstream consumers MUST use the same canonical tuple `(tenant_id, turn_id, request_id)` — extracted from the `dedupe_key` or from the payload — for idempotent processing. Other modules define their own `dedupe_key` format and idempotency extraction rules in their respective feature specs.
+**Mini-Chat-specific convention (not enforced by generic library):** In the Mini Chat domain, the canonical format is `"{tenant_id}/{turn_id}/{request_id}"` (see DESIGN.md section 5.6). Mini Chat domain code MUST validate this format and enforce non-null `dedupe_key` for all quota-bearing events before calling `enqueue`. The validation is the caller's responsibility, not the outbox library's. Mini Chat downstream consumers MUST use the same canonical tuple `(tenant_id, turn_id, request_id)` — extracted from the `dedupe_key` or from the payload — for idempotent processing. Other gears define their own `dedupe_key` format and idempotency extraction rules in their respective feature specs.
 
-The presence of `tenant_id` as a table column does not replace domain-level idempotency semantics embedded in `dedupe_key`. The two serve different purposes. When both are populated, modules SHOULD ensure consistency (tenant_id column matches the tenant component of dedupe_key), but this is a module-level convention, not a database constraint.
+The presence of `tenant_id` as a table column does not replace domain-level idempotency semantics embedded in `dedupe_key`. The two serve different purposes. When both are populated, gears SHOULD ensure consistency (tenant_id column matches the tenant component of dedupe_key), but this is a gear-level convention, not a database constraint.
 
 ### 1.7 Proposed `toolkit_db::outbox` v1 API (sketch)
 
 This is the intended interface shape for the generalized outbox mechanism in `toolkit-db`.
-Modules consume this API with their own `namespace/topic`.
+Gears consume this API with their own `namespace/topic`.
 
 ```rust
 use toolkit_db::secure::DBRunner;
@@ -211,13 +211,13 @@ where
 **Behavior (normative)**:
 - The dispatcher is an internal background worker (implemented as a ToolKit stateful lifecycle task).
 - It MUST periodically poll for publishable outbox rows and process them until a shutdown `CancellationToken` is triggered.
-  - **Polling interval**: configurable per-dispatcher via `poll_interval: Duration` (runtime configuration, supplied by the deploying module). No hardcoded default in this spec. The polling interval MUST be significantly less than `lease_duration` (recommended: `poll_interval <= lease_duration / 3`) to avoid spurious lease-expiry reclaims.
+  - **Polling interval**: configurable per-dispatcher via `poll_interval: Duration` (runtime configuration, supplied by the deploying gear). No hardcoded default in this spec. The polling interval MUST be significantly less than `lease_duration` (recommended: `poll_interval <= lease_duration / 3`) to avoid spurious lease-expiry reclaims.
 - Claiming MUST be safe under concurrency (multiple replicas/workers) and MUST use row-level locking via `FOR UPDATE SKIP LOCKED`.
 - Claimed rows MUST be leased using `(locked_by, locked_until)` so that:
   - A crashing worker does not permanently strand a row.
   - Another worker can reclaim a row after lease expiry.
 - For each claimed row, the dispatcher MUST publish the outbox payload to the downstream consumer.
-  - **"Publish" definition**: Publish is an abstract operation supplied by the consuming module as a callback (e.g., `async fn(ClaimedMessage) -> Result<(), PublishError>`). The transport mechanism (in-process function call, HTTP, message queue) is module-defined and outside the scope of this spec. The dispatcher treats the callback return value as the publish outcome: `Ok(())` = success, `Err(...)` = failure. The dispatcher MUST NOT interpret payload contents.
+  - **"Publish" definition**: Publish is an abstract operation supplied by the consuming gear as a callback (e.g., `async fn(ClaimedMessage) -> Result<(), PublishError>`). The transport mechanism (in-process function call, HTTP, message queue) is gear-defined and outside the scope of this spec. The dispatcher treats the callback return value as the publish outcome: `Ok(())` = success, `Err(...)` = failure. The dispatcher MUST NOT interpret payload contents.
 - On publish success, the row MUST transition to `delivered` and be made ineligible for further dispatch.
 - On publish failure, the row MUST be returned to `pending` and rescheduled by setting `next_attempt_at` using a retry policy, while recording `attempts` and `last_error`.
 
@@ -243,10 +243,10 @@ where
 
 **Input**:
 - Operation outcome (completed/failed/aborted)
-- Committed side effects summary (module-defined)
+- Committed side effects summary (gear-defined)
 - Identifiers used for idempotency and downstream correlation
 
-**Caller responsibility**: The `enqueue` function persists whatever message it receives; it does not inspect or filter by outcome. The *caller* (domain operation code) is responsible for deciding whether a given outcome requires an outbox event. The set of outbox-requiring outcomes is defined by each consuming module (see section 1.2). If the caller determines that no event is needed (e.g., a pre-reserve validation failure), it simply does not call `enqueue`.
+**Caller responsibility**: The `enqueue` function persists whatever message it receives; it does not inspect or filter by outcome. The *caller* (domain operation code) is responsible for deciding whether a given outcome requires an outbox event. The set of outbox-requiring outcomes is defined by each consuming gear (see section 1.2). If the caller determines that no event is needed (e.g., a pre-reserve validation failure), it simply does not call `enqueue`.
 
 **Output**:
 - Persisted `toolkit_outbox_events` row inserted atomically with the committed side effects
@@ -315,12 +315,12 @@ where
   > `next_attempt_at = now() + jittered_delay`
   >
   > Where:
-  > * `base_delay` — minimum retry interval. Runtime configuration supplied by the deploying module (e.g., 1 s). Immutable per dispatcher instance.
-  > * `max_delay` — upper bound on computed delay before jitter. Runtime configuration supplied by the deploying module (e.g., 300 s). Immutable per dispatcher instance.
+  > * `base_delay` — minimum retry interval. Runtime configuration supplied by the deploying gear (e.g., 1 s). Immutable per dispatcher instance.
+  > * `max_delay` — upper bound on computed delay before jitter. Runtime configuration supplied by the deploying gear (e.g., 300 s). Immutable per dispatcher instance.
   > * `attempts` — current value of the row's `attempts` column (persisted, incremented at claim time per section 3 claim algo).
   > * Jitter: uniform random over `[delay/2, delay]` (equal-jitter strategy). Bounding is applied before jitter: `delay` is clamped to `max_delay` first, then jitter is applied to the clamped value.
 
-- If `attempts >= max_attempts`, the dispatcher MUST transition the row to `dead` and MUST NOT retry it automatically. `max_attempts` is the same value as `ClaimCfg.max_attempts` (section 1.7); it represents total delivery attempts. Runtime configuration supplied by the deploying module, immutable per dispatcher instance.
+- If `attempts >= max_attempts`, the dispatcher MUST transition the row to `dead` and MUST NOT retry it automatically. `max_attempts` is the same value as `ClaimCfg.max_attempts` (section 1.7); it represents total delivery attempts. Runtime configuration supplied by the deploying gear, immutable per dispatcher instance.
 
 ## 4. States (CDSL)
 

@@ -1,6 +1,6 @@
 //! Hierarchy-integrity check subsystem (Rust-side).
 //!
-//! This module replaces the legacy raw-SQL classifier path with eight
+//! This gear replaces the legacy raw-SQL classifier path with eight
 //! pure-Rust classifiers that operate on an in-memory
 //! [`Snapshot`](snapshot::Snapshot) of `(tenants, tenant_closure)`. The
 //! split between transient DB I/O and synchronous classification is the

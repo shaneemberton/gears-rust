@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/domain/service.rs
+// simulated_dir=/cf-gears/gears/some_gear/domain/service.rs
 // Test file for DE0301: No Infrastructure Dependencies in Domain
 // This file simulates being in a domain/ directory
 #![allow(unused_imports)]

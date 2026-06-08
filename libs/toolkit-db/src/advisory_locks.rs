@@ -77,7 +77,7 @@ pub struct DbLockGuard {
 }
 
 impl DbLockGuard {
-    /// Lock key with module namespace ("module:key").
+    /// Lock key with gear namespace ("gear:key").
     pub fn key(&self) -> &str {
         &self.namespaced_key
     }
@@ -128,15 +128,15 @@ impl LockManager {
         Self { dsn }
     }
 
-    /// Acquire an advisory lock for `{module}:{key}`.
+    /// Acquire an advisory lock for `{gear}:{key}`.
     ///
     /// Returns a guard that releases the lock when dropped (best-effort) or
     /// deterministically when `release().await` is called.
     ///
     /// # Errors
     /// Returns `DbLockError` if the lock cannot be acquired.
-    pub async fn lock(&self, module: &str, key: &str) -> Result<DbLockGuard, DbLockError> {
-        let namespaced_key = format!("{module}:{key}");
+    pub async fn lock(&self, gear: &str, key: &str) -> Result<DbLockGuard, DbLockError> {
+        let namespaced_key = format!("{gear}:{key}");
         self.lock_file(&namespaced_key).await
     }
 
@@ -151,11 +151,11 @@ impl LockManager {
     /// Returns `DbLockError` on unrecoverable lock errors.
     pub async fn try_lock(
         &self,
-        module: &str,
+        gear: &str,
         key: &str,
         config: LockConfig,
     ) -> Result<Option<DbLockGuard>, DbLockError> {
-        let namespaced_key = format!("{module}:{key}");
+        let namespaced_key = format!("{gear}:{key}");
         let start = Instant::now();
         let mut attempt = 0u32;
         let mut backoff = config.initial_backoff;
@@ -358,10 +358,10 @@ mod tests {
         );
 
         let guard1 = lock_manager
-            .lock("module1", &format!("{test_id}_key"))
+            .lock("gear1", &format!("{test_id}_key"))
             .await?;
         let guard2 = lock_manager
-            .lock("module2", &format!("{test_id}_key"))
+            .lock("gear2", &format!("{test_id}_key"))
             .await?;
 
         assert!(!guard1.key().is_empty());
@@ -385,7 +385,7 @@ mod tests {
         );
 
         let _guard1 = lock_manager
-            .lock("test_module", &format!("{test_id}_key"))
+            .lock("test_gear", &format!("{test_id}_key"))
             .await?;
 
         // Different key should succeed quickly even with retries/timeouts
@@ -397,7 +397,7 @@ mod tests {
         };
 
         let result = lock_manager
-            .try_lock("test_module", &format!("{test_id}_different_key"), config)
+            .try_lock("test_gear", &format!("{test_id}_different_key"), config)
             .await?;
         assert!(result.is_some(), "expected successful lock acquisition");
         Ok(())
@@ -417,7 +417,7 @@ mod tests {
 
         let result = lock_manager
             .try_lock(
-                "test_module",
+                "test_gear",
                 &format!("{test_id}_key"),
                 LockConfig::default(),
             )
@@ -438,11 +438,8 @@ mod tests {
                 .as_nanos()
         );
 
-        let guard = lock_manager.lock("test_module", &test_id).await?;
-        let err = lock_manager
-            .lock("test_module", &test_id)
-            .await
-            .unwrap_err();
+        let guard = lock_manager.lock("test_gear", &test_id).await?;
+        let err = lock_manager.lock("test_gear", &test_id).await.unwrap_err();
         match err {
             DbLockError::AlreadyHeld { lock_name } => {
                 assert!(lock_name.contains(&test_id));
@@ -466,13 +463,13 @@ mod tests {
                 .as_nanos()
         );
 
-        let _guard = lock_manager.lock("module", &key).await?;
+        let _guard = lock_manager.lock("gear", &key).await?;
         let config = LockConfig {
             max_wait: Some(Duration::from_millis(100)),
             max_attempts: Some(2),
             ..Default::default()
         };
-        let res = lock_manager.try_lock("module", &key, config).await?;
+        let res = lock_manager.try_lock("gear", &key, config).await?;
         assert!(res.is_none());
         Ok(())
     }

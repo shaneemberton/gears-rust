@@ -6,7 +6,7 @@ use toolkit::api::canonical_prelude::*;
 use toolkit_security::SecurityContext;
 
 use crate::api::rest::dto::{ReactionDto, SetReactionReq};
-use crate::module::AppServices;
+use crate::gear::AppServices;
 
 /// PUT /mini-chat/v1/chats/{id}/messages/{msg_id}/reaction
 #[tracing::instrument(skip(svc, ctx, req_body), fields(chat_id = %chat_id, msg_id = %msg_id))]

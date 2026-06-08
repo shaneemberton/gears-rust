@@ -12,7 +12,7 @@ use tracing::field::Empty;
 use toolkit::api::canonical_prelude::*;
 
 use super::{CreateGroupDto, GroupDto, GroupWithDepthDto, SecurityContext, UpdateGroupDto, info};
-use crate::module::ConcreteGroupService;
+use crate::gear::ConcreteGroupService;
 
 /// Query parameters for delete endpoint.
 #[derive(Debug, serde::Deserialize)]

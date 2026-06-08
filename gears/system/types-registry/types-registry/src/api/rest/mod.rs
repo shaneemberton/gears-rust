@@ -1,4 +1,4 @@
-//! REST API layer for the Types Registry module.
+//! REST API layer for the Types Registry gear.
 
 pub mod dto;
 pub mod error;

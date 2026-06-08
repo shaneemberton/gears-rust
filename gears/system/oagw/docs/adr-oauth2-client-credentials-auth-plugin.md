@@ -58,7 +58,7 @@ Both registered in `AuthPluginRegistry::with_builtins`. Only `auth_method` diffe
 | `client_secret_ref` | Yes | `cred://` reference for `client_secret` |
 | `scopes` | No | Space-separated OAuth2 scopes |
 
-### Module-Level Configuration (OagwConfig)
+### Gear-Level Configuration (OagwConfig)
 
 | Key | Default | Description |
 |---|---|---|

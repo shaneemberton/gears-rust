@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/other/structs.rs
+// simulated_dir=/cf-gears/gears/some_gear/other/structs.rs
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

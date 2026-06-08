@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::{
     AddressDto, ApiResult, Json, JsonBody, PutAddressReq, SecurityContext, info, no_content,
 };
-use crate::module::ConcreteAppServices;
+use crate::gear::ConcreteAppServices;
 
 /// Get address for a specific user
 #[tracing::instrument(

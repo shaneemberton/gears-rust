@@ -1,8 +1,8 @@
 # cf-chat-engine-sdk
 
-SDK crate for the **chat-engine** module: plugin traits, shared models, and error types used by backend plugin implementations.
+SDK crate for the **chat-engine** gear: plugin traits, shared models, and error types used by backend plugin implementations.
 
-The Chat Engine module is a multi-tenant conversational infrastructure with a plugin-driven backend. Chat Engine owns session state, message trees, streaming, and routing — but **zero business logic**. All message processing is delegated to backend plugins that implement the `ChatEngineBackendPlugin` trait defined in this crate.
+The Chat Engine gear is a multi-tenant conversational infrastructure with a plugin-driven backend. Chat Engine owns session state, message trees, streaming, and routing — but **zero business logic**. All message processing is delegated to backend plugins that implement the `ChatEngineBackendPlugin` trait defined in this crate.
 
 ## Purpose
 

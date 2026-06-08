@@ -54,7 +54,7 @@ decision-makers: Constructor Fabric Steering Committee
 
 ## Context and Problem Statement
 
-The Resource Group (RG) module needs a type identification standard for its hierarchy and membership model. The core problem: how to identify and compose RG types across vendors while maintaining DB-enforced referential integrity and clear separation of type-level metadata (topology rules) from instance-level data (group fields)?
+The Resource Group (RG) gear needs a type identification standard for its hierarchy and membership model. The core problem: how to identify and compose RG types across vendors while maintaining DB-enforced referential integrity and clear separation of type-level metadata (topology rules) from instance-level data (group fields)?
 
 ## Decision Drivers
 
@@ -100,7 +100,7 @@ Chosen option: "GTS with traits pattern", because it is the only option that pro
 * Good, because SMALLINT surrogate keys minimize storage (2 bytes vs 50+ byte strings per FK)
 * Good, because junction tables provide DB-level referential integrity for type relationships
 * Good, because traits pattern cleanly separates topology rules from instance data
-* Good, because aligns with platform GTS conventions used by other modules
+* Good, because aligns with platform GTS conventions used by other gears
 * Bad, because adds complexity: type registration order dependency, chained identifier parsing
 * Bad, because requires GTS type registry to be available before RG can create types
 

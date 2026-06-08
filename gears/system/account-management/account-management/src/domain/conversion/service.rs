@@ -357,7 +357,7 @@ pub(super) mod pep {
 /// Central AM domain service for `ConversionRequest` lifecycle.
 ///
 /// Construction mirrors `TenantService::new` — every dependency is
-/// passed in as an `Arc<dyn ...>` so production wiring (`module.rs`)
+/// passed in as an `Arc<dyn ...>` so production wiring (`gear.rs`)
 /// and tests (`FakeConversionRepo` / `FakeTenantRepo`) share the same
 /// constructor surface. The clock seam (`now_fn`) is overridable via
 /// the [`Self::with_now_fn`] builder so service-level unit tests can
@@ -377,7 +377,7 @@ pub struct ConversionService {
     /// PEP gate. Mirrors `TenantService` / `UserService` / `MetadataService`:
     /// every caller-facing conversion method PEP-gates via
     /// [`Self::authorize`] before any state read. The `PolicyEnforcer`
-    /// is owned by-value (it is `Clone`); the module wiring clones it
+    /// is owned by-value (it is `Clone`); the gear wiring clones it
     /// from the shared instance used by sibling services.
     enforcer: PolicyEnforcer,
     now_fn: NowFn,
@@ -494,7 +494,7 @@ impl ConversionService {
 
     /// Override the cleanup-loop knobs `cleanup_interval`,
     /// `expire_batch_size`, and `retention_batch_size`. Production
-    /// wiring (`AccountManagementModule::init`) reads these from the
+    /// wiring (`AccountManagementGear::init`) reads these from the
     /// `[conversion]` config section. Tests that do not invoke this
     /// builder pick up ADR-0003 §1 defaults.
     #[must_use]
@@ -544,7 +544,7 @@ impl ConversionService {
     }
 
     /// Override the per-page `$top` cap surfaced on the listing
-    /// endpoints. Production wiring (`AccountManagementModule::init`)
+    /// endpoints. Production wiring (`AccountManagementGear::init`)
     /// passes `cfg.listing.max_top` so the conversion listing surface
     /// shares the platform-wide ceiling with `list_tenants` /
     /// `list_metadata` / `list_users`.

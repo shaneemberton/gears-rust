@@ -2,7 +2,7 @@
 # This mode automatically injects SecurityCtx::root_ctx() for all requests
 # WARNING: Only use for single-user on-premise installations
 
-# Module configurations
+# Gear configurations
 api_gateway:
   bind_addr: "0.0.0.0:8080"
   enable_docs: true
@@ -43,8 +43,8 @@ api_gateway:
     allow_credentials: false
     max_age_seconds: 600
 
-# Example module with database access - will use root context
+# Example gear with database access - will use root context
 users-info:
-  # Module-specific configuration
+  # Gear-specific configuration
   log_level: "info"
 

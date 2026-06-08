@@ -1,13 +1,13 @@
-//! Types Registry Module Implementation
+//! Types Registry Gear Implementation
 //!
-//! This module provides GTS entity registration, storage, validation, and REST API endpoints.
+//! This gear provides GTS entity registration, storage, validation, and REST API endpoints.
 //! The public API is defined in `types-registry-sdk` and re-exported here.
 //!
 //! ## Architecture
 //!
 //! - **Two-phase storage**: Configuration phase (no validation) → Ready phase (full validation)
 //! - **gts-rust integration**: Uses the official GTS library for all operations
-//! - **`ClientHub` registration**: Other modules access via `hub.get::<dyn TypesRegistryClient>()?`
+//! - **`ClientHub` registration**: Other gears access via `hub.get::<dyn TypesRegistryClient>()?`
 
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]
@@ -19,8 +19,8 @@ pub use types_registry_sdk::{
 };
 
 // === MODULE DEFINITION ===
-pub mod module;
-pub use module::TypesRegistryModule;
+pub mod gear;
+pub use gear::TypesRegistryGear;
 
 // === CONFIGURATION ===
 pub mod config;

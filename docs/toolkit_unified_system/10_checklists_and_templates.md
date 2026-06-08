@@ -2,38 +2,38 @@
 
 This section provides minimal checklists and code templates for common ToolKit tasks.
 
-## Adding a New Module
+## Adding a New Gear
 
 ### Checklist
 
-- [ ] Create `<module>-sdk` crate with `api.rs`, `models.rs`, `errors.rs`, `lib.rs`
-- [ ] Create `<module>` crate with `module.rs`, `api/rest/`, `domain/`, `infra/storage/`
+- [ ] Create `<gear>-sdk` crate with `api.rs`, `models.rs`, `errors.rs`, `lib.rs`
+- [ ] Create `<gear>` crate with `gear.rs`, `api/rest/`, `domain/`, `infra/storage/`
 - [ ] Implement SDK trait with `async_trait` and `SecurityContext` first param
 - [ ] Add `#[domain_model]` on all `struct`/`enum` in `domain/` (import `toolkit_macros::domain_model`)
 - [ ] Add `#[derive(ODataFilterable)]` on REST DTOs (import `toolkit_odata_macros::ODataFilterable`)
 - [ ] Add `#[derive(Scopable)]` on SeaORM entities (import `toolkit_db_macros::Scopable`)
 - [ ] Use `SecureConn` + `SecurityContext` for all DB operations
-- [ ] Register client in `init()`: `ctx.client_hub().register::<dyn MyModuleApi>(api)`
+- [ ] Register client in `init()`: `ctx.client_hub().register::<dyn MyGearApi>(api)`
 - [ ] Pick the right config loader: `ctx.config()` is strict; `ctx.config_or_default()` is lenient
-- [ ] Export SDK types from module crate `lib.rs`
-- [ ] Add module to `Cargo.toml` workspace and `main.rs` type_name check
+- [ ] Export SDK types from gear crate `lib.rs`
+- [ ] Add gear to `Cargo.toml` workspace and `main.rs` type_name check
 
-### Module `src/lib.rs` template
+### Gear `src/lib.rs` template
 
 ```rust
-//! <YourModule> Module Implementation
+//! <YourGear> Gear Implementation
 //!
-//! The public API is defined in `<your-module>-sdk` and re-exported here.
+//! The public API is defined in `<your-gear>-sdk` and re-exported here.
 
 // === PUBLIC API (from SDK) ===
-pub use <your_module>_sdk::{
-    YourModuleClient, YourModuleError,
+pub use <your_gear>_sdk::{
+    YourGearClient, YourGearError,
     User, NewUser, UserPatch, UpdateUserRequest,
 };
 
 // === MODULE DEFINITION ===
-pub mod module;
-pub use module::YourModule;
+pub mod gear;
+pub use gear::YourGear;
 
 // === INTERNAL MODULES ===
 #[doc(hidden)]
@@ -46,23 +46,23 @@ pub mod domain;
 pub mod infra;
 ```
 
-### Module registration template
+### Gear registration template
 
 ```rust
-#[toolkit::module(
-    name = "my_module",
+#[toolkit::gear(
+    name = "my_gear",
     deps = ["foo", "bar"],
     capabilities = [db, rest, stateful],
-    client = my_module_sdk::MyModuleApi,
-    ctor = MyModule::new(),
+    client = my_gear_sdk::MyGearApi,
+    ctor = MyGear::new(),
     lifecycle(entry = "serve", stop_timeout = "30s", await_ready)
 )]
-pub struct MyModule {
+pub struct MyGear {
     /* fields */
 }
 ```
 
-> The `client = ...` attribute validates the trait at compile time and exposes MODULE_NAME, but does not auto-register the client into ClientHub. You must still register it explicitly in your `init()` method using `ctx.client_hub().register::<dyn my_module_sdk::MyModuleApi>(client)`.
+> The `client = ...` attribute validates the trait at compile time and exposes MODULE_NAME, but does not auto-register the client into ClientHub. You must still register it explicitly in your `init()` method using `ctx.client_hub().register::<dyn my_gear_sdk::MyGearApi>(client)`.
 
 ## DB Access and Secure ORM
 
@@ -200,8 +200,8 @@ pub struct UserDto {
 ### Checklist
 
 - [ ] Define `DomainError` in `domain/error.rs` with `thiserror::Error`
-- [ ] Define SDK error in `<module>-sdk/src/errors.rs` (transport-agnostic)
-- [ ] Implement `From<DomainError> for <Sdk>Error` in module crate
+- [ ] Define SDK error in `<gear>-sdk/src/errors.rs` (transport-agnostic)
+- [ ] Implement `From<DomainError> for <Sdk>Error` in gear crate
 - [ ] Implement `From<DomainError> for Problem` in `api/rest/error.rs`
 - [ ] Use `ApiResult<T>` in handlers and `?` for error propagation
 - [ ] Register relevant errors in OperationBuilder (`.error_*` or `.standard_errors()`)
@@ -226,12 +226,12 @@ pub enum DomainError {
 }
 ```
 
-## ClientHub and Inter-Module Communication
+## ClientHub and Inter-Gear Communication
 
 ### Checklist
 
 - [ ] Define SDK trait with `async_trait` and `SecurityContext` first param
-- [ ] Implement local adapter in module crate
+- [ ] Implement local adapter in gear crate
 - [ ] Register client in `init()`: `ctx.client_hub().register::<dyn Trait>(api)`
 - [ ] Consume client: `ctx.client_hub().get::<dyn Trait>()?`
 - [ ] For plugins: use `ClientScope::gts_id()` and `register_scoped()`
@@ -241,16 +241,16 @@ pub enum DomainError {
 
 ```rust
 // In init()
-let api: std::sync::Arc<dyn my_module_sdk::MyModuleApi> =
-    std::sync::Arc::new(crate::domain::local_client::MyModuleLocalClient::new(svc));
-ctx.client_hub().register::<dyn my_module_sdk::MyModuleApi>(api);
+let api: std::sync::Arc<dyn my_gear_sdk::MyGearApi> =
+    std::sync::Arc::new(crate::domain::local_client::MyGearLocalClient::new(svc));
+ctx.client_hub().register::<dyn my_gear_sdk::MyGearApi>(api);
 ```
 
 ### Client consumption template
 
 ```rust
-// In consumer module
-let api = ctx.client_hub().get::<dyn my_module_sdk::MyModuleApi>()?;
+// In consumer gear
+let api = ctx.client_hub().get::<dyn my_gear_sdk::MyGearApi>()?;
 let result = api.do_something(&ctx, input).await?;
 ```
 
@@ -258,7 +258,7 @@ let result = api.do_something(&ctx, input).await?;
 
 ### Checklist
 
-- [ ] Add `lifecycle(entry = "...")` to `#[toolkit::module(...)]` for background tasks
+- [ ] Add `lifecycle(entry = "...")` to `#[toolkit::gear(...)]` for background tasks
 - [ ] Use `CancellationToken` for shutdown coordination
 - [ ] Pass child tokens to background tasks
 - [ ] Call `ready.notify()` after setup when using `await_ready`
@@ -286,15 +286,15 @@ pub fn spawn_background_task(cancel: CancellationToken) {
 }
 ```
 
-## Out-of-Process (OoP) Modules
+## Out-of-Process (OoP) Gears
 
 ### Checklist
 
 - [ ] Create `*-sdk` crate with API trait, types, gRPC client, and wiring helpers
 - [ ] Define `.proto` file and generate gRPC stubs in SDK
-- [ ] Implement gRPC server in module crate
+- [ ] Implement gRPC server in gear crate
 - [ ] Use `toolkit_transport_grpc::client` utilities for connections
-- [ ] Register both local and remote clients in module
+- [ ] Register both local and remote clients in gear
 - [ ] Use `CancellationToken` for coordinated shutdown
 - [ ] Test with mock gRPC servers
 
@@ -302,9 +302,9 @@ pub fn spawn_background_task(cancel: CancellationToken) {
 
 ```rust
 // In SDK crate
-pub async fn wire_client(endpoint: &str) -> Result<Box<dyn MyModuleApi>, Box<dyn std::error::Error>> {
+pub async fn wire_client(endpoint: &str) -> Result<Box<dyn MyGearApi>, Box<dyn std::error::Error>> {
     let channel = connect_with_stack(endpoint).await?;
-    let client = MyModuleGrpcClient::new(channel);
+    let client = MyGearGrpcClient::new(channel);
     Ok(Box::new(client))
 }
 ```
@@ -315,7 +315,7 @@ pub async fn wire_client(endpoint: &str) -> Result<Box<dyn MyModuleApi>, Box<dyn
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opts = OopRunOptions {
-        module_name: "my_module".to_string(),
+        gear_name: "my_gear".to_string(),
         instance_id: None,
         directory_endpoint: "http://127.0.0.1:50051".to_string(),
         config_path: None,
@@ -391,7 +391,7 @@ async fn create_test_router() -> Router {
     let service = create_test_service().await;
     let router = Router::new();
     let openapi = ApiGateway::default();
-    your_module::api::rest::routes::register_routes(router, &openapi, service).unwrap()
+    your_gear::api::rest::routes::register_routes(router, &openapi, service).unwrap()
 }
 
 #[tokio::test]
@@ -399,7 +399,7 @@ async fn test_get_endpoint() {
     let router = create_test_router().await;
 
     let request = Request::builder()
-        .uri("/your-module/v1/resources/00000000-0000-0000-0000-000000000001")
+        .uri("/your-gear/v1/resources/00000000-0000-0000-0000-000000000001")
         .body(Body::empty())
         .unwrap();
 
@@ -419,7 +419,7 @@ async fn test_post_endpoint() {
 
     let request = Request::builder()
         .method("POST")
-        .uri("/your-module/v1/resources")
+        .uri("/your-gear/v1/resources")
         .header("Content-Type", "application/json")
         .body(Body::from(serde_json::to_string(&body).unwrap()))
         .unwrap();

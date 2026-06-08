@@ -1,6 +1,6 @@
 //! Directory API - contract for service discovery and instance resolution
 //!
-//! This module defines the core traits and types for the directory service API.
+//! This gear defines the core traits and types for the directory service API.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -40,8 +40,8 @@ impl ServiceEndpoint {
 /// Information about a service instance
 #[derive(Debug, Clone)]
 pub struct ServiceInstanceInfo {
-    /// Module name this instance belongs to
-    pub module: String,
+    /// Gear name this instance belongs to
+    pub gear: String,
     /// Unique instance identifier
     pub instance_id: String,
     /// Primary endpoint for the instance
@@ -50,11 +50,11 @@ pub struct ServiceInstanceInfo {
     pub version: Option<String>,
 }
 
-/// Information for registering a new module instance
+/// Information for registering a new gear instance
 #[derive(Debug, Clone)]
 pub struct RegisterInstanceInfo {
-    /// Module name
-    pub module: String,
+    /// Gear name
+    pub gear: String,
     /// Unique instance identifier
     pub instance_id: String,
     /// Map of gRPC service name to endpoint
@@ -65,26 +65,26 @@ pub struct RegisterInstanceInfo {
 
 /// Directory API trait for service discovery and instance management
 ///
-/// This trait defines the contract for interacting with the module directory.
+/// This trait defines the contract for interacting with the gear directory.
 /// It can be implemented by:
-/// - A local implementation that delegates to `ModuleManager`
-/// - A gRPC client for out-of-process modules
+/// - A local implementation that delegates to `GearManager`
+/// - A gRPC client for out-of-process gears
 #[async_trait]
 pub trait DirectoryClient: Send + Sync {
     /// Resolve a gRPC service by its logical name to an endpoint
     async fn resolve_grpc_service(&self, service_name: &str) -> Result<ServiceEndpoint>;
 
-    /// List all service instances for a given module
-    async fn list_instances(&self, module: &str) -> Result<Vec<ServiceInstanceInfo>>;
+    /// List all service instances for a given gear
+    async fn list_instances(&self, gear: &str) -> Result<Vec<ServiceInstanceInfo>>;
 
-    /// Register a new module instance with the directory
+    /// Register a new gear instance with the directory
     async fn register_instance(&self, info: RegisterInstanceInfo) -> Result<()>;
 
-    /// Deregister a module instance (for graceful shutdown)
-    async fn deregister_instance(&self, module: &str, instance_id: &str) -> Result<()>;
+    /// Deregister a gear instance (for graceful shutdown)
+    async fn deregister_instance(&self, gear: &str, instance_id: &str) -> Result<()>;
 
-    /// Send a heartbeat for a module instance to indicate it's still alive
-    async fn send_heartbeat(&self, module: &str, instance_id: &str) -> Result<()>;
+    /// Send a heartbeat for a gear instance to indicate it's still alive
+    async fn send_heartbeat(&self, gear: &str, instance_id: &str) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn test_register_instance_info() {
         let info = RegisterInstanceInfo {
-            module: "test_module".to_owned(),
+            gear: "test_gear".to_owned(),
             instance_id: "instance1".to_owned(),
             grpc_services: vec![(
                 "test.Service".to_owned(),
@@ -120,7 +120,7 @@ mod tests {
             version: Some("1.0.0".to_owned()),
         };
 
-        assert_eq!(info.module, "test_module");
+        assert_eq!(info.gear, "test_gear");
         assert_eq!(info.instance_id, "instance1");
         assert_eq!(info.grpc_services.len(), 1);
     }

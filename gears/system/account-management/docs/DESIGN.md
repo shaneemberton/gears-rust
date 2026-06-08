@@ -42,13 +42,13 @@ Created:  2026-04-01 by Diffora
 
 ### 1.1 Architectural Vision
 
-AM is the foundational multi-tenancy source-of-truth module for the Gears platform. It owns the tenant hierarchy, tenant type enforcement, barrier metadata, delegated IdP user operations, and extensible tenant metadata. AM follows the standard ToolKit module pattern under `gears/system/account-management/`: a planned SDK crate (`account-management-sdk`) exposes transport-agnostic traits and models, and a planned implementation crate (`account-management`) provides the module lifecycle, REST API, domain logic, and infrastructure adapters.
+AM is the foundational multi-tenancy source-of-truth gear for the Gears platform. It owns the tenant hierarchy, tenant type enforcement, barrier metadata, delegated IdP user operations, and extensible tenant metadata. AM follows the standard ToolKit gear pattern under `gears/system/account-management/`: a planned SDK crate (`account-management-sdk`) exposes transport-agnostic traits and models, and a planned implementation crate (`account-management`) provides the gearifecycle, REST API, domain logic, and infrastructure adapters.
 
 The architecture separates data ownership from enforcement. AM stores and validates the tenant tree structure, barrier flags, and type constraints. It does not evaluate authorization policies, generate SQL predicates, or validate bearer tokens on the per-request path. Tenant Resolver and AuthZ Resolver consume AM source-of-truth data for runtime enforcement. This separation keeps AM focused on administrative correctness while letting specialized resolvers optimize the hot path independently.
 
 IdP integration uses the Gears gateway + plugin pattern, analogous to AuthN Resolver (see `cpt-cf-account-management-adr-idp-contract-separation`). AM defines an `IdpPluginClient` trait for tenant and user administrative operations (tenant provisioning/deprovisioning, user provision/deprovision, tenant-scoped query). The plugin is discovered via GTS types-registry and resolved through `ClientHub`. The platform ships a default provider plugin; vendors substitute their own implementation behind the same trait. The IdP provider plugin is intentionally separate from the AuthN Resolver plugin — the two target different concerns (admin operations vs hot-path token validation) with different performance profiles and protocols. The contract is one-directional: AM calls IdP, IdP does not call AM.
 
-User group management is handled by the [Resource Group](../../resource-group/docs/PRD.md) module. AM registers a dedicated Resource Group type for user groups during module initialization; consumers call `ResourceGroupClient` directly for group lifecycle, membership, and hierarchy operations.
+User group management is handled by the [Resource Group](../../resource-group/docs/PRD.md) gear. AM registers a dedicated Resource Group type for user groups during gear initialization; consumers call `ResourceGroupClient` directly for group lifecycle, membership, and hierarchy operations.
 
 #### System Context
 
@@ -76,7 +76,7 @@ graph LR
 
 | Requirement | Design Response |
 |-------------|-----------------|
-| `cpt-cf-account-management-fr-root-tenant-creation` | Bootstrap runs as the first action inside the module's `lifecycle(entry = ...)` method, creating the initial root tenant with IdP linking before signalling ready. |
+| `cpt-cf-account-management-fr-root-tenant-creation` | Bootstrap runs as the first action inside the gear's `lifecycle(entry = ...)` method, creating the initial root tenant with IdP linking before signalling ready. |
 | `cpt-cf-account-management-fr-root-tenant-idp-link` | Bootstrap calls `provision_tenant` for the root tenant (same contract as all tenants), forwarding deployer-configured `root_tenant_metadata` so the IdP provider plugin can establish the tenant-to-IdP binding. Any provider-returned `IdpProvisionResult` metadata is persisted as tenant metadata. AM does not validate binding sufficiency — binding establishment is the provider's responsibility, whether via returned metadata, external configuration, or convention. |
 | `cpt-cf-account-management-fr-bootstrap-idempotency` | Bootstrap checks for existing root tenant before creation; no-op when already present. |
 | `cpt-cf-account-management-fr-bootstrap-ordering` | Bootstrap retries IdP availability with configurable backoff and timeout before proceeding. |
@@ -107,7 +107,7 @@ graph LR
 | `cpt-cf-account-management-fr-idp-user-provision` | `IdpPluginClient::provision_user` with tenant scope binding and resolved tenant metadata (for IdP context resolution, e.g., effective Keycloak realm). |
 | `cpt-cf-account-management-fr-idp-user-deprovision` | `IdpPluginClient::deprovision_user` with session revocation; an already-absent IdP user is treated as a successful no-op so `DELETE /tenants/{id}/users/{user_id}` remains idempotent. |
 | `cpt-cf-account-management-fr-idp-user-query` | `IdpPluginClient::list_users` with tenant filter; supports optional user-ID filter for single-user lookups. |
-| `cpt-cf-account-management-fr-user-group-rg-type` | `AccountManagementModule` idempotently registers the user-group Resource Group type `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~` during module initialization, with `allowed_memberships` including the platform user resource type (`gts.cf.core.am.user.v1~`). |
+| `cpt-cf-account-management-fr-user-group-rg-type` | `AccountManagementGear` idempotently registers the user-group Resource Group type `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~` during gear initialization, with `allowed_memberships` including the platform user resource type (`gts.cf.core.am.user.v1~`). |
 | `cpt-cf-account-management-fr-user-group-lifecycle` | Consumers call `ResourceGroupClient` directly for group create/update/delete. AM does not proxy these operations. |
 | `cpt-cf-account-management-fr-user-group-membership` | Consumers call `ResourceGroupClient` directly for membership add/remove. Callers verify user existence via AM's user-list endpoint; RG treats `resource_id` as opaque. |
 | `cpt-cf-account-management-fr-nested-user-groups` | Nested groups via Resource Group parent-child hierarchy; cycle detection enforced by Resource Group forest invariants. No AM involvement at runtime. |
@@ -153,7 +153,7 @@ The following architecture decisions are adopted in this DESIGN:
 | Tenant hierarchy closure ownership | AM owns both the canonical tenant tree and the platform-canonical `tenant_closure` table `(ancestor_id, descendant_id, barrier, descendant_status)`. Closure maintenance is transactional with tenant writes in `TenantService` and `ConversionService::approve`. AM does not expose a sync capability (canonical enumeration or revision/change token); Tenant Resolver reads AM-owned storage directly via a **dedicated SecureConn connection pool** bound to a read-only database role — distinct from AM's writer pool, so plugin hot-path reads and AM writer traffic are isolated at the pool layer and cannot starve each other. | `cpt-cf-tr-plugin-adr-p1-tenant-hierarchy-closure-ownership` — [ADR-001](tr-plugin/ADR/ADR-001-tenant-hierarchy-closure-ownership.md) |
 | Provisioning tenants excluded from `tenant_closure` | Closure rows are inserted transactionally with the `provisioning → active` transition (saga step 3) and removed with hard-deletion. Provisioning tenants never appear in `tenant_closure`; `descendant_status` domain tightens to `{active, suspended, deleted}`. The Tenant Resolver Plugin's unconditional `descendant_status <> 'provisioning'` filter goes away — provisioning invisibility becomes structural on closure-driven reads. | `cpt-cf-account-management-adr-provisioning-excluded-from-closure` — [ADR-0007](ADR/0007-cpt-cf-account-management-adr-provisioning-excluded-from-closure.md) |
 
-Rejected prospective direction: `cpt-cf-account-management-adr-resource-group-tenant-hierarchy-source` — [ADR-0004](ADR/0004-cpt-cf-account-management-adr-resource-group-tenant-hierarchy-source.md) considered moving canonical tenant hierarchy storage from the AM `tenants` table to Resource Group, but rejected it because it splits tenant structure and tenant lifecycle ownership across modules. This DESIGN intentionally retains the dedicated `tenants` table as the AM source of truth.
+Rejected prospective direction: `cpt-cf-account-management-adr-resource-group-tenant-hierarchy-source` — [ADR-0004](ADR/0004-cpt-cf-account-management-adr-resource-group-tenant-hierarchy-source.md) considered moving canonical tenant hierarchy storage from the AM `tenants` table to Resource Group, but rejected it because it splits tenant structure and tenant lifecycle ownership across gears. This DESIGN intentionally retains the dedicated `tenants` table as the AM source of truth.
 
 ### 1.3 Architecture Layers
 
@@ -204,7 +204,7 @@ Every tenant write validates that the resulting hierarchy remains a valid tree: 
 
 - [ ] `p2` - **ID**: `cpt-cf-account-management-principle-barrier-as-data`
 
-AM does not enforce access-control barriers. It stores the `self_managed` flag on `tenants` rows, materializes the same barrier state into `tenant_closure.barrier` for every affected `(ancestor, descendant)` pair, returns both in reads consumed by downstream modules, and exposes `self_managed` in API responses. Barrier enforcement is resource-type dependent and applied at the platform AuthZ layer rather than inside AM domain logic: barrier-enforced subtree/resource reads use Tenant Resolver / AuthZ semantics, while parent-side tenant metadata visibility remains policy-defined per the platform tenant model. AM domain logic does not implement module-specific barrier filtering, but its services do read hierarchy data that may include barrier-hidden tenants for two internal purposes: (1) **metadata inheritance boundary** — the ancestor walk stops at self-managed boundaries so that a self-managed tenant never inherits metadata from ancestors above its barrier (see `cpt-cf-account-management-fr-tenant-metadata-api`); (2) **structural invariant validation** — hierarchy-owner operations (parent-child type validation during creation, child-count pre-checks during deletion, child-state validation for the parent-scoped conversion endpoint) require full hierarchy visibility regardless of barrier state. Neither purpose constitutes access-control filtering — the results are used for internal precondition checks and are not exposed to API callers. These reads are performed via unscoped hierarchy lookups on the `tenants` table (see Security Architecture, Data Protection), distinct from the platform's `BarrierMode::Ignore` concept which AM does not use. AM's storage contract defines `tenant_closure.barrier = 1` iff some tenant on `(ancestor, descendant]` is self-managed (ancestor excluded, descendant included), with self-rows fixed to `barrier = 0` (the `barrier` column is `SMALLINT` per TENANT_MODEL.md — 16 bits of bitmask headroom for future multi-dimensional barriers, portable across PostgreSQL and MySQL; v1 uses bit 0 for self_managed). `tenant_closure` contains rows only for SDK-visible tenants (`active`, `suspended`, `deleted`); provisioning tenants are absent from the closure entirely and their barrier materialization happens at the `provisioning → active` transition, inserted in the same transaction as the status update. When a tenant converts to self-managed, AM commits `self_managed=true` on the tenant row and flips the `barrier` column on every affected non-self `(ancestor, descendant)` row of `tenant_closure` inside the same conversion transaction, so barrier-aware queries observe the new state as soon as the transaction commits.
+AM does not enforce access-control barriers. It stores the `self_managed` flag on `tenants` rows, materializes the same barrier state into `tenant_closure.barrier` for every affected `(ancestor, descendant)` pair, returns both in reads consumed by downstream gears, and exposes `self_managed` in API responses. Barrier enforcement is resource-type dependent and applied at the platform AuthZ layer rather than inside AM domain logic: barrier-enforced subtree/resource reads use Tenant Resolver / AuthZ semantics, while parent-side tenant metadata visibility remains policy-defined per the platform tenant model. AM domain logic does not implement gear-specific barrier filtering, but its services do read hierarchy data that may include barrier-hidden tenants for two internal purposes: (1) **metadata inheritance boundary** — the ancestor walk stops at self-managed boundaries so that a self-managed tenant never inherits metadata from ancestors above its barrier (see `cpt-cf-account-management-fr-tenant-metadata-api`); (2) **structural invariant validation** — hierarchy-owner operations (parent-child type validation during creation, child-count pre-checks during deletion, child-state validation for the parent-scoped conversion endpoint) require full hierarchy visibility regardless of barrier state. Neither purpose constitutes access-control filtering — the results are used for internal precondition checks and are not exposed to API callers. These reads are performed via unscoped hierarchy lookups on the `tenants` table (see Security Architecture, Data Protection), distinct from the platform's `BarrierMode::Ignore` concept which AM does not use. AM's storage contract defines `tenant_closure.barrier = 1` iff some tenant on `(ancestor, descendant]` is self-managed (ancestor excluded, descendant included), with self-rows fixed to `barrier = 0` (the `barrier` column is `SMALLINT` per TENANT_MODEL.md — 16 bits of bitmask headroom for future multi-dimensional barriers, portable across PostgreSQL and MySQL; v1 uses bit 0 for self_managed). `tenant_closure` contains rows only for SDK-visible tenants (`active`, `suspended`, `deleted`); provisioning tenants are absent from the closure entirely and their barrier materialization happens at the `provisioning → active` transition, inserted in the same transaction as the status update. When a tenant converts to self-managed, AM commits `self_managed=true` on the tenant row and flips the `barrier` column on every affected non-self `(ancestor, descendant)` row of `tenant_closure` inside the same conversion transaction, so barrier-aware queries observe the new state as soon as the transaction commits.
 
 **Drivers**: `cpt-cf-account-management-fr-self-managed-tenant-creation`, `cpt-cf-account-management-fr-mode-conversion-approval`, `cpt-cf-account-management-fr-mode-conversion-expiry`, `cpt-cf-account-management-fr-child-conversions-query`, `cpt-cf-account-management-nfr-barrier-enforcement`
 
@@ -214,7 +214,7 @@ AM does not enforce access-control barriers. It stores the `self_managed` flag o
 
 - [ ] `p2` - **ID**: `cpt-cf-account-management-principle-delegation-to-rg`
 
-User group hierarchy, membership storage, cycle detection, and tenant-scoped isolation are handled by the Resource Group module. AM registers the user-group RG type at module initialization and triggers RG cleanup during tenant hard-deletion. Consumers call `ResourceGroupClient` directly for all group and membership operations — AM does not proxy or coordinate these calls. AM's user-list endpoint (`GET /tenants/{id}/users`) provides the valid user set; callers combine it with RG's membership API.
+User group hierarchy, membership storage, cycle detection, and tenant-scoped isolation are handled by the Resource Group gearAM registers the user-group RG type at gear initialization and triggers RG cleanup during tenant hard-deletion. Consumers call `ResourceGroupClient` directly for all group and membership operations — AM does not proxy or coordinate these calls. AM's user-list endpoint (`GET /tenants/{id}/users`) provides the valid user set; callers combine it with RG's membership API.
 
 **Drivers**: `cpt-cf-account-management-fr-user-group-rg-type`, `cpt-cf-account-management-fr-user-group-lifecycle`, `cpt-cf-account-management-fr-user-group-membership`, `cpt-cf-account-management-fr-nested-user-groups`
 
@@ -274,13 +274,13 @@ AM acts as a data processor for identity-linked payloads. Data protection regula
 
 #### Resource Constraints
 
-Resource constraints (team size, timeline) are not applicable at module level — tracked at project level. Regulatory constraints (GDPR processor obligations) are enforced at the platform level per `cpt-cf-account-management-constraint-data-handling`. Data residency is delegated to platform infrastructure per PRD Section 6.9.
+Resource constraints (team size, timeline) are not applicable at gear level — tracked at project level. Regulatory constraints (GDPR processor obligations) are enforced at the platform level per `cpt-cf-account-management-constraint-data-handling`. Data residency is delegated to platform infrastructure per PRD Section 6.9.
 
 #### Vendor and Licensing
 
 - [ ] `p2` - **ID**: `cpt-cf-account-management-constraint-vendor-licensing`
 
-AM uses only platform-approved open-source dependencies (SeaORM, Axum, OpenTelemetry via ToolKit). Vendor lock-in is limited to the IdP provider plugin contract, which is intentionally pluggable — vendors substitute their own implementation. No proprietary or copyleft-licensed dependencies are introduced at the module level.
+AM uses only platform-approved open-source dependencies (SeaORM, Axum, OpenTelemetry via ToolKit). Vendor lock-in is limited to the IdP provider plugin contract, which is intentionally pluggable — vendors substitute their own implementation. No proprietary or copyleft-licensed dependencies are introduced at the gear level.
 
 **ADRs**: None yet — platform dependency policy.
 
@@ -288,7 +288,7 @@ AM uses only platform-approved open-source dependencies (SeaORM, Axum, OpenTelem
 
 - [ ] `p2` - **ID**: `cpt-cf-account-management-constraint-legacy-integration`
 
-Legacy system integration is handled through the pluggable IdP provider contract, which allows AM to integrate with existing organizational directories and identity providers without module-level changes. No additional legacy integration constraints exist for v1.
+Legacy system integration is handled through the pluggable IdP provider contract, which allows AM to integrate with existing organizational directories and identity providers without gear-level changes. No additional legacy integration constraints exist for v1.
 
 **ADRs**: None yet — covered by IdP-Agnostic principle.
 
@@ -332,7 +332,7 @@ Legacy system integration is handled through the pluggable IdP provider contract
 | `ConversionRequestStatus` | `pending`, `approved`, `cancelled`, `rejected`, `expired`, plus tombstoned historical state via `deleted_at`. | Conversion service + storage constraint |
 | Single root invariant | Exactly one tenant has `parent_id = NULL`; root is undeletable. | Bootstrap + domain validation + partial unique index |
 | Tree invariant | Each tenant has at most one parent and no cycles. | Domain service + FK structure |
-| Closure provisioning exclusion invariant | `tenant_closure` contains rows **only** for tenants whose `tenants.status` is SDK-visible (`active`, `suspended`, `deleted`). Tenants in the transient `provisioning` state have no closure rows. Rows are inserted in a single transaction with the `provisioning → active` transition and removed in a single transaction with hard-deletion. Rationale: the closure is a publication contract (future replication to business modules), and provisioning is internal AM saga state that must not leak across that boundary. | `TenantService::activate_tenant` (insert) + hard-deletion flow (remove) |
+| Closure provisioning exclusion invariant | `tenant_closure` contains rows **only** for tenants whose `tenants.status` is SDK-visible (`active`, `suspended`, `deleted`). Tenants in the transient `provisioning` state have no closure rows. Rows are inserted in a single transaction with the `provisioning → active` transition and removed in a single transaction with hard-deletion. Rationale: the closure is a publication contract (future replication to business gears), and provisioning is internal AM saga state that must not leak across that boundary. | `TenantService::activate_tenant` (insert) + hard-deletion flow (remove) |
 | Closure self-row invariant | Every tenant with SDK-visible status has a `(id, id)` row in `tenant_closure`, with `barrier = 0` and `descendant_status = tenants.status`. | `TenantService::activate_tenant` + integrity check |
 | Closure coverage invariant | For every tenant row with SDK-visible status, `tenant_closure` contains one row per strict ancestor along the `parent_id` chain in addition to the self-row. | `TenantService::activate_tenant` + integrity check |
 | Closure barrier materialization invariant | `tenant_closure.barrier` is `1` on `(A, D)` when any tenant on the strict `A → D` path (excluding A, including D) has `self_managed = true`; otherwise `0`. The column is `SMALLINT` (bit 0 = self_managed in v1). | `TenantService::create_child_tenant` + `ConversionService::approve` |
@@ -436,8 +436,8 @@ graph TD
         MODELS[Models + Errors]
     end
 
-    subgraph MODULE["account-management (ToolKit module)"]
-        AM[AccountManagementModule]
+    subgraph MODULE["account-management (ToolKit gear)"]
+        AM[AccountManagementGear]
         TS[TenantService]
         MS[MetadataService]
         BS[BootstrapService]
@@ -461,7 +461,7 @@ graph TD
         DB[("Database<br>tenants + tenant_closure<br>+ tenant_metadata<br>+ conversion_requests")]
     end
 
-    subgraph PLATFORM["Platform Modules"]
+    subgraph PLATFORM["Platform Gears"]
         GTS[GTS Types Registry]
         RG[Resource Group]
         TR["Tenant Resolver<br>(query facade)"]
@@ -488,9 +488,9 @@ graph TD
     AM --> AC
 ```
 
-#### AccountManagementModule
+#### AccountManagementGear
 
-- [ ] `p2` - **ID**: `cpt-cf-account-management-component-module`
+- [ ] `p2` - **ID**: `cpt-cf-account-management-component-gear`
 
 ##### Why this component exists
 
@@ -498,7 +498,7 @@ Entry point for the ToolKit lifecycle. Initializes all internal services, regist
 
 ##### Responsibility scope
 
-Module lifecycle (`init()` for wiring; `lifecycle(entry = ...)` for startup bootstrap and background jobs; `CancellationToken` for graceful shutdown), REST route registration via OperationBuilder, ClientHub registration of `AccountManagementClient` implementation, database migration registration, bootstrap orchestration on first start.
+Gear lifecycle (`init()` for wiring; `lifecycle(entry = ...)` for startup bootstrap and background jobs; `CancellationToken` for graceful shutdown), REST route registration via OperationBuilder, ClientHub registration of `AccountManagementClient` implementation, database migration registration, bootstrap orchestration on first start.
 
 ##### Responsibility boundaries
 
@@ -539,7 +539,7 @@ Does not evaluate authorization policies — relies on `PolicyEnforcer` PEP in t
 
 ##### Related components (by ID)
 
-- `cpt-cf-account-management-component-module` — called by; registered during module initialization
+- `cpt-cf-account-management-component-gear` — called by; registered during gear initialization
 - `cpt-cf-account-management-component-metadata-service` — related; metadata entries cascade-deleted via DB `ON DELETE CASCADE` when tenant row is removed; MetadataService used for tenant metadata resolution in user operations
 
 ##### Diagnostic Capabilities
@@ -579,7 +579,7 @@ Each category is alerted and dashboarded distinctly. Zero-value emissions occur 
 
 **Single-flight**: AM enforces at-most-one concurrent integrity check so a long-running run cannot pile up against itself. The mechanism is uniform across PostgreSQL and SQLite and uses a **three-transaction lifecycle** so the gate row is committed (and therefore visible) for the duration of the work: a short *acquire* transaction inserts a row into `integrity_check_runs` keyed by the synthetic singleton id (`id = 1`, enforced by a `CHECK` constraint) and commits before the snapshot transaction begins; the *snapshot/work* transaction performs the SecureSelect load + classifiers (and, for repair, the closure-side writes); a final short *release* transaction deletes the gate row keyed by `worker_id`. The PRIMARY KEY on the singleton `id` is the atomic claim primitive — concurrent acquires receive a unique-violation that maps to `DomainError::IntegrityCheckInProgress` (boundary-converted to `CanonicalError::ResourceExhausted`, HTTP 429). The acquire path also sweeps stale rows whose `started_at` is older than `MAX_LOCK_AGE` so a row left behind by a crashed worker does not block indefinitely; the release path warns when the DELETE affected zero rows so an eviction by stale-lock sweep is observable in telemetry. The legacy `pg_try_advisory_xact_lock` path is intentionally not used — uniform single-flight semantics across both backends is the whole point of the gate. Contention surfaces are translated by the REST and SDK error-mapping layers to HTTP `429 Too Many Requests` per `errors-observability`; callers retry with backoff, AM does not queue.
 
-**Test strategy**: a single feature-gated integration test file (`tests/integrity_integration.rs`) hosts two `#[cfg(feature = "postgres")] mod pg` and `#[cfg(feature = "sqlite")] mod sqlite` blocks plus a shared seed/assertion `common` module. Each backend exercises a positive and a negative case per category plus a single-flight contention test asserting the `429` path. Postgres coverage uses a testcontainers Postgres image (workspace pattern via `cf-gears-toolkit-db` dev-dependencies); SQLite coverage uses `:memory:` databases (portable across SQLite >= 3.8.3). The Rust-side cycle detector (DFS with seen-set, bounded by `tenants.len()`) is unit-tested in `audit/classifiers/cycle.rs` against both true cycles and deep linear chains to guard against false positives.
+**Test strategy**: a single feature-gated integration test file (`tests/integrity_integration.rs`) hosts two `#[cfg(feature = "postgres")] mod pg` and `#[cfg(feature = "sqlite")] mod sqlite` blocks plus a shared seed/assertion `common` gear. Each backend exercises a positive and a negative case per category plus a single-flight contention test asserting the `429` path. Postgres coverage uses a testcontainers Postgres image (workspace pattern via `cf-gears-toolkit-db` dev-dependencies); SQLite coverage uses `:memory:` databases (portable across SQLite >= 3.8.3). The Rust-side cycle detector (DFS with seen-set, bounded by `tenants.len()`) is unit-tested in `audit/classifiers/cycle.rs` against both true cycles and deep linear chains to guard against false positives.
 
 #### ConversionService
 
@@ -608,15 +608,15 @@ Role-per-transition validation (initiator vs. counterparty) lives in the service
 
 Does not evaluate authorization policies — the REST handler calls `PolicyEnforcer::enforce` on `ConversionRequest.read` / `ConversionRequest.write` first, then the service runs the role-per-transition check. Does not bypass self-managed barriers — the `list_inbound_for_parent` carve-out is a structural hierarchy-owner read (`parent_id` lookup on AM-owned data), the same pattern AM already uses for deletion pre-checks and child-count validation. Does not manage tenant creation-time `self_managed=true` — that path is handled directly by `TenantService::create_tenant` and never touches `conversion_requests`.
 
-##### Configuration — AM module config
+##### Configuration — AM gear config
 
-The approval window, resolved-retention window, and cleanup interval are bounded module configuration, not hardcoded and not tenant-type-specific in v1. `AccountManagementModule::init` validates these settings before the module becomes ready and fails fast when the requested operating envelope is incoherent.
+The approval window, resolved-retention window, and cleanup interval are bounded gear configuration, not hardcoded and not tenant-type-specific in v1. `AccountManagementGear::init` validates these settings before the mogearecomes ready and fails fast when the requested operating envelope is incoherent.
 
 Invariants enforced at startup:
 
 - `approval_ttl ∈ [1h, 30d]`. Below 1h the approver-response window becomes unusable; above 30d a pending request would outlive any reasonable soft-delete retention and pollute the partial unique index.
 - `resolved_retention ∈ [1d, 365d]`. Below 1d history disappears faster than typical audit reads; above 365d the table grows unbounded without operator intent.
-- `resolved_retention <= tenant hard-delete retention period`. `conversion_requests.tenant_id` is `ON DELETE CASCADE`, so resolved-request history cannot outlive the tenant row. `AccountManagementModule::init` cross-validates the conversion window against the tenant deletion-retention configuration and fails fast if the requested history window is unattainable.
+- `resolved_retention <= tenant hard-delete retention period`. `conversion_requests.tenant_id` is `ON DELETE CASCADE`, so resolved-request history cannot outlive the tenant row. `AccountManagementGear::init` cross-validates the conversion window against the tenant deletion-retention configuration and fails fast if the requested history window is unattainable.
 - `cleanup_interval ∈ [10s, 10m]`. Matches the bounds already used by AM's existing retention-cleanup job.
 
 v1 does not introduce a per-tenant-type TTL override. The enum-style `inheritance_policy` precedent is applicable in principle, but there is no concrete v1 consumer — keeping the configuration single-valued avoids speculative contract surface.
@@ -640,7 +640,7 @@ stateDiagram-v2
 ##### Related components (by ID)
 
 - `cpt-cf-account-management-component-tenant-service` — collaborates; `approve` transaction toggles `tenants.self_managed` alongside the request status update; the conversion service reads `tenants` for precondition validation.
-- `cpt-cf-account-management-component-module` — called by; register routes and bind the background expiry/retention jobs during module initialization.
+- `cpt-cf-account-management-component-gear` — called by; register routes and bind the background expiry/retention jobs during gear initialization.
 
 #### MetadataService
 
@@ -674,7 +674,7 @@ Does not define metadata schemas — schemas are registered in GTS. Does not int
 ##### Related components (by ID)
 
 - `cpt-cf-account-management-component-tenant-service` — related; metadata entries cascade-deleted via DB `ON DELETE CASCADE` when tenant row is removed; MetadataService called by TenantService for tenant metadata resolution in user operations
-- `cpt-cf-account-management-component-module` — called by; for route registration
+- `cpt-cf-account-management-component-gear` — called by; for route registration
 
 #### BootstrapService
 
@@ -690,12 +690,12 @@ Checks whether the initial root tenant already exists (idempotency). Bounds the 
 
 ##### Responsibility boundaries
 
-Root tenant creation is exclusively handled by BootstrapService — no API endpoint creates root tenants. Does not interpret the `root_tenant_metadata` content — the bootstrap config is a pass-through for the IdP provider plugin; AM neither validates nor namespaces the input or the returned blob (the plugin owns its shape end-to-end). Does not provision the Platform Administrator user — that identity is pre-provisioned in the IdP during infrastructure setup. Runs only at the start of `AccountManagementModule`'s `lifecycle(entry = ...)` method, before the ready signal.
+Root tenant creation is exclusively handled by BootstrapService — no API endpoint creates root tenants. Does not interpret the `root_tenant_metadata` content — the bootstrap config is a pass-through for the IdP provider plugin; AM neither validates nor namespaces the input or the returned blob (the plugin owns its shape end-to-end). Does not provision the Platform Administrator user — that identity is pre-provisioned in the IdP during infrastructure setup. Runs only at the start of `AccountManagementGear`'s `lifecycle(entry = ...)` method, before the ready signal.
 
 ##### Related components (by ID)
 
 - `cpt-cf-account-management-component-tenant-service` — calls; for tenant creation during bootstrap
-- `cpt-cf-account-management-component-module` — called by; at the start of the lifecycle entry method
+- `cpt-cf-account-management-component-gear` — called by; at the start of the lifecycle entry method
 
 ### 3.3 API Contracts
 
@@ -777,7 +777,7 @@ This interface exposes raw and resolved tenant metadata keyed by registered GTS 
 - **Technology**: Rust trait + ClientHub
 - **Location**: `gears/system/account-management/account-management-sdk/src/api.rs`
 
-`AccountManagementClient` is the transport-agnostic in-process contract for module-to-module reads and administrative calls. It mirrors the public capability groups of the REST surface, but does not supersede the OpenAPI file as the public wire contract. Consumers resolve it through ClientHub so that AM remains replaceable behind a stable capability interface.
+`AccountManagementClient` is the transport-agnostic in-process contract for gear-to-gear reads and administrative calls. It mirrors the public capability groups of the REST surface, but does not supersede the OpenAPI file as the public wire contract. Consumers resolve it through ClientHub so that AM remains replaceable behind a stable capability interface.
 
 #### IdP Provider Plugin
 
@@ -797,14 +797,14 @@ This interface exposes raw and resolved tenant metadata keyed by registered GTS 
 
 ### 3.4 Internal Dependencies
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear    | Interface Used | Purpose |
 |-------------------|----------------|---------|
-| [Resource Group](../../resource-group/docs/PRD.md) | `ResourceGroupClient` (SDK trait via ClientHub) | AM registers a user-group RG type at module initialization, uses RG ownership-graph reads to verify that no tenant-owned resource associations remain before soft deletion, and triggers tenant-scoped group cleanup during hard-deletion. If RG is unavailable during deletion validation, AM fails the operation with `service_unavailable` rather than proceeding. Consumers call `ResourceGroupClient` directly for all group lifecycle, membership, and hierarchy operations. |
+| [Resource Group](../../resource-group/docs/PRD.md) | `ResourceGroupClient` (SDK trait via ClientHub) | AM registers a user-group RG type at gear initialization, uses RG ownership-graph reads to verify that no tenant-owned resource associations remain before soft deletion, and triggers tenant-scoped group cleanup during hard-deletion. If RG is unavailable during deletion validation, AM fails the operation with `service_unavailable` rather than proceeding. Consumers call `ResourceGroupClient` directly for all group lifecycle, membership, and hierarchy operations. |
 | GTS Types Registry | `TypesRegistryClient` (SDK trait via ClientHub) | Runtime tenant type definitions, parent-child constraint validation, metadata schema registration and validation. |
 
 **Dependency Rules** (per project conventions):
 - No circular dependencies
-- Always use SDK modules for inter-module communication
+- Always use SDK gears for inter-gear communication
 - No cross-category sideways deps except through contracts
 - `SecurityContext` must be propagated across all in-process calls
 
@@ -822,7 +822,7 @@ This interface exposes raw and resolved tenant metadata keyed by registered GTS 
 | **Data Format** | Provider-specific; abstracted behind `IdpPluginClient` trait |
 | **Compatibility** | Provider implementations are vendor-replaceable. AM tolerates IdP unavailability during bootstrap with retry/backoff. |
 | **SLA** | Provider-specific; not prescribed by AM. |
-| **Resilience** | Per-call timeouts and retry budgets. At the approved administrative traffic profile (~1K rps peak), circuit breakers and module-level rate limiting are not warranted. |
+| **Resilience** | Per-call timeouts and retry budgets. At the approved administrative traffic profile (~1K rps peak), circuit breakers and gear-level rate limiting are not warranted. |
 
 IdP provider plugin credentials are managed by the plugin implementation and the platform secret management infrastructure; AM does not handle, store, or configure provider credentials.
 
@@ -849,7 +849,7 @@ IdP provider plugin credentials are managed by the plugin implementation and the
 | **Direction** | Tenant Resolver reads AM-owned storage |
 | **Protocol / Driver** | Read-only PostgreSQL role provisioned by AM with `SELECT`-only grants scoped to `tenants` and `tenant_closure` |
 | **Data Format** | Rows from `tenants` (`id`, `parent_id`, `name`, `tenant_type_uuid`, `status`, `self_managed`, `depth`, timestamps, and any resolver-mapped metadata fields) and `tenant_closure` (`ancestor_id`, `descendant_id`, `barrier`, `descendant_status`) — the platform-canonical closure shape defined in [TENANT_MODEL.md](../../../../docs/arch/authorization/TENANT_MODEL.md). Public chained `tenant_type` identifiers are re-hydrated by Tenant Resolver from `tenant_type_uuid` via Types Registry. |
-| **Compatibility** | Schema changes to `tenants` and `tenant_closure` are coordinated contract changes between AM and Tenant Resolver; rolling-upgrade compatibility constraints apply to both modules simultaneously |
+| **Compatibility** | Schema changes to `tenants` and `tenant_closure` are coordinated contract changes between AM and Tenant Resolver; rolling-upgrade compatibility constraints apply to both gears simultaneously |
 | **Availability / Fallback** | Tenant Resolver query availability tracks AM database availability. AM commits tree and closure updates as one transaction, so Tenant Resolver observes every committed non-`provisioning` hierarchy change the moment it becomes visible in the database — there is no projection, no sync job, no drift-detection loop, and no revision or change token. Internal `provisioning` rows may exist transiently during bootstrap and tenant-create sagas, but they are outside the resolver-facing contract and remain non-visible until finalized to `active` or compensated away. |
 
 #### AuthZ Resolver
@@ -900,7 +900,7 @@ IdP provider plugin credentials are managed by the plugin implementation and the
 
 ```mermaid
 sequenceDiagram
-    participant AM as AccountManagementModule
+    participant AM as AccountManagementGear
     participant BS as BootstrapService
     participant TS as TenantService
     participant DB as Database
@@ -1384,10 +1384,10 @@ Renaming the canonical-error mapping above requires a contract-version bump (per
 |---------|-------------|--------------------------|------------------|
 | End-user UX and portal workflows | Out of scope | Portal/UI products | AM exposes REST and SDK contracts only. |
 | Token validation, federation, session renewal, MFA | Inherited | [OIDC AuthN Plugin DESIGN.md](../../authn-resolver/plugins/oidc-authn-plugin/docs/DESIGN.md), [docs/arch/authorization/DESIGN.md](../../../../docs/arch/authorization/DESIGN.md) | AM trusts the normalized `SecurityContext`; it never validates bearer tokens itself. |
-| Compliance program, privacy orchestration, DSAR, legal hold | Inherited with module contribution | [docs/security/SECURITY.md](../../../../docs/security/SECURITY.md) | AM contributes data-minimization, audit hooks, and explicit ownership boundaries, but is not the legal or policy control plane. |
-| API gateway rate limiting and request shaping | Inherited | [docs/toolkit_unified_system/README.md](../../../../docs/toolkit_unified_system/README.md) | AM relies on shared gateway and framework controls rather than module-specific throttling. |
+| Compliance program, privacy orchestration, DSAR, legal hold | Inherited with gear contribution | [docs/security/SECURITY.md](../../../../docs/security/SECURITY.md) | AM contributes data-minimization, audit hooks, and explicit ownership boundaries, but is not the legal or policy control plane. |
+| API gateway rate limiting and request shaping | Inherited | [docs/toolkit_unified_system/README.md](../../../../docs/toolkit_unified_system/README.md) | AM relies on shared gateway and framework controls rather than gear-specific throttling. |
 | Deployment topology and load balancing | Inherited with AM coordination notes below | Platform runtime and SRE practice | AM only defines bootstrap and recurring-job coordination requirements. |
-| Event bus and tenant lifecycle CloudEvents | Deferred | Future EVT module | v1 remains synchronous and request-driven. |
+| Event bus and tenant lifecycle CloudEvents | Deferred | Future EVT gear | v1 remains synchronous and request-driven. |
 | Consumer-facing publication flow for contracts | Explicitly handled here | Documentation Strategy section below | OpenAPI, JSON schemas, migration reference, PRD, and DESIGN have separate owners and sync rules. |
 
 ### 4.2 Security Architecture
@@ -1446,13 +1446,13 @@ The following bundles are design guidance for policy authors. They are not hardc
 |--------------|-------|-----------------|
 | Credential handling, federation, session policy | Platform AuthN docs above | AM stores no credentials, no session state, and no user-profile cache |
 | Audit retention, tamper evidence, immutable storage | [docs/security/SECURITY.md](../../../../docs/security/SECURITY.md) and platform audit sink | AM emits request-driven and `actor=system` lifecycle audit records with tenant and resource context |
-| Encryption in transit and at rest, secret management | [docs/security/SECURITY.md](../../../../docs/security/SECURITY.md) | AM relies on shared TLS, DB protection, and provider-managed credentials rather than custom module crypto |
+| Encryption in transit and at rest, secret management | [docs/security/SECURITY.md](../../../../docs/security/SECURITY.md) | AM relies on shared TLS, DB protection, and provider-managed credentials rather than custom gear crypto |
 | Security monitoring and alert routing | Platform SRE / security monitoring | AM exports domain metrics and traces so platform monitoring can detect IdP failures, integrity anomalies, and cleanup failures |
 | Privacy / legal process handling | Platform compliance program | AM minimizes persisted identity data, keeps audit user identities UUID-based, and does not store DSAR-heavy profile data locally |
 
 ### Threat Modeling
 
-AM is the foundational multi-tenancy module handling tenant hierarchy, barrier state, and IdP integration. The following threat catalog identifies key threats and maps them to existing mitigations.
+AM is the foundational multi-tenancy gear handling tenant hierarchy, barrier state, and IdP integration. The following threat catalog identifies key threats and maps them to existing mitigations.
 
 #### Threat Catalog
 
@@ -1483,12 +1483,12 @@ AM is the foundational multi-tenancy module handling tenant hierarchy, barrier s
 | GTS registry | Platform shared service | Existing reads continue, but type-validating writes and metadata writes that require fresh schema lookup fail deterministically | GTS call latency and error metrics |
 | IdP provider path | Deployment-specific external dependency | Tenant creation, user ops, and bootstrap fail or retry by contract; AM-owned tenant and metadata reads continue | IdP failure-rate and latency metrics |
 | AuthZ / PEP path | Platform shared service | Protected operations fail closed; AM does not provide a local authorization fallback | Authorization error rate and platform auth alerts |
-| Resource Group dependency for delete prechecks and cleanup | Platform module | Tenant deletion waits until RG ownership checks and cleanup steps succeed; AM does not guess missing ownership state | Delete failure metrics and background cleanup failures |
+| Resource Group dependency for delete prechecks and cleanup | Platform gear | Tenant deletion waits until RG ownership checks and cleanup steps succeed; AM does not guess missing ownership state | Delete failure metrics and background cleanup failures |
 | Background-job coordination | Platform runtime plus AM idempotent jobs | Missed or duplicated schedules may delay cleanup, but jobs must remain idempotent and safe to rerun | Cleanup lag, expired-row backlog, integrity diagnostics |
 
 #### Replica and Background-Job Coordination
 
-- AM HTTP handlers are stateless across replicas. Any replica may serve a request once the module has reached ready state.
+- AM HTTP handlers are stateless across replicas. Any replica may serve a request once the gear has reached ready state.
 - Bootstrap is a singleton workflow, but coordination is provided by the `ux_tenants_single_root` unique partial index rather than a runtime lease (see §3.2 Bootstrap Service). Replicas may race on a fresh deployment; the index lets exactly one root insert win, and the losing replica falls through to the idempotency path on its next classification attempt.
 - Recurring jobs such as provisioning reaper, conversion expiry, integrity diagnostics, and retention cleanup require single-run coordination per cycle. The implementation may use a database-backed lease or platform scheduler, but the design requires idempotent work units rather than a specific primitive.
 - A repeated or delayed job execution may slow cleanup, but it must not corrupt tenant state, duplicate mode changes, or create additional roots.
@@ -1521,7 +1521,7 @@ AM is the foundational multi-tenancy module handling tenant hierarchy, barrier s
 The approved planning envelope remains 100K tenants, 300K users, and 1K peak administrative requests per second. Within that envelope, AM expects:
 
 - no partitioning or dedicated storage tier for AM-owned tables
-- no module-specific rate limiter or custom caching layer for correctness
+- no gear-specific rate limiter or custom caching layer for correctness
 - IdP calls, not local storage, to be the dominant variable cost for user-heavy administrative workloads
 
 Cost and architecture review is mandatory when any of the following occurs:
@@ -1534,7 +1534,7 @@ Error-budget interpretation:
 
 - At 25% burn of the monthly reliability budget for AM-owned operations, the team opens an investigation and pauses non-essential operational tuning changes.
 - At 50% burn, the team prioritizes dependency mitigation and background-job stabilization over new contract-surface expansion.
-- Missed cleanup or integrity-remediation windows are treated as operational incidents even when customer-facing APIs remain up, because AM is a source-of-truth module.
+- Missed cleanup or integrity-remediation windows are treated as operational incidents even when customer-facing APIs remain up, because AM is a source-of-truth gear.
 
 ### Data Governance
 
@@ -1550,7 +1550,7 @@ AM-owned data quality expectations:
 
 - integrity diagnostics cover anomalies AM can observe directly via the 8 pure-Rust classifiers detailed in §3.2 *Diagnostic Capabilities* — `orphan`, `cycle`, `depth`, `self_row`, `strict_ancestor`, `extra_edge`, `root`, and `barrier` — each surfacing as a `Vec<Violation>` from a synchronous Rust function over a `(tenants, tenant_closure)` SecureSelect snapshot with single-flight gating (transaction model and gate lifecycle authoritative in §3.2)
 - AM-owned anomalies and compensation failures must become operator-visible within 15 minutes of detection and have a documented remediation path triaged within one business day
-- cross-module inconsistencies that AM cannot safely repair, such as orphaned RG memberships or post-restore IdP drift, remain explicit telemetry and debt items rather than silent fixes
+- cross-gear inconsistencies that AM cannot safely repair, such as orphaned RG memberships or post-restore IdP drift, remain explicit telemetry and debt items rather than silent fixes
 
 Data classification and privacy posture:
 
@@ -1567,7 +1567,7 @@ DESIGN defines verification ownership, not exhaustive test cases. Detailed test 
 | Unit / domain tests | State-machine rules, invariants, and deterministic error mapping inside `TenantService`, `MetadataService`, and `ConversionService` |
 | Integration / persistence tests | SQL constraints, lifecycle persistence, tenant scoping, retention ordering, and recovery semantics against a real database |
 | API / contract tests | OpenAPI conformance, RFC 9457 problem mapping, authorization wiring, and tenant-scoped HTTP behavior |
-| End-to-end tests | Bootstrap, IdP integration, cross-module cleanup, and mixed-mode hierarchy flows in a production-like stack |
+| End-to-end tests | Bootstrap, IdP integration, cross-gear cleanup, and mixed-mode hierarchy flows in a production-like stack |
 
 Non-mockable architectural boundaries:
 
@@ -1590,7 +1590,7 @@ Risk-to-test ownership:
 
 | Artifact | Owner | Update when | Validation expectation |
 |----------|-------|-------------|------------------------|
-| [PRD.md](./PRD.md) | Product / module owner | Externally observable behavior, scope, actors, or NFR commitments change | `cpt validate --artifact` and TOC regeneration |
+| [PRD.md](./PRD.md) | Product / gear owner | Externally observable behavior, scope, actors, or NFR commitments change | `cpt validate --artifact` and TOC regeneration |
 | [DESIGN.md](./DESIGN.md) | Architecture owner | Boundaries, invariants, dependency model, or review-level operational guidance change | `cpt validate --artifact` and TOC regeneration |
 | [account-management-v1.yaml](./account-management-v1.yaml) | API contract owner | Public REST paths, request/response schemas, or public error mappings change | OpenAPI linting plus Cypilot artifact validation |
 | [migration.sql](./migration.sql) | Persistence owner | Reference schema, indexes, or physical invariants change | Manual review plus consistency with DESIGN storage responsibilities |
@@ -1602,7 +1602,7 @@ Sync rules:
 - behavioral API changes update OpenAPI in the same change set; PRD changes are needed only when externally observable behavior or promises change
 - storage-detail changes update `migration.sql` in the same change set; `DESIGN.md` changes only when the storage responsibility or invariant changes
 - new GTS schema usage updates the relevant JSON schemas and the OpenAPI references; DESIGN changes only when the new schema kind introduces a new architectural boundary or invariant
-- every changed Markdown artifact in this module must keep its generated TOC in sync and pass Cypilot validation before review
+- every changed Markdown artifact in this gear must keep its generated TOC in sync and pass Cypilot validation before review
 
 ### Known Limitations & Technical Debt
 
@@ -1610,9 +1610,9 @@ Sync rules:
 |------|----------|-------|-----------------|------------------|----------------|--------|
 | Stale `provisioning` recovery beyond the normal reaper path | Reliability | AM maintainers | Repeated compensation failures or persistent stale rows in production | First post-v1 reliability hardening cycle | Automated or operator-assisted recovery path exists for provider cleanup failures | Deferred |
 | Extended barrier types beyond binary `self_managed` | Extensibility | AM + AuthZ architecture owners | First product need for barrier semantics beyond managed/self-managed | Major-version planning for AM / Tenant Resolver / AuthZ Resolver | Versioned contract and resolver support exist across all three components | Deferred |
-| Hierarchy reparenting | Feature | AM maintainers | First product requirement to move tenant subtrees | Post-v1 capability planning | Safe subtree move semantics and cross-module consistency model are specified | Deferred |
+| Hierarchy reparenting | Feature | AM maintainers | First product requirement to move tenant subtrees | Post-v1 capability planning | Safe subtree move semantics and cross-gear consistency model are specified | Deferred |
 | Automated IdP reconciliation after restore | Recovery | Platform ops + AM maintainers | Restore exercises reveal recurring manual reconciliation effort | Recovery hardening milestone | Automated diff and repair flow exists for AM versus provider state | Deferred |
-| Group-membership orphan cleanup after user deprovision | Cross-module consistency | AM + Resource Group owners | User-deprovision workflows require automatic cleanup guarantees | Cross-module lifecycle follow-up | RG and AM expose a coordinated cleanup contract or background repair path | Deferred |
+| Group-membership orphan cleanup after user deprovision | Cross-gear consistency | AM + Resource Group owners | User-deprovision workflows require automatic cleanup guarantees | Cross-gear lifecycle follow-up | RG and AM expose a coordinated cleanup contract or background repair path | Deferred |
 
 Hierarchy reparenting remains intentionally out of scope for the review-ready v1 baseline because it is a subtree operation with cross-cutting invariants, not a generic `PATCH` of `parent_id`. The expected future implementation shape is an explicit `TenantService::move_subtree(subtree_root_id, new_parent_id, actor)` workflow that:
 

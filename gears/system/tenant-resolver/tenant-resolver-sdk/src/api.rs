@@ -1,7 +1,7 @@
 //! Public API trait for the tenant resolver.
 //!
 //! This trait defines the interface that consumers use to interact with
-//! the tenant resolver. The module implements this trait and delegates
+//! the tenant resolver. The gear implements this trait and delegates
 //! to the appropriate plugin.
 
 use async_trait::async_trait;
@@ -13,7 +13,7 @@ use crate::models::{
     GetTenantsOptions, IsAncestorOptions, TenantId, TenantInfo,
 };
 
-/// Public API trait for the tenant resolver module.
+/// Public API trait for the tenant resolver gear.
 ///
 /// ```ignore
 /// let resolver = hub.get::<dyn TenantResolverClient>()?;
@@ -36,7 +36,7 @@ use crate::models::{
 ///
 /// # Security Context
 ///
-/// The module  does **not** perform its own access-control checks.
+/// The gear  does **not** perform its own access-control checks.
 /// The `SecurityContext` is passed through to the plugin, which decides
 /// how (or whether) to enforce authorization. This is intentional —
 /// different plugins may have different access-control semantics.

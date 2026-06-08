@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 
+use crate::gear::DEFAULT_URL_PREFIX;
 use crate::infra::llm::ProviderKind;
-use crate::module::DEFAULT_URL_PREFIX;
 
 pub mod background;
 pub use background::{CleanupWorkerConfig, OrphanWatchdogConfig, ThreadSummaryWorkerConfig};
@@ -78,7 +78,7 @@ pub enum StorageKind {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsConfig {
-    /// Metric name prefix. When empty (the default), derived from the module
+    /// Metric name prefix. When empty (the default), derived from the gear
     /// name by converting it to `snake_case` (e.g., `"mini-chat"` → `"mini_chat"`).
     #[serde(default)]
     pub prefix: String,
@@ -86,12 +86,12 @@ pub struct MetricsConfig {
 
 impl MetricsConfig {
     /// Resolve the effective prefix: explicit config value, or
-    /// `snake_case(module_name)`.
+    /// `snake_case(gear_name)`.
     #[must_use]
-    pub fn effective_prefix(&self, module_name: &str) -> String {
+    pub fn effective_prefix(&self, gear_name: &str) -> String {
         let trimmed = self.prefix.trim();
         if trimmed.is_empty() {
-            heck::ToSnakeCase::to_snake_case(module_name)
+            heck::ToSnakeCase::to_snake_case(gear_name)
         } else {
             trimmed.to_owned()
         }
@@ -114,7 +114,7 @@ pub struct ProviderEntry {
     #[serde(default)]
     pub upstream_alias: Option<String>,
     /// Upstream hostname (e.g., `api.openai.com`). Used for OAGW upstream
-    /// registration during module init.
+    /// registration during gear init.
     #[expand_vars]
     pub host: String,
     /// Upstream port. Defaults to `443` (HTTPS). Set to a non-standard port
@@ -1644,7 +1644,7 @@ mod tests {
     }
 
     #[test]
-    fn metrics_effective_prefix_uses_module_name_when_empty() {
+    fn metrics_effective_prefix_uses_gear_name_when_empty() {
         let cfg = MetricsConfig {
             prefix: String::new(),
         };
@@ -1652,7 +1652,7 @@ mod tests {
     }
 
     #[test]
-    fn metrics_effective_prefix_uses_module_name_when_whitespace() {
+    fn metrics_effective_prefix_uses_gear_name_when_whitespace() {
         let cfg = MetricsConfig {
             prefix: "   ".to_owned(),
         };

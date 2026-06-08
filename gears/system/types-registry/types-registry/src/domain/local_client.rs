@@ -26,7 +26,7 @@ use crate::domain::model::{GtsEntity, ListQuery};
 use crate::domain::service::TypesRegistryService;
 use crate::infra::cache::{CacheConfig, InMemoryCache, InstanceCache, TypeSchemaCache};
 
-/// Local client for the Types Registry module.
+/// Local client for the Types Registry gear.
 ///
 /// Implements the public [`TypesRegistryClient`] trait by wrapping
 /// [`TypesRegistryService`] and adding kind discrimination, recursive

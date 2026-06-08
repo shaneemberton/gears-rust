@@ -8,7 +8,7 @@ Comprehensive test coverage for the cleanup worker across unit and integration l
 
 ### 6.1 Unit Tests — Repository Methods (Phase 1)
 
-File: `src/infra/db/repo/attachment_repo.rs` (test module)
+File: `src/infra/db/repo/attachment_repo.rs` (test gear)
 
 | Test | Asserts |
 |------|---------|
@@ -21,7 +21,7 @@ File: `src/infra/db/repo/attachment_repo.rs` (test module)
 | `mark_attachments_pending_for_chat_bulk` | All matching attachments get `pending`, others untouched |
 | `mark_attachments_pending_skips_already_set` | Attachments with existing cleanup_status unchanged |
 
-File: `src/infra/db/repo/vector_store_repo.rs` (test module)
+File: `src/infra/db/repo/vector_store_repo.rs` (test gear)
 
 | Test | Asserts |
 |------|---------|
@@ -30,7 +30,7 @@ File: `src/infra/db/repo/vector_store_repo.rs` (test module)
 
 ### 6.2 Unit Tests — AttachmentCleanupHandler (Phase 3)
 
-File: `src/infra/workers/cleanup_worker.rs` (test module)
+File: `src/infra/workers/cleanup_worker.rs` (test gear)
 
 | Test | Asserts |
 |------|---------|
@@ -44,7 +44,7 @@ File: `src/infra/workers/cleanup_worker.rs` (test module)
 
 ### 6.3 Unit Tests — ChatCleanupHandler (Phase 4)
 
-File: `src/infra/workers/chat_cleanup_worker.rs` (or same file, test module)
+File: `src/infra/workers/chat_cleanup_worker.rs` (or same file, test gear)
 
 | Test | Asserts |
 |------|---------|

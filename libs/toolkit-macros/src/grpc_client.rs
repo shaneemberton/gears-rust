@@ -73,7 +73,7 @@ impl Parse for GrpcClientConfig {
         let tonic = tonic.ok_or_else(|| {
             syn::Error::new(
                 proc_macro2::Span::call_site(),
-                "missing required parameter: tonic = \"module::TonicClient<Channel>\"",
+                "missing required parameter: tonic = \"gear::TonicClient<Channel>\"",
             )
         })?;
 

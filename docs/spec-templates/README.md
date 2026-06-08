@@ -23,7 +23,7 @@ Templates work standalone or can be enhanced with Cypilot annotations (`cpt-id`)
 
 **Global Guidelines**: Project-wide standards defined in root PRD, DESIGN, and [guidelines/](../../guidelines/) covering architecture, security, performance, operations, runtime environments, testing strategy.
 
-**Module-level specs**: Document only **deviations** or **extensions** from global standards. Avoid duplicating project-wide requirements.
+**Gear-level specs**: Document only **deviations** or **extensions** from global standards. Avoid duplicating project-wide requirements.
 
 **Testing Strategy**: All requirements verified via automated tests (unit, integration, e2e, security, performance) targeting 90%+ code coverage. Document verification method only for non-test approaches (analysis, inspection, demonstration).
 
@@ -34,7 +34,7 @@ Templates work standalone or can be enhanced with Cypilot annotations (`cpt-id`)
 | Template | Purpose | Layer |
 |----------|---------|-------|
 | [PRD.md](./PRD.md) | Product Requirements Document — vision, actors, capabilities, use cases, FR, NFR | Foundation |
-| [UPSTREAM_REQS.md](./UPSTREAM_REQS.md) | Upstream Requirements — technical requirements FROM other modules TO this module | Integration |
+| [UPSTREAM_REQS.md](./UPSTREAM_REQS.md) | Upstream Requirements — technical requirements FROM other gears TO this gear | Integration |
 | [DESIGN.md](./DESIGN.md) | Technical Design — architecture, principles, constraints, domain model, API contracts | System-level |
 | [DECOMPOSITION.md](./DECOMPOSITION.md) | Decomposition — break down features into implementation units with traceability | Feature-level |
 | [ADR.md](./ADR.md) | Architecture Decision Record — capture decisions, options, trade-offs, consequences | Cross-cutting |
@@ -46,11 +46,11 @@ Quick reference for what goes where:
 
 ### PRD.md
 1. **Overview** — Purpose, background, goals, glossary
-2. **Actors** — Human and system actors that interact with this module (stakeholders managed at project/task level)
-3. **Operational Concept & Environment** (optional) — Module-specific environment constraints (delete if none)
+2. **Actors** — Human and system actors that interact with this gear (stakeholders managed at project/task level)
+3. **Operational Concept & Environment** (optional) — Gear-specific environment constraints (delete if none)
 4. **Scope** — In/out of scope boundaries
 5. **Functional Requirements** — What the system MUST do (WHAT, not HOW) with rationale; verification method optional (default: automated tests 90%+ coverage)
-6. **Non-Functional Requirements** — Module-specific NFRs only (exclusions/extensions from project defaults)
+6. **Non-Functional Requirements** — Gear-specific NFRs only (exclusions/extensions from project defaults)
 7. **Public Library Interfaces** — Public API surface, stability guarantees, integration contracts
 8. **Use Cases** — Optional interaction flows
 9. **Acceptance Criteria** — Business-level validation
@@ -68,18 +68,18 @@ Standards alignment:
 Note: Stakeholder needs (per ISO 29148) managed at project/task level by steering committee.
 
 ### UPSTREAM_REQS.md
-**Per upstream module** (repeat for each upstream module):
-1. **UPSTREAM: {upstream module name}** — H1 section for each upstream module
-2. **System Actor Definition** — How the upstream module interacts with target module
-3. **Functional Requirements** — Capabilities the target module must provide
-4. **Non-Functional Requirements** — NFRs imposed by upstream module
+**Per upstream gear** (repeat for each upstream gear):
+1. **UPSTREAM: {upstream gear name}** — H1 section for each upstream gear
+2. **System Actor Definition** — How the upstream gear interacts with target gear
+3. **Functional Requirements** — Capabilities the target gear must provide
+4. **Non-Functional Requirements** — NFRs imposed by upstream gear
 5. **Public Interface Requirements** — Interfaces that must be exposed
 
 Standards alignment:
   - IEEE 830 / ISO/IEC/IEEE 29148:2018 (requirements specification)
   - ISO/IEC 15288 / 12207 (interface requirements)
 
-Note: Optional document. UPSTREAM_REQS captures what OTHER modules need FROM this module. Each upstream module gets its own H1 section. Use when upstream requirements are known before the module's PRD is complete, or for API-first design.
+Note: Optional document. UPSTREAM_REQS captures what OTHER gears need FROM this gear. Each upstream gear gets its own H1 section. Use when upstream requirements are known before the gear's PRD is complete, or for API-first design.
 
 ### DESIGN.md
 1. **Architecture Overview** — Vision, drivers (functional + NFR allocation table), layers
@@ -135,25 +135,25 @@ Use ADRs only when there was a meaningful discussion/debate and the rationale ne
 
 ### About Upstream Requirements (UPSTREAM_REQS.md)
 
-Upstream Requirements documents are optional and capture technical requirements **imposed ON** a module **BY** other modules (consumers, dependencies, surrounding systems). This creates an external perspective complementing the internal perspective of PRD.md.
+Upstream Requirements documents are optional and capture technical requirements **imposed ON** a gear **BY** other gears (consumers, dependencies, surrounding systems). This creates an external perspective complementing the internal perspective of PRD.md.
 
 **Key differences from PRD:**
-- **PRD.md**: "What does THIS module do?" (internal goals and capabilities)
-- **UPSTREAM_REQS.md**: "What do OTHER modules need FROM this module?" (external obligations)
+- **PRD.md**: "What does THIS gear do?" (internal goals and capabilities)
+- **UPSTREAM_REQS.md**: "What do OTHER gears need FROM this gear?" (external obligations)
 
 **When to use:**
-- **Early-stage development**: Upstream needs are known before the module's full PRD exists
+- **Early-stage development**: Upstream needs are known before the gear's full PRD exists
 - **API-first design**: Consumers define interface requirements before implementation
-- **Integration planning**: Capture cross-module dependencies explicitly
+- **Integration planning**: Capture cross-gear dependencies explicitly
 - **Incremental development**: Build features driven by actual consumer needs rather than speculation
 
 **Structure benefits:**
-- Requirements grouped by source module for clear ownership
-- Each upstream module has its own section with actors, FRs, NFRs, and interfaces
-- Cross-module requirements section for shared needs
+- Requirements grouped by source gear for clear ownership
+- Each upstream gear has its own section with actors, FRs, NFRs, and interfaces
+- Cross-gear requirements section for shared needs
 - Integration contract matrix for visibility across all consumers
 
-A single UPSTREAM_REQS.md can contain requirements from multiple upstream modules, making it a central integration point for the target module.
+A single UPSTREAM_REQS.md can contain requirements from multiple upstream gears, making it a central integration point for the target gear.
 
 ### About Feature Files (features/*.md)
 
@@ -167,10 +167,10 @@ Unlike PRD which answers "what do we need?", Feature files answer "how exactly d
 
 ## Document Placement
 
-Documents should be placed **inside appropriate subsystem or module folder** following this structure:
+Documents should be placed **inside appropriate subsystem or gear folder** following this structure:
 
 ```
-docs/arch/common/ or docs/arch/{subsystem}/ or {module}/
+docs/arch/common/ or docs/arch/{subsystem}/ or {gear}/
 ├── PRD.md                     # Product requirements
 ├── DESIGN.md                  # Technical design
 ├── ADR/                       # Architecture Decision Records
@@ -201,7 +201,7 @@ Cypilot IDs enable traceability across all specification artifacts.
 
 ### Cypilot ID Definition
 
-An Cypilot ID **defines** a unique identifier for a specification element (actor, requirement, feature, etc.). Each ID must be **globally unique** within the module, subsystem or global project depending on where it's defined
+An Cypilot ID **defines** a unique identifier for a specification element (actor, requirement, feature, etc.). Each ID must be **globally unique** within the gear, subsystem or global project depending on where it's defined
 
 **Format**:
 ```

@@ -1,4 +1,4 @@
-# Technical Design — {Module Name}
+# Technical Design — {Gear Name}
 
 <!--
 =============================================================================
@@ -166,7 +166,7 @@ graph LR
 
 ### 3.3 API Contracts
 
-{For module-level design: Document all public API contracts exposed by this module. For multi-component design: Document the primary API contracts exposed by each component. Add references to module designs}
+{For gear-level design: Document all public API contracts exposed by this gear. For multi-component design: Document the primary API contracts exposed by each component. Add references to gear designs}
 
 - [ ] `p2` - **ID**: `cpt-{system}-interface-{slug}`
 
@@ -182,36 +182,36 @@ graph LR
 
 ### 3.4 Internal Dependencies
 
-{Internal system/module dependencies within the platform. All inter-module communication goes through versioned contracts, SDK clients, or plugin interfaces — never through internal types.}
+{Internal system/gear dependencies within the platform. All inter-gear communication goes through versioned contracts, SDK clients, or plugin interfaces — never through internal types.}
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear | Interface Used | Purpose |
 |-------------------|----------------|----------|
-| {module_name} | {contract / SDK client / plugin} | {Why this module is needed} |
+| {gear_name} | {contract / SDK client / plugin} | {Why this gear is needed} |
 
 **Dependency Rules** (per project conventions):
 - No circular dependencies
-- Always use SDK modules for inter-module communication
+- Always use sdk modules for inter-gear communication
 - No cross-category sideways deps except through contracts
-- Only integration/adapter modules talk to external systems
+- Only integration/adapter gears talk to external systems
 - `SecurityContext` must be propagated across all in-process calls
 
 ### 3.5 External Dependencies
 
-External systems, databases, and third-party services this module interacts with. Define protocols, data formats, and integration points.
+External systems, databases, and third-party services this gear interacts with. Define protocols, data formats, and integration points.
 
 #### {External System / Database / Service Name}
 
 - **Contract**: `cpt-{system}-contract-{slug}`
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear | Interface Used | Purpose |
 |-------------------|---------------|---------|
-| {module_name} | {contract / SDK client / plugin} | {Why this module is needed} |
+| {gear_name} | {contract / SDK client / plugin} | {Why this gear is needed} |
 
 **Dependency Rules** (per project conventions):
 - No circular dependencies
-- Always use SDK modules for inter-module communication
+- Always use SDK modules for inter-gear communication
 - No cross-category sideways deps except through contracts
-- Only integration/adapter modules talk to external systems
+- Only integration/adapter gears talk to external systems
 - `SecurityContext` must be propagated across all in-process calls
 
 ### 3.6 Interactions & Sequences
@@ -229,7 +229,7 @@ External systems, databases, and third-party services this module interacts with
 ```mermaid
 sequenceDiagram
     User ->> System: Request
-    System ->> Module B: Call
+    System ->> Gear B: Call
     System ->> Database: Query
     Database -->> System: Result
     System -->> User: Response
@@ -239,7 +239,7 @@ sequenceDiagram
 
 ### 3.7 Database schemas & tables
 
-{ For module-level design: Document database tables, schemas, and data models. For multi-component design: refer to component-level design documents. }
+{ For gear-level design: Document database tables, schemas, and data models. For multi-component design: refer to component-level design documents. }
 
 - [ ] `p3` - **ID**: `cpt-{system}-db-{slug}`
 

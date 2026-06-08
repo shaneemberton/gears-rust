@@ -1,2 +1,2 @@
 #[test]
-fn out_of_line_test_module_is_allowed() {}
+fn out_of_line_test_gear_is_allowed() {}

@@ -224,9 +224,9 @@ Persistent data storage. Interface: SQL via backend.
 
 ### 3.4 Internal Dependencies
 
-No internal module dependencies — Todo App is a standalone module with no platform module consumers or providers.
+No internal gear dependencies — Todo App is a standalone gear with no platform gear consumers or providers.
 
-| Dependency Module | Interface Used | Purpose |
+| Dependency Gear | Interface Used | Purpose |
 |-------------------|---------------|--------|
 | (none) | — | — |
 

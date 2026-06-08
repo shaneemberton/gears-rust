@@ -1,5 +1,5 @@
 <!-- Created: 2026-04-07 by Constructor Tech -->
-# DE1101: Enabling the lint for a new module
+# DE1101: Enabling the lint for a new gear
 
 ## Quick start
 
@@ -7,13 +7,13 @@ Three steps to enable DE1101 for a module that's currently excluded:
 
 ### 1. Remove the module from `dylint.toml` exclusions
 
-Open `dylint.toml` in the workspace root and delete the module's line from `[de1101_tests_in_separate_files].excluded_paths`:
+Open `dylint.toml` in the workspace root and delete the gear's line from `[de1101_tests_in_separate_files].excluded_paths`:
 
 ```toml
 [de1101_tests_in_separate_files]
 excluded_paths = [
     # ...
-    # "gears/my-module",   ← delete this line
+    # "gears/my-gear",   ← delete this line
     # ...
 ]
 ```

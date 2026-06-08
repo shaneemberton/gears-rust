@@ -7,9 +7,9 @@ on:
     paths:
       - '**/*.md'
       - 'docs/**'
-      - 'modules/**/docs/**'
-      - 'modules/**/src/**'
-      - 'modules/**/tests/**'
+      - 'gears/**/docs/**'
+      - 'gears/**/src/**'
+      - 'gears/**/tests/**'
       - '.cypilot/config/**'
       - 'Makefile'
   workflow_call:

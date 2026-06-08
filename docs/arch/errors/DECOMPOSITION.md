@@ -6,7 +6,7 @@ This document tracks the phased migration from the legacy error system (`Problem
 
 ## Overview
 
-This decomposition organizes the canonical error migration into sequential implementation phases (foundation, middleware, module migration, cleanup, CI gates, docs) plus orthogonal workstreams. Each entry is structured so teams can execute incrementally while preserving traceability to PRD/DESIGN constraints.
+This decomposition organizes the canonical error migration into sequential implementation phases (foundation, middleware, gear migration, cleanup, CI gates, docs) plus orthogonal workstreams. Each entry is structured so teams can execute incrementally while preserving traceability to PRD/DESIGN constraints.
 
 ## Entries
 
@@ -61,8 +61,8 @@ Build the `CanonicalError` enum, context types, `Problem` mapping, and `#[resour
 
 - [ ] 1.5.1 Implement a dylint rule — **No direct `Problem` construction**: reject `Problem { ... }` struct literals and direct `IntoResponse` impls that bypass `CanonicalError`; all `Problem` instances must originate from `CanonicalError` via the `From` impl
 - [ ] 1.5.2 Implement a dylint rule — **No legacy error patterns**: reject usage of `Problem::new()`, `ErrDef`, `declare_errors!`, or `ErrorCode`
-- [ ] 1.5.3 Implement a dylint rule — **No raw status-code error responses**: handlers must return `Result<T, CanonicalError>`, not ad-hoc HTTP error responses or module-specific error enums
-- [ ] 1.5.4 Add dylint CI gate to run on all module code
+- [ ] 1.5.3 Implement a dylint rule — **No raw status-code error responses**: handlers must return `Result<T, CanonicalError>`, not ad-hoc HTTP error responses or gear-specific error enums
+- [ ] 1.5.4 Add dylint CI gate to run on all gear code
 
 #### 1.6 Contract enforcement (Tier 2)
 
@@ -89,36 +89,36 @@ Build the `CanonicalError` enum, context types, `Problem` mapping, and `#[resour
 
 ---
 
-### Phase 3 — Module Migration
+### Phase 3 — Gear Migration
 
-- [ ] `p1` - **ID**: `cpt-cf-errors-feature-module-migration`
+- [ ] `p1` - **ID**: `cpt-cf-errors-feature-gear-migration`
 
-Migrate each module from legacy error types to `CanonicalError`. Can proceed in parallel per module once Phase 1 is merged.
+Migrate each gear from legacy error types to `CanonicalError`. Can proceed in parallel per gear once Phase 1 is merged.
 
-#### 3.1 Migration per module
+#### 3.1 Migration per gear
 
-For each module:
+For each gear:
 
-- [ ] 3.x.1 Define `#[resource_error("gts.cf.{module}.{resource}.v1~")] struct ResourceError;` for each resource type in the module
+- [ ] 3.x.1 Define `#[resource_error("gts.cf.{gear}.{resource}.v1~")] struct ResourceError;` for each resource type in the gear
 - [ ] 3.x.2 Replace `Problem::new()` / `ErrDef` / `ErrorCode` calls with `CanonicalError` / `ResourceError` constructors
 - [ ] 3.x.3 Replace `Result<T, Problem>` handler return types with `Result<T, CanonicalError>`
-- [ ] 3.x.4 Remove module-specific error enums that are now covered by canonical categories
-- [ ] 3.x.5 Update module tests to use canonical error matching
+- [ ] 3.x.4 Remove gear-specific error enums that are now covered by canonical categories
+- [ ] 3.x.5 Update gear tests to use canonical error matching
 
-#### 3.2 Module list
+#### 3.2 Gear list
 
 - [ ] 3.2.1 OAGW (`gears/system/oagw/`)
-- [ ] 3.2.2 Credstore (`modules/core/credstore/`)
-- [ ] 3.2.3 Tenant Resolver (`modules/core/tenant-resolver/`)
-- [ ] 3.2.4 AuthZ Resolver (`modules/core/authz-resolver/`)
-- [ ] 3.2.5 AuthN Resolver (`modules/core/authn-resolver/`)
-- [ ] 3.2.6 Simple Resource Registry (`modules/simple-resource-registry/`)
-- [ ] 3.2.7 Simple User Settings (`modules/simple-user-settings/`)
+- [ ] 3.2.2 Credstore (`gears/core/credstore/`)
+- [ ] 3.2.3 Tenant Resolver (`gears/core/tenant-resolver/`)
+- [ ] 3.2.4 AuthZ Resolver (`gears/core/authz-resolver/`)
+- [ ] 3.2.5 AuthN Resolver (`gears/core/authn-resolver/`)
+- [ ] 3.2.6 Simple Resource Registry (`gears/simple-resource-registry/`)
+- [ ] 3.2.7 Simple User Settings (`gears/simple-user-settings/`)
 - [ ] 3.2.8 API Gateway (`gears/system/api-gateway/`)
 - [ ] 3.2.9 Nodes Registry (`gears/system/nodes-registry/`)
 - [ ] 3.2.10 Types Registry (`gears/system/types-registry/`)
-- [ ] 3.2.11 File Parser (`modules/file-parser/`)
-- [ ] 3.2.12 Mini-Chat (`modules/mini-chat/`)
+- [ ] 3.2.11 File Parser (`gears/file-parser/`)
+- [ ] 3.2.12 Mini-Chat (`gears/mini-chat/`)
 
 ---
 
@@ -126,7 +126,7 @@ For each module:
 
 - [ ] `p1` - **ID**: `cpt-cf-errors-feature-legacy-cleanup`
 
-All modules are now on `CanonicalError`. Remove legacy infrastructure and finalize the `Problem` struct.
+All gears are now on `CanonicalError`. Remove legacy infrastructure and finalize the `Problem` struct.
 
 > Traces to: `cpt-cf-errors-constraint-error-contract-stability`
 
@@ -147,14 +147,14 @@ All modules are now on `CanonicalError`. Remove legacy infrastructure and finali
 - [ ] 4.2.3 Remove `ValidationViolation` struct (replaced by `FieldViolation` in `InvalidArgument` and `OutOfRange` context types)
 - [ ] 4.2.4 Remove `ValidationError` and `ValidationErrorResponse` structs
 - [ ] 4.2.5 Remove convenience constructors from `libs/toolkit/src/api/problem.rs` (`bad_request`, `not_found`, `conflict`, `internal_error`)
-- [ ] 4.2.6 Remove all `gts/errors.json` files from modules and examples
+- [ ] 4.2.6 Remove all `gts/errors.json` files from gears and examples
 - [ ] 4.2.7 Remove any remaining `ErrorCode` enum references
 
 #### 4.3 Final verification
 
 - [ ] 4.3.1 `cargo build` — workspace compiles with no legacy error references
 - [ ] 4.3.2 `cargo test` — all tests pass
-- [ ] 4.3.3 Grep verification: zero occurrences of `Problem::new`, `ErrDef`, `declare_errors!`, `ErrorCode`, `with_code()`, `with_errors()` in module code
+- [ ] 4.3.3 Grep verification: zero occurrences of `Problem::new`, `ErrDef`, `declare_errors!`, `ErrorCode`, `with_code()`, `with_errors()` in gear code
 - [ ] 4.3.4 Grep verification: zero `gts/errors.json` files in repository
 
 ---

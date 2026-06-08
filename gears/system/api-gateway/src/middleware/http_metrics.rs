@@ -28,16 +28,16 @@ pub struct HttpMetrics {
 }
 
 impl HttpMetrics {
-    /// Create instruments on the global meter scoped to the given module name.
+    /// Create instruments on the global meter scoped to the given gear name.
     ///
     /// When `prefix` is non-empty the metric names become
     /// `{prefix}.http.server.request.duration` and
     /// `{prefix}.http.server.active_requests`.
     #[must_use]
-    pub fn new(module_name: &str, prefix: &str) -> Self {
+    pub fn new(gear_name: &str, prefix: &str) -> Self {
         let prefix = prefix.trim().trim_end_matches('.'); // Normalize prefix.
 
-        let scope = opentelemetry::InstrumentationScope::builder(module_name.to_owned()).build();
+        let scope = opentelemetry::InstrumentationScope::builder(gear_name.to_owned()).build();
         let meter = opentelemetry::global::meter_with_scope(scope);
 
         let (duration_name, active_name) = if prefix.is_empty() {

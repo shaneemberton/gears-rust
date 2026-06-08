@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use axum::{Router, extract::Json, routing::post};
 use std::sync::Arc;
 use toolkit::{
-    Module, ModuleCtx, RestApiCapability,
+    Gear, GearCtx, RestApiCapability,
     api::OperationBuilder,
     config::ConfigProvider,
     contracts::{ApiGatewayCapability, OpenApiRegistry},
@@ -19,8 +19,8 @@ struct TestConfigProvider {
 }
 
 impl ConfigProvider for TestConfigProvider {
-    fn get_module_config(&self, module: &str) -> Option<&serde_json::Value> {
-        if module == "api-gateway" {
+    fn get_gear_config(&self, gear: &str) -> Option<&serde_json::Value> {
+        if gear == "api-gateway" {
             Some(&self.config)
         } else {
             None
@@ -34,7 +34,7 @@ fn wrap_config(config: &serde_json::Value) -> serde_json::Value {
     })
 }
 
-fn create_test_module_ctx_with_body_limit(limit_bytes: usize) -> ModuleCtx {
+fn create_test_gear_ctx_with_body_limit(limit_bytes: usize) -> GearCtx {
     let config = wrap_config(&serde_json::json!({
         "bind_addr": "127.0.0.1:0",
         "cors_enabled": true,
@@ -51,7 +51,7 @@ fn create_test_module_ctx_with_body_limit(limit_bytes: usize) -> ModuleCtx {
 
     let hub = Arc::new(toolkit::ClientHub::new());
 
-    ModuleCtx::new(
+    GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
@@ -66,19 +66,19 @@ struct LargePayload {
     data: String,
 }
 
-pub struct BodyLimitTestModule;
+pub struct BodyLimitTestGear;
 
 #[async_trait]
-impl Module for BodyLimitTestModule {
-    async fn init(&self, _ctx: &toolkit::ModuleCtx) -> Result<()> {
+impl Gear for BodyLimitTestGear {
+    async fn init(&self, _ctx: &toolkit::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
-impl RestApiCapability for BodyLimitTestModule {
+impl RestApiCapability for BodyLimitTestGear {
     fn register_rest(
         &self,
-        _ctx: &toolkit::ModuleCtx,
+        _ctx: &toolkit::GearCtx,
         router: axum::Router,
         openapi: &dyn OpenApiRegistry,
     ) -> Result<axum::Router> {
@@ -106,12 +106,12 @@ async fn upload_handler(Json(payload): Json<LargePayload>) -> Json<serde_json::V
 async fn test_body_limit_configured() {
     let limit = 1024; // 1KB limit
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_body_limit(limit);
+    let ctx = create_test_gear_ctx_with_body_limit(limit);
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = BodyLimitTestModule;
+    let gear = BodyLimitTestGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -131,12 +131,12 @@ async fn test_body_limit_configured() {
 async fn test_body_limit_with_cors() {
     // Verify body limit and CORS layers coexist
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_body_limit(16 * 1024 * 1024);
+    let ctx = create_test_gear_ctx_with_body_limit(16 * 1024 * 1024);
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = BodyLimitTestModule;
+    let gear = BodyLimitTestGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -162,7 +162,7 @@ async fn test_default_body_limit() {
 
     let hub = Arc::new(toolkit::ClientHub::new());
 
-    let ctx = ModuleCtx::new(
+    let ctx = GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
@@ -173,9 +173,9 @@ async fn test_default_body_limit() {
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = BodyLimitTestModule;
+    let gear = BodyLimitTestGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -195,12 +195,12 @@ async fn test_default_body_limit() {
 #[tokio::test]
 async fn test_openapi_includes_413_response() {
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_body_limit(1024);
+    let ctx = create_test_gear_ctx_with_body_limit(1024);
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = BodyLimitTestModule;
+    let gear = BodyLimitTestGear;
     let router = Router::new();
-    let _router = module
+    let _router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 

@@ -5,7 +5,7 @@
 //! singleton (`id = 1`, enforced by a `CHECK` constraint) so the
 //! table holds at most one row at a time: a second worker attempting
 //! to insert receives a unique-violation, which the runtime lock
-//! module maps to
+//! gear maps to
 //! [`crate::domain::error::DomainError::IntegrityCheckInProgress`].
 //!
 //! The gate row is committed by a short `acquire` transaction

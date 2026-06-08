@@ -1,6 +1,6 @@
 //! `OData` schema types for type-safe query building.
 //!
-//! This module defines the core schema abstraction for `OData` queries:
+//! This gear defines the core schema abstraction for `OData` queries:
 //! - `Schema` trait: Maps field enums to string names
 //! - `FieldRef`: Type-safe field references with compile-time type checking
 //! - Helper traits for field operations and value conversion

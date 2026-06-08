@@ -73,7 +73,7 @@ Created:  2026-03-30 by Virtuozzo
 
 ### 1.1 Purpose
 
-AM is the foundational multi-tenancy source-of-truth module for the Gears platform. It provides hierarchical tenant management, tenant isolation metadata, delegated administration, and a pluggable Identity Provider (IdP) integration contract for administrative user lifecycle operations.
+AM is the foundational multi-tenancy source-of-truth gear for the Gears platform. It provides hierarchical tenant management, tenant isolation metadata, delegated administration, and a pluggable Identity Provider (IdP) integration contract for administrative user lifecycle operations.
 
 AM enables diverse organizational models — from cloud hosting (Provider / Reseller / Customer) to enterprise divisions and managed-service providers — within a single deployment, supporting both managed (delegated administration) and self-managed (barrier-isolated) tenant modes in the same hierarchy.
 
@@ -87,7 +87,7 @@ Tenant hierarchy is needed because many customers operate as parent/child organi
 
 The platform needs a tenant model with unlimited hierarchy depth (configurable advisory threshold), visibility barriers for self-managed tenants, and consistent tenant context propagation across all services.
 
-**Representative use-cases the module is designed for:**
+**Representative use-cases the gear is designed for:**
 
 | Domain | Use-case | How AM is used |
 |--------|----------|-----------------|
@@ -110,8 +110,8 @@ The platform needs a tenant model with unlimited hierarchy depth (configurable a
 
 | Metric | Baseline | Target | Timeframe |
 |--------|----------|--------|-----------|
-| Tenant onboarding effort | 5+ API calls and manual IdP configuration per tenant (*baseline estimate from the current pre-AM workflow: create tenant record, provision IdP realm/org, bind admin identity, create root user-group, set barrier/policy flags; no production measurement exists because AM itself replaces this workflow, so the baseline is a design-time estimate used for GA pass/fail rather than a measured SLO*) | Single API call — tenant create with type and mode | Module GA |
-| Separate deployments per tenant model | 2 separate deployment configurations required today (one per managed/self-managed pattern) | Both modes in one tenant tree — zero per-model deployments (pass/fail) | Module GA |
+| Tenant onboarding effort | 5+ API calls and manual IdP configuration per tenant (*baseline estimate from the current pre-AM workflow: create tenant record, provision IdP realm/org, bind admin identity, create root user-group, set barrier/policy flags; no production measurement exists because AM itself replaces this workflow, so the baseline is a design-time estimate used for GA pass/fail rather than a measured SLO*) | Single API call — tenant create with type and mode | Gear GA |
+| Separate deployments per tenant model | 2 separate deployment configurations required today (one per managed/self-managed pattern) | Both modes in one tenant tree — zero per-model deployments (pass/fail) | Gear GA |
 | End-to-end tenant context validation latency (p95) | 0 approved AM-backed benchmarks against the target | ≥ 1 approved pre-GA benchmark on the deployment profile with p95 ≤ 5ms through the resolver path | Pre-GA load test gate |
 | Cross-tenant data leaks | 0 AM-specific automated isolation scenarios wired into the gate today | Zero leaks observed; 100% of the planned AM isolation scenarios pass | Pre-GA security gate |
 | Hierarchy depth coverage | Fixed shallow hierarchies (2–3 levels) | No hard AM structural depth cap; configurable advisory threshold (default: 10); benchmark-backed validation of at least 3 distinct type topologies, at least one of which reaches **≥ 15 levels** (50% above the default advisory threshold) on the approved deployment profile defined in §13 | Pre-GA performance + integration gate |
@@ -140,9 +140,9 @@ The platform needs a tenant model with unlimited hierarchy depth (configurable a
 | Subject Tenant | Tenant the subject (user or API client) belongs to. Used for authorization context. |
 | Context Tenant | Tenant scope root for an operation. May differ from Subject Tenant in platform-authorized cross-tenant administrative scenarios. |
 | Resource Tenant | Actual tenant owning a specific resource. |
-| Self-Managed Tenant | Child tenant that creates a visibility barrier for barrier-enforced subtree/resource reads. Barrier handling is resource-type dependent per the platform tenant model: parent-side reads of child tenant metadata may still be policy-authorized, while barrier-respecting subtree/resource traversal stops at the self-managed boundary. AM's only module-specific v1 carve-out is the dedicated conversion-request discovery surface (`/child-conversions`), which exposes minimal request metadata required for the dual-consent workflow. |
+| Self-Managed Tenant | Child tenant that creates a visibility barrier for barrier-enforced subtree/resource reads. Barrier handling is resource-type dependent per the platform tenant model: parent-side reads of child tenant metadata may still be policy-authorized, while barrier-respecting subtree/resource traversal stops at the self-managed boundary. AM's only gear-specific v1 carve-out is the dedicated conversion-request discovery surface (`/child-conversions`), which exposes minimal request metadata required for the dual-consent workflow. |
 | Managed Tenant | Child tenant where the parent is eligible for controlled access to child tenant APIs and resources per policy. No visibility barrier exists. |
-| Tenant Barrier | Visibility and access boundary created by self-managed tenants for barrier-enforced reads and subtree traversal. Whether the barrier applies is resource-type dependent per the platform tenant model; AM itself adds no module-specific bypass beyond the narrow conversion-request metadata carve-out described for `/child-conversions`. |
+| Tenant Barrier | Visibility and access boundary created by self-managed tenants for barrier-enforced reads and subtree traversal. Whether the barrier applies is resource-type dependent per the platform tenant model; AM itself adds no gear-specific bypass beyond the narrow conversion-request metadata carve-out described for `/child-conversions`. |
 | Barrier Mode | Authorization parameter controlling barrier handling: `Respect` (default) stops traversal at self-managed boundaries; `Ignore` traverses through barriers for operations like billing queries. Values align with the `BarrierMode` SDK enum. Tenant metadata resolution does not use `BarrierMode::Ignore` — inheritance stops at self-managed boundaries instead (see §5.7). |
 | Tenant Tree | Single rooted hierarchy of tenants. Has exactly one root tenant (`parent_id = NULL`) created at platform bootstrap. |
 | Root Tenant | Top-level tenant in the tree (`parent_id = NULL`). Exactly one root tenant exists per deployment, created automatically during platform bootstrap. |
@@ -153,7 +153,7 @@ The platform needs a tenant model with unlimited hierarchy depth (configurable a
 | Tenant Type | Classification of a tenant node. Types are extensible at runtime via the GTS types registry. Deployments define their own type topology. |
 | User | A human subject managed by AM via the IdP contract (provisioning, tenant binding, group membership). Corresponds to the platform-level [Subject](../../../../docs/arch/authorization/DESIGN.md#core-terms) term narrowed to human identities; API clients and service accounts are not AM-managed users. |
 | IdP Contract | Abstract pluggable interface for Identity Provider operations (tenant provisioning, tenant deprovisioning, user provisioning, deprovisioning, and tenant-scoped user query). |
-| User Group | A [Resource Group](../../resource-group/docs/PRD.md) entity with a Resource Group type configured for user membership (`allowed_memberships` includes the user resource type). AM delegates group hierarchy, membership management, and cycle detection to the Resource Group module. |
+| User Group | A [Resource Group](../../resource-group/docs/PRD.md) entity with a Resource Group type configured for user membership (`allowed_memberships` includes the user resource type). AM delegates group hierarchy, membership management, and cycle detection to the Resource Group gear. |
 | Tenant Metadata Schema | A GTS-registered schema that defines a category of extensible tenant data (e.g., branding, contacts), its validation rules, and its `inheritance_policy` trait; identified by its chained `schema_id`. |
 | Inheritance Policy | The `inheritance_policy` trait on a tenant metadata schema, controlling parent-to-child propagation: `override_only` (default; each tenant sets its own value, no inheritance) or `inherit` (child inherits parent value unless overridden). |
 
@@ -217,11 +217,11 @@ The platform needs a tenant model with unlimited hierarchy depth (configurable a
 | AuthZ Resolver Plugin | Consumer-owned: AuthZ decides its own cache-invalidation and convergence strategy over the AM-owned hierarchy and barrier state exposed by the Tenant Resolver. AM neither commits to a propagation deadline nor maintains an AM-side cache. | Downstream consumer; responsible for its own resilience (see above). |
 | Billing System | Consumer-owned, batch-friendly: Billing aggregates tenant hierarchy on its own cadence using `BarrierMode::Ignore`. AM commits no tight convergence window; hours-scale lag is architecturally acceptable. | Downstream consumer; responsible for its own resilience (see above). |
 
-The absence of AM-side SLA contracts is a deliberate architectural choice, not an omission: AM is an administrative source-of-truth module (see §3), and any per-consumer freshness guarantee would either require AM-owned caching/replication (rejected in [ADR-0004](ADR/0004-cpt-cf-account-management-adr-resource-group-tenant-hierarchy-source.md)) or shift AM into the request-path enforcement role it explicitly refuses (see §3).
+The absence of AM-side SLA contracts is a deliberate architectural choice, not an omission: AM is an administrative source-of-truth gear (see §3), and any per-consumer freshness guarantee would either require AM-owned caching/replication (rejected in [ADR-0004](ADR/0004-cpt-cf-account-management-adr-resource-group-tenant-hierarchy-source.md)) or shift AM into the request-path enforcement role it explicitly refuses (see §3).
 
 ## 3. Operational Concept & Environment
 
-AM is the control-plane source of truth for tenant hierarchy, tenant mode, tenant metadata, and delegated user lifecycle intent. It is an administrative module, not a request-path enforcement module. Authentication, authorization, token handling, and tenant-scoped runtime enforcement are inherited from the platform AuthN/AuthZ architecture in [docs/arch/authorization/DESIGN.md](../../../../docs/arch/authorization/DESIGN.md).
+AM is the control-plane source of truth for tenant hierarchy, tenant mode, tenant metadata, and delegated user lifecycle intent. It is an administrative gear, not a request-path enforcement gear. Authentication, authorization, token handling, and tenant-scoped runtime enforcement are inherited from the platform AuthN/AuthZ architecture in [docs/arch/authorization/DESIGN.md](../../../../docs/arch/authorization/DESIGN.md).
 
 ### 3.1 Core Boundary
 
@@ -270,7 +270,7 @@ AM coordinates user lifecycle operations but **does not own user identity data**
 - IdP is the single source of truth for "user X exists and belongs to tenant Y."
 - User IDs exposed through AM are IdP-issued UUIDs; AM passes them through for audit and Resource Group integration but does not mint a separate user identity model.
 - AM stores no credentials, no profile cache, and no local user projection.
-- Group membership cleanup after user deprovisioning is a future cross-module lifecycle capability and is not solved in v1.
+- Group membership cleanup after user deprovisioning is a future cross-gear lifecycle capability and is not solved in v1.
 
 ## 4. Scope
 
@@ -295,7 +295,7 @@ AM coordinates user lifecycle operations but **does not own user identity data**
 - User authentication flows: covered by IAM PRD.
 - Tenant context propagation (SecurityContext population, cross-tenant rejection, service-to-service forwarding): framework and AuthZ Resolver responsibility.
 - Barrier-aware tenant tree traversal (ancestor chains, descendant queries with `BarrierMode`): Tenant Resolver Plugin responsibility. AM owns the underlying `tenants` + `tenant_closure` storage and the canonical closure shape, and exposes it to the Plugin via a read-only database role; barrier-aware SDK queries are served by the Plugin over that shared storage. AM's own public API exposes tenant CRUD and direct-children discovery, not barrier-aware subtree traversal.
-- AuthZ Resolver (PDP) implementation: covered by Gears DESIGN; this module covers the tenant model consumed by PDP.
+- AuthZ Resolver (PDP) implementation: covered by Gears DESIGN; this gear covers the tenant model consumed by PDP.
 - Resource provisioning and lifecycle for non-identity platform resources: outside AM scope. AM provides tenant context and ownership boundaries but does not manage downstream resource CRUD or provisioning workflows.
 - Tenant lifecycle events (CloudEvents): deferred until EVT (Events and Audit Bus) is introduced.
 
@@ -455,7 +455,7 @@ The system **MUST** allow an authorized administrator to update only mutable ten
 
 The system **MUST** own a `tenant_closure` table with the platform-canonical shape `(ancestor_id, descendant_id, barrier, descendant_status)` defined in TENANT_MODEL.md. Closure rows **MUST** exist only for tenants whose `tenants.status` is SDK-visible (`active`, `suspended`, `deleted`): each such tenant has a self-row `(id, id)` plus one row per strict ancestor along the `parent_id` chain. Tenants in the transient `provisioning` state **MUST NOT** have any closure rows — they are inserted in a single transaction with the `provisioning → active` status transition, and removed in a single transaction with hard-deletion. Every status transition between SDK-visible states **MUST** update `descendant_status` transactionally for all rows where that tenant is `descendant_id`. The `barrier` column (`SMALLINT`, v1 uses bit 0 for self_managed per TENANT_MODEL.md) reflects whether any tenant on the path `(ancestor, descendant]` is `self_managed` (ancestor excluded, descendant included); self-rows `(id, id)` **MUST** carry `barrier = 0`. The `descendant_status` column domain is `{active, suspended, deleted}` only — the internal `provisioning` state is excluded by construction. The system **MUST** expose this storage to the Tenant Resolver Plugin through a read-only database role scoped to `tenants` and `tenant_closure`, and **MUST NOT** provide any sync, projection, revision-token, or change-feed capability on top of that storage.
 
-- **Rationale**: Barrier-aware subtree, ancestor, and existence queries on the authorization hot path need a transitive representation of the tenant tree. Co-owning the canonical closure table inside AM, and co-maintaining it transactionally with tenant writes, is what allows the Tenant Resolver Plugin to be a stateless query facade with no sync pipeline, no projection freshness budget, and no drift-detection loop — barrier changes and hierarchy changes become visible to the Plugin atomically the moment AM commits them. Keeping `provisioning` tenants out of `tenant_closure` entirely (rather than carrying them as a filtered state) makes the closure a clean publication contract for future replication to business modules — replica consumers never observe transient AM saga state and have no `provisioning`-specific filtering obligation.
+- **Rationale**: Barrier-aware subtree, ancestor, and existence queries on the authorization hot path need a transitive representation of the tenant tree. Co-owning the canonical closure table inside AM, and co-maintaining it transactionally with tenant writes, is what allows the Tenant Resolver Plugin to be a stateless query facade with no sync pipeline, no projection freshness budget, and no drift-detection loop — barrier changes and hierarchy changes become visible to the Plugin atomically the moment AM commits them. Keeping `provisioning` tenants out of `tenant_closure` entirely (rather than carrying them as a filtered state) makes the closure a clean publication contract for future replication to business gears — replica consumers never observe transient AM saga state and have no `provisioning`-specific filtering obligation.
 
 ### 5.3 Tenant Type Enforcement
 
@@ -676,7 +676,7 @@ User groups are implemented as [Resource Group](../../resource-group/docs/PRD.md
 
 **Actors**: `cpt-cf-account-management-actor-platform-admin`
 
-AM **MUST** register (or require via seeding) the chained Resource Group type schema `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~` for user groups. Its `allowed_memberships` **MUST** include the platform user resource type `gts.cf.core.am.user.v1~`, and its `allowed_parents` **MUST** include itself to support nested groups. Tenant-scoped placement is enforced by Resource Group's ownership-graph rules rather than encoded as a schema trait. Registration happens during AM module initialization.
+AM **MUST** register (or require via seeding) the chained Resource Group type schema `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~` for user groups. Its `allowed_memberships` **MUST** include the platform user resource type `gts.cf.core.am.user.v1~`, and its `allowed_parents` **MUST** include itself to support nested groups. Tenant-scoped placement is enforced by Resource Group's ownership-graph rules rather than encoded as a schema trait. Registration happens during AM gear initialization.
 
 - **Rationale**: A dedicated Resource Group type ensures user group operations are governed by the same typed hierarchy, forest invariants, and tenant isolation rules as all other Resource Group entities, without reimplementing group infrastructure in AM.
 
@@ -768,7 +768,7 @@ The metadata permission model **MUST** allow authorization policies to restrict 
 
 **Actors**: `cpt-cf-account-management-actor-tenant-admin`, `cpt-cf-account-management-actor-platform-admin`
 
-The module **MUST** map every failure to one of the AIP-193 canonical
+The gear **MUST** map every failure to one of the AIP-193 canonical
 categories surfaced by [`toolkit-canonical-errors`](../../../../libs/toolkit-canonical-errors/).
 AM does not maintain a private error taxonomy — the SDK re-exports
 `CanonicalError` (as `AccountManagementError`) verbatim, and the HTTP
@@ -787,7 +787,7 @@ Categories AM uses today:
 - `Unimplemented` (HTTP 501) — IdP plugin does not support the requested operation
 - `Internal` (HTTP 500) — unclassified internal failure
 
-Rationale: anchoring AM's error contract to the AIP-193 canonical model means clients and operators react consistently across Gears — every module that adopts `toolkit-canonical-errors` shares the same envelope shape, the same HTTP semantics, and the same `errors[]` discriminator vocabulary. Fine-grained discriminators (`INVALID_TENANT_TYPE`, `TENANT_HAS_CHILDREN`, `PENDING_EXISTS`, `SERIALIZATION_CONFLICT`, …) live inside the canonical envelope as `reason` tokens on field/precondition/quota violations rather than as a private AM-side `code` field.
+Rationale: anchoring AM's error contract to the AIP-193 canonical model means clients and operators react consistently across Gears — every gear that adopts `toolkit-canonical-errors` shares the same envelope shape, the same HTTP semantics, and the same `errors[]` discriminator vocabulary. Fine-grained discriminators (`INVALID_TENANT_TYPE`, `TENANT_HAS_CHILDREN`, `PENDING_EXISTS`, `SERIALIZATION_CONFLICT`, …) live inside the canonical envelope as `reason` tokens on field/precondition/quota violations rather than as a private AM-side `code` field.
 
 The authoritative HTTP mapping, the `errors[]` violation vocabulary, and the GTS resource-type tags are documented in [DESIGN §3.8](./DESIGN.md#38-error-codes-reference). Provider-specific diagnostics appear in audit trails or in the audit-only `diagnostic` field without changing the public envelope.
 
@@ -799,13 +799,13 @@ The authoritative HTTP mapping, the `errors[]` violation vocabulary, and the GTS
 
 **Actors**: `cpt-cf-account-management-actor-platform-admin`
 
-The module **MUST** export domain-specific metrics for dependency health, metadata resolution, bootstrap lifecycle, tenant-retention work, conversion lifecycle, hierarchy-depth threshold exceedance, and cross-tenant denials. Metric naming and exposure **MUST** follow platform observability conventions.
+The gear **MUST** export domain-specific metrics for dependency health, metadata resolution, bootstrap lifecycle, tenant-retention work, conversion lifecycle, hierarchy-depth threshold exceedance, and cross-tenant denials. Metric naming and exposure **MUST** follow platform observability conventions.
 
-- **Rationale**: Operators need visibility into AM-specific domain operations (external dependency health, internal sub-operation latencies, security event counts) that platform-level middleware cannot provide. The boundary between platform-provided and module-internal metrics is an implementation concern owned by the DESIGN.
+- **Rationale**: Operators need visibility into AM-specific domain operations (external dependency health, internal sub-operation latencies, security event counts) that platform-level middleware cannot provide. The boundary between platform-provided and gear-internal metrics is an implementation concern owned by the DESIGN.
 
 ## 6. Non-Functional Requirements
 
-> **Global baselines**: Project-wide NFRs (performance, security, reliability, scalability) defined in root PRD. Document only module-specific NFRs here: **exclusions** from defaults or **standalone** requirements.
+> **Global baselines**: Project-wide NFRs (performance, security, reliability, scalability) defined in root PRD. Document only gear-specific NFRs here: **exclusions** from defaults or **standalone** requirements.
 >
 > **Testing strategy**: NFRs verified via automated benchmarks, security scans, and monitoring unless otherwise specified.
 
@@ -825,7 +825,7 @@ AM data access and source-of-truth lookups **MUST** enable end-to-end tenant-con
 AM API endpoints **MUST** require authenticated requests via platform `SecurityContext`.
 
 - **Inherited ownership**: Token validation, session renewal, federation, credential policy, and MFA policy are inherited from [docs/arch/authorization/DESIGN.md](../../../../docs/arch/authorization/DESIGN.md) and the configured IdP provider.
-- **AM-specific addendum**: AM defines only the extra administrative identity requirements unique to this module, namely tenant-scoped administrative user operations and preservation of tenant identity context in audit records.
+- **AM-specific addendum**: AM defines only the extra administrative identity requirements unique to this gear, namely tenant-scoped administrative user operations and preservation of tenant identity context in audit records.
 
 ### 6.3 Tenant Isolation Integrity
 
@@ -868,14 +868,14 @@ The tenant model **MUST** support both managed (no barrier) and self-managed (wi
 
 Published REST APIs **MUST** follow path-based versioning. SDK client and IdP integration contracts are stable interfaces — breaking changes **MUST** follow platform versioning policy and require a new contract version with a migration path for consumers.
 
-- **Inherited runtime compatibility**: AM has no module-specific runtime, OS, or deployment-topology deviations; it inherits standard ToolKit runtime, database, and rolling-upgrade compatibility from [docs/toolkit_unified_system/README.md](../../../../docs/toolkit_unified_system/README.md).
+- **Inherited runtime compatibility**: AM has no gear-specific runtime, OS, or deployment-topology deviations; it inherits standard ToolKit runtime, database, and rolling-upgrade compatibility from [docs/toolkit_unified_system/README.md](../../../../docs/toolkit_unified_system/README.md).
 - **Consumer compatibility**: Changes to AM source-of-truth tenant data consumed by Tenant Resolver, AuthZ Resolver, or Billing **MUST** remain backward-compatible within a minor release or publish a coordinated migration path.
 
 ### 6.8 Expected Production Scale
 
 - [ ] `p1` - **ID**: `cpt-cf-account-management-nfr-production-scale`
 
-The AM deployment profile is defined authoritatively in §13 *Review Baseline Decisions* and frozen for the v1 review. The dimensions below are the **design targets** the architecture is validated against — not measured production workloads (AM is a new module; no production AM traffic exists yet). Each bound is anchored to a specific architectural decision in the companion DESIGN, so enlarging any bound requires revisiting that decision rather than a documentation change.
+The AM deployment profile is defined authoritatively in §13 *Review Baseline Decisions* and frozen for the v1 review. The dimensions below are the **design targets** the architecture is validated against — not measured production workloads (AM is a new gear; no production AM traffic exists yet). Each bound is anchored to a specific architectural decision in the companion DESIGN, so enlarging any bound requires revisiting that decision rather than a documentation change.
 
 | Dimension | v1 Design Target (from §13) | Anchored architectural decision |
 |-----------|-----------------------------|--------------------------------|
@@ -935,7 +935,7 @@ AM **MUST** provide diagnostic checks for hierarchy integrity anomalies that it 
 
 - [ ] `p2` - **ID**: `cpt-cf-account-management-nfr-data-remediation`
 
-AM-owned integrity anomalies and compensation failures **MUST** produce operator-visible telemetry within 15 minutes of detection and a documented remediation path that can be triaged within one business day. Cross-module cleanup gaps that AM cannot correct automatically **MUST** remain explicitly surfaced rather than silently ignored.
+AM-owned integrity anomalies and compensation failures **MUST** produce operator-visible telemetry within 15 minutes of detection and a documented remediation path that can be triaged within one business day. Cross-gear cleanup gaps that AM cannot correct automatically **MUST** remain explicitly surfaced rather than silently ignored.
 
 #### Operational Metrics Treatment
 
@@ -946,13 +946,13 @@ AM domain metrics **MUST** be integrated into shared platform dashboards and ale
 ### NFR Exclusions
 
 - **Offline support**: Not applicable. AM is a server-side platform service and does not operate in offline mode.
-- **Usability (UX)**: Not applicable at module level — AM exposes REST API and SDK traits. Portal UI is a separate concern.
-- **Compliance (COMPL)**: Regulatory programs and certifications remain platform-level obligations. AM's module-specific contribution is captured in NFRs 6.4 and 6.9.
+- **Usability (UX)**: Not applicable at gear level — AM exposes REST API and SDK traits. Portal UI is a separate concern.
+- **Compliance (COMPL)**: Regulatory programs and certifications remain platform-level obligations. AM's gear-specific contribution is captured in NFRs 6.4 and 6.9.
 - **Safety (SAFE)**: Not applicable — AM is a pure information system with no physical interaction or safety-critical operations.
 - **Operations (OPS)**: Deployment topology, on-call process, and runbook ownership are inherited platform concerns. AM-specific observability treatment is captured in NFR 6.12.
 - **Maintainability / Documentation (MAINT)**: Consumer-facing contract publication and architectural sync rules are defined in DESIGN, not in this PRD.
-- **Geographic distribution**: Not applicable at module level — AM follows platform deployment topology. Data residency and cross-region replication are platform infrastructure concerns.
-- **Rate limiting**: Not applicable at module level — API rate limiting is enforced by the platform API gateway. AM does not implement module-specific throttling.
+- **Geographic distribution**: Not applicable at gear level — AM follows platform deployment topology. Data residency and cross-region replication are platform infrastructure concerns.
+- **Rate limiting**: Not applicable at gear level — API rate limiting is enforced by the platform API gateway. AM does not implement gear-specific throttling.
 
 ## 7. Public Library Interfaces
 
@@ -1553,7 +1553,7 @@ IdP implementations may align with standards such as SCIM 2.0 and OIDC where app
 
 ### 8.4 User Groups
 
-> User group operations are performed by consumers directly via the [Resource Group module](../../resource-group/docs/PRD.md). AM's role is limited to registering the user-group RG type at module initialization and triggering tenant-scoped group cleanup during hard-deletion. Structural invariants (cycle detection, forest enforcement, tenant scoping) are enforced by Resource Group; see [Resource Group use cases](../../resource-group/docs/PRD.md#8-use-cases).
+> User group operations are performed by consumers directly via the [Resource Group gear](../../resource-group/docs/PRD.md). AM's role is limited to registering the user-group RG type at gear initialization and triggering tenant-scoped group cleanup during hard-deletion. Structural invariants (cycle detection, forest enforcement, tenant scoping) are enforced by Resource Group; see [Resource Group use cases](../../resource-group/docs/PRD.md#8-use-cases).
 
 #### Scenario: Create User Group via Resource Group
 
@@ -1861,7 +1861,7 @@ IdP implementations may align with standards such as SCIM 2.0 and OIDC where app
 - [ ] Direct children queries return paginated results with status filtering.
 - [ ] IdP user operations (provision, deprovision, query) work through pluggable IdP integration contract.
 - [ ] User deprovisioning is idempotent: deleting an already-absent IdP user returns success while a missing tenant still returns `not_found`.
-- [ ] AM module initialization registers or verifies the chained Resource Group user-group type schema `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~`, including `allowed_memberships = [gts.cf.core.am.user.v1~]` and self-referential `allowed_parents`, before user-group operations are relied upon.
+- [ ] AM gear initialization registers or verifies the chained Resource Group user-group type schema `gts.cf.core.rg.type.v1~cf.core.am.user_group.v1~`, including `allowed_memberships = [gts.cf.core.am.user.v1~]` and self-referential `allowed_parents`, before user-group operations are relied upon.
 - [ ] User groups (delegated to Resource Group) support creation, membership management, and nested groups with cycle detection via Resource Group forest invariants.
 - [ ] Extensible tenant metadata (e.g., branding, contacts, billing-address) is configurable per tenant via GTS-registered schemas, with per-schema inheritance policy, exposed via tenant metadata resolution API.
 - [ ] Tenant metadata entries written directly on a tenant are discoverable via a dedicated listing endpoint with pagination; listing honors self-managed barriers the same way other tenant-scoped reads do.

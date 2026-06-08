@@ -1,4 +1,4 @@
-//! Infrastructure layer for the Types Registry module.
+//! Infrastructure layer for the Types Registry gear
 //!
 //! Contains storage implementations and adapters.
 

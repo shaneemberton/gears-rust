@@ -3,11 +3,11 @@
 //!
 //! This crate provides utilities for building SDKs on top of toolkit, including:
 //!
-//! - **Security context scoping** (`secured` module) - Zero-allocation wrapper for binding
+//! - **Security context scoping** (`secured` gear) - Zero-allocation wrapper for binding
 //!   `SecurityContext` to clients
-//! - **Type-safe `OData` queries** (`odata` module) - Fluent query builder with compile-time
+//! - **Type-safe `OData` queries** (`odata` gear) - Fluent query builder with compile-time
 //!   field validation
-//! - **Cursor-based pagination** (`pager` module) - Stream API for paginated results
+//! - **Cursor-based pagination** (`pager` gear) - Stream API for paginated results
 //!
 //! ## Example
 //!

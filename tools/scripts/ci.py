@@ -142,7 +142,7 @@ def cmd_gts_docs(args):
         "--exclude",
         "docs/api/*",
         "docs",
-        "modules",
+        "gears",
         "libs",
         "examples",
     ]
@@ -184,7 +184,7 @@ def cmd_cypilot_validate(_args):
                   "(branch checkout detected)")
         else:
             print("Updating .cypilot via git "
-                  "submodule update (detached HEAD)")
+                  "subgear update (detached HEAD)")
             run_cmd(
                 [
                     "git", "submodule", "update",
@@ -397,7 +397,7 @@ def cmd_e2e(args):
         server_process = None
         print("Starting cf-gears-server for local E2E...")
 
-        # Build all required modules and binaries using project build orchestration
+        # Build all required gears and binaries using project build orchestration
         step("Building release artifacts for local E2E")
         run_cmd(["make", "build"])
 

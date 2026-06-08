@@ -14,7 +14,7 @@ Updated:  2026-03-06 by Constructor Tech
   - [2.1 Human Actors](#21-human-actors)
   - [2.2 System Actors](#22-system-actors)
 - [3. Operational Concept & Environment](#3-operational-concept--environment)
-  - [3.1 Module-Specific Environment Constraints](#31-module-specific-environment-constraints)
+  - [3.1 Gear-Specific Environment Constraints](#31-gear-specific-environment-constraints)
 - [4. Scope](#4-scope)
   - [4.1 In Scope](#41-in-scope)
   - [4.2 Out of Scope](#42-out-of-scope)
@@ -40,7 +40,7 @@ Updated:  2026-03-06 by Constructor Tech
 
 ### 1.1 Purpose
 
-**Purpose**: Chat Engine is a gateway Gear that manages session lifecycle and message routing between clients and Backend Plugin modules. It provides a unified interface for building conversational applications by abstracting session management, message history persistence, and flexible message processing — allowing application developers to focus on user experiences and backend plugin developers to focus on message processing logic.
+**Purpose**: Chat Engine is a gateway Gear that manages session lifecycle and message routing between clients and Backend Plugin gears. It provides a unified interface for building conversational applications by abstracting session management, message history persistence, and flexible message processing — allowing application developers to focus on user experiences and backend plugin developers to focus on message processing logic.
 
 The core value proposition is enabling flexible, stateful conversation management with support for advanced features like message regeneration, conversation branching, and variant exploration. By decoupling conversation infrastructure from processing logic, Chat Engine enables rapid experimentation with different backend implementations and conversation patterns — supporting use cases from automated assistants to human-in-the-loop support systems — without requiring changes to client applications.
 
@@ -88,7 +88,7 @@ The core value proposition is enabling flexible, stateful conversation managemen
 |------|------------|
 | **Session** | A persistent conversation context with a unique ID, owned by a client and associated with a session type |
 | **Session Type** | A configuration profile that maps a session to a backend plugin and declares available capabilities (the maximum set the plugin can provide) |
-| **Backend Plugin** | A Gear plugin module implementing `ChatEngineBackendPlugin` trait; co-located in the same Gears process and called directly via `ClientHub`. External HTTP backends are supported via the `chat-engine-webhook-adapter` plugin. See ADR-0022. |
+| **Backend Plugin** | A Gear plugin gear implementing `ChatEngineBackendPlugin` trait; co-located in the same Gears process and called directly via `ClientHub`. External HTTP backends are supported via the `chat-engine-webhook-adapter` plugin. See ADR-0022. |
 | **Message Tree** | A tree structure where each message references a parent message; sibling nodes with the same parent are variants |
 | **Message Variant** | An alternative response at the same position in the conversation tree — created by regeneration or branching |
 | **Capability** | A typed feature declared by the backend plugin (`bool`, `enum`, `str`, `int`). `SessionType.available_capabilities` is the maximum set the plugin supports; `Session.enabled_capabilities` is the confirmed set for a specific session. Per-message settings are passed as `CapabilityValue` (id + value). |
@@ -123,7 +123,7 @@ The core value proposition is enabling flexible, stateful conversation managemen
 **ID**: `cpt-cf-chat-engine-actor-backend-developer`
 
 <!-- fdd-id-content -->
-**Role**: Implements a Gear plugin modules that satisfy the `ChatEngineBackendPlugin` trait. Registers the plugin in `types-registry` and declares its capabilities. May call external processing services, retrieval systems, or human-in-the-loop workflows internally. Optionally wraps an external HTTP endpoint using the `chat-engine-webhook-adapter` plugin.
+**Role**: Implements a Gear plugin gears that satisfy the `ChatEngineBackendPlugin` trait. Registers the plugin in `types-registry` and declares its capabilities. May call external processing services, retrieval systems, or human-in-the-loop workflows internally. Optionally wraps an external HTTP endpoint using the `chat-engine-webhook-adapter` plugin.
 <!-- fdd-id-content -->
 
 ### 2.2 System Actors
@@ -143,7 +143,7 @@ The core value proposition is enabling flexible, stateful conversation managemen
 <!-- fdd-id-content -->
 **Role**: a Gear plugin that implements the `ChatEngineBackendPlugin` trait and registers itself in the platform `types-registry`. Receives full session context, message history, and declared capabilities from Chat Engine. Implements custom message processing logic (LLM calls, RAG, rule-based responses, etc.).
 
-Plugin modules are co-located within the same Gears server process and called directly via `ClientHub` — no HTTP round-trip, no auth negotiation, no retry logic required at the Chat Engine level. Plugin vendors who need to delegate to an external HTTP endpoint use the first-party **`chat-engine-webhook-adapter`** plugin, which internally handles auth, retry, circuit breaker, and throttling.
+Plugin gears are co-located within the same Gears server process and called directly via `ClientHub` — no HTTP round-trip, no auth negotiation, no retry logic required at the Chat Engine level. Plugin vendors who need to delegate to an external HTTP endpoint use the first-party **`chat-engine-webhook-adapter`** plugin, which internally handles auth, retry, circuit breaker, and throttling.
 
 **See**: ADR-0022 (Gears Plugin System for Backend Integration)
 <!-- fdd-id-content -->
@@ -178,11 +178,11 @@ Plugin modules are co-located within the same Gears server process and called di
 
 ## 3. Operational Concept & Environment
 
-> Chat Engine operates as a stateless ToolKit gateway module within the Gears middleware. No module-specific environment constraints beyond platform defaults.
+> Chat Engine operates as a stateless ToolKit gateway gear within the Gears middleware. No gear-specific environment constraints beyond platform defaults.
 
-### 3.1 Module-Specific Environment Constraints
+### 3.1 Gear-Specific Environment Constraints
 
-No module-specific environment constraints beyond platform defaults.
+No gear-specific environment constraints beyond platform defaults.
 
 ## 4. Scope
 
@@ -1106,7 +1106,7 @@ Backend Plugin integration is defined through the `ChatEngineBackendPlugin` trai
 |------------|-------------|-------------|
 | File Storage Service | External file storage for message attachments | p1 |
 | Database Service | PostgreSQL for session and message persistence | p1 |
-| Backend Plugin modules | Message processing implementations | p1 |
+| Backend Plugin gears | Message processing implementations | p1 |
 
 ## 11. Assumptions
 
@@ -1303,16 +1303,16 @@ The following checklist categories are **not applicable** to this PRD. Each is e
 | **Accessibility (UX-PRD-002)** | N/A | Chat Engine exposes a server-side REST/WebSocket API only — no user interface. Accessibility standards (WCAG) apply to client applications built on top of Chat Engine, not to Chat Engine itself. |
 | **Internationalization (UX-PRD-003)** | N/A | Chat Engine is message-content-agnostic. It stores and forwards opaque text without interpreting language, encoding, or locale. I18n is the responsibility of client applications and backend plugins. |
 | **Inclusivity (UX-PRD-005)** | N/A | Chat Engine has no user interface. Inclusivity concerns apply to client applications. |
-| **Market Positioning (BIZ-PRD-002)** | N/A | Chat Engine is an internal platform module, not a market-facing product. Competitive analysis and market positioning are not applicable. |
+| **Market Positioning (BIZ-PRD-002)** | N/A | Chat Engine is an internal platform gear, not a market-facing product. Competitive analysis and market positioning are not applicable. |
 | **Documentation Requirements (MAINT-PRD-001)** | Addressed in NFR-017 | Developer documentation, API spec, and webhook contract documentation are covered under `cpt-cf-chat-engine-nfr-developer-experience`. |
-| **Support Requirements (MAINT-PRD-002)** | Deferred | Support tier SLAs are defined at the Gears middleware level, not per-module. Chat Engine inherits platform-wide support policies. |
+| **Support Requirements (MAINT-PRD-002)** | Deferred | Support tier SLAs are defined at the Gears middleware level, not per-gear. Chat Engine inherits platform-wide support policies. |
 | **Deployment Requirements (OPS-PRD-001)** | Deferred | Deployment environment, release cadence, and rollback policies are defined in the Gears middleware-level PRD and infrastructure documentation. Chat Engine inherits these. |
 | **Monitoring Requirements (OPS-PRD-002)** | Deferred | Alerting, dashboards, and log retention are governed by the Gears middleware observability standards. Chat Engine must emit standard structured logs and metrics — specifics defined in DESIGN. |
 | **Industry Standards (COMPL-PRD-002)** | Partial | Applicable standards are referenced inline: GDPR (Art. 17, 25), CCPA, and ACID transaction guarantees. No formal certification (ISO 27001, SOC 2) is currently required. |
 | **WebSocket Protocol** (FR-015) | Excluded | Excluded per ADR-0006 — HTTP streaming with NDJSON chosen over WebSocket for client communication. WebSocket adds connection state, sticky sessions, and deployment complexity incompatible with stateless scaling architecture. |
 | **WebSocket Performance** (NFR-011) | Excluded | Excluded per ADR-0006 — WebSocket protocol not adopted; performance NFRs not applicable. |
 | **WebSocket Reliability** (NFR-012) | Excluded | Excluded per ADR-0006 — WebSocket protocol not adopted; reliability NFRs not applicable. |
-| **Audit Logging / Trail** (SEC-PRD-004) | Deferred | Audit logging and trail requirements are the responsibility of the platform-level observability infrastructure, not individual modules. Chat Engine emits standard structured logs and metrics consumed by the platform. |
+| **Audit Logging / Trail** (SEC-PRD-004) | Deferred | Audit logging and trail requirements are the responsibility of the platform-level observability infrastructure, not individual gears. Chat Engine emits standard structured logs and metrics consumed by the platform. |
 | **Legal / Consent Management** (COMPL-PRD-003) | N/A | Consent management, data subject access/rectification/portability rights, terms of service, and privacy policy requirements are the client application's responsibility. Chat Engine operates as a data processor; controller obligations are out of scope. |
 
 ## 15. Traceability

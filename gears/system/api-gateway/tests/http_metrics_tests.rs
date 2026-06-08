@@ -21,7 +21,7 @@ use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use toolkit::{
-    Module, api::OperationBuilder, config::ConfigProvider, context::ModuleCtx,
+    Gear, api::OperationBuilder, config::ConfigProvider, context::GearCtx,
     contracts::ApiGatewayCapability,
 };
 use tower::ServiceExt;
@@ -35,14 +35,14 @@ struct TestConfigProvider {
 }
 
 impl ConfigProvider for TestConfigProvider {
-    fn get_module_config(&self, module: &str) -> Option<&serde_json::Value> {
-        self.config.get(module)
+    fn get_gear_config(&self, gear: &str) -> Option<&serde_json::Value> {
+        self.config.get(gear)
     }
 }
 
-fn create_api_gateway_ctx(config: serde_json::Value) -> ModuleCtx {
+fn create_api_gateway_ctx(config: serde_json::Value) -> GearCtx {
     let hub = Arc::new(toolkit::ClientHub::new());
-    ModuleCtx::new(
+    GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),

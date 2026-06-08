@@ -1,10 +1,10 @@
 # Resource Group SDK
 
-SDK crate for the Resource Group module, providing public API contracts for hierarchical resource group management with the GTS type system in Gears.
+SDK crate for the Resource Group gear, providing public API contracts for hierarchical resource group management with the GTS type system in Gears.
 
 ## Overview
 
-This crate defines the transport-agnostic interface for the Resource Group module:
+This crate defines the transport-agnostic interface for the Resource Group gear:
 
 - **`ResourceGroupClient`** — Async trait for full type/group/membership lifecycle
 - **`ResourceGroupReadHierarchy`** — Narrow read-only trait for in-process plugin consumers (e.g. AuthZ resolver, tenant-resolver RG plugin) that need ancestor/descendant walks plus flat OData listing

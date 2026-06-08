@@ -78,13 +78,13 @@ DESIGN LANGUAGE:
 
 ### 1.1 Architectural Vision
 
-The Serverless Runtime module provides a stable, implementation-agnostic domain model and API contract for runtime creation, registration, and invocation of Functions and Workflows. Functions and Workflows are sibling callable types — both are registered definitions invoked via the runtime API, sharing the same registration and invocation surface, consistent response shapes, and shared lifecycle management, but they are independent GTS base types so plugins can match positively on either without accidental substitutability.
+The Serverless Runtime gear provides a stable, implementation-agnostic domain model and API contract for runtime creation, registration, and invocation of Functions and Workflows. Functions and Workflows are sibling callable types — both are registered definitions invoked via the runtime API, sharing the same registration and invocation surface, consistent response shapes, and shared lifecycle management, but they are independent GTS base types so plugins can match positively on either without accidental substitutability.
 
 The architecture is designed to support multiple implementation technologies (Temporal, Starlark, cloud-native FaaS) through a pluggable plugin model. Each plugin registers itself as a GTS type and implements the SDK plugin trait. The platform validates plugin-specific limits, traits, and implementation payloads against the plugin's registered schemas, ensuring type safety without coupling the core model to any specific runtime.
 
-**Scope note — host responsibilities vs. plugin-provided workflow features:** The host module owns Function Registry, Tenant Policy, the REST façade, GTS validation, audit aggregation, plugin dispatch, and a lightweight invocation index — not durable execution machinery. Each runtime plugin owns its own invocation engine, scheduler, and event-trigger handling using its backend's native primitives (Temporal Schedule API and signals, EventBridge Scheduler with SQS, Azure Durable native timers, etc.). Workflow orchestration features — parallel execution, event waiting, per-step timeouts, deterministic replay, conditional branching, retry, compensation, checkpointing, and timeout enforcement — are implemented inside the runtime plugin appropriate for the function (Temporal, Serverless Workflow 1.0 engine, in-process Starlark, etc.). This is intentional: the host remains independent of execution engine specifics, and plugins can leverage their native strengths without being constrained by a lowest-common-denominator abstraction. See [section 2.3](#23-capability-allocation) for the capability allocation.
+**Scope note — host responsibilities vs. plugin-provided workflow features:** The host gear owns Function Registry, Tenant Policy, the REST façade, GTS validation, audit aggregation, plugin dispatch, and a lightweight invocation index — not durable execution machinery. Each runtime plugin owns its own invocation engine, scheduler, and event-trigger handling using its backend's native primitives (Temporal Schedule API and signals, EventBridge Scheduler with SQS, Azure Durable native timers, etc.). Workflow orchestration features — parallel execution, event waiting, per-step timeouts, deterministic replay, conditional branching, retry, compensation, checkpointing, and timeout enforcement — are implemented inside the runtime plugin appropriate for the function (Temporal, Serverless Workflow 1.0 engine, in-process Starlark, etc.). This is intentional: the host remains independent of execution engine specifics, and plugins can leverage their native strengths without being constrained by a lowest-common-denominator abstraction. See [section 2.3](#23-capability-allocation) for the capability allocation.
 
-The domain model uses the Global Type System (GTS) for identity, schema validation, and type inheritance. All entities carry GTS identifiers, enabling schema-first validation, version resolution, and consistent cross-module references. Security context propagation, tenant isolation, and governance are built into the API contract layer, ensuring that every operation is scoped, auditable, and policy-compliant.
+The domain model uses the Global Type System (GTS) for identity, schema validation, and type inheritance. All entities carry GTS identifiers, enabling schema-first validation, version resolution, and consistent cross-gear references. Security context propagation, tenant isolation, and governance are built into the API contract layer, ensuring that every operation is scoped, auditable, and policy-compliant.
 
 ### 1.2 Architecture Drivers
 
@@ -138,7 +138,7 @@ Requirements that significantly influence architecture decisions.
 | `cpt-cf-serverless-runtime-adr-jsonrpc-mcp-protocol-surfaces` | JSON-RPC 2.0 and MCP protocol surfaces for direct function invocation and AI agent tool integration |
 | `cpt-cf-serverless-runtime-adr-workflow-dsl` | CNCF Serverless Workflow Specification v1.0.0 adopted as the vendor-neutral, declarative JSON/YAML workflow DSL — decoupled from the execution engine |
 | `cpt-cf-serverless-runtime-adr-temporal-workflow-engine` | Temporal chosen as the durable execution backend for the workflow engine plugin, interpreting the Serverless Workflow DSL atop Temporal primitives |
-| `cpt-cf-serverless-runtime-adr-thin-host` | Serverless-runtime module boundary: host owns Registry, Tenant Policy, lightweight invocation index, REST, GTS validation, audit, and plugin dispatch; runtime plugins own invocation, scheduling, and event-trigger handling using their backend's native primitives |
+| `cpt-cf-serverless-runtime-adr-thin-host` | Serverless-runtime gear boundary: host owns Registry, Tenant Policy, lightweight invocation index, REST, GTS validation, audit, and plugin dispatch; runtime plugins own invocation, scheduling, and event-trigger handling using their backend's native primitives |
 
 ### 1.3 Architecture Layers
 
@@ -151,21 +151,21 @@ Requirements that significantly influence architecture decisions.
 
 ### 1.4 ToolKit Integration
 
-Per ADR `cpt-cf-serverless-runtime-adr-thin-host`, the serverless-runtime capability is a **thin host** with **fat runtime plugins**, implemented as a single ToolKit module at `modules/serverless-runtime/`.
+Per ADR `cpt-cf-serverless-runtime-adr-thin-host`, the serverless-runtime capability is a **thin host** with **fat runtime plugins**, implemented as a single ToolKit gear at `gears/serverless-runtime/`.
 
-#### 1.4.1 Module Structure
+#### 1.4.1 Gear Structure
 
-The capability lives at `modules/serverless-runtime/` with three crate roles:
+The capability lives at `gears/serverless-runtime/` with three crate roles:
 
 - **`serverless-runtime-sdk/`** — contract crate. Domain types, the plugin trait, the host trait (public CRUD + thin event port), the SDK error taxonomy, and plugin-conformance harness hooks.
-- **`serverless-runtime/`** — host implementation crate (`#[toolkit::module]`, `[db, rest]`). Owns Function Registry, Tenant Policy, plugin dispatch, REST façade, GTS validation, audit aggregation, and the lightweight invocation index.
+- **`serverless-runtime/`** — host implementation crate (`#[toolkit::gear]`, `[db, rest]`). Owns Function Registry, Tenant Policy, plugin dispatch, REST façade, GTS validation, audit aggregation, and the lightweight invocation index.
 - **`plugins/<backend>-plugin/`** — one self-contained plugin crate per backend (Temporal, Lambda, Starlark, …), each owning its invocation engine, scheduler, and event-trigger handling using the backend's native primitives.
 
-Plugin crates are **siblings** of the SDK and impl crates under `modules/serverless-runtime/plugins/` (mirroring `gears/system/tenant-resolver/plugins/`), never nested inside the impl crate's `src/`. The host crate has no compile-time dependency on any plugin crate; plugins are resolved at runtime through `ClientHub` scoped registration keyed by plugin GTS type. Internal file layout for each crate follows the canonical DDD-light layout in [Module Layout and SDK Pattern](../../../docs/toolkit_unified_system/02_module_layout_and_sdk_pattern.md) — not restated here.
+Plugin crates are **siblings** of the SDK and impl crates under `gears/serverless-runtime/plugins/` (mirroring `gears/system/tenant-resolver/plugins/`), never nested inside the impl crate's `src/`. The host crate has no compile-time dependency on any plugin crate; plugins are resolved at runtime through `ClientHub` scoped registration keyed by plugin GTS type. Internal file layout for each crate follows the canonical DDD-light layout in [Gear Layout and SDK Pattern](../../../docs/toolkit_unified_system/02_gear_layout_and_sdk_pattern.md) — not restated here.
 
 #### 1.4.2 Plugin model
 
-Each runtime backend (Temporal, Lambda, the planned Starlark in-process runner, etc.) is implemented as a **standalone plugin crate** under `modules/serverless-runtime/plugins/<backend>-plugin/`. Per ADR `cpt-cf-serverless-runtime-adr-thin-host`, the host crate does not depend on any plugin crate at compile time; plugins are resolved at runtime through ClientHub scoped registration keyed by plugin GTS type. Every plugin is self-contained — there is no capability flag carving up the plugin contract into different dispatch tiers, because no such tiering exists.
+Each runtime backend (Temporal, Lambda, the planned Starlark in-process runner, etc.) is implemented as a **standalone plugin crate** under `gears/serverless-runtime/plugins/<backend>-plugin/`. Per ADR `cpt-cf-serverless-runtime-adr-thin-host`, the host crate does not depend on any plugin crate at compile time; plugins are resolved at runtime through ClientHub scoped registration keyed by plugin GTS type. Every plugin is self-contained — there is no capability flag carving up the plugin contract into different dispatch tiers, because no such tiering exists.
 
 **Dispatch.** The host's plugin-dispatch component reads the function definition's `implementation.adapter` GTS type ID, looks up the registered plugin via `ClientHub` scoped resolution keyed by that GTS ID, and forwards the request through the SDK plugin trait declared in `serverless-runtime-sdk`. Plugins register themselves during their own ToolKit `init()` against the same GTS types-registry mechanism used elsewhere in the platform; the host treats each registered plugin as opaque.
 
@@ -175,28 +175,28 @@ Each runtime backend (Temporal, Lambda, the planned Starlark in-process runner, 
 
 **Plugin → host event port.** Plugins emit index updates back to the host through a thin event port on the host trait — status-update and timeline-event notifications used by plugins to populate the host invocation index. This port is a **notification surface only** — it is not a general-purpose callback API and replaces the prior request/response callback design.
 
-**Plugin error isolation.** Each plugin owns a private plugin-specific error enum that captures backend-native failures (e.g. Temporal `ApplicationError`, Lambda invoke errors, EventBridge dispatch failures). Every plugin trait method converts those backend errors into the SDK error type before returning, so the host never observes backend-specific error types. Information not preserved by the SDK taxonomy — raw stack traces, backend retry counters, vendor error codes — stays inside the plugin and is surfaced through the plugin's timeline-retrieval method rather than crossing the host boundary. Errors flowing into the host's domain layer follow the canonical toolkit three-layer pattern (`DomainError` → SDK error → `Problem`) without any serverless-runtime-specific deviation; see `docs/toolkit_unified_system/05_errors_rfc9457.md` and `02_module_layout_and_sdk_pattern.md` for the canonical layering.
+**Plugin error isolation.** Each plugin owns a private plugin-specific error enum that captures backend-native failures (e.g. Temporal `ApplicationError`, Lambda invoke errors, EventBridge dispatch failures). Every plugin trait method converts those backend errors into the SDK error type before returning, so the host never observes backend-specific error types. Information not preserved by the SDK taxonomy — raw stack traces, backend retry counters, vendor error codes — stays inside the plugin and is surfaced through the plugin's timeline-retrieval method rather than crossing the host boundary. Errors flowing into the host's domain layer follow the canonical toolkit three-layer pattern (`DomainError` → SDK error → `Problem`) without any serverless-runtime-specific deviation; see `docs/toolkit_unified_system/05_errors_rfc9457.md` and `02_gear_layout_and_sdk_pattern.md` for the canonical layering.
 
 #### 1.4.3 SDK Crate
 
 The contract crate `serverless-runtime-sdk` exports two traits, the domain types they reference, the error taxonomy they raise, and plugin-conformance harness hooks used by every plugin's test suite:
 
-- **Host-implemented trait** — the host's `ClientHub` interface for the serverless-runtime module. Carries public CRUD over host-owned resources (functions, the invocation index, host-side schedule and trigger metadata, tenant policy) plus a thin notification-only event port that plugins use to populate the host invocation index. Consumers and plugins reach the host through this trait rather than HTTP.
+- **Host-implemented trait** — the host's `ClientHub` interface for the serverless-runtime gear. Carries public CRUD over host-owned resources (functions, the invocation index, host-side schedule and trigger metadata, tenant policy) plus a thin notification-only event port that plugins use to populate the host invocation index. Consumers and plugins reach the host through this trait rather than HTTP.
 - **Plugin-implemented trait** — the contract every backend plugin satisfies. The host dispatches to it via `dyn` after `ClientHub` resolution keyed by plugin GTS type. Covers backend-side identity, lifecycle, invocation, scheduling, and event-trigger handling using the backend's native primitives.
 
 Specific trait names, method surfaces, the SDK error type, conformance hooks, and version policy live in the SDK crate's own design and are intentionally not restated here.
 
-#### 1.4.4 Module Lifecycle
+#### 1.4.4 Gear Lifecycle
 
-The `serverless-runtime` host crate is a single ToolKit module declared with `#[toolkit::module]` over a `[db, rest]` capability set. Lifecycle hooks follow the canonical ToolKit lifecycle (see [Module Layout and SDK Pattern](../../../docs/toolkit_unified_system/02_module_layout_and_sdk_pattern.md)); the host applies host-owned migrations and fails fast if any host-owned dependency (types-registry, authz-resolver, persistence) is unavailable.
+The `serverless-runtime` host crate is a single ToolKit gear declared with `#[toolkit::gear]` over a `[db, rest]` capability set. Lifecycle hooks follow the canonical ToolKit lifecycle (see [Gear Layout and SDK Pattern](../../../docs/toolkit_unified_system/02_gear_layout_and_sdk_pattern.md)); the host applies host-owned migrations and fails fast if any host-owned dependency (types-registry, authz-resolver, persistence) is unavailable.
 
-Each runtime backend is its own ToolKit plugin module under `modules/serverless-runtime/plugins/<backend>-plugin/` with an independent lifecycle: it registers its plugin trait implementation against ClientHub keyed by plugin GTS type and starts the long-running workers its backend needs (Temporal workers, EventBridge subscribers, Azure Durable hosts, etc.). On shutdown, the platform's ordered-shutdown sequence stops plugins before the host; each plugin drains its backend-native workers within its own `stop_timeout`, and the host then drains in-flight REST requests within its own `stop_timeout`. The host fans out no cancellation to plugins through any callback surface.
+Each runtime backend is its own ToolKit plugin gear under `gears/serverless-runtime/plugins/<backend>-plugin/` with an independent lifecycle: it registers its plugin trait implementation against ClientHub keyed by plugin GTS type and starts the long-running workers its backend needs (Temporal workers, EventBridge subscribers, Azure Durable hosts, etc.). On shutdown, the platform's ordered-shutdown sequence stops plugins before the host; each plugin drains its backend-native workers within its own `stop_timeout`, and the host then drains in-flight REST requests within its own `stop_timeout`. The host fans out no cancellation to plugins through any callback surface.
 
 #### 1.4.5 Database Access and Tenant Isolation
 
 Host-owned tables in the `serverless-runtime` crate: `functions` (polymorphic — Function and Workflow definitions, discriminated by GTS type), the `invocation_index`, `schedules`, `event_triggers`, `webhook_triggers`, and `tenant_policies`. Plugin-owned entities (full invocation records, timelines, internal checkpoints) live inside each plugin crate.
 
-Tenant isolation follows the canonical toolkit `SecureConn` + `Scopable` pattern (see `docs/toolkit_unified_system/06_authn_authz_secure_orm.md` and `02_module_layout_and_sdk_pattern.md`). Two serverless-runtime-specific cases:
+Tenant isolation follows the canonical toolkit `SecureConn` + `Scopable` pattern (see `docs/toolkit_unified_system/06_authn_authz_secure_orm.md` and `02_gear_layout_and_sdk_pattern.md`). Two serverless-runtime-specific cases:
 
 - The host `invocation_index` is populated only via the SDK event port and is never coupled to plugin-internal storage.
 - System-scoped Functions (`OwnerRef.owner_type = "system"`, visible to all tenants) require an elevated `AccessScope` that includes the system tenant scope alongside the requesting tenant's scope.
@@ -215,7 +215,7 @@ The domain model and API contracts are intentionally decoupled from any specific
 
 - [ ] `p1` - **ID**: `cpt-cf-serverless-runtime-principle-gts-identity`
 
-All domain entities use Global Type System (GTS) identifiers following the [GTS specification](https://github.com/globaltypesystem/gts-spec). GTS provides hierarchical type inheritance, schema-first validation, and stable cross-module references. Entity identity is the GTS instance address, not an internal database key, ensuring that types are portable and self-describing.
+All domain entities use Global Type System (GTS) identifiers following the [GTS specification](https://github.com/globaltypesystem/gts-spec). GTS provides hierarchical type inheritance, schema-first validation, and stable cross-gear references. Entity identity is the GTS instance address, not an internal database key, ensuring that types are portable and self-describing.
 
 #### Unified Callable Model
 
@@ -749,7 +749,7 @@ Full-instance examples (Function and Workflow) live in [DESIGN_GTS_SCHEMAS.md](D
 
 ### 3.2 Component Model
 
-> **Owner labels.** Per ADR `cpt-cf-serverless-runtime-adr-thin-host`, every component below is owned by exactly one of: **host** (the `serverless-runtime` ToolKit module — Function Registry, Tenant Policy, REST façade, GTS validation, audit aggregation, plugin dispatch, lightweight invocation index), **SDK contract** (behaviour defined in `serverless-runtime-sdk` and binding on every plugin; no host implementation), or **Runtime Plugin** (a backend-specific plugin crate under `modules/serverless-runtime/plugins/<backend>-plugin/` that implements the SDK-contract behaviour using the backend's native primitives).
+> **Owner labels.** Per ADR `cpt-cf-serverless-runtime-adr-thin-host`, every component below is owned by exactly one of: **host** (the `serverless-runtime` ToolKit gear — Function Registry, Tenant Policy, REST façade, GTS validation, audit aggregation, plugin dispatch, lightweight invocation index), **SDK contract** (behaviour defined in `serverless-runtime-sdk` and binding on every plugin; no host implementation), or **Runtime Plugin** (a backend-specific plugin crate under `gears/serverless-runtime/plugins/<backend>-plugin/` that implements the SDK-contract behaviour using the backend's native primitives).
 
 The Serverless Runtime is composed of the following logical components. Each component has a defined responsibility scope and interacts with other components through the domain model types defined in [section 3.1](#31-domain-model).
 
@@ -787,7 +787,7 @@ Every external invocation request passes through the host before reaching a plug
 
 - [ ] `p1` - **ID**: `cpt-cf-serverless-runtime-component-executor`
 
-**Owner:** Runtime Plugin — each plugin lives at `modules/serverless-runtime/plugins/<backend>-plugin/` and implements the SDK plugin trait.
+**Owner:** Runtime Plugin — each plugin lives at `gears/serverless-runtime/plugins/<backend>-plugin/` and implements the SDK plugin trait.
 
 Per ADR `cpt-cf-serverless-runtime-adr-thin-host`, every backend is a self-contained "fat plugin" that owns the full execution stack for its technology and is resolved at runtime through `ClientHub` scoped registration keyed by plugin GTS type — there are no compile-time dependencies from host to plugin. Each plugin implements the full plugin trait (invocation lifecycle, scheduling, event triggers, registration-time validation hooks) using the backend's native primitives (Temporal Schedule API and signals, EventBridge Scheduler with SQS, Azure Durable native timers, etc.) and is the system of record for its `InvocationRecord`, timeline, and any internal execution state. There are no host durability APIs to call into; index updates flow back to the host **only** through the SDK event port.
 
@@ -848,7 +848,7 @@ All APIs require authentication. Authorization is enforced based on tenant conte
 
 #### Response Conventions
 
-Response shape, error envelope, pagination, filtering, and sorting follow ToolKit canonical conventions: RFC 9457 Problem Details for errors (`docs/toolkit_unified_system/05_errors_rfc9457.md`); cursor pagination, OData `$filter` / `$orderby`, and `$select` projection (`docs/toolkit_unified_system/07_odata_pagination_select_filter.md`). This module adds no module-specific deviations.
+Response shape, error envelope, pagination, filtering, and sorting follow ToolKit canonical conventions: RFC 9457 Problem Details for errors (`docs/toolkit_unified_system/05_errors_rfc9457.md`); cursor pagination, OData `$filter` / `$orderby`, and `$select` projection (`docs/toolkit_unified_system/07_odata_pagination_select_filter.md`). This gear adds no gear-specific deviations.
 
 ---
 
@@ -1065,7 +1065,7 @@ Read-only access to per-invocation observability for debugging, audit, and execu
 
 ### 3.4 Internal Dependencies
 
-The module dependency graph has no cycles; see `Cargo.toml` for the actual dependency list.
+The gear dependency graph has no cycles; see `Cargo.toml` for the actual dependency list.
 
 ### 3.5 External Dependencies
 
@@ -1165,13 +1165,13 @@ The runtime emits audit events for every Function, Workflow, Invocation, Schedul
 
 ### Non-Applicable Domains
 
-- **Privacy Architecture (COMPL-DESIGN-002)**: Not applicable — this module does not process personal data or PII directly. Functions receive opaque tenant payloads; data classification and privacy controls are the responsibility of the calling services and the platform's data governance layer.
-- **Compliance Architecture (COMPL-DESIGN-001)**: Not applicable — the Serverless Runtime is an internal platform module, not a regulated product boundary. Compliance controls (SOC 2, ISO 27001) are enforced at the platform level; this module contributes audit events (see Audit Events above) but does not implement compliance architecture independently.
-- **User-Facing / Frontend Architecture (UX-DESIGN-001)**: Not applicable — this module is a backend runtime library with REST APIs. It has no direct user-facing UI; UI/UX for function authoring or debugging is out of scope (see Constraints, section 2.2).
+- **Privacy Architecture (COMPL-DESIGN-002)**: Not applicable — this gear does not process personal data or PII directly. Functions receive opaque tenant payloads; data classification and privacy controls are the responsibility of the calling services and the platform's data governance layer.
+- **Compliance Architecture (COMPL-DESIGN-001)**: Not applicable — the Serverless Runtime is an internal platform gear, not a regulated product boundary. Compliance controls (SOC 2, ISO 27001) are enforced at the platform level; this gear contributes audit events (see Audit Events above) but does not implement compliance architecture independently.
+- **User-Facing / Frontend Architecture (UX-DESIGN-001)**: Not applicable — this gear is a backend runtime library with REST APIs. It has no direct user-facing UI; UI/UX for function authoring or debugging is out of scope (see Constraints, section 2.2).
 - **Complete API Specifications (INT-DESIGN-NO-001)**: This document describes resource shapes and endpoint inventories at the architectural level only; the OpenAPI spec is the source of truth for wire-level request/response shapes and will be generated during implementation.
 
 ## 5. Traceability
 
 - **PRD**: [PRD.md](./PRD.md)
-- **ADRs**: [Callable Type Hierarchy](./ADR/0001-cpt-cf-serverless-runtime-adr-callable-type-hierarchy.md), [JSON-RPC / MCP Protocol Surfaces](./ADR/0002-cpt-cf-serverless-runtime-adr-jsonrpc-mcp-protocol-surfaces-v1.md), [Workflow DSL](./ADR/0003-cpt-cf-serverless-runtime-adr-workflow-dsl.md), [Temporal Workflow Engine](./ADR/0004-cpt-cf-serverless-runtime-adr-temporal-workflow-engine.md), [Thin Host Module / Fat Runtime Plugins](./ADR/0005-cpt-cf-serverless-runtime-adr-thin-host.md)
+- **ADRs**: [Callable Type Hierarchy](./ADR/0001-cpt-cf-serverless-runtime-adr-callable-type-hierarchy.md), [JSON-RPC / MCP Protocol Surfaces](./ADR/0002-cpt-cf-serverless-runtime-adr-jsonrpc-mcp-protocol-surfaces-v1.md), [Workflow DSL](./ADR/0003-cpt-cf-serverless-runtime-adr-workflow-dsl.md), [Temporal Workflow Engine](./ADR/0004-cpt-cf-serverless-runtime-adr-temporal-workflow-engine.md), [Thin Host Gear / Fat Runtime Plugins](./ADR/0005-cpt-cf-serverless-runtime-adr-thin-host.md)
 - **Features**: TBD

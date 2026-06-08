@@ -38,17 +38,17 @@ Unified interface for LLM inference across providers. Stateless, pass-through de
 
 - [ ] Audit events
 
-## Module Structure
+## Gear Structure
 
 ```plaintext
-modules/llm-gateway/
+gears/llm-gateway/
 ├── docs/                    # Documentation
 │   ├── PRD.md
 │   ├── DESIGN.md
 │   └── ADR/
 ├── llm-gateway-sdk/         # Public API traits, models, errors
 │   └── schemas/             # GTS domain model schemas
-├── llm-gateway/             # Core module implementation (planned)
+├── llm-gateway/             # Core gear implementation (planned)
 └── plugins/                 # (planned)
     ├── providers/
     │   ├── openai_plugin/       # OpenAI-compatible providers
@@ -61,7 +61,7 @@ modules/llm-gateway/
     │   ├── noop_usage_tracker/  # Default no-op
     │   └── ...                  # Custom usage tracking
     └── audit/
-        ├── noop_audit_module/   # Default no-op
+        ├── noop_audit_gear/   # Default no-op
         └── ...                  # Custom audit logging
 ```
 
@@ -75,7 +75,7 @@ modules/llm-gateway/
 
 ## Dependencies
 
-| Module | Role |
+| Gear | Role |
 |--------|------|
 | Model Registry | Model catalog, availability checks |
 | Outbound API Gateway | External API calls to providers |
@@ -84,7 +84,7 @@ modules/llm-gateway/
 
 ## Consumers
 
-| Module | Usage |
+| Gear | Usage |
 |--------|-------|
 | Chat Engine | Response generation |
 | RAG | Embeddings for semantic search |

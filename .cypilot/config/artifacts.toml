@@ -26,8 +26,8 @@ reason = "Ignore module 'grpc-hub' (not SDLC-documented yet: missing required PR
 patterns = ["gears/system/grpc-hub/*"]
 
 [[ignore]]
-reason = "Ignore module 'module-orchestrator' (not SDLC-documented yet: missing required PRD/DESIGN)."
-patterns = ["gears/system/module-orchestrator/*"]
+reason = "Ignore module 'gear-orchestrator' (not SDLC-documented yet: missing required PRD/DESIGN)."
+patterns = ["gears/system/gear-orchestrator/*"]
 
 [[ignore]]
 reason = "Ignore module 'nodes-registry' (not SDLC-documented yet: missing required PRD/DESIGN)."
@@ -142,7 +142,7 @@ require_md_extension = true
 fail_on_unmatched_markdown = true
 
 [[systems.autodetect.codebase]]
-name = "Modules"
+name = "Gears"
 path = "{system_root}/src"
 extensions = [".rs"]
 
@@ -207,7 +207,7 @@ require_md_extension = true
 fail_on_unmatched_markdown = false
 
 [[systems.autodetect.codebase]]
-name = "Modules"
+name = "Gears"
 path = "{system_root}/src"
 extensions = [".rs"]
 
@@ -217,7 +217,7 @@ path = "{system_root}/tests"
 extensions = [".rs"]
 
 [[systems.autodetect.codebase]]
-name = "Nested Modules"
+name = "Nested Gears"
 path = "{system_root}/{system}/src"
 extensions = [".rs"]
 

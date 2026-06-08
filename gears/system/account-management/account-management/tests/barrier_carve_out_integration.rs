@@ -90,10 +90,10 @@ impl Topology {
     }
 }
 
-/// Seed the topology described in the module docs into a fresh harness.
+/// Seed the topology described in the gear docs into a fresh harness.
 #[allow(
     clippy::cognitive_complexity,
-    reason = "linear, hand-wired seed of a small fixed topology; splitting it into per-subtree helpers would obscure the closure-row table the module doc pins"
+    reason = "linear, hand-wired seed of a small fixed topology; splitting it into per-subtree helpers would obscure the closure-row table the gear doc pins"
 )]
 async fn seed_topology(h: &Harness, t: &Topology) {
     seed_root(h, t.root).await;

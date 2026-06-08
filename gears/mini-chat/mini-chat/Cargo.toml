@@ -1,6 +1,6 @@
 [package]
 name = "cf-gears-mini-chat"
-description = "Mini-chat module: multi-tenant AI chat"
+description = "mini-chat gear: multi-tenant AI chat"
 version = "0.1.31"
 edition.workspace = true
 license.workspace = true

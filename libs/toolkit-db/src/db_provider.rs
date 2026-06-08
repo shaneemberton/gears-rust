@@ -5,7 +5,7 @@ use crate::{Db, DbError};
 
 /// Thin, reusable DB entrypoint for application services.
 ///
-/// This wraps a module-scoped `Db` and provides:
+/// This wraps a gear-scoped `Db` and provides:
 /// - `conn()` for non-transactional operations
 /// - `transaction(...)` for transactional operations without exposing `DbHandle`
 ///

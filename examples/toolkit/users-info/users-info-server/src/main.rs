@@ -1,14 +1,14 @@
-mod registered_modules;
+mod registered_gears;
 
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 use toolkit::bootstrap::{AppConfig, run_server};
 
-/// Standalone server for the users-info example module
+/// Standalone server for the users-info example gear
 #[derive(Parser)]
 #[command(name = "users-info-server")]
-#[command(about = "Standalone server for users-info example module")]
+#[command(about = "Standalone server for users-info example gear")]
 struct Cli {
     /// Path to configuration file
     #[arg(short, long)]

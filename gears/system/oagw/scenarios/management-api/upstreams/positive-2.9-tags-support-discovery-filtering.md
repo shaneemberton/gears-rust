@@ -24,7 +24,7 @@ Content-Type: application/json
 
 ## List/filter
 
-If tags are exposed via OData `$filter`, use that. Otherwise use the module’s tags filter parameter.
+If tags are exposed via OData `$filter`, use that. Otherwise use the gear’s tags filter parameter.
 
 Example (OData-style placeholder):
 

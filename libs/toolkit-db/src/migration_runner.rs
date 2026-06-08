@@ -1,23 +1,23 @@
-//! Migration runner for `ToolKit` modules.
+//! Migration runner for `ToolKit` gears.
 //!
-//! This module provides a secure migration execution system that:
-//! - Executes module-provided migrations using a **per-module** migration history table.
-//! - Does **not** expose raw database connections or `SQLx` pools to modules.
+//! This gear provides a secure migration execution system that:
+//! - Executes gear-provided migrations using a **per-gear** migration history table.
+//! - Does **not** expose raw database connections or `SQLx` pools to gears.
 //! - Ensures deterministic, idempotent migration execution.
 //!
-//! # Per-Module Migration Tables
+//! # Per-Gear Migration Tables
 //!
-//! Each module gets its own migration history table named `toolkit_migrations__<prefix>__<hash8>`,
-//! where `<hash8>` is an 8-character hex hash derived from the module prefix via `xxh3_64`.
-//! This prevents conflicts between modules that might have similarly named migrations.
+//! Each gear gets its own migration history table named `toolkit_migrations__<prefix>__<hash8>`,
+//! where `<hash8>` is an 8-character hex hash derived from the gear prefix via `xxh3_64`.
+//! This prevents conflicts between gears that might have similarly named migrations.
 //!
 //! Examples:
 //! - Test prefix "_test" → `toolkit_migrations___test__e5f6a7b8`
 //!
 //! # Security Model
 //!
-//! Modules only provide migration definitions via `MigrationTrait`. The runtime executes
-//! them using its privileged connection. Modules never receive raw database access.
+//! Gears only provide migration definitions via `MigrationTrait`. The runtime executes
+//! them using its privileged connection. Gears never receive raw database access.
 
 use sea_orm::{
     ConnectionTrait, DatabaseBackend, DbErr, ExecResult, FromQueryResult, Statement,
@@ -33,32 +33,32 @@ use xxhash_rust::xxh3::xxh3_64;
 #[derive(Debug, Error)]
 pub enum MigrationError {
     /// Failed to create the migration history table.
-    #[error("failed to create migration table for module '{module}': {source}")]
-    CreateTable { module: String, source: DbErr },
+    #[error("failed to create migration table for gear '{gear}': {source}")]
+    CreateTable { gear: String, source: DbErr },
 
     /// Failed to query existing migrations.
-    #[error("failed to query migration history for module '{module}': {source}")]
-    QueryHistory { module: String, source: DbErr },
+    #[error("failed to query migration history for gear '{gear}': {source}")]
+    QueryHistory { gear: String, source: DbErr },
 
     /// A specific migration failed to execute.
-    #[error("migration '{migration}' failed for module '{module}': {source}")]
+    #[error("migration '{migration}' failed for gear '{gear}': {source}")]
     MigrationFailed {
-        module: String,
+        gear: String,
         migration: String,
         source: DbErr,
     },
 
     /// Failed to record a migration in the history table.
-    #[error("failed to record migration '{migration}' for module '{module}': {source}")]
+    #[error("failed to record migration '{migration}' for gear '{gear}': {source}")]
     RecordFailed {
-        module: String,
+        gear: String,
         migration: String,
         source: DbErr,
     },
 
     /// Duplicate migration name found in provided migrations list.
-    #[error("duplicate migration name '{name}' for module '{module}'")]
-    DuplicateMigrationName { module: String, name: String },
+    #[error("duplicate migration name '{name}' for gear '{gear}'")]
+    DuplicateMigrationName { gear: String, name: String },
 }
 
 /// Result of a migration run.
@@ -78,12 +78,12 @@ struct MigrationRecord {
     version: String,
 }
 
-/// Sanitize a module name into a safe identifier fragment.
+/// Sanitize a gear name into a safe identifier fragment.
 ///
 /// Rules:
 /// - Allowed: `[a-zA-Z0-9_]`
 /// - Everything else becomes `_` (DO NOT hard-fail on '.', '/', etc.)
-fn sanitize_module_name(name: &str) -> String {
+fn sanitize_gear_name(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for c in name.chars() {
         match c {
@@ -94,21 +94,21 @@ fn sanitize_module_name(name: &str) -> String {
     if out.is_empty() { "_".to_owned() } else { out }
 }
 
-/// Build the per-module migration table name.
+/// Build the per-gear migration table name.
 ///
 /// Format: `toolkit_migrations__<prefix>__<hash8>`
 ///
-/// - `<prefix>` is a sanitized module name fragment
-/// - `<hash8>` is a stable hash of the ORIGINAL module name
+/// - `<prefix>` is a sanitized gear name fragment
+/// - `<hash8>` is a stable hash of the ORIGINAL gear name
 /// - Name is capped to Postgres 63-byte identifier limit (and kept short for all backends)
-fn migration_table_name(module_name: &str) -> String {
+fn migration_table_name(gear_name: &str) -> String {
     const PREFIX: &str = "toolkit_migrations__";
     const SEP: &str = "__";
     const HASH_LEN: usize = 8;
     const PG_IDENT_MAX: usize = 63;
 
-    let sanitized = sanitize_module_name(module_name);
-    let hash = xxh3_64(module_name.as_bytes());
+    let sanitized = sanitize_gear_name(gear_name);
+    let hash = xxh3_64(gear_name.as_bytes());
     let hash8 = format!("{hash:016x}")[..HASH_LEN].to_owned();
 
     // Reserve space for: PREFIX + prefix + SEP + hash8
@@ -125,11 +125,11 @@ fn migration_table_name(module_name: &str) -> String {
     format!("{PREFIX}{prefix_part}{SEP}{hash8}")
 }
 
-/// Create the migration history table for a module if it doesn't exist.
+/// Create the migration history table for a gear if it doesn't exist.
 async fn ensure_migration_table(
     conn: &impl ConnectionTrait,
     table_name: &str,
-    module_name: &str,
+    gear_name: &str,
 ) -> Result<(), MigrationError> {
     let backend = conn.get_database_backend();
 
@@ -163,18 +163,18 @@ async fn ensure_migration_table(
     conn.execute(Statement::from_string(backend, sql))
         .await
         .map_err(|e| MigrationError::CreateTable {
-            module: module_name.to_owned(),
+            gear: gear_name.to_owned(),
             source: e,
         })?;
 
     Ok(())
 }
 
-/// Query all applied migrations for a module.
+/// Query all applied migrations for a gear.
 async fn get_applied_migrations(
     conn: &impl ConnectionTrait,
     table_name: &str,
-    module_name: &str,
+    gear_name: &str,
 ) -> Result<HashSet<String>, MigrationError> {
     let backend = conn.get_database_backend();
 
@@ -190,7 +190,7 @@ async fn get_applied_migrations(
             .all(conn)
             .await
             .map_err(|e| MigrationError::QueryHistory {
-                module: module_name.to_owned(),
+                gear: gear_name.to_owned(),
                 source: e,
             })?;
 
@@ -201,7 +201,7 @@ async fn get_applied_migrations(
 async fn record_migration(
     conn: &impl ConnectionTrait,
     table_name: &str,
-    module_name: &str,
+    gear_name: &str,
     migration_name: &str,
 ) -> Result<ExecResult, MigrationError> {
     let backend = conn.get_database_backend();
@@ -220,21 +220,21 @@ async fn record_migration(
     ))
     .await
     .map_err(|e| MigrationError::RecordFailed {
-        module: module_name.to_owned(),
+        gear: gear_name.to_owned(),
         migration: migration_name.to_owned(),
         source: e,
     })
 }
 
-/// Run migrations for a specific module using a `Db`.
+/// Run migrations for a specific gear using a `Db`.
 ///
-/// This is the main entry point for the runtime to execute module migrations.
+/// This is the main entry point for the runtime to execute gear migrations.
 /// It uses the internal database connection from the handle.
 ///
 /// # Arguments
 ///
 /// * `db` - The secure database entrypoint (owned by the runtime).
-/// * `module_name` - The name of the module (used for the migration table name).
+/// * `gear_name` - The name of the gear (used for the migration table name).
 /// * `migrations` - The list of migrations to run.
 ///
 /// # Returns
@@ -245,10 +245,10 @@ async fn record_migration(
 /// # Example
 ///
 /// ```ignore
-/// use toolkit_db::migration_runner::run_migrations_for_module;
+/// use toolkit_db::migration_runner::run_migrations_for_gear;
 ///
-/// let migrations: Vec<Box<dyn MigrationTrait>> = module.migrations();
-/// let result = run_migrations_for_module(&db, "my_module", migrations).await?;
+/// let migrations: Vec<Box<dyn MigrationTrait>> = gear.migrations();
+/// let result = run_migrations_for_gear(&db, "my_gear", migrations).await?;
 /// println!("Applied {} migrations", result.applied);
 /// ```
 ///
@@ -256,19 +256,19 @@ async fn record_migration(
 ///
 /// Returns `Err(MigrationError)` if the migration table cannot be created, the history
 /// cannot be queried, or any migration fails.
-pub async fn run_migrations_for_module(
+pub async fn run_migrations_for_gear(
     db: &crate::Db,
-    module_name: &str,
+    gear_name: &str,
     migrations: Vec<Box<dyn MigrationTrait>>,
 ) -> Result<MigrationResult, MigrationError> {
     let conn = db.sea_internal();
-    run_module_migrations(&conn, module_name, migrations).await
+    run_gear_migrations(&conn, gear_name, migrations).await
 }
 
-/// Run migrations for a specific module (internal implementation).
+/// Run migrations for a specific gear (internal implementation).
 ///
 /// This function:
-/// 1. Creates a per-module migration table if it doesn't exist.
+/// 1. Creates a per-gear migration table if it doesn't exist.
 /// 2. Queries which migrations have already been applied.
 /// 3. Sorts migrations by name for deterministic ordering.
 /// 4. Executes pending migrations and records them.
@@ -276,23 +276,23 @@ pub async fn run_migrations_for_module(
 /// # Arguments
 ///
 /// * `conn` - The database connection (privileged, from the runtime).
-/// * `module_name` - The name of the module (used for the migration table name).
+/// * `gear_name` - The name of the gear (used for the migration table name).
 /// * `migrations` - The list of migrations to run.
 ///
 /// # Returns
 ///
 /// Returns `Ok(MigrationResult)` with statistics about the migration run,
 /// or an error if any migration fails.
-async fn run_module_migrations<C>(
+async fn run_gear_migrations<C>(
     conn: &C,
-    module_name: &str,
+    gear_name: &str,
     migrations: Vec<Box<dyn MigrationTrait>>,
 ) -> Result<MigrationResult, MigrationError>
 where
     C: ConnectionTrait + TransactionTrait,
 {
     if migrations.is_empty() {
-        debug!(module = module_name, "No migrations to run");
+        debug!(gear = gear_name, "No migrations to run");
         return Ok(MigrationResult {
             applied: 0,
             skipped: 0,
@@ -306,20 +306,20 @@ where
         let n = m.name().to_owned();
         if !seen.insert(n.clone()) {
             return Err(MigrationError::DuplicateMigrationName {
-                module: module_name.to_owned(),
+                gear: gear_name.to_owned(),
                 name: n,
             });
         }
     }
 
-    // Get the per-module migration table name
-    let table_name = migration_table_name(module_name);
+    // Get the per-gear migration table name
+    let table_name = migration_table_name(gear_name);
 
     // Ensure the migration table exists
-    ensure_migration_table(conn, &table_name, module_name).await?;
+    ensure_migration_table(conn, &table_name, gear_name).await?;
 
     // Get already-applied migrations
-    let applied = get_applied_migrations(conn, &table_name, module_name).await?;
+    let applied = get_applied_migrations(conn, &table_name, gear_name).await?;
 
     // Sort migrations by name for deterministic ordering
     let mut sorted_migrations: Vec<_> = migrations.into_iter().collect();
@@ -336,7 +336,7 @@ where
 
         if applied.contains(&name) {
             debug!(
-                module = module_name,
+                gear =  gear_name,
                 migration = %name,
                 "Migration already applied, skipping"
             );
@@ -345,7 +345,7 @@ where
         }
 
         info!(
-            module = module_name,
+            gear =  gear_name,
             migration = %name,
             "Applying migration"
         );
@@ -357,7 +357,7 @@ where
             .begin()
             .await
             .map_err(|e| MigrationError::MigrationFailed {
-                module: module_name.to_owned(),
+                gear: gear_name.to_owned(),
                 migration: name.clone(),
                 source: e,
             })?;
@@ -368,12 +368,12 @@ where
                 .up(&manager)
                 .await
                 .map_err(|e| MigrationError::MigrationFailed {
-                    module: module_name.to_owned(),
+                    gear: gear_name.to_owned(),
                     migration: name.clone(),
                     source: e,
                 })?;
 
-            record_migration(&txn, &table_name, module_name, &name).await?;
+            record_migration(&txn, &table_name, gear_name, &name).await?;
             Ok(())
         })
         .await;
@@ -383,7 +383,7 @@ where
                 txn.commit()
                     .await
                     .map_err(|e| MigrationError::MigrationFailed {
-                        module: module_name.to_owned(),
+                        gear: gear_name.to_owned(),
                         migration: name.clone(),
                         source: e,
                     })?;
@@ -395,7 +395,7 @@ where
         }
 
         info!(
-            module = module_name,
+            gear =  gear_name,
             migration = %name,
             "Migration applied successfully"
         );
@@ -405,7 +405,7 @@ where
     }
 
     info!(
-        module = module_name,
+        gear = gear_name,
         applied = result.applied,
         skipped = result.skipped,
         "Migration run complete"
@@ -416,7 +416,7 @@ where
 
 /// Run migrations for testing purposes.
 ///
-/// This is a convenience function for unit tests that don't need per-module
+/// This is a convenience function for unit tests that don't need per-gear
 /// table separation. It calls `migration_table_name("_test")` which produces
 /// a hashed table name like `toolkit_migrations___test__<hash8>`.
 ///
@@ -442,7 +442,7 @@ where
 /// #[tokio::test]
 /// async fn test_my_migrations() {
 ///     let db = setup_test_db().await;
-///     let migrations = my_module::SettingsModule::default().migrations();
+///     let migrations = my_gear::SettingsGear::default().migrations();
 ///     let result = run_migrations_for_testing(&db, migrations).await.unwrap();
 ///     assert_eq!(result.applied, 2);
 /// }
@@ -452,15 +452,15 @@ pub async fn run_migrations_for_testing(
     migrations: Vec<Box<dyn MigrationTrait>>,
 ) -> Result<MigrationResult, MigrationError> {
     let conn = db.sea_internal();
-    run_module_migrations(&conn, "_test", migrations).await
+    run_gear_migrations(&conn, "_test", migrations).await
 }
 
-/// Check if migrations are pending for a module without applying them.
+/// Check if migrations are pending for a gear without applying them.
 ///
 /// # Arguments
 ///
 /// * `db` - The database handle.
-/// * `module_name` - The name of the module.
+/// * `gear_name` - The name of the gear.
 /// * `migrations` - The list of migrations to check.
 ///
 /// # Returns
@@ -472,24 +472,24 @@ pub async fn run_migrations_for_testing(
 /// Returns `Err(MigrationError)` if the migration history cannot be queried.
 pub async fn get_pending_migrations(
     db: &crate::Db,
-    module_name: &str,
+    gear_name: &str,
     migrations: &[Box<dyn MigrationTrait>],
 ) -> Result<Vec<String>, MigrationError> {
     let conn = db.sea_internal();
-    get_pending_migrations_internal(&conn, module_name, migrations).await
+    get_pending_migrations_internal(&conn, gear_name, migrations).await
 }
 
 /// Internal implementation for checking pending migrations.
 async fn get_pending_migrations_internal(
     conn: &impl ConnectionTrait,
-    module_name: &str,
+    gear_name: &str,
     migrations: &[Box<dyn MigrationTrait>],
 ) -> Result<Vec<String>, MigrationError> {
     if migrations.is_empty() {
         return Ok(vec![]);
     }
 
-    let table_name = migration_table_name(module_name);
+    let table_name = migration_table_name(gear_name);
 
     // Check if table exists - if not, all migrations are pending.
     // Propagate DB errors rather than treating them as "table missing".
@@ -503,7 +503,7 @@ async fn get_pending_migrations_internal(
                 .query_one(Statement::from_string(backend, sql))
                 .await
                 .map_err(|e| MigrationError::QueryHistory {
-                    module: module_name.to_owned(),
+                    gear: gear_name.to_owned(),
                     source: e,
                 })?;
             row.and_then(|r| r.try_get_by_index::<bool>(0).ok())
@@ -517,7 +517,7 @@ async fn get_pending_migrations_internal(
                 .query_one(Statement::from_string(backend, sql))
                 .await
                 .map_err(|e| MigrationError::QueryHistory {
-                    module: module_name.to_owned(),
+                    gear: gear_name.to_owned(),
                     source: e,
                 })?;
             row.and_then(|r| r.try_get_by_index::<i64>(0).ok())
@@ -531,7 +531,7 @@ async fn get_pending_migrations_internal(
                 .query_one(Statement::from_string(backend, sql))
                 .await
                 .map_err(|e| MigrationError::QueryHistory {
-                    module: module_name.to_owned(),
+                    gear: gear_name.to_owned(),
                     source: e,
                 })?;
             row.and_then(|r| r.try_get_by_index::<i32>(0).ok())
@@ -543,7 +543,7 @@ async fn get_pending_migrations_internal(
         return Ok(migrations.iter().map(|m| m.name().to_owned()).collect());
     }
 
-    let applied = get_applied_migrations(conn, &table_name, module_name).await?;
+    let applied = get_applied_migrations(conn, &table_name, gear_name).await?;
 
     Ok(migrations
         .iter()
@@ -560,13 +560,13 @@ mod tests {
     use sea_orm_migration::sea_orm::DatabaseBackend;
 
     #[test]
-    fn test_sanitize_module_name() {
-        assert_eq!(sanitize_module_name("my_module"), "my_module");
-        assert_eq!(sanitize_module_name("my-module"), "my_module");
-        assert_eq!(sanitize_module_name("MyModule123"), "MyModule123");
-        assert_eq!(sanitize_module_name("my.module"), "my_module");
-        assert_eq!(sanitize_module_name("my/module"), "my_module");
-        assert_eq!(sanitize_module_name(""), "_");
+    fn test_sanitize_gear_name() {
+        assert_eq!(sanitize_gear_name("my_gear"), "my_gear");
+        assert_eq!(sanitize_gear_name("my-gear"), "my_gear");
+        assert_eq!(sanitize_gear_name("MyGear123"), "MyGear123");
+        assert_eq!(sanitize_gear_name("my.gear"), "my_gear");
+        assert_eq!(sanitize_gear_name("my/gear"), "my_gear");
+        assert_eq!(sanitize_gear_name(""), "_");
     }
 
     #[test]
@@ -638,10 +638,10 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_run_module_migrations_empty() {
+        async fn test_run_gear_migrations_empty() {
             let db = setup_test_db().await;
 
-            let result = run_migrations_for_module(&db, "test_module", vec![])
+            let result = run_migrations_for_gear(&db, "test_gear", vec![])
                 .await
                 .expect("Migration should succeed");
 
@@ -651,14 +651,14 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_run_module_migrations_single() {
+        async fn test_run_gear_migrations_single() {
             let db = setup_test_db().await;
 
             let migrations: Vec<Box<dyn MigrationTrait>> = vec![Box::new(TestMigration {
                 name: "m001_initial".to_owned(),
             })];
 
-            let result = run_migrations_for_module(&db, "test_module_single", migrations)
+            let result = run_migrations_for_gear(&db, "test_gear_single", migrations)
                 .await
                 .expect("Migration should succeed");
 
@@ -668,17 +668,17 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_run_module_migrations_idempotent() {
+        async fn test_run_gear_migrations_idempotent() {
             let db = setup_test_db().await;
 
-            let module_name = "test_module_idempotent";
+            let gear_name = "test_gear_idempotent";
 
             // First run
             let migrations: Vec<Box<dyn MigrationTrait>> = vec![Box::new(TestMigration {
                 name: "m001_initial".to_owned(),
             })];
 
-            let result1 = run_migrations_for_module(&db, module_name, migrations)
+            let result1 = run_migrations_for_gear(&db, gear_name, migrations)
                 .await
                 .expect("First migration run should succeed");
 
@@ -689,7 +689,7 @@ mod tests {
                 name: "m001_initial".to_owned(),
             })];
 
-            let result2 = run_migrations_for_module(&db, module_name, migrations)
+            let result2 = run_migrations_for_gear(&db, gear_name, migrations)
                 .await
                 .expect("Second migration run should succeed");
 
@@ -698,7 +698,7 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_run_module_migrations_deterministic_ordering() {
+        async fn test_run_gear_migrations_deterministic_ordering() {
             let db = setup_test_db().await;
 
             // Provide migrations in non-sorted order
@@ -714,7 +714,7 @@ mod tests {
                 }),
             ];
 
-            let result = run_migrations_for_module(&db, "test_ordering", migrations)
+            let result = run_migrations_for_gear(&db, "test_ordering", migrations)
                 .await
                 .expect("Migration should succeed");
 
@@ -726,35 +726,35 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_per_module_table_separation() {
+        async fn test_per_gear_table_separation() {
             let db = setup_test_db().await;
 
-            // Run migrations for module A
+            // Run migrations for gear A
             let migrations_a: Vec<Box<dyn MigrationTrait>> = vec![Box::new(TestMigration {
                 name: "m001_initial".to_owned(),
             })];
 
-            let result_a = run_migrations_for_module(&db, "module_a", migrations_a)
+            let result_a = run_migrations_for_gear(&db, "gear_a", migrations_a)
                 .await
-                .expect("Module A migration should succeed");
+                .expect("Gear A migration should succeed");
 
             assert_eq!(result_a.applied, 1);
 
-            // Run migrations for module B (same migration name, but separate table)
+            // Run migrations for gear B (same migration name, but separate table)
             let migrations_b: Vec<Box<dyn MigrationTrait>> = vec![Box::new(TestMigration {
                 name: "m001_initial".to_owned(),
             })];
 
-            let result_b = run_migrations_for_module(&db, "module_b", migrations_b)
+            let result_b = run_migrations_for_gear(&db, "gear_b", migrations_b)
                 .await
-                .expect("Module B migration should succeed");
+                .expect("Gear B migration should succeed");
 
-            // Module B should also apply its migration (not shared with A)
+            // Gear B should also apply its migration (not shared with A)
             assert_eq!(result_b.applied, 1);
 
-            // Verify both tables exist (separate per-module history tables)
-            let table_a = migration_table_name("module_a");
-            let table_b = migration_table_name("module_b");
+            // Verify both tables exist (separate per-gear history tables)
+            let table_a = migration_table_name("gear_a");
+            let table_b = migration_table_name("gear_b");
             let conn = db.sea_internal();
             let backend = conn.get_database_backend();
             let check_a = conn
@@ -799,13 +799,13 @@ mod tests {
                 }),
             ];
 
-            let err = run_migrations_for_module(&db, "dup_module", migrations)
+            let err = run_migrations_for_gear(&db, "dup_gear", migrations)
                 .await
                 .unwrap_err();
 
             match err {
-                MigrationError::DuplicateMigrationName { module, name } => {
-                    assert_eq!(module, "dup_module");
+                MigrationError::DuplicateMigrationName { gear, name } => {
+                    assert_eq!(gear, "dup_gear");
                     assert_eq!(name, "m001_dup");
                 }
                 other => panic!("expected DuplicateMigrationName, got: {other:?}"),
@@ -814,9 +814,8 @@ mod tests {
 
         #[test]
         fn test_table_name_length_limit() {
-            // Long module name should still produce <= 63-byte identifier (Postgres limit).
-            let long =
-                "this-is-a-very-long-module-name/with.weird.chars/and-more-and-more-and-more";
+            // Long gear name should still produce <= 63-byte identifier (Postgres limit).
+            let long = "this-is-a-very-long-gear-name/with.weird.chars/and-more-and-more-and-more";
             let t = migration_table_name(long);
             assert!(t.len() <= 63);
             assert!(t.starts_with("toolkit_migrations__"));
@@ -826,7 +825,7 @@ mod tests {
         async fn test_get_pending_migrations() {
             let db = setup_test_db().await;
 
-            let module_name = "test_pending";
+            let gear_name = "test_pending";
 
             // Before any migrations, all should be pending
             let migrations: Vec<Box<dyn MigrationTrait>> = vec![
@@ -838,7 +837,7 @@ mod tests {
                 }),
             ];
 
-            let pending = get_pending_migrations(&db, module_name, &migrations)
+            let pending = get_pending_migrations(&db, gear_name, &migrations)
                 .await
                 .expect("Should succeed");
 
@@ -849,12 +848,12 @@ mod tests {
                 name: "m001_first".to_owned(),
             })];
 
-            run_migrations_for_module(&db, module_name, first)
+            run_migrations_for_gear(&db, gear_name, first)
                 .await
                 .expect("Should succeed");
 
             // Now only second should be pending
-            let pending = get_pending_migrations(&db, module_name, &migrations)
+            let pending = get_pending_migrations(&db, gear_name, &migrations)
                 .await
                 .expect("Should succeed");
 

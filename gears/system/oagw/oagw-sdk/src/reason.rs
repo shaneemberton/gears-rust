@@ -8,7 +8,7 @@
 //! the round-trip test in [`crate::tests::reason_constants_round_trip`]
 //! pins each value.
 //!
-//! Modules group constants by the canonical context where the value
+//! Gears group constants by the canonical context where the value
 //! lands:
 //!
 //! * [`auth`] — values for `CanonicalError::Unauthenticated.ctx.reason`

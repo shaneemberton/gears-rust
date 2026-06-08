@@ -1,5 +1,5 @@
 // Updated: 2026-04-07 by Constructor Tech
-//! Domain service for the credstore module.
+//! Domain service for the credstore gear.
 //!
 //! Plugin discovery is lazy: resolved on first API call after
 //! types-registry is ready.

@@ -1,7 +1,7 @@
 // Updated: 2026-04-28 by Constructor Tech
 //! Type-safe API operation builder with compile-time guarantees
 //!
-//! This module implements a type-state builder pattern that ensures:
+//! This gear implements a type-state builder pattern that ensures:
 //! - `register()` cannot be called unless a handler is set
 //! - `register()` cannot be called unless at least one response is declared
 //! - Descriptive methods remain available at any stage
@@ -90,7 +90,7 @@ pub mod state {
 
 /// Internal trait mapping handler state to the concrete router slot type.
 /// For `Missing` there is no router slot; for `Present` it is `MethodRouter<S>`.
-/// Private sealed trait to enforce the implementation is only visible within this module.
+/// Private sealed trait to enforce the implementation is only visible within this gear.
 mod sealed {
     pub trait Sealed {}
     pub trait SealedAuth {}

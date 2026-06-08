@@ -2,7 +2,7 @@
 
 ### What it does
 
-Checks that structs and enums in contract modules do not derive `Serialize` or `Deserialize` from serde.
+Checks that structs and enums in contract gears do not derive `Serialize` or `Deserialize` from serde.
 
 ### Why is this bad?
 
@@ -19,10 +19,10 @@ This separation provides:
 // ❌ Bad - contract model derives serde traits
 mod contract {
     use serde::Serialize;
-    
+
     #[derive(Serialize)]
-    pub struct User { 
-        pub id: String 
+    pub struct User {
+        pub id: String
     }
 }
 ```
@@ -32,18 +32,18 @@ Use instead:
 ```rust
 // ✅ Good - contract model without serde
 mod contract {
-    pub struct User { 
-        pub id: String 
+    pub struct User {
+        pub id: String
     }
 }
 
 // Separate DTO in API layer
 mod api {
     use serde::Serialize;
-    
+
     #[derive(Serialize)]
-    pub struct UserDto { 
-        pub id: String 
+    pub struct UserDto {
+        pub id: String
     }
 }
 ```

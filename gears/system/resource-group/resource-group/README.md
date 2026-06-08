@@ -1,10 +1,10 @@
 # Resource Group
 
-Main module for hierarchical resource group management in Gears. Backed by `cf-gears-resource-group-sdk`, persisted via SeaORM, exposed over REST, and integrated with the AuthZ resolver and types registry.
+Main gear for hierarchical resource group management in Gears. Backed by `cf-gears-resource-group-sdk`, persisted via SeaORM, exposed over REST, and integrated with the AuthZ resolver and types registry.
 
 ## Overview
 
-The `cf-gears-resource-group` module provides:
+The `cf-gears-resource-group` gear provides:
 
 - **GTS-typed groups** — every group is bound to a GTS type (validated against the types registry)
 - **Hierarchy** — parent/child relationships with ancestor/descendant traversal and depth tracking
@@ -13,12 +13,12 @@ The `cf-gears-resource-group` module provides:
 - **AuthZ enforcement** — every mutation and read goes through `PolicyEnforcer` from `cf-gears-authz-resolver-sdk`
 - **ClientHub integration** — registers `ResourceGroupClient` (full surface) and `ResourceGroupReadHierarchy` (narrow read-only) for in-process consumers
 
-The module owns its database schema via `DatabaseCapability` and exposes a REST surface via `RestApiCapability`.
+The gear owns its database schema via `DatabaseCapability` and exposes a REST surface via `RestApiCapability`.
 
 ## Architecture
 
 ```
-Consumer Module
+Consumer Gear
     │
     ▼
 ResourceGroupClient / ResourceGroupReadHierarchy  (SDK traits, ClientHub)
@@ -33,9 +33,9 @@ cf-gears-resource-group  (this crate — services, repos, REST handlers)
 
 ## Capabilities
 
-- `db` — SeaORM-backed storage with module-owned migrations
+- `db` — SeaORM-backed storage with gear-owned migrations
 - `rest` — REST API for types, groups, and memberships (OpenAPI-described)
-- Module dependencies: `authz-resolver`, `types-registry`
+- Gear dependencies: `authz-resolver`, `types-registry`
 
 ## Usage (in-process)
 
@@ -59,7 +59,7 @@ let descendants = read.get_group_descendants(&ctx, group_id, &query).await?;
 
 ## REST API
 
-The module registers REST routes for types, groups, hierarchy traversal, and memberships. See the generated OpenAPI document for the full surface, including cascade-delete endpoints that are intentionally not exposed via the SDK.
+The gear registers REST routes for types, groups, hierarchy traversal, and memberships. See the generated OpenAPI document for the full surface, including cascade-delete endpoints that are intentionally not exposed via the SDK.
 
 ## Testing
 

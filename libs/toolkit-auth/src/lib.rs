@@ -1,7 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![warn(warnings)]
 
-// Core modules
+// Core gears
 pub mod errors;
 pub mod http_error;
 pub mod traits;

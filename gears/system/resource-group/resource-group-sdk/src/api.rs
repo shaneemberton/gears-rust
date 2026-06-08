@@ -1,6 +1,6 @@
 // Created: 2026-04-16 by Constructor Tech
 // @cpt-dod:cpt-cf-resource-group-dod-sdk-foundation-sdk-traits:p1
-//! SDK trait contracts for the resource-group module.
+//! SDK trait contracts for the resource-group gear.
 
 use async_trait::async_trait;
 use toolkit_security::SecurityContext;
@@ -105,7 +105,7 @@ pub trait ResourceGroupClient: Send + Sync {
     /// every closure-table row anchored at this group. Mirrors the
     /// `force=true` REST flag.
     ///
-    /// Intended for **cross-module cleanup paths** -- e.g. the AM
+    /// Intended for **cross-gear cleanup paths** -- e.g. the AM
     /// tenant-hard-delete cascade hook that tears down all user-group
     /// state for a tenant before the `tenants` row is removed. Most
     /// consumers want [`Self::delete_group`] (the non-cascade variant)

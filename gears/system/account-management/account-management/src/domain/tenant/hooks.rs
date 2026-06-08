@@ -3,7 +3,7 @@
 //! Sibling AM features (future 2.6 user-groups, 2.7 tenant-metadata) own
 //! rows keyed by `tenant_id` and MUST clean them up before AM deletes
 //! the tenant itself. They register a [`TenantHardDeleteHook`] via
-//! [`crate::AccountManagementModule::register_hard_delete_hook`] at
+//! [`crate::AccountManagementGear::register_hard_delete_hook`] at
 //! startup; the hard-delete pipeline invokes every hook (in registration
 //! order) before the `IdP` deprovision call and before the final DB
 //! teardown.

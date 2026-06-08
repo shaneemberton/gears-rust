@@ -430,9 +430,9 @@ Included in `oagw` crate (`infra/plugin/`):
 
 Performance: Native code, zero overhead.
 
-### External Plugins (Toolkit Modules)
+### External Plugins (Toolkit Gears)
 
-Separate modules implementing plugin traits from `oagw-sdk`:
+Separate gears implementing plugin traits from `oagw-sdk`:
 - `cf-gears-oagw-plugin-oauth2-pkce` (custom auth)
 - `cf-gears-oagw-plugin-jwt-auth` (JWT validation)
 - `cf-gears-oagw-plugin-custom-guard` (tenant-specific rules)

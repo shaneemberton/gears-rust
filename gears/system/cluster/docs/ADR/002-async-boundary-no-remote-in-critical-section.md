@@ -29,7 +29,7 @@ date: 2026-04-02
 
 ## Context and Problem Statement
 
-The cluster module is the Gears middleware's abstraction for cluster coordination: distributed cache, leader election, distributed locks, and service discovery. Every meaningful cluster operation is a remote call over the network — there is no "in-process" version of a distributed lock, and the "standalone" provider is a testing/development fixture, not the production target.
+The cluster gears the Gears middleware's abstraction for cluster coordination: distributed cache, leader election, distributed locks, and service discovery. Every meaningful cluster operation is a remote call over the network — there is no "in-process" version of a distributed lock, and the "standalone" provider is a testing/development fixture, not the production target.
 
 Two interrelated design questions emerged during review:
 

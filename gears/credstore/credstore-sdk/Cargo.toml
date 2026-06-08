@@ -1,6 +1,6 @@
 [package]
 name = "cf-gears-credstore-sdk"
-description = "SDK for credstore module: API traits, models, and error definitions"
+description = "SDK for credstore gear: API traits, models, and error definitions"
 version = "0.1.24"
 edition.workspace = true
 license.workspace = true

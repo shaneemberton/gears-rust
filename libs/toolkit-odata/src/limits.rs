@@ -1,6 +1,6 @@
 //! Input validation and safety limits for `OData` parsing
 //!
-//! This module enforces sane caps to prevent abuse and resource exhaustion:
+//! This gear enforces sane caps to prevent abuse and resource exhaustion:
 //! - Maximum `$top` value
 //! - Maximum number of `$orderby` fields
 //! - Maximum filter expression length

@@ -94,7 +94,7 @@ pub enum CodeInterpreterStatus {
 ///
 /// Populated only when the chat's LLM provider uses the Anthropic Messages
 /// adapter (see `anthropic-provider-support.md` §8.0). `upstream_alias` is the
-/// OAGW alias under which Anthropic's API was registered at module init.
+/// OAGW alias under which Anthropic's API was registered at gear init.
 #[domain_model]
 #[derive(Debug, Clone)]
 pub struct AnthropicUploadInfo {

@@ -77,7 +77,7 @@ Consider migrating to gRPC if:
 
 * OAGW adopts gRPC as a standard internal protocol for all consumers
 * Connection count becomes a bottleneck (hundreds of concurrent streams per instance)
-* Other modules need typed streaming contracts with OAGW beyond simple SSE passthrough
+* Other gears need typed streaming contracts with OAGW beyond simple SSE passthrough
 
 ## Traceability
 

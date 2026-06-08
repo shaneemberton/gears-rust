@@ -1454,7 +1454,7 @@ async fn security_metadata_schema_double_underscore_keys_filtered() {
         .expect("create type with __ keys");
 
     // Retrieval must strip all `__*` keys — both the caller-supplied ones
-    // (`__internal`, `__secret`) and the module-internal ones added during
+    // (`__internal`, `__secret`) and the gear-internal ones added during
     // storage (`__can_be_root`). Only non-underscore keys should remain.
     // A slip in the filter (e.g. `starts_with('_')` vs `starts_with("__")`,
     // or dropping the filter entirely) would let caller data leak back out,
@@ -1479,7 +1479,7 @@ async fn security_metadata_schema_double_underscore_keys_filtered() {
     );
     assert!(
         obj.get("__can_be_root").is_none(),
-        "module-internal __can_be_root must not leak back, got: {obj:?}",
+        "gear-internal __can_be_root must not leak back, got: {obj:?}",
     );
     assert_eq!(
         obj.get("visible"),

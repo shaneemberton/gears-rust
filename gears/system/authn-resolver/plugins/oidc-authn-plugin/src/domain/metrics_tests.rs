@@ -33,8 +33,7 @@ impl MetricsHarness {
     /// Create a meter using the canonical plugin meter name.
     #[must_use]
     pub fn meter(&self) -> Meter {
-        self.provider
-            .meter(crate::OidcAuthNPluginModule::MODULE_NAME)
+        self.provider.meter(crate::OidcAuthNPluginGear::MODULE_NAME)
     }
 
     /// Create a metrics handle bound to this harness.

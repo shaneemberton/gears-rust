@@ -13,14 +13,14 @@ Converts various document formats into a unified structured representation. Extr
 
 Full API documentation: <http://127.0.0.1:8087/cf/docs>
 
-The example server uses the gateway prefix `/cf`. This comes from `modules.api-gateway.config.prefix_path` and is configurable.
+The example server uses the gateway prefix `/cf`. This comes from `gears.api-gateway.config.prefix_path` and is configurable.
 
 ## Configuration
 
-`allowed_local_base_dir` is **required**. The module will refuse to start if it is missing or the path cannot be resolved.
+`allowed_local_base_dir` is **required**. The gear will refuse to start if it is missing or the path cannot be resolved.
 
 ```yaml
-modules:
+gears:
   file-parser:
     config:
       max_file_size_mb: 100

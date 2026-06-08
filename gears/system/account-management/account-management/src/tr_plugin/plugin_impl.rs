@@ -4,7 +4,7 @@
 //! Each trait method delegates to the matching free function in
 //! [`super::queries`], threading the port handle and the
 //! `TypesRegistryClient` used for `tenant_type` reverse-resolution.
-//! Wiring to AM's `init()` is in [`crate::module`].
+//! Wiring to AM's `init()` is in the gear's init function.
 
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ pub struct PluginImpl {
 impl PluginImpl {
     /// Build the plugin from AM's already-resolved dependencies.
     ///
-    /// Called from `AccountManagementModule::init` after the
+    /// Called from `AccountManagementGear::init` after the
     /// `TenantHierarchyReadAdapter` and `TypesRegistryClient` have
     /// been constructed.
     #[must_use]

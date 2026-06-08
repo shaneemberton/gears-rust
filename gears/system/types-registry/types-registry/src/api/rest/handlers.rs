@@ -1,4 +1,4 @@
-//! REST handlers for the Types Registry module.
+//! REST handlers for the Types Registry gear.
 
 use std::sync::Arc;
 

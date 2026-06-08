@@ -48,7 +48,7 @@ data:
         console_format: "json"
         console_level: debug
 
-    modules:
+    gears:
       api-gateway:
         config:
           bind_addr: "0.0.0.0:{{ .Values.service.port }}"
@@ -67,7 +67,7 @@ data:
               in_flight: 64
           auth_disabled: true
 
-      module-orchestrator:
+      gear-orchestrator:
         config: {}
 
       grpc-hub:

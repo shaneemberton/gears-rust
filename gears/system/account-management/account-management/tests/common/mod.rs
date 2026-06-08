@@ -607,7 +607,7 @@ pub fn deferred_count(
 //   `UserService`, `ConversionService`) vs RG's three.
 // * AM uses [`PermitWithSubtreeResolver`] (already defined above) — it
 //   emits `InTenantSubtree` predicates, matching the production
-//   PDP shape declared in `module.rs` (`Capability::TenantHierarchy`).
+//   PDP shape declared in `gear.rs` (`Capability::TenantHierarchy`).
 // * Path prefix on every endpoint is `/account-management/v1/...` —
 //   the production `/api/` prefix is added by the gateway layer, not
 //   by `register_routes`, so the test router does NOT nest under
@@ -971,7 +971,7 @@ pub struct TestServices {
 /// Build the four AM domain services using the default fakes
 /// ([`fake_idp`], [`inert_resource_checker`], [`empty_metadata_registry`],
 /// inert types-registry, [`mock_enforcer`]). Mirrors the production
-/// `register_rest` wiring in `module.rs`.
+/// `register_rest` wiring in `gear.rs`.
 #[must_use]
 pub fn build_services(harness: &Harness) -> TestServices {
     build_services_with(harness, fake_idp(), empty_metadata_registry())

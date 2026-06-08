@@ -11,7 +11,7 @@
 //! The boundary mapping between [`DomainError`] and the public
 //! [`AccountManagementError`](account_management_sdk::error::AccountManagementError)
 //! / [`CanonicalError`](toolkit_canonical_errors::CanonicalError) wire
-//! envelope lives in [`crate::infra::sdk_error_mapping`]. This module
+//! envelope lives in [`crate::infra::sdk_error_mapping`]. This gear
 //! is classifier-only.
 //!
 //! # Lift vs classify

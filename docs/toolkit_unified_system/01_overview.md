@@ -2,8 +2,8 @@
 
 ## What ToolKit provides
 
-- **Composable modules** discovered via `inventory`, initialized in dependency order.
-- **Gateway as a module** (e.g., `api-gateway`) that owns the Axum router and OpenAPI document.
+- **Composable gears** discovered via `inventory`, initialized in dependency order.
+- **Gateway as a gear** (e.g., `api-gateway`) that owns the Axum router and OpenAPI document.
 - **Type-safe REST** via an operation builder that prevents half-wired routes at compile time.
 - **Server-Sent Events (SSE)** with type-safe broadcasters and domain event integration.
 - **OpenAPI 3.1** generation using `utoipa` with automatic schema registration for DTOs.
@@ -15,26 +15,26 @@
 
 ## Core invariants (apply everywhere)
 
-- **SDK pattern is the public API**: Use `<module>-sdk` crate for traits, models, errors. Do not expose internals.
-- **Secure-by-default DB access**: Use `SecureConn` + `AccessScope`. Modules cannot access raw database connections.
+- **SDK pattern is the public API**: Use `<gear>-sdk` crate for traits, models, errors. Do not expose internals.
+- **Secure-by-default DB access**: Use `SecureConn` + `AccessScope`. Gears cannot access raw database connections.
 - **RFC-9457 errors everywhere**: Use `Problem` (implements `IntoResponse`). Do not use `ProblemResponse`.
 - **Type-safe REST**: Use `OperationBuilder` with `.authenticated()` and `.standard_errors()`.
 - **OData macros are in `toolkit-odata-macros`**: Use `toolkit_odata_macros::ODataFilterable`.
-- **ClientHub registration**: `ctx.client_hub().register::<dyn MyModuleApi>(api)`; `ctx.client_hub().get::<dyn MyModuleApi>()?`.
+- **ClientHub registration**: `ctx.client_hub().register::<dyn MyGearApi>(api)`; `ctx.client_hub().get::<dyn MyGearApi>()?`.
 - **Cancellation**: Pass `CancellationToken` to background tasks for cooperative shutdown.
 - **GTS schema**: Use `gts_schema_with_refs_as_string()` for faster, correct schema generation.
 
 ## Golden path (quick reference)
 
 ```rust
-// Module registration
-#[toolkit::module(
-    name = "my_module",
+// Gear registration
+#[toolkit::gear(
+    name = "my_gear",
     deps = ["foo", "bar"],
     capabilities = [db, rest],
-    client = my_module_sdk::MyModuleApi,
+    client = my_gear_sdk::MyGearApi,
 )]
-pub struct MyModule { /* ... */ }
+pub struct MyGear { /* ... */ }
 
 // Secure DB access
 let secure_conn = db.sea_secure();
@@ -45,8 +45,8 @@ let users = secure_conn
     .await?;
 
 // ClientHub
-ctx.client_hub().register::<dyn my_module_sdk::MyModuleApi>(api);
-let api = ctx.client_hub().get::<dyn my_module_sdk::MyModuleApi>()?;
+ctx.client_hub().register::<dyn my_gear_sdk::MyGearApi>(api);
+let api = ctx.client_hub().get::<dyn my_gear_sdk::MyGearApi>()?;
 
 // Errors
 impl From<DomainError> for Problem { /* ... */ }

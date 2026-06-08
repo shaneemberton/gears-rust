@@ -5,8 +5,8 @@ pub use oagw_sdk::{
 };
 
 // === MODULE DEFINITION ===
-pub mod module;
-pub use module::OutboundApiGatewayModule;
+pub mod gear;
+pub use gear::OutboundApiGatewayGear;
 
 // === INTERNAL MODULES ===
 #[doc(hidden)]

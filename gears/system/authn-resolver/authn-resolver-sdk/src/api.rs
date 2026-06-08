@@ -11,8 +11,8 @@ use crate::models::{AuthenticationResult, ClientCredentialsRequest};
 
 /// Public API trait for the `AuthN` resolver.
 ///
-/// This trait is registered in `ClientHub` by the module and
-/// can be consumed by other modules (primarily the API gateway):
+/// This trait is registered in `ClientHub` by the gear and
+/// can be consumed by other gears (primarily the API gateway):
 ///
 /// ```ignore
 /// let authn = hub.get::<dyn AuthNResolverClient>()?;

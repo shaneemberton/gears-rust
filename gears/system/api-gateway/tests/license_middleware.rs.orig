@@ -13,7 +13,7 @@ use toolkit::{
     api::OperationBuilder,
     api::operation_builder::LicenseFeature,
     config::ConfigProvider,
-    context::ModuleCtx,
+    context::GearCtx,
     contracts::{ApiGatewayCapability, OpenApiRegistry, RestApiCapability},
 };
 use toolkit_canonical_errors::Problem;
@@ -31,15 +31,15 @@ struct TestConfigProvider {
 }
 
 impl ConfigProvider for TestConfigProvider {
-    fn get_module_config(&self, module: &str) -> Option<&serde_json::Value> {
-        self.config.get(module)
+    fn get_gear_config(&self, gear: &str) -> Option<&serde_json::Value> {
+        self.config.get(gear)
     }
 }
 
-fn create_api_gateway_ctx(config: serde_json::Value) -> ModuleCtx {
+fn create_api_gateway_ctx(config: serde_json::Value) -> GearCtx {
     let hub = Arc::new(ClientHub::new());
 
-    ModuleCtx::new(
+    GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
@@ -48,9 +48,9 @@ fn create_api_gateway_ctx(config: serde_json::Value) -> ModuleCtx {
     )
 }
 
-fn create_test_module_ctx() -> ModuleCtx {
-    ModuleCtx::new(
-        "test_module",
+fn create_test_gear_ctx() -> GearCtx {
+    GearCtx::new(
+        "test_gear",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config: json!({}) }),
         Arc::new(ClientHub::new()),
@@ -62,11 +62,11 @@ async fn ok_handler() -> impl IntoResponse {
     StatusCode::OK
 }
 
-pub struct TestLicenseModule;
+pub struct TestLicenseGear;
 
 #[async_trait]
-impl Module for TestLicenseModule {
-    async fn init(&self, _ctx: &ModuleCtx) -> Result<()> {
+impl Gear for TestLicenseGear {
+    async fn init(&self, _ctx: &GearCtx) -> Result<()> {
         Ok(())
     }
 }
@@ -91,10 +91,10 @@ impl AsRef<str> for BaseFeature {
 
 impl LicenseFeature for BaseFeature {}
 
-impl RestApiCapability for TestLicenseModule {
+impl RestApiCapability for TestLicenseGear {
     fn register_rest(
         &self,
-        _ctx: &ModuleCtx,
+        _ctx: &GearCtx,
         router: Router,
         openapi: &dyn OpenApiRegistry,
     ) -> Result<Router> {
@@ -144,14 +144,14 @@ async fn rejects_non_base_feature_requirement() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let mut router = Router::new();
-    let test_module = TestLicenseModule;
-    router = test_module
+    let test_gear = TestLicenseGear;
+    router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -201,14 +201,14 @@ async fn rejects_non_base_feature_requirement_with_prefix() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let mut router = Router::new();
-    let test_module = TestLicenseModule;
-    router = test_module
+    let test_gear = TestLicenseGear;
+    router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -256,14 +256,14 @@ async fn allows_base_feature_requirement() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let router = Router::new();
-    let test_module = TestLicenseModule;
-    let router = test_module
+    let test_gear = TestLicenseGear;
+    let router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -299,14 +299,14 @@ async fn allows_base_feature_requirement_with_prefix() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let router = Router::new();
-    let test_module = TestLicenseModule;
-    let router = test_module
+    let test_gear = TestLicenseGear;
+    let router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -341,14 +341,14 @@ async fn allows_no_license_requirement() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let mut router = Router::new();
-    let test_module = TestLicenseModule;
-    router = test_module
+    let test_gear = TestLicenseGear;
+    router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 

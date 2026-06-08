@@ -1,10 +1,10 @@
 //! User Groups feature (DECOMPOSITION §2.6).
 //!
-//! Delegates all user-group state to the Resource Group module.
+//! Delegates all user-group state to the Resource Group gear.
 //! AM owns two thin touchpoints:
 //!
 //! 1. Idempotent registration of **two** chained RG type schemas
-//!    during module init ([`register_user_group_types`]):
+//!    during gear init ([`register_user_group_types`]):
 //!
 //!    - [`USER_MEMBERSHIP_TYPE`] -- the AM-user member handle. A
 //!      type-registry-only entry; AM users live in AM's tables +
@@ -56,4 +56,4 @@ pub(crate) const USER_MEMBERSHIP_TYPE: &str = account_management_sdk::gts::USER_
 // factory makes "where does AM elevate to system?" trivially
 // auditable by grep, and the per-site `tracing` log emitted by each
 // factory gives the audit pipeline a wire signal. See the
-// `system_actor` module docs for the full rationale.
+// `system_actor` gear docs for the full rationale.

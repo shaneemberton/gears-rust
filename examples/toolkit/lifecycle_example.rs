@@ -2,12 +2,12 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use toolkit::contracts::StatefulModule;
+use toolkit::contracts::StatefulGear;
 use toolkit::lifecycle::{Runnable, WithLifecycle};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-/// Example server module that demonstrates the lifecycle framework
+/// Example server gear that demonstrates the lifecycle framework
 struct ExampleServer {
     port: u16,
     counter: std::sync::atomic::AtomicU32,
@@ -65,31 +65,31 @@ async fn main() -> Result<()> {
     // Create our server
     let server = ExampleServer::new(8080);
 
-    // Wrap it with WithLifecycle to get StatefulModule implementation
-    let module = WithLifecycle::new(server).with_stop_timeout(Duration::from_secs(5)); // 5 second timeout
+    // Wrap it with WithLifecycle to get StatefulGear implementation
+    let gear = WithLifecycle::new(server).with_stop_timeout(Duration::from_secs(5)); // 5 second timeout
 
-    println!("Module status: {:?}", module.status());
+    println!("Gear status: {:?}", gear.status());
 
     // Create a cancellation token for external control
     let cancel_token = CancellationToken::new();
 
-    // Start the module
-    println!("Starting module...");
-    module.start(cancel_token.clone()).await?;
+    // Start the gear
+    println!("Starting gear...");
+    gear.start(cancel_token.clone()).await?;
 
     // Give it some time to run
     println!("Letting server run for 2 seconds...");
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Check the counter
-    println!("Requests processed: {}", module.inner().get_counter());
+    println!("Requests processed: {}", gear.inner().get_counter());
 
-    // Stop the module
-    println!("Stopping module...");
-    module.stop(cancel_token.clone()).await?;
+    // Stop the gear
+    println!("Stopping gear...");
+    gear.stop(cancel_token.clone()).await?;
 
-    println!("Final module status: {:?}", module.status());
-    println!("Final request count: {}", module.inner().get_counter());
+    println!("Final gear status: {:?}", gear.status());
+    println!("Final request count: {}", gear.inner().get_counter());
 
     println!("\nExample completed successfully!");
     Ok(())

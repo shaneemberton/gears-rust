@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/contract/
+// simulated_dir=/cf-gears/gears/some_gear/contract/
 // Should trigger DE0103 - HTTP types in contract
 use http::StatusCode;
 // Should trigger DE0103 - HTTP types in contract

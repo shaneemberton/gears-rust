@@ -2,9 +2,9 @@
 
 ## 1. Architecture Overview
 
-Simple User Settings is implemented as a toolkit module with database persistence. It provides a REST API for CRUD operations on user settings.
+Simple User Settings is implemented as a ToolKit gear with database persistence. It provides a REST API for CRUD operations on user settings.
 
-**System Context**: Operates as a lightweight service module within Gears, using the platform's database layer for storage.
+**System Context**: Operates as a lightweight service gear within Gears, using the platform's database layer for storage.
 
 ## 2. Design Principles
 

@@ -13,8 +13,8 @@ use toolkit_db::{config::*, manager::DbManager};
 #[cfg(feature = "sqlite")]
 async fn test_pool_cfg_options_applied() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "engine": "sqlite",
                     "dsn": "sqlite::memory:",
@@ -34,7 +34,7 @@ async fn test_pool_cfg_options_applied() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
@@ -48,10 +48,10 @@ async fn test_pool_cfg_options_applied() {
     }
 }
 
-/// Test that module pool config overrides server pool config.
+/// Test that gear pool config overrides server pool config.
 #[tokio::test]
 #[cfg(feature = "sqlite")]
-async fn test_module_pool_overrides_server_pool() {
+async fn test_gear_pool_overrides_server_pool() {
     let global_config = GlobalDatabaseConfig {
         servers: {
             let mut servers = HashMap::new();
@@ -76,8 +76,8 @@ async fn test_module_pool_overrides_server_pool() {
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
         "database": global_config,
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "server": "sqlite_server",
                     "engine": "sqlite",
@@ -95,12 +95,12 @@ async fn test_module_pool_overrides_server_pool() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
-            // Connection succeeded - module pool config took precedence
-            // The pool should have max_conns=25 and acquire_timeout=60s from module config
+            // Connection succeeded - gear pool config took precedence
+            // The pool should have max_conns=25 and acquire_timeout=60s from gear config
         }
         Err(err) => {
             panic!("Expected successful connection with overridden pool settings, got: {err:?}");
@@ -108,7 +108,7 @@ async fn test_module_pool_overrides_server_pool() {
     }
 }
 
-/// Test pool config inheritance from server when module has no pool config.
+/// Test pool config inheritance from server when gear has no pool config.
 #[tokio::test]
 #[cfg(feature = "sqlite")]
 async fn test_pool_config_inheritance() {
@@ -136,8 +136,8 @@ async fn test_pool_config_inheritance() {
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
         "database": global_config,
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "server": "sqlite_server",
                     "engine": "sqlite",
@@ -150,7 +150,7 @@ async fn test_pool_config_inheritance() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
@@ -167,8 +167,8 @@ async fn test_pool_config_inheritance() {
 #[cfg(feature = "sqlite")]
 async fn test_default_pool_configuration() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                         "dsn": "sqlite::memory:"
                     // No pool config - should use defaults
@@ -180,7 +180,7 @@ async fn test_default_pool_configuration() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {
@@ -242,8 +242,8 @@ fn test_pool_cfg_helper_methods() {
 #[cfg(feature = "sqlite")]
 async fn test_partial_pool_configuration() {
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "modules": {
-            "test_module": {
+        "gears": {
+            "test_gear": {
                 "database": {
                     "dsn": "sqlite::memory:",
                     "pool": {
@@ -259,7 +259,7 @@ async fn test_partial_pool_configuration() {
     let temp_dir = TempDir::new().unwrap();
     let manager = DbManager::from_figment(figment, temp_dir.path().to_path_buf()).unwrap();
 
-    let result = manager.get("test_module").await;
+    let result = manager.get("test_gear").await;
 
     match result {
         Ok(_handle) => {

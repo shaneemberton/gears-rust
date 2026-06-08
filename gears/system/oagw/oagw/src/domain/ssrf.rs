@@ -132,7 +132,7 @@ impl Cidr {
 
 /// Pre-compiled SSRF guard for runtime IP and hostname checks.
 ///
-/// Built once from [`SsrfPolicy`] at module init and shared via `Arc`.
+/// Built once from [`SsrfPolicy`] at gear init and shared via `Arc`.
 #[domain_model]
 pub struct SsrfGuard {
     enabled: bool,

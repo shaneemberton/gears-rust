@@ -23,7 +23,7 @@
 //! workspace (see top-level `Cargo.toml`), so we cannot construct a
 //! `SchemaManager` reporting `DatabaseBackend::MySql` without a live
 //! MySQL container. The behaviour is held by code review and by the
-//! module-level docstring on the m0006 source.
+//! gear-level docstring on the m0006 source.
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![cfg_attr(coverage_nightly, coverage(off))]

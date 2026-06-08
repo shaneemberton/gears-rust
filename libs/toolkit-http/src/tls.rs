@@ -1,6 +1,6 @@
 //! TLS utilities for the HTTP client.
 //!
-//! This module provides cached loading of native root certificates to avoid
+//! This gear provides cached loading of native root certificates to avoid
 //! repeated OS certificate store lookups (which can be slow on some platforms).
 
 use rustls_pki_types::CertificateDer;
@@ -70,7 +70,7 @@ pub fn native_root_certs() -> &'static [CertificateDer<'static>] {
 /// site) has not yet run, every call into `get_crypto_provider()` will
 /// rebuild a provider — and `CryptoProvider::get_default()` continues
 /// to observe the absence. In practice this is benign because each
-/// build returns an `Arc` over the same module-level statics inside
+/// build returns an `Arc` over the same gear-level statics inside
 /// the underlying provider crate (corecrypto's `default_provider()`
 /// itself caches a process-wide `Arc<CryptoProvider>`, so the
 /// "concurrent providers" are byte-identical handles), but it is **not
@@ -137,7 +137,7 @@ pub fn get_crypto_provider() -> Arc<rustls::crypto::CryptoProvider> {
         })
 }
 
-/// Error type returned by the fallible TLS-config builders in this module.
+/// Error type returned by the fallible TLS-config builders in this gear.
 ///
 /// The `Other` variant carries a boxed `dyn Error` so the source-error chain
 /// from rustls (and any future foreign error) is preserved end-to-end —
@@ -444,7 +444,7 @@ mod tests {
     /// Without this, an Apple-corecrypto-backed FIPS build silently advertises
     /// `config.fips() == false` because rustls's stock `require_ems` default
     /// is gated on rustls's *own* `fips` feature — which we deliberately keep
-    /// off on macOS to avoid pulling the AWS-LC FIPS module.
+    /// off on macOS to avoid pulling the AWS-LC FIPS gear.
     ///
     /// Exercised via the public `webpki_roots_client_config()` (which routes
     /// through `build_client_config`); calling it avoids a hard dependency on
@@ -452,7 +452,7 @@ mod tests {
     ///
     /// Run via `cargo test -p cf-gears-toolkit-http --features fips`.
     /// `build_client_config` auto-installs the platform FIPS provider in
-    /// test mode (see `fips_test_provider` module) so this test does not
+    /// test mode (see `fips_test_provider` gear) so this test does not
     /// need its own explicit install.
     #[test]
     #[cfg(feature = "fips")]

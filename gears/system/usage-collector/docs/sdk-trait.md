@@ -34,7 +34,7 @@
 - [Exclusions/Non-goals](#exclusionsnon-goals)
   - [REST-only exclusions](#rest-only-exclusions)
   - [Plugin SPI exclusions](#plugin-spi-exclusions)
-  - [Module non-goals reaffirmed on the SDK trait](#module-non-goals-reaffirmed-on-the-sdk-trait)
+  - [Gear non-goals reaffirmed on the SDK trait](#gear-non-goals-reaffirmed-on-the-sdk-trait)
 - [Traceability](#traceability)
   - [Trait identifier and consumer contract](#trait-identifier-and-consumer-contract)
   - [Capabilities exposed by the SDK trait](#capabilities-exposed-by-the-sdk-trait)
@@ -50,8 +50,8 @@
 ## Overview
 
 The Usage Collector SDK trait is the public, in-process, transport-agnostic
-async Rust API for the Usage Collector module. It exposes the
-platform-developer-facing capabilities of the module — usage record
+async Rust API for the Usage Collector gear. It exposes the
+platform-developer-facing capabilities of the gear — usage record
 ingestion, aggregated query, raw cursor-paginated query, and individual
 event deactivation — as a single ClientHub-registered async trait. The
 trait deliberately omits operator-only catalog and platform-observability
@@ -69,14 +69,14 @@ Sources: phase-01 §"SDK trait surface (DESIGN section 3.3)"
 SDK Surface" and §"SDK Method Candidates".
 
 **Consistency floor (read-after-write rule).** Reads through the SDK trait
-inherit the module-level consistency floor: a record `Acknowledged` by the
+inherit the gear-level consistency floor: a record `Acknowledged` by the
 ingestion methods (`submit_usage_record`, `submit_usage_records`) is durable
 and dedup-visible on the ingestion path, but the same record MAY be invisible
 to a subsequent SDK aggregated query (`query_aggregated`), raw query
 (`query_raw_keyset`), or catalog read (`read_metric`, `list_metrics`) for an
 indeterminate window. The window is driven by the
 active plugin's replication topology and the workload-isolation routing it
-implements. Source modules MUST NOT design admission control, post-emit
+implements. Source gears MUST NOT design admission control, post-emit
 summary, or any same-request outcome flow against the SDK query methods —
 they MUST consume the ingestion ack the SDK already returns. Consumers that
 need a tighter bound consciously couple themselves to a specific plugin's
@@ -131,7 +131,7 @@ ADR 0012 (`./ADR/0012-unified-plugin-catalog-and-gts-id-reference.md`).
 
 The SDK trait does not expose platform health (those endpoints remain
 REST-only). Operational telemetry is pushed via OTLP from ToolKit's
-global `SdkMeterProvider`; no in-module HTTP metrics surface exists on
+global `SdkMeterProvider`; no in-gear HTTP metrics surface exists on
 either the SDK trait or the REST API. The SDK trait does not implement
 authentication, authorization, storage, cursor token generation, or
 aggregation pushdown — authentication is owned by the ToolKit gateway
@@ -161,8 +161,8 @@ The companion plugin trait `UsageCollectorPluginV1` lives in
 `usage-collector-sdk/src/plugin_api.rs`. Both traits, the GTS spec for
 plugin discovery, the domain models, and the public error enum share a
 single `usage-collector-sdk` crate — there is no separate `-contracts`
-or `-plugin-api` crate. This follows the platform-standard `<module>` +
-`<module>-sdk` two-crate layout used by every reference module
+or `-plugin-api` crate. This follows the platform-standard `<gear>` +
+`<gear>-sdk` two-crate layout used by every reference gear
 (`credstore`, `authn-resolver`, `authz-resolver`).
 
 Required files under `usage-collector-sdk/src/`, all transport-agnostic:
@@ -183,7 +183,7 @@ The in-process implementation `UsageCollectorLocalClient` lives in
 `usage-collector/src/domain/local_client.rs` (inside the host crate)
 and is registered un-scoped into ClientHub via
 `ctx.client_hub().register::<dyn UsageCollectorClientV1>(...)`, mirroring
-the pattern used by `credstore/src/module.rs:57–58`.
+the pattern used by `credstore/src/gear.rs:57–58`.
 
 Sources: phase-02 §"ToolKit Conventions" / "Crate placement and layout";
 DESIGN §3.12.9 "Cargo crate naming" two-crate layout.
@@ -194,9 +194,9 @@ DESIGN §3.12.9 "Cargo crate naming" two-crate layout.
   `Send + Sync + 'static`, and is used through ClientHub as a
   trait object.
 - The canonical trait name is `UsageCollectorClientV1`, following the
-  ToolKit naming convention that places the module name and capability
+  ToolKit naming convention that places the gear name and capability
   before the `V1` suffix. The `V1` suffix encodes the SDK trait's major
-  version and aligns with the module's major-version stability contract.
+  version and aligns with the gear's major-version stability contract.
 - Every method takes `&self` as the receiver and accepts
   `&SecurityContext` as its first explicit parameter; the SDK never
   synthesizes identity or falls back to anonymous access.
@@ -204,7 +204,7 @@ DESIGN §3.12.9 "Cargo crate naming" two-crate layout.
   `UsageCollectorError` enum declared in `error.rs` (see §"Error
   Taxonomy"); the `Ok` variant is the method-specific output type
   declared in `models.rs`.
-- The trait is registered into ClientHub without scope by the module's
+- The trait is registered into ClientHub without scope by the gear's
   `init()`; consumers obtain the client through ClientHub.
 
 Sources: phase-02 §"ToolKit Conventions" / "Trait shape", "ClientHub
@@ -232,7 +232,7 @@ The SDK trait operates exclusively on the canonical Usage Collector
 domain types from `domain-model.md`. All domain types are declared in
 `usage-collector-sdk/src/models.rs` and remain transport-agnostic.
 Field names are snake_case; struct and enum names are UpperCamelCase.
-Identifiers (`tenant_id`, `resource_id`, `subject_id`, `source_module`,
+Identifiers (`tenant_id`, `resource_id`, `subject_id`, `source_gear`,
 `gts_id`) are opaque platform identifiers; the Usage Collector neither
 parses nor classifies them. All timestamps are UTC instants.
 
@@ -246,7 +246,7 @@ types and models".
   single attributed measurement of resource consumption with status.
   Fields: `id` (opaque, plugin-minted, present on accepted records),
   `tenant_id` (opaque, required), `resource` (`ResourceRef`,
-  required), `subject` (`SubjectRef`, optional), `source_module`
+  required), `subject` (`SubjectRef`, optional), `source_gear`
   (opaque, required), `gts_id` (GTS metric identifier string;
   required; MUST resolve to a row in `metric_catalog` per ADR 0012),
   `value` (signed numeric; permitted sign is determined jointly by the
@@ -352,7 +352,7 @@ types and models".
   in-process caller (SDK surface); consumed but not owned by the
   Usage Collector. Carries `principal`, `tenant_scope_claims`,
   `auxiliary_claims`, and `correlation_id` (required for API operations
-  and propagated through gateway, PDP-decision logs, module logs, and
+  and propagated through gateway, PDP-decision logs, gear logs, and
   platform audit trail). The SDK requires a resolved `SecurityContext`
   on every call.
 
@@ -369,9 +369,9 @@ Sources: phase-01 §"Domain Entities".
   non-goal), `aggregation` (enum of `Sum`, `Count`, `Min`, `Max`,
   `Avg`, required), `tenant_id` (opaque, optional), `resource`
   (`ResourceRef`, optional), `subject` (`SubjectRef`, optional),
-  `source_module` (opaque, optional), `group_by` (optional list of
+  `source_gear` (opaque, optional), `group_by` (optional list of
   dimensions; admits the **fixed dimensions** — tenant, resource,
-  subject, source module, authorized time-period groupings — plus
+  subject, source gear, authorized time-period groupings — plus
   the **per-metric declared keys** resolved per request from the
   referenced metric's `metadata_fields` list). `$filter` over the
   same dimension set accepts `eq` / `in` operators on `String`-typed
@@ -393,7 +393,7 @@ Sources: phase-01 §"Domain Entities".
   - `filter_ast: toolkit_odata::filter::FilterNode<UsageRecordFilterField>`
     — parsed OData `$filter`. The admissible field set is no longer
     a static enum: it is the union of the fixed fields (`tenant`,
-    `resource`, `subject`, `source_module`, `timestamp`, `status`)
+    `resource`, `subject`, `source_gear`, `timestamp`, `status`)
     and the per-metric declared dimensions resolved from
     `metric_gts_id` per the rule above. Dimension filters accept
     `eq` / `in` (categorical strings); fixed-field operator
@@ -413,7 +413,7 @@ id)` keyset captured by the gateway from the caller-supplied
   filter-admissibility surface for raw and aggregated query paths.
   Per ADR 0012 this is no longer a static Rust enum: it is the
   **union of fixed `UsageRecord` fields** (`tenant`, `resource`,
-  `subject`, `source_module`, `timestamp`, `status`) and the
+  `subject`, `source_gear`, `timestamp`, `status`) and the
   **per-metric declared keys resolved per request** from the
   metric referenced by `RawQuery.metric_gts_id` (or
   `AggregationQuery.metric_gts_id`) — specifically, every key in
@@ -492,7 +492,7 @@ SDK Surface" and §"Validation And Testing Ideas" (PDP-double seam).
   Taxonomy"), so a divergent same-key re-emission is rejected
   fail-closed and never silently dropped. The compared canonical fields
   are `value`, `timestamp`, `resource_ref`, `subject_ref`,
-  `source_module`, `entry_type`, `corrects_id`, and `metadata`; the
+  `source_gear`, `entry_type`, `corrects_id`, and `metadata`; the
   dedup-key tuple is the match key and the server-owned `id` / `status`
   are excluded, so ALL compared fields equal → `Deduplicated`, and ANY
   compared field differs — including a metadata-only difference or a
@@ -609,7 +609,7 @@ Tenancy Facts"; phase-02 §"Versioning, Deprecation, And Non-Goals".
 The Usage Collector exposes one public SDK trait,
 `UsageCollectorClientV1`. The trait is async, `Send + Sync + 'static`,
 declared in `usage-collector-sdk/src/api.rs`, and registered into
-ClientHub without scope by the Usage Collector module's `init()`.
+ClientHub without scope by the Usage Collector gear's `init()`.
 
 The trait carries nine methods, one per SDK-exposed capability (ADR 0012 removed `read_metric_chain`):
 
@@ -664,7 +664,7 @@ Concrete error variant names are defined in §"Error Taxonomy".
 
 The `UsageCollectorClientV1` trait implementation
 (`UsageCollectorClientV1` realized by the in-process
-`usage-collector` module crate) is the canonical site for PDP
+`usage-collector` gear crate) is the canonical site for PDP
 enforcement, Metric-existence validation, and Plugin SPI dispatch
 for every method below. This is the D11 decision from
 `research-toolkit-alignment.md` and is anchored at the per-domain
@@ -683,7 +683,7 @@ Concretely:
 - `OperationBuilder::authenticated()` performs bearer-auth
   resolution and injects a `SecurityContext` extractor. Nothing
   beyond that runs at the framework layer.
-- The REST handlers in the module crate are thin pass-throughs that
+- The REST handlers in the gear crate are thin pass-throughs that
   map REST DTO → domain, call
   `UsageCollectorClientV1::<op>(ctx, domain_query)`, map domain →
   REST DTO, and return. They do NOT perform PDP enforcement,
@@ -756,7 +756,7 @@ Text".
   argument) to the per-component `authz_scope` helper invoked by
   `cpt-cf-usage-collector-component-ingestion-gateway` for ingestion
   authorization against the attribution tuple
-  `(tenant, resource, source_module, Metric)` and additionally
+  `(tenant, resource, source_gear, Metric)` and additionally
   `subject` when present.
 - Unified ingestion path — single emit operation: this Method is the SDK
   surface for BOTH ordinary usage emission AND the counter
@@ -771,7 +771,7 @@ Text".
   - `tenant_id` — opaque tenant identifier; required.
   - `resource` — `ResourceRef`; required.
   - `subject` — `SubjectRef`; optional.
-  - `source_module` — opaque source-module identifier; required.
+  - `source_gear` — opaque source-gear identifier; required.
   - `gts_id` — GTS metric identifier string (suffixed `~`); required.
     MUST resolve to a row in `metric_catalog` per ADR 0012. This is
     the same value persisted by the plugin as the FK column on
@@ -827,7 +827,7 @@ Text".
      `cpt-cf-usage-collector-algo-event-deactivation-concurrency-guard`.
 
   There is NO L2 remaining-amount check at the SDK layer; per-record
-  remaining-amount tracking is an explicit non-goal of the module.
+  remaining-amount tracking is an explicit non-goal of the gear.
 
 - Validation behaviour (executed in order before plugin dispatch):
   1. Missing or invalid `SecurityContext` (authentication is owned by
@@ -870,7 +870,7 @@ usage` passes through unchanged.
   10. A same-key resubmission (same
       `(tenant_id, gts_id, idempotency_key)`) whose caller-supplied
       canonical fields (`value`, `timestamp`, `resource_ref`,
-      `subject_ref`, `source_module`, `entry_type`, `corrects_id`,
+      `subject_ref`, `source_gear`, `entry_type`, `corrects_id`,
       `metadata`) differ from the stored record yields the
       `IdempotencyConflict` error variant (`DedupOutcome::Conflict`)
       and no second record is persisted; an exact-equality retry
@@ -976,9 +976,9 @@ Inputs And Outputs" / "Ingestion".
   caller-supplied filters before plugin dispatch.
 - Structural inputs: one `AggregationQuery` value. `time_range`,
   `metric_gts_id`, and `aggregation` are required; `tenant_id`,
-  `resource`, `subject`, `source_module`, and `group_by` are optional.
+  `resource`, `subject`, `source_gear`, and `group_by` are optional.
   Per ADR 0012, `group_by` admits the fixed dimensions (tenant,
-  resource, subject, source module, authorized time-period
+  resource, subject, source gear, authorized time-period
   groupings) **plus the per-metric declared keys** resolved per
   request from the metric referenced by `metric_gts_id` — every
   key in the metric's `metadata_fields` list. `$filter` over the
@@ -1515,7 +1515,7 @@ Variant catalog:
 - `IdempotencyConflict` — Ingestion submitted a record whose
   `(tenant_id, gts_id, idempotency_key)` collides with a stored
   record **but** whose caller-supplied canonical fields (`value`,
-  `timestamp`, `resource_ref`, `subject_ref`, `source_module`,
+  `timestamp`, `resource_ref`, `subject_ref`, `source_gear`,
   `entry_type`, `corrects_id`, `metadata`) differ from that stored record (the
   `DedupOutcome::Conflict` outcome from the Plugin SPI; see
   §"Method-specific output types"). The second write is rejected
@@ -1580,7 +1580,7 @@ Variant catalog:
   `context.retry_after_seconds` per the canonical envelope. Wire-header
   treatment (whether a corresponding `Retry-After` HTTP header is set)
   is owned by `toolkit-canonical-errors`' `IntoResponse` and is not
-  asserted by this module's contract.
+  asserted by this gear's contract.
 - `Internal` — Unclassified failure. The `detail` field **MUST** be
   DSN-free and pre-redacted at the construction site; no internal
   storage paths, credentials, or stack traces are surfaced through
@@ -1679,7 +1679,7 @@ Conventions" / "Error and Problem mapping".
   bump.
 - At most one prior major version is supported concurrently per
   surface. The Plugin SPI carries the same posture, so a Usage
-  Collector module instance may serve callers of the current SDK
+  Collector gear instance may serve callers of the current SDK
   major and the immediately prior SDK major in parallel during a
   deprecation window.
 - Rust trait compatibility tests gate every PR against the prior
@@ -1704,14 +1704,14 @@ bullet.
 The SDK trait does not expose the following operations; consumers
 must use the Usage Collector REST API:
 
-- Platform liveness and readiness probes (handled by the ToolKit host above the module boundary — the collector does not expose module-local health endpoints).
+- Platform liveness and readiness probes (handled by the ToolKit host above the gear boundary — the collector does not expose gear-local health endpoints).
 - Operational telemetry; instruments are pushed via OTLP from
-  ToolKit's global `SdkMeterProvider` (no in-module HTTP metrics
+  ToolKit's global `SdkMeterProvider` (no in-gear HTTP metrics
   endpoint is provided).
 - The REST-side error wire envelope (RFC-9457 `Problem`); SDK errors
   are domain-classified and the REST handler performs the conversion.
 - CORS, TLS termination, and output encoding; these are platform API
-  gateway responsibilities, not SDK or module responsibilities.
+  gateway responsibilities, not SDK or gear responsibilities.
 
 Note: per ADR 0012, metric catalog operations (registration, read,
 list, delete) are NOT REST-only — they are exposed on both the SDK
@@ -1750,7 +1750,7 @@ the SDK trait:
 
 Sources: phase-02 §"Plugin SPI Boundary".
 
-### Module non-goals reaffirmed on the SDK trait
+### Gear non-goals reaffirmed on the SDK trait
 
 - A dedicated backfill capability (watermarks, late-data coordination,
   or a bulk-import method beyond the existing batched `record_usage`
@@ -1764,24 +1764,24 @@ Sources: phase-02 §"Plugin SPI Boundary".
   transition.
 - Rate limiting, watermarks for high-cardinality bursts, and
   low-watermark coordination for late-arriving usage are caller- and
-  operator-tuned at the gateway and source-module layers and are not
+  operator-tuned at the gateway and source-gear layers and are not
   surfaced on the SDK trait.
-- Multi-region deployment is not a v1 capability of the module.
-- Module-emitted audit events for operator-write paths are deferred;
+- Multi-region deployment is not a v1 capability of the gear.
+- Gear-emitted audit events for operator-write paths are deferred;
   the v1 access trail is composed at the gateway and PDP decision
   points.
 - Pricing, rating, billing, invoice generation, and quota decisions
   are out of scope.
-- Module-owned compliance scope is not claimed; concrete control
+- Gear-owned compliance scope is not claimed; concrete control
   mapping is platform-compliance-owned.
 - The Usage Collector exposes REST, SDK, and Plugin SPI surfaces
   only; there is no end-user UI and no business-event publish or
   subscribe bus.
-- Module-side caching of PDP decisions is forbidden.
+- Gear-side caching of PDP decisions is forbidden.
 - At-rest encryption, key management, masking, disposal, backup,
   point-in-time recovery, disaster recovery, replication, tiering,
   retention windows, archival, compression, encoding, and
-  partitioning as module-owned mechanisms are out of scope and
+  partitioning as gear-owned mechanisms are out of scope and
   plugin-owned.
 - Dead-letter queue, poison-message handling, and compensation-saga
   patterns are out of scope; ingestion is synchronous and fail-closed.
@@ -1901,7 +1901,7 @@ Sources: phase-01 §"Metric lifecycle"; DESIGN §3.6 / §3.7;
   envelope; cursor lifecycle is realized by
   `toolkit_odata::CursorV1` plus `validate_cursor_against`, per
   `cpt-cf-usage-collector-principle-cursor-gateway-ownership`. The
-  former module-owned page and cursor-token entities defined in
+  former gear-owned page and cursor-token entities defined in
   earlier drafts of `domain-model.md` are no longer carried on the
   SDK surface.
 
@@ -1974,7 +1974,7 @@ default this reference adopts.
 - OQ-1 (phase-02 OQ-1, gap G-9): Whether the SDK trait surfaces
   `PdpConstraint` values to callers on query responses so callers can
   see which scope was applied. This reference keeps `PdpDecision` and
-  `PdpConstraint` internal to the module and does not surface them on
+  `PdpConstraint` internal to the gear and does not surface them on
   the trait; the SDK trait conveys only the post-authorization outcome
   through `Ok` results or the `Authorization` error variant. The SDK
   crate may add a non-required diagnostic field on query result types

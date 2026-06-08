@@ -9,7 +9,7 @@ use zeroize::Zeroize;
 
 use crate::error::CredStoreError;
 
-/// Re-export from tenant-resolver-sdk for cross-module type consistency.
+/// Re-export from tenant-resolver-sdk for cross-gear type consistency.
 pub use tenant_resolver_sdk::TenantId;
 
 /// Owner identifier, representing `SecurityContext.subject_id()`.

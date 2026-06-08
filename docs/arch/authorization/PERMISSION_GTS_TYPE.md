@@ -4,20 +4,20 @@ Specification of the canonical base GTS Type for Gears authorization permissions
 
 - The GTS Type Schema definition and allowed field semantics.
 - The well-known Instance Identifier naming convention.
-- How modules declare their permissions.
+- How gears declare their permissions.
 - Scenario examples covering CRUD-style, wildcard, and ABAC-style permissions.
 
 For the overall authorization model (PDP/PEP, SecurityContext, constraints), see [DESIGN.md](./DESIGN.md).
 
 ## Purpose
 
-CF/Gears all need to describe "what can be granted" in a uniform way so admin UIs and the future AuthZ Management module can:
+CF/Gears all need to describe "what can be granted" in a uniform way so admin UIs and the future AuthZ Management gear can:
 
-- List every permission any module has declared.
-- Filter by owning module, resource type, or action.
-- Attach permissions to identities/roles without understanding module internals.
+- List every permission any gear has declared.
+- Filter by owning gear, resource type, or action.
+- Attach permissions to identities/roles without understanding gear internals.
 
-This doc defines `gts.cf.toolkit.authz.permission.v1~` as that canonical base GTS Type. Modules ship their permissions as well-known GTS Instances of this type and register them with `types-registry` at startup.
+This doc defines `gts.cf.toolkit.authz.permission.v1~` as that canonical base GTS Type. Gears ship their permissions as well-known GTS Instances of this type and register them with `types-registry` at startup.
 
 ## Base Type Definition
 
@@ -38,7 +38,7 @@ This doc defines `gts.cf.toolkit.authz.permission.v1~` as that canonical base GT
 
 The Type Schema has `additionalProperties: false` in v1. Future fields on the base (`description`, `category`, `deprecated`, `implies`, …) will be added via GTS minor version evolution when a concrete consumer needs them — YAGNI governs today's shape.
 
-**Extending with per-permission metadata.** If a module needs ABAC-style per-permission attributes (audit category, MFA requirement, risk class, …), it can declare a derived Type Schema with `#[toolkit_gts::gts_type_schema(base = AuthzPermissionV1, schema_id = "...", ...)]` and register Instances against that derived Type Schema (three-segment instance IDs, analogous to how [`PluginV1`-derived plugin specs](../../TOOLKIT_PLUGINS.md) work). The wrapper joins the link-time inventory automatically, so the derived Type Schema lands in `types-registry` on the same path as the base. This is reserved for concrete consumers with real need; today's `AuthzPermissionV1` is non-generic and module catalogs live at level 2.
+**Extending with per-permission metadata.** If a gear needs ABAC-style per-permission attributes (audit category, MFA requirement, risk class, …), it can declare a derived Type Schema with `#[toolkit_gts::gts_type_schema(base = AuthzPermissionV1, schema_id = "...", ...)]` and register Instances against that derived Type Schema (three-segment instance IDs, analogous to how [`PluginV1`-derived plugin specs](../../TOOLKIT_PLUGINS.md) work). The wrapper joins the link-time inventory automatically, so the derived Type Schema lands in `types-registry` on the same path as the base. This is reserved for concrete consumers with real need; today's `AuthzPermissionV1` is non-generic and gear catalogs live at level 2.
 
 ## Instance Identifier Convention
 
@@ -48,7 +48,7 @@ Well-known permission Instances use a two-segment GTS chain:
 gts.cf.toolkit.authz.permission.v1~<vendor>.<package>.<namespace>.<permission_name>.v1
 ```
 
-The right-hand segment encodes the declaring module's ownership (`<vendor>.<package>.<namespace>`) and an internal handle for the permission (`<permission_name>`). Use `_` as a placeholder when a slot has no meaningful value — e.g. when `<package>` already identifies the module uniquely, `<namespace>` is `_`.
+The right-hand segment encodes the declaring gear's ownership (`<vendor>.<package>.<namespace>`) and an internal handle for the permission (`<permission_name>`). Use `_` as a placeholder when a slot has no meaningful value — e.g. when `<package>` already identifies the gear uniquely, `<namespace>` is `_`.
 
 Examples:
 
@@ -68,7 +68,7 @@ The `resource_type` field accepts a **GTS expression**. Three forms are permitte
 
 ## Scenario Examples
 
-### Scenario A — Coarse action on a whole module's resource
+### Scenario A — Coarse action on a whole gear's resource
 
 ```json
 {
@@ -107,7 +107,7 @@ Matches any tenant type under `gts.cf.core.am.tenant.*`. Good for coarse admin p
 
 Built-in AuthZ plugin compiles the `[category='support']` predicate into a PEP constraint (`{ eq: category='support' }`). PEP must advertise `category` in `supported_properties`; otherwise fail-closed per DESIGN.md rule #9.
 
-### Scenario D — Action specific to a module
+### Scenario D — Action specific to a gear
 
 ```json
 {
@@ -118,7 +118,7 @@ Built-in AuthZ plugin compiles the `[category='support']` predicate into a PEP c
 }
 ```
 
-Fine-grained domain action. The `action` field is free-form, so each module maps its own verbs (`retry_turn`, `upload_attachment`, `set_reaction`, …) naturally.
+Fine-grained domain action. The `action` field is free-form, so each gear maps its own verbs (`retry_turn`, `upload_attachment`, `set_reaction`, …) naturally.
 
 ## Registration
 
@@ -127,7 +127,7 @@ Fine-grained domain action. The `action` field is free-form, so each module maps
 The base Type Schema `gts.cf.toolkit.authz.permission.v1~` is shipped by the `cf-gears-toolkit-gts` crate (located at `libs/toolkit-gts/`) and self-registers via the `inventory` crate. `types-registry::init()` seeds its own in-memory registry with every inventory Type Schema + well-known Instance before publishing the client:
 
 ```rust
-// gears/system/types-registry/types-registry/src/module.rs (init)
+// gears/system/types-registry/types-registry/src/gear.rs (init)
 use toolkit_gts::{all_inventory_instances, all_inventory_type_schemas};
 
 let type_schemas = all_inventory_type_schemas()?;
@@ -141,12 +141,12 @@ RegisterResult::ensure_all_ok(&results)?;
 
 No edit to a central list is ever needed — adding a new `#[gts_type_schema(...)]` struct anywhere in `toolkit-gts` (or in any crate that uses the macro) picks it up automatically. `types-registry` code stays content-agnostic: it only calls aggregator functions and never references specific type names like `PluginV1` or `AuthzPermissionV1`.
 
-### Per-module permission Instances — declared at compile time via `gts_instance!`
+### Per-gear permission Instances — declared at compile time via `gts_instance!`
 
-Modules that define permissions depend on `cf-gears-toolkit-gts` directly and declare each permission with the typed form of the `gts_instance!` macro. The macro takes a single `AuthzPermissionV1` struct literal with the full Instance Identifier as the `id` field's string literal; the upstream macro emits a compile-time assertion that the literal's prefix matches `<AuthzPermissionV1 as GtsSchema>::SCHEMA_ID` exactly, so a typo in the prefix is a build error rather than a silent runtime mismatch. The wrapper additionally emits an `inventory::submit!` block that lands in the process-wide `InventoryInstance` collector consumed by `types-registry::init()` — no module-side registration code, no `types-registry-sdk` dependency, and no ordering coupling with the declaring module's own `init()`.
+Gears that define permissions depend on `cf-gears-toolkit-gts` directly and declare each permission with the typed form of the `gts_instance!` macro. The macro takes a single `AuthzPermissionV1` struct literal with the full Instance Identifier as the `id` field's string literal; the upstream macro emits a compile-time assertion that the literal's prefix matches `<AuthzPermissionV1 as GtsSchema>::SCHEMA_ID` exactly, so a typo in the prefix is a build error rather than a silent runtime mismatch. The wrapper additionally emits an `inventory::submit!` block that lands in the process-wide `InventoryInstance` collector consumed by `types-registry::init()` — no gear-side registration code, no `types-registry-sdk` dependency, and no ordering coupling with the declaring gear's own `init()`.
 
 ```rust
-// modules/mini-chat/mini-chat/src/gts/permissions.rs
+// gears/mini-chat/mini-chat/src/gts/permissions.rs
 use crate::domain::service::actions;
 use toolkit_gts::{AuthzPermissionV1, gts_instance};
 
@@ -162,7 +162,7 @@ gts_instance! {
     }
 }
 
-// ...one invocation per (resource_type, action) the module surfaces.
+// ...one invocation per (resource_type, action) the gear surfaces.
 ```
 
 The struct literal must contain exactly one of `id` / `gts_id` / `gtsId` as a string literal — upstream rewrites it into a `GtsInstanceId` value before constructing the typed struct. The emitted `payload_fn` serializes the typed struct via `serde_json::to_value`. Typos in field names, wrong field types, and missing required fields surface as compile errors; by pulling `action` values from `crate::domain::service::actions`, the permission catalog and the runtime PEP arguments share a single source of truth.
@@ -179,9 +179,9 @@ The struct literal must contain exactly one of `id` / `gts_id` / `gtsId` as a st
 
 ## Out of Scope
 
-- **AuthZ Management Module.** Full data model for storing grants (identity → permission bindings), role types, role hierarchies, and binding APIs. Covered by a future design.
+- **AuthZ Management Gear.** Full data model for storing grants (identity → permission bindings), role types, role hierarchies, and binding APIs. Covered by a future design.
 - **Built-in AuthZ plugin.** The PDP implementation that evaluates permission Instances against subject/action/resource requests. Out of scope for the base-type spec.
-- **Module migration.** Walking every existing module (mini-chat, users-info, etc.) and converting its hard-coded `resources::*` / `actions::*` constants into registered permission Instances is a separate per-module task.
+- **Gear migration.** Walking every existing gear (mini-chat, users-info, etc.) and converting its hard-coded `resources::*` / `actions::*` constants into registered permission Instances is a separate per-gear task.
 - **`x-gts-traits`** for per-permission evaluation metadata (risk level, MFA-required, audit category). Added when a concrete consumer needs it.
 - **Additional Type Schema fields** (`description`, `category`, `implies`, `deprecated`) deferred until driven by a concrete use case.
 - **GTS §3.4 Attribute selector** in `resource_type`. Semantically wrong for describing a *set* of resources; kept for single-value reads from bound Instances.

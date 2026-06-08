@@ -2,7 +2,7 @@
 //! [`crate::domain::error::DomainError`].
 //!
 //! The trait + DTO are stable contract and live in
-//! [`account_management_sdk::idp`] (see that module's docs for the
+//! [`account_management_sdk::idp`] (see that gear's docs for the
 //! provisioner contract). This module owns the **mapping** from those
 //! plugin-facing failure variants onto AM's internal error taxonomy
 //! via the crate-private extension trait

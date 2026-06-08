@@ -219,7 +219,7 @@ false }` and a descendant adds `{ "allOf": [ { "$ref": "gts://<parent>~" },
 - The static `UsageRecordFilterField` enum (`domain-model.md` §2.11) is
   replaced by **fixed fields plus per-metric-declared dimensions resolved per
   request** from the catalog. Fixed fields remain (`tenant`, `resource`,
-  `subject`, `source_module`, `timestamp`, `status`); dynamic dimensions are
+  `subject`, `source_gear`, `timestamp`, `status`); dynamic dimensions are
   resolved by looking up the metric type's `effective_schema()` and selecting
   the properties marked `x-uc-indexable: true`.
 - **`RawQuery.metric_gts_id` becomes required** (was optional). Dimension
@@ -239,7 +239,7 @@ false }` and a descendant adds `{ "allOf": [ { "$ref": "gts://<parent>~" },
   used in `types-registry`); the concrete invalidation logic is a code-level
   concern, not an ADR-level decision.
 - **Types-registry publication remains optional / deferred** — ADR-0010 does
-  not require publication to the `types-registry` module for cross-service
+  not require publication to the `types-registry` gear for cross-service
   discovery. The catalog SPI restored by ADR-0009 is the authoritative
   durable source; publishing a rebuildable projection upstream is left as a
   later, additive decision.
@@ -368,7 +368,7 @@ conventions to live outside the system. Aggregation engines parse the
   aggregate locally — exactly the shape PRD §1.3 forbids.
 - Bad, because the aggregation engine cannot introspect declared dimensions
   — there are none. Group-by semantics collapse back to the fixed-field set
-  (`tenant`, `resource`, `subject`, `source_module`, `timestamp`, `status`).
+  (`tenant`, `resource`, `subject`, `source_gear`, `timestamp`, `status`).
 - Bad, because there is no inheritance: a vendor that wants to add a
   dimension on top of a platform base metric must mint a new metric id and
   reconcile downstream, with no merge support from UC.
@@ -462,7 +462,7 @@ NOT NULL`; full table schema deferred to DESIGN per ARCH-ADR-NO-001).
   - **PERF** — addressed (gateway L1 validation cache invariant; per-request
     dimension resolution; cascade-invalidation on register / delete).
   - **INT** — addressed (catalog SPI surface restored by ADR-0009 carries the
-    schema as a payload; no new module integration introduced).
+    schema as a payload; no new gear integration introduced).
   - **MAINT** — addressed (lift-and-own merge core; explicit non-dependency on
     `types-registry-sdk`; comment-link the lifted code back to its origin).
   - **SEC** — Not applicable: ADR-0010 introduces no secrets, no auth

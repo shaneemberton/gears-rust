@@ -1,25 +1,25 @@
-//! Out-of-process module bootstrap library
+//! Out-of-process gear bootstrap library
 //!
-//! This module provides reusable functionality for bootstrapping `OoP` (out-of-process)
-//! toolkit modules in local (non-k8s) environments.
+//! This gear provides reusable functionality for bootstrapping `OoP` (out-of-process)
+//! `ToolKit` gears in local (non-k8s) environments.
 //!
 //! ## Features
 //!
 //! - Configuration loading using `toolkit-bootstrap`
 //! - Logging initialization with tracing
 //! - gRPC connection to `DirectoryService`
-//! - Module instance registration
+//! - Gear instance registration
 //! - Heartbeat management
-//! - Module lifecycle execution
+//! - Gear lifecycle execution
 //!
 //! ## Shutdown Model
 //!
 //! Shutdown is driven by a single root `CancellationToken` per process:
 //! - OS signals (SIGTERM, SIGINT, Ctrl+C) are hooked at bootstrap level
-//! - The root token is passed to `RunOptions::Token` for module runtime shutdown
+//! - The root token is passed to `RunOptions::Token` for gear runtime shutdown
 //! - Background tasks (like heartbeat) use child tokens derived from the root
 //!
-//! On shutdown, the module deregisters itself from the `DirectoryService` before exiting.
+//! On shutdown, the gear deregisters itself from the `DirectoryService` before exiting.
 //!
 //! ## Example
 //!
@@ -29,7 +29,7 @@
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     let opts = OopRunOptions {
-//!         module_name: "my_module".to_string(),
+//!         gear_name: "my_gear".to_string(),
 //!         instance_id: None,
 //!         directory_endpoint: "http://127.0.0.1:50051".to_string(),
 //!         config_path: None,
@@ -53,7 +53,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use super::config::{
-    AppConfig, CliArgs, LoggingConfig, RenderedDbConfig, RenderedModuleConfig,
+    AppConfig, CliArgs, LoggingConfig, RenderedDbConfig, RenderedGearConfig,
     TOOLKIT_MODULE_CONFIG_ENV,
 };
 use crate::bootstrap::host::{init_logging_unified, init_panic_tracing};
@@ -63,11 +63,11 @@ use crate::runtime::{
 };
 use cf_system_sdks::directory::{DirectoryClient, DirectoryGrpcClient};
 
-/// Configuration options for `OoP` module bootstrap
+/// Configuration options for `OoP` gear bootstrap
 #[derive(Debug, Clone)]
 pub struct OopRunOptions {
-    /// Logical module name (e.g., "`file-parser`")
-    pub module_name: String,
+    /// Logical gear name (e.g., "`file-parser`")
+    pub gear_name: String,
 
     /// Instance ID (defaults to a random UUID if None)
     pub instance_id: Option<Uuid>,
@@ -99,7 +99,7 @@ impl Default for OopRunOptions {
             .unwrap_or_else(|_| "http://127.0.0.1:50051".to_owned());
 
         Self {
-            module_name: String::new(),
+            gear_name: String::new(),
             instance_id: None,
             directory_endpoint,
             config_path,
@@ -110,7 +110,7 @@ impl Default for OopRunOptions {
     }
 }
 
-/// Builds the final configuration and `DbOptions` for an `OoP` module.
+/// Builds the final configuration and `DbOptions` for an `OoP` gear.
 ///
 /// Configuration merge strategy (for each section):
 /// - **Database**: field-by-field merge using `DbManager` (master as base, local as override)
@@ -121,8 +121,8 @@ impl Default for OopRunOptions {
 ///
 /// For database, the merge happens at 3 levels:
 /// 1. Global database.servers.* from master
-/// 2. Module's database section from master (modules.<name>.database)
-/// 3. Module's database section from local --config (overrides master)
+/// 2. Gear's database section from master (gears.<name>.database)
+/// 3. Gear's database section from local --config (overrides master)
 #[tracing::instrument(
     level = "debug",
     skip(local_config, rendered_config),
@@ -133,24 +133,24 @@ impl Default for OopRunOptions {
 )]
 fn build_oop_config_and_db(
     local_config: &AppConfig,
-    module_name: &str,
-    rendered_config: Option<&RenderedModuleConfig>,
+    gear_name: &str,
+    rendered_config: Option<&RenderedGearConfig>,
 ) -> Result<(AppConfig, LoggingConfig, DbOptions)> {
     let home_dir = PathBuf::from(&local_config.server.home_dir);
 
-    // Build final_config for module's "config" section
+    // Build final_config for gear's "config" section
     let final_config = if let Some(rendered) = rendered_config {
         // TOOLKIT_MODULE_CONFIG exists: use rendered config as BASE, local config as OVERRIDE
         let mut config = local_config.clone();
 
-        // Get or create the module entry
-        let module_entry = config
-            .modules
-            .entry(module_name.to_owned())
+        // Get or create the gear entry
+        let gear_entry = config
+            .gears
+            .entry(gear_name.to_owned())
             .or_insert_with(|| serde_json::json!({}));
 
-        // Merge rendered.config as base, local module config as override
-        if let Some(obj) = module_entry.as_object_mut() {
+        // Merge rendered.config as base, local gear config as override
+        if let Some(obj) = gear_entry.as_object_mut() {
             // If local doesn't have "config" section, use rendered entirely
             // If local has "config" section, it takes precedence (local overrides master)
             if !obj.contains_key("config") || obj["config"].is_null() {
@@ -160,7 +160,7 @@ fn build_oop_config_and_db(
         }
 
         debug!(
-            module = %module_name,
+            gear =  %gear_name,
             has_rendered_db = %rendered.database.is_some(),
             has_rendered_logging = %rendered.logging.is_some(),
             "Using rendered config from master as base, local config as override"
@@ -170,7 +170,7 @@ fn build_oop_config_and_db(
     } else {
         // No TOOLKIT_MODULE_CONFIG: use local config entirely (standalone mode)
         debug!(
-            module = %module_name,
+            gear =  %gear_name,
             "No rendered config from master, using local config entirely (standalone mode)"
         );
         local_config.clone()
@@ -186,7 +186,7 @@ fn build_oop_config_and_db(
     // This allows field-by-field merge: master db config (base) -> local db config (override)
     let db_options = build_merged_db_options(
         &home_dir,
-        module_name,
+        gear_name,
         rendered_config.as_ref().and_then(|r| r.database.as_ref()),
         local_config,
     )?;
@@ -213,29 +213,29 @@ fn merge_logging_configs(master: Option<&LoggingConfig>, local: &LoggingConfig) 
 /// database connection setup with field-by-field merge logic.
 fn build_merged_db_options(
     home_dir: &Path,
-    module_name: &str,
+    gear_name: &str,
     rendered_db: Option<&RenderedDbConfig>,
     local_config: &AppConfig,
 ) -> Result<DbOptions> {
     // Check if we have any database configuration
-    let has_rendered_db = rendered_db.is_some_and(|db| db.module.is_some() || db.global.is_some());
+    let has_rendered_db = rendered_db.is_some_and(|db| db.gear.is_some() || db.global.is_some());
     let has_local_db = local_config.database.is_some()
         || local_config
-            .modules
-            .get(module_name)
+            .gears
+            .get(gear_name)
             .and_then(|m| m.get("database"))
             .is_some();
 
     if !has_rendered_db && !has_local_db {
         debug!(
-            module = %module_name,
+            gear =  %gear_name,
             "No database config available"
         );
         return Ok(DbOptions::None);
     }
 
     // Build a merged configuration for DbManager:
-    // 1. Start with rendered config from master (global servers + module db)
+    // 1. Start with rendered config from master (global servers + gear db)
     // 2. Overlay local config (local can override any field)
 
     let mut merged_config = serde_json::Map::new();
@@ -249,19 +249,16 @@ fn build_merged_db_options(
             merged_config.insert("database".to_owned(), global_json);
         }
 
-        // Add module's database config from master
-        if let Some(ref module_db) = rendered.module {
-            let module_db_json = serde_json::to_value(module_db)
-                .context("Failed to serialize rendered module db config")?;
+        // Add gear's database config from master
+        if let Some(ref gear_db) = rendered.gear {
+            let gear_db_json = serde_json::to_value(gear_db)
+                .context("Failed to serialize rendered gear db config")?;
 
-            let mut modules = serde_json::Map::new();
-            let mut module_entry = serde_json::Map::new();
-            module_entry.insert("database".to_owned(), module_db_json);
-            modules.insert(
-                module_name.to_owned(),
-                serde_json::Value::Object(module_entry),
-            );
-            merged_config.insert("modules".to_owned(), serde_json::Value::Object(modules));
+            let mut gears = serde_json::Map::new();
+            let mut gear_entry = serde_json::Map::new();
+            gear_entry.insert("database".to_owned(), gear_db_json);
+            gears.insert(gear_name.to_owned(), serde_json::Value::Object(gear_entry));
+            merged_config.insert("gears".to_owned(), serde_json::Value::Object(gears));
         }
     }
 
@@ -279,31 +276,31 @@ fn build_merged_db_options(
         }
     }
 
-    // Local module database config
-    if let Some(local_module) = local_config.modules.get(module_name)
-        && let Some(local_module_db) = local_module.get("database")
+    // Local gear database config
+    if let Some(local_gear) = local_config.gears.get(gear_name)
+        && let Some(local_gear_db) = local_gear.get("database")
     {
-        let modules = merged_config
-            .entry("modules".to_owned())
+        let gears = merged_config
+            .entry("gears".to_owned())
             .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
 
-        if let Some(modules_obj) = modules.as_object_mut() {
-            let module_entry = modules_obj
-                .entry(module_name.to_owned())
+        if let Some(gears_obj) = gears.as_object_mut() {
+            let gear_entry = gears_obj
+                .entry(gear_name.to_owned())
                 .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
 
-            if let Some(module_obj) = module_entry.as_object_mut() {
-                if let Some(existing_db) = module_obj.get_mut("database") {
-                    merge_json_objects(existing_db, local_module_db);
+            if let Some(gear_obj) = gear_entry.as_object_mut() {
+                if let Some(existing_db) = gear_obj.get_mut("database") {
+                    merge_json_objects(existing_db, local_gear_db);
                 } else {
-                    module_obj.insert("database".to_owned(), local_module_db.clone());
+                    gear_obj.insert("database".to_owned(), local_gear_db.clone());
                 }
             }
         }
     }
 
     debug!(
-        module = %module_name,
+        gear =  %gear_name,
         has_rendered = %rendered_db.is_some(),
         has_local_global = %local_config.database.is_some(),
         "Building DbManager with merged config"
@@ -343,23 +340,23 @@ fn merge_json_objects(target: &mut serde_json::Value, source: &serde_json::Value
     }
 }
 
-/// Run an out-of-process module with the given options
+/// Run an out-of-process gear with the given options
 ///
 /// This function:
 /// 1. Creates a root `CancellationToken` for the process
 /// 2. Hooks OS signals (SIGTERM, SIGINT, Ctrl+C) to trigger cancellation
 /// 3. Loads configuration and initializes logging
 /// 4. Connects to the `DirectoryService`
-/// 5. Registers the module instance
+/// 5. Registers the gear instance
 /// 6. Starts a background heartbeat loop (using a child token)
-/// 7. Runs the module lifecycle with `ShutdownOptions::Token`
+/// 7. Runs the gear lifecycle with `ShutdownOptions::Token`
 /// 8. Deregisters from `DirectoryService` on shutdown
 ///
 /// ## Shutdown Model
 ///
 /// A single root cancellation token drives shutdown for the entire process.
 /// OS signals are hooked at this bootstrap level (not via `ShutdownOptions::Signals`).
-/// The heartbeat loop and module runtime both observe this token tree.
+/// The heartbeat loop and gear runtime both observe this token tree.
 ///
 /// # Arguments
 ///
@@ -367,7 +364,7 @@ fn merge_json_objects(target: &mut serde_json::Value, source: &serde_json::Value
 ///
 /// # Returns
 ///
-/// * `Ok(())` - If the module lifecycle completed successfully
+/// * `Ok(())` - If the gear lifecycle completed successfully
 /// * `Err(e)` - If any step failed
 ///
 /// # Example
@@ -378,7 +375,7 @@ fn merge_json_objects(target: &mut serde_json::Value, source: &serde_json::Value
 /// #[tokio::main]
 /// async fn main() -> anyhow::Result<()> {
 ///     let opts = OopRunOptions {
-///         module_name: "file-parser".to_string(),
+///         gear_name: "file-parser".to_string(),
 ///         instance_id: None,
 ///         directory_endpoint: "http://127.0.0.1:50051".to_string(),
 ///         config_path: None,
@@ -392,13 +389,13 @@ fn merge_json_objects(target: &mut serde_json::Value, source: &serde_json::Value
 /// ```
 ///
 /// # Errors
-/// Returns an error if the `OoP` module fails to start or run.
+/// Returns an error if the `OoP` gear fails to start or run.
 #[tracing::instrument(
     level = "info",
     name = "oop_bootstrap",
     skip(opts),
     fields(
-        module = %opts.module_name,
+        gear =  %opts.gear_name,
         directory = %opts.directory_endpoint
     )
 )]
@@ -407,7 +404,7 @@ pub async fn run_oop_with_options(opts: OopRunOptions) -> Result<()> {
     let instance_id = opts.instance_id.unwrap_or_else(Uuid::new_v4);
 
     // Create root cancellation token for the entire process.
-    // This token drives shutdown for the module runtime and all background tasks.
+    // This token drives shutdown for the gear runtime and all background tasks.
     let cancel = CancellationToken::new();
 
     // Hook OS signals to the root token at bootstrap level.
@@ -445,10 +442,10 @@ pub async fn run_oop_with_options(opts: OopRunOptions) -> Result<()> {
     let mut config = AppConfig::load_or_default(opts.config_path.as_ref())?;
     config.apply_cli_overrides(args.verbose);
 
-    // Try to read rendered module config from master host via env var BEFORE logging init
+    // Try to read rendered gear config from master host via env var BEFORE logging init
     // so we can use the tracing config from master for OTEL
     let rendered_config = match std::env::var(TOOLKIT_MODULE_CONFIG_ENV) {
-        Ok(json) => RenderedModuleConfig::from_json(&json).ok(),
+        Ok(json) => RenderedGearConfig::from_json(&json).ok(),
         Err(_) => None,
     };
 
@@ -457,10 +454,10 @@ pub async fn run_oop_with_options(opts: OopRunOptions) -> Result<()> {
     // 2. Local config file (override)
     // This also merges logging configuration for proper initialization
     let (final_config, merged_logging, db_options) =
-        build_oop_config_and_db(&config, &opts.module_name, rendered_config.as_ref())?;
+        build_oop_config_and_db(&config, &opts.gear_name, rendered_config.as_ref())?;
 
     // Use OpenTelemetry config from rendered (master) config only.
-    // OoP modules do not fall back to local config for telemetry — if the master
+    // OoP gears do not fall back to local config for telemetry — if the master
     // does not provide an opentelemetry section, telemetry is skipped entirely.
     #[cfg(feature = "otel")]
     let otel_cfg = rendered_config
@@ -518,10 +515,10 @@ pub async fn run_oop_with_options(opts: OopRunOptions) -> Result<()> {
     }
 
     info!(
-        module = %opts.module_name,
+        gear =  %opts.gear_name,
         instance_id = %instance_id,
         directory_endpoint = %opts.directory_endpoint,
-        "OoP module bootstrap starting"
+        "OoP gear bootstrap starting"
     );
 
     // Print config and exit if requested
@@ -543,7 +540,7 @@ pub async fn run_oop_with_options(opts: OopRunOptions) -> Result<()> {
     // Start heartbeat loop in background using a child token from the root.
     // This allows the heartbeat to be cancelled when the root token is cancelled.
     let heartbeat_directory = Arc::clone(&directory_api);
-    let heartbeat_module = opts.module_name.clone();
+    let heartbeat_gear = opts.gear_name.clone();
     let heartbeat_instance_id_str = instance_id.to_string();
     let heartbeat_interval = Duration::from_secs(opts.heartbeat_interval_secs);
     let heartbeat_cancel = cancel.child_token();
@@ -562,7 +559,7 @@ pub async fn run_oop_with_options(opts: OopRunOptions) -> Result<()> {
                 }
                 () = sleep(heartbeat_interval) => {
                     match heartbeat_directory
-                        .send_heartbeat(&heartbeat_module, &heartbeat_instance_id_str)
+                        .send_heartbeat(&heartbeat_gear, &heartbeat_instance_id_str)
                         .await
                     {
                         Ok(()) => {
@@ -577,32 +574,32 @@ pub async fn run_oop_with_options(opts: OopRunOptions) -> Result<()> {
         }
     });
 
-    // Build config provider for modules
+    // Build config provider for gears
     let config_provider = Arc::new(final_config);
 
     // Keep a reference to directory_api for deregistration after shutdown
-    // Run the module lifecycle with the root cancellation token.
+    // Run the gear lifecycle with the root cancellation token.
     // Shutdown is driven by the signal handler spawned above, not by ShutdownOptions::Signals.
-    // The DirectoryClient (gRPC client) is injected into the ClientHub so modules can access it.
-    info!("Starting module lifecycle");
+    // The DirectoryClient (gRPC client) is injected into the ClientHub so gears can access it.
+    info!("Starting gear lifecycle");
     let run_options = RunOptions {
-        modules_cfg: config_provider,
+        gears_cfg: config_provider,
         db: db_options,
         shutdown: ShutdownOptions::Token(cancel.clone()),
         clients: vec![ClientRegistration::new::<dyn DirectoryClient>(
             directory_api,
         )],
         instance_id,
-        oop: None, // OoP modules don't spawn other OoP modules
+        oop: None, // OoP gears don't spawn other OoP gears
         shutdown_deadline: None,
     };
 
     let result = run(run_options).await;
 
     if let Err(ref e) = result {
-        error!(error = %e, "Module runtime failed");
+        error!(error = %e, "Gear runtime failed");
     } else {
-        info!("Module runtime completed successfully");
+        info!("Gear runtime completed successfully");
     }
 
     result

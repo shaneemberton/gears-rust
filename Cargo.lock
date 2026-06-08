@@ -1540,9 +1540,9 @@ dependencies = [
  "cf-gears-authz-resolver",
  "cf-gears-credstore",
  "cf-gears-file-parser",
+ "cf-gears-gear-orchestrator",
  "cf-gears-grpc-hub",
  "cf-gears-mini-chat",
- "cf-gears-module-orchestrator",
  "cf-gears-nodes-registry",
  "cf-gears-oagw",
  "cf-gears-resource-group",
@@ -1608,6 +1608,29 @@ dependencies = [
  "clap",
  "tokio",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "cf-gears-gear-orchestrator"
+version = "0.1.25"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "cf-gears-api-gateway",
+ "cf-gears-system-sdks",
+ "cf-gears-toolkit",
+ "cf-gears-toolkit-macros",
+ "inventory",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tonic",
+ "tower",
+ "tracing",
+ "utoipa",
+ "uuid",
 ]
 
 [[package]]
@@ -1703,29 +1726,6 @@ dependencies = [
  "thiserror 2.0.18",
  "time",
  "tokio-util",
- "tracing",
- "utoipa",
- "uuid",
-]
-
-[[package]]
-name = "cf-gears-module-orchestrator"
-version = "0.1.25"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "cf-gears-api-gateway",
- "cf-gears-system-sdks",
- "cf-gears-toolkit",
- "cf-gears-toolkit-macros",
- "inventory",
- "parking_lot",
- "serde",
- "serde_json",
- "tokio",
- "tonic",
- "tower",
  "tracing",
  "utoipa",
  "uuid",

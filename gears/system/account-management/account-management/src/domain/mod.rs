@@ -1,4 +1,4 @@
-//! Domain layer for the Account Management module.
+//! Domain layer for the Account Management gear.
 //!
 //! Houses the error taxonomy, metric catalog, `IdP` provisioner contract,
 //! tenant domain model + repository trait, the `TenantService`
@@ -9,11 +9,11 @@
 //! the Rust-side classifier pipeline in
 //! [`crate::infra::storage::integrity`].
 //!
-//! Audit-event emission is **not** carried in this module. The platform
+//! Audit-event emission is **not** carried in this gear. The platform
 //! audit-bus contract is not specified yet; lifecycle observability
 //! lives on `tracing::info!(target = "am.events" / "am.bootstrap" /
 //! "am.integrity")` log lines and on the metric catalog. When the
-//! transport contract lands, an `audit`-shaped sub-module can be
+//! transport contract lands, an `audit`-shaped sub-gear can be
 //! reintroduced without touching the call sites that already log.
 
 pub(crate) mod authz;

@@ -1,10 +1,10 @@
 # Mini Chat
 
-Multi-tenant AI chat module with SSE streaming, credit-based quota enforcement, and pluggable model policy.
+Multi-tenant AI chat gear with SSE streaming, credit-based quota enforcement, and pluggable model policy.
 
 ## Overview
 
-The `cf-gears-mini-chat` module provides:
+The `cf-gears-mini-chat` gear provides:
 
 - **Chat management** — CRUD for chats, turns, messages, and attachments with per-tenant isolation
 - **SSE streaming** — real-time token streaming from LLM providers via OAGW proxy
@@ -12,7 +12,7 @@ The `cf-gears-mini-chat` module provides:
 - **Policy plugin** — discovers `minichat-policy-plugin` via types-registry for model catalog, kill switches, and per-user limits
 - **File search / RAG** — document upload, chunking, vector-store retrieval per turn
 - **Web search** — optional per-request web search with daily quota
-- **ClientHub integration** — registers services for inter-module use
+- **ClientHub integration** — registers services for inter-gear use
 
 Dependencies: `types-registry`, `authz-resolver`, `oagw`.
 

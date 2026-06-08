@@ -1,6 +1,6 @@
-//! Configuration module for toolkit-bootstrap
+//! Configuration gear for toolkit-bootstrap
 //!
-//! This module provides configuration types and utilities for both host and `OoP` modules.
+//! This gear provides configuration types and utilities for both host and `OoP` gears.
 
 mod dump;
 
@@ -37,36 +37,36 @@ pub enum VendorConfigError {
 
 // Re-export dump functions
 pub use dump::{
-    dump_effective_modules_config_json, dump_effective_modules_config_yaml, list_module_names,
-    redact_dsn_password, render_effective_modules_config,
+    dump_effective_gears_config_json, dump_effective_gears_config_yaml, list_gear_names,
+    redact_dsn_password, render_effective_gears_config,
 };
 
-/// Small typed view to parse each module entry.
+/// Small typed view to parse each gear entry.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ModuleConfig {
+pub struct GearConfig {
     #[serde(default)]
     pub database: Option<DbConnConfig>,
     #[serde(default)]
     pub config: serde_json::Value,
     #[serde(default)]
-    pub runtime: Option<ModuleRuntime>,
+    pub runtime: Option<GearRuntime>,
     #[serde(default)] // Used by the CLI
     pub metadata: serde_json::Value,
 }
 
-/// Runtime configuration for a module (local vs out-of-process).
+/// Runtime configuration for a gear (local vs out-of-process).
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
-pub struct ModuleRuntime {
+pub struct GearRuntime {
     #[serde(default, rename = "type")]
     pub mod_type: RuntimeKind,
-    /// Execution configuration for `OoP` modules.
+    /// Execution configuration for `OoP` gears.
     #[serde(default)]
     pub execution: Option<ExecutionConfig>,
 }
 
-/// Execution configuration for out-of-process modules.
+/// Execution configuration for out-of-process gears.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionConfig {
@@ -83,7 +83,7 @@ pub struct ExecutionConfig {
     pub environment: HashMap<String, String>,
 }
 
-/// Module runtime kind.
+/// Gear runtime kind.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RuntimeKind {
@@ -93,7 +93,7 @@ pub enum RuntimeKind {
 }
 
 /// Main application configuration with strongly-typed global sections
-/// and a flexible per-module configuration bag.
+/// and a flexible per-gear configuration bag.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AppConfig {
@@ -107,12 +107,12 @@ pub struct AppConfig {
     /// OpenTelemetry configuration (resource, tracing, metrics).
     #[serde(default)]
     pub opentelemetry: OpenTelemetryConfig,
-    /// Directory containing per-module YAML files (optional).
+    /// Directory containing per-gear YAML files (optional).
     #[serde(default)]
-    pub modules_dir: Option<String>,
-    /// Per-module configuration bag: `module_name` → arbitrary JSON/YAML value.
+    pub gears_dir: Option<String>,
+    /// Per-gear configuration bag: `gear_name` → arbitrary JSON/YAML value.
     #[serde(default)]
-    pub modules: HashMap<String, serde_json::Value>,
+    pub gears: HashMap<String, serde_json::Value>,
     /// Per-vendor configuration bag: `vendor_name` → arbitrary JSON/YAML value.
     /// Allows vendors to add their own typed configuration sections.
     #[serde(default)]
@@ -127,16 +127,16 @@ impl Default for AppConfig {
             database: None,
             logging: default_logging_config(),
             opentelemetry: OpenTelemetryConfig::default(),
-            modules_dir: None,
-            modules: HashMap::new(),
+            gears_dir: None,
+            gears: HashMap::new(),
             vendor: VendorConfig::new(),
         }
     }
 }
 
 impl ConfigProvider for AppConfig {
-    fn get_module_config(&self, module_name: &str) -> Option<&serde_json::Value> {
-        self.modules.get(module_name)
+    fn get_gear_config(&self, gear_name: &str) -> Option<&serde_json::Value> {
+        self.gears.get(gear_name)
     }
 }
 
@@ -201,7 +201,7 @@ pub type LoggingConfig = HashMap<String, Section>;
 /// [`AppConfig::vendor_config`] or [`AppConfig::vendor_config_or_default`].
 pub type VendorConfig = HashMap<String, serde_json::Value>;
 
-// ================= Custom serde module for optional Level (supports "off") =================
+// ================= Custom serde gear for optional Level (supports "off") =================
 mod optional_level_serde {
     use serde::{Deserialize, Deserializer, Serializer};
     use tracing::Level;
@@ -317,7 +317,7 @@ impl AppConfig {
 
         // For layered loading, start from AppConfig::default() which provides logging
         // defaults (via default_logging_config()); other optional sections (database,
-        // tracing, modules_dir) remain None unless overridden by YAML/ENV.
+        // tracing, gears_dir) remain None unless overridden by YAML/ENV.
         let figment = Figment::new()
             .merge(Serialized::defaults(AppConfig::default()))
             .merge(StrictYaml::file(config_path))
@@ -334,9 +334,9 @@ impl AppConfig {
             .normalize_home_dir_inplace()
             .context("Failed to resolve server.home_dir")?;
 
-        // Merge module files if modules_dir is specified.
-        if let Some(dir) = config.modules_dir.as_ref() {
-            merge_module_files(&mut config.modules, dir)?;
+        // Merge gear files if gears_dir is specified.
+        if let Some(dir) = config.gears_dir.as_ref() {
+            merge_gear_files(&mut config.gears, dir)?;
         }
 
         Ok(config)
@@ -459,7 +459,7 @@ impl figment::providers::Format for StrictYaml {
     }
 }
 
-fn merge_module_files(
+fn merge_gear_files(
     bag: &mut HashMap<String, serde_json::Value>,
     dir: impl AsRef<Path>,
 ) -> Result<()> {
@@ -489,7 +489,7 @@ fn merge_module_files(
             .to_owned();
         let raw = fs::read_to_string(&path)?;
         let json: serde_json::Value = strict_yaml_parse(&raw)
-            .with_context(|| format!("failed to parse module file: {}", path.display()))?;
+            .with_context(|| format!("failed to parse gear file: {}", path.display()))?;
         bag.insert(name, json);
     }
     Ok(())
@@ -545,13 +545,13 @@ pub fn validate_dsn(dsn: &str) -> Result<()> {
 }
 
 /// Resolves `SQLite` @`file()` syntax in DSN to actual file paths.
-/// - `sqlite://@file(users.sqlite)` → `$HOME/.cf-gears/<module>/users.sqlite`
+/// - `sqlite://@file(users.sqlite)` → `$HOME/.cf-gears/<gear>/users.sqlite`
 /// - `sqlite://@file(/abs/path/file.db)` → use absolute path
-/// - `sqlite://` or `sqlite:///` → `$HOME/.cf-gears/<module>/<module>.sqlite`
+/// - `sqlite://` or `sqlite:///` → `$HOME/.cf-gears/<gear>/<gear>.sqlite`
 fn resolve_sqlite_dsn(
     dsn: &str,
     home_dir: &Path,
-    module_name: &str,
+    gear_name: &str,
     dry_run: bool,
 ) -> Result<String> {
     if dsn.contains("@file(") {
@@ -567,17 +567,14 @@ fn resolve_sqlite_dsn(
                 // Absolute path (Unix or Windows)
                 PathBuf::from(file_path)
             } else {
-                // Relative path - resolve under module directory
-                let module_dir = home_dir.join(module_name);
+                // Relative path - resolve under gear directory
+                let gear_dir = home_dir.join(gear_name);
                 if !dry_run {
-                    std::fs::create_dir_all(&module_dir).with_context(|| {
-                        format!(
-                            "Failed to create module directory: {}",
-                            module_dir.display()
-                        )
+                    std::fs::create_dir_all(&gear_dir).with_context(|| {
+                        format!("Failed to create gear directory: {}", gear_dir.display())
                     })?;
                 }
-                module_dir.join(file_path)
+                gear_dir.join(file_path)
             };
 
             let normalized_path = normalize_path(&resolved_path);
@@ -595,18 +592,15 @@ fn resolve_sqlite_dsn(
         ));
     }
 
-    // Handle empty DSN or just sqlite:// - default to module.sqlite
+    // Handle empty DSN or just sqlite:// - default to gear.sqlite
     if dsn == "sqlite://" || dsn == "sqlite:///" || dsn == "sqlite:" {
-        let module_dir = home_dir.join(module_name);
+        let gear_dir = home_dir.join(gear_name);
         if !dry_run {
-            std::fs::create_dir_all(&module_dir).with_context(|| {
-                format!(
-                    "Failed to create module directory: {}",
-                    module_dir.display()
-                )
+            std::fs::create_dir_all(&gear_dir).with_context(|| {
+                format!("Failed to create gear directory: {}", gear_dir.display())
             })?;
         }
-        let db_path = module_dir.join(format!("{module_name}.sqlite"));
+        let db_path = gear_dir.join(format!("{gear_name}.sqlite"));
         let normalized_path = normalize_path(&db_path);
         // For Windows absolute paths (C:/...), use sqlite:path format
         // For Unix absolute paths (/...), use sqlite://path format
@@ -686,7 +680,7 @@ fn build_server_dsn(
 fn build_sqlite_dsn_with_dbname_override(
     original_dsn: &str,
     dbname: &str,
-    module_name: &str,
+    gear_name: &str,
     home_dir: &Path,
     dry_run: bool,
 ) -> Result<String> {
@@ -698,16 +692,12 @@ fn build_sqlite_dsn_with_dbname_override(
     };
 
     // Build the correct path for the database file
-    let module_dir = home_dir.join(module_name);
+    let gear_dir = home_dir.join(gear_name);
     if !dry_run {
-        std::fs::create_dir_all(&module_dir).with_context(|| {
-            format!(
-                "Failed to create module directory: {}",
-                module_dir.display()
-            )
-        })?;
+        std::fs::create_dir_all(&gear_dir)
+            .with_context(|| format!("Failed to create gear directory: {}", gear_dir.display()))?;
     }
-    let db_path = module_dir.join(dbname);
+    let db_path = gear_dir.join(dbname);
     let normalized_path = normalize_path(&db_path);
 
     // Build the new DSN with correct format for the platform
@@ -732,20 +722,20 @@ fn build_sqlite_dsn(
     file: Option<&str>,
     path: Option<&PathBuf>,
     dbname: Option<&str>,
-    module_name: &str,
+    gear_name: &str,
     home_dir: &Path,
     dry_run: bool,
 ) -> Result<String> {
     // If full DSN provided, resolve @file() syntax and validate
     if let Some(dsn) = dsn {
-        let resolved_dsn = resolve_sqlite_dsn(dsn, home_dir, module_name, dry_run)?;
+        let resolved_dsn = resolve_sqlite_dsn(dsn, home_dir, gear_name, dry_run)?;
 
         // If dbname is provided, we need to replace the database file path while preserving query params
         if let Some(dbname) = dbname {
             return build_sqlite_dsn_with_dbname_override(
                 &resolved_dsn,
                 dbname,
-                module_name,
+                gear_name,
                 home_dir,
                 dry_run,
             );
@@ -773,18 +763,15 @@ fn build_sqlite_dsn(
         return Ok(format!("sqlite://{normalized_path}"));
     }
 
-    // Build from file (relative under module dir)
+    // Build from file (relative under gear dir)
     if let Some(file) = file {
-        let module_dir = home_dir.join(module_name);
+        let gear_dir = home_dir.join(gear_name);
         if !dry_run {
-            std::fs::create_dir_all(&module_dir).with_context(|| {
-                format!(
-                    "Failed to create module directory: {}",
-                    module_dir.display()
-                )
+            std::fs::create_dir_all(&gear_dir).with_context(|| {
+                format!("Failed to create gear directory: {}", gear_dir.display())
             })?;
         }
-        let db_path = module_dir.join(file);
+        let db_path = gear_dir.join(file);
         let normalized_path = normalize_path(&db_path);
         // For Windows absolute paths (C:/...), use sqlite:path format
         // For Unix absolute paths (/...), use sqlite://path format
@@ -796,17 +783,13 @@ fn build_sqlite_dsn(
         return Ok(format!("sqlite://{normalized_path}"));
     }
 
-    // Default to module.sqlite
-    let module_dir = home_dir.join(module_name);
+    // Default to gear.sqlite
+    let gear_dir = home_dir.join(gear_name);
     if !dry_run {
-        std::fs::create_dir_all(&module_dir).with_context(|| {
-            format!(
-                "Failed to create module directory: {}",
-                module_dir.display()
-            )
-        })?;
+        std::fs::create_dir_all(&gear_dir)
+            .with_context(|| format!("Failed to create gear directory: {}", gear_dir.display()))?;
     }
-    let db_path = module_dir.join(format!("{module_name}.sqlite"));
+    let db_path = gear_dir.join(format!("{gear_name}.sqlite"));
     let normalized_path = normalize_path(&db_path);
     // For Windows absolute paths (C:/...), use sqlite:path format
     // For Unix absolute paths (/...), use sqlite://path format
@@ -819,7 +802,7 @@ fn build_sqlite_dsn(
     }
 }
 
-/// Type alias for the complex return type of `build_final_db_for_module`
+/// Type alias for the complex return type of `build_final_db_for_gear`
 type DbConfigResult = Result<Option<(String /* final_dsn */, PoolCfg)>>;
 
 /// Builder for accumulating database configuration from multiple sources
@@ -845,7 +828,7 @@ impl DbConfigBuilder {
         &mut self,
         global_server: &DbConnConfig,
         home_dir: &Path,
-        module_name: &str,
+        gear_name: &str,
         dry_run: bool,
     ) -> Result<()> {
         // Apply global server DSN
@@ -853,7 +836,7 @@ impl DbConfigBuilder {
             let expanded_dsn = expand_env_in_dsn(global_dsn)?;
             // For SQLite, resolve @file() syntax before validation
             let resolved_dsn = if expanded_dsn.starts_with("sqlite") {
-                resolve_sqlite_dsn(&expanded_dsn, home_dir, module_name, dry_run)?
+                resolve_sqlite_dsn(&expanded_dsn, home_dir, gear_name, dry_run)?
             } else {
                 expanded_dsn
             };
@@ -887,47 +870,47 @@ impl DbConfigBuilder {
         Ok(())
     }
 
-    /// Apply module DSN (overrides global DSN)
-    fn apply_module_dsn(
+    /// Apply gear DSN (overrides global DSN)
+    fn apply_gear_dsn(
         &mut self,
-        module_dsn: &str,
+        gear_dsn: &str,
         home_dir: &Path,
-        module_name: &str,
+        gear_name: &str,
         dry_run: bool,
     ) -> Result<()> {
         // For SQLite, resolve @file() syntax before validation
-        let resolved_dsn = if module_dsn.starts_with("sqlite") {
-            resolve_sqlite_dsn(module_dsn, home_dir, module_name, dry_run)?
+        let resolved_dsn = if gear_dsn.starts_with("sqlite") {
+            resolve_sqlite_dsn(gear_dsn, home_dir, gear_name, dry_run)?
         } else {
-            module_dsn.to_owned()
+            gear_dsn.to_owned()
         };
         validate_dsn(&resolved_dsn)?;
         self.dsn = Some(resolved_dsn);
         Ok(())
     }
 
-    /// Apply module fields (override everything)
-    fn apply_module_fields(&mut self, module_db_config: &DbConnConfig) -> Result<()> {
-        if let Some(host) = &module_db_config.host {
+    /// Apply gear fields (override everything)
+    fn apply_gear_fields(&mut self, gear_db_config: &DbConnConfig) -> Result<()> {
+        if let Some(host) = &gear_db_config.host {
             self.host = Some(host.clone());
         }
-        if let Some(port) = module_db_config.port {
+        if let Some(port) = gear_db_config.port {
             self.port = Some(port);
         }
-        if let Some(user) = &module_db_config.user {
+        if let Some(user) = &gear_db_config.user {
             self.user = Some(user.clone());
         }
-        if let Some(password) = resolve_password(module_db_config.password.as_deref())? {
+        if let Some(password) = resolve_password(gear_db_config.password.as_deref())? {
             self.password = Some(password);
         }
-        if let Some(dbname) = &module_db_config.dbname {
+        if let Some(dbname) = &gear_db_config.dbname {
             self.dbname = Some(dbname.clone());
         }
-        if let Some(params) = &module_db_config.params {
+        if let Some(params) = &gear_db_config.params {
             self.params.extend(params.clone());
         }
-        if let Some(pool) = &module_db_config.pool {
-            // Module pool settings override global ones
+        if let Some(pool) = &gear_db_config.pool {
+            // Gear pool settings override global ones
             if let Some(max_conns) = pool.max_conns {
                 self.pool.max_conns = Some(max_conns);
             }
@@ -949,39 +932,39 @@ impl DbConfigBuilder {
 }
 
 /// Determines the database backend type (`SQLite` or server-based)
-fn decide_backend(builder: &DbConfigBuilder, module_db_config: &DbConnConfig) -> bool {
+fn decide_backend(builder: &DbConfigBuilder, gear_db_config: &DbConnConfig) -> bool {
     // Always treat as SQLite if DSN starts with "sqlite", regardless of server reference
     // Also treat as SQLite if no server reference and no explicit DSN (default case)
-    module_db_config.file.is_some()
-        || module_db_config.path.is_some()
+    gear_db_config.file.is_some()
+        || gear_db_config.path.is_some()
         || builder
             .dsn
             .as_ref()
             .is_some_and(|dsn| dsn.starts_with("sqlite"))
-        || (module_db_config.server.is_none() && builder.dsn.is_none())
+        || (gear_db_config.server.is_none() && builder.dsn.is_none())
 }
 
 /// Finalize `SQLite` DSN from builder state
 fn finalize_sqlite_dsn(
     builder: &DbConfigBuilder,
-    module_db_config: &DbConnConfig,
-    module_name: &str,
+    gear_db_config: &DbConnConfig,
+    gear_name: &str,
     home_dir: &Path,
     dry_run: bool,
 ) -> Result<String> {
     build_sqlite_dsn(
         builder.dsn.as_deref(),
-        module_db_config.file.as_deref(),
-        module_db_config.path.as_ref(),
+        gear_db_config.file.as_deref(),
+        gear_db_config.path.as_ref(),
         builder.dbname.as_deref(),
-        module_name,
+        gear_name,
         home_dir,
         dry_run,
     )
 }
 
 /// Finalize server-based DSN from builder state
-fn finalize_server_dsn(builder: &DbConfigBuilder, module_name: &str) -> Result<String> {
+fn finalize_server_dsn(builder: &DbConfigBuilder, gear_name: &str) -> Result<String> {
     // Extract dbname from DSN if not provided separately
     let dbname = if let Some(dbname) = builder.dbname.as_deref() {
         dbname.to_owned()
@@ -994,17 +977,17 @@ fn finalize_server_dsn(builder: &DbConfigBuilder, module_name: &str) -> Result<S
                 path[1..].to_string()
             } else {
                 return Err(anyhow::anyhow!(
-                    "Server-based database config for module '{module_name}' missing required 'dbname'"
+                    "Server-based database config for gear '{gear_name}' missing required 'dbname'"
                 ));
             }
         } else {
             return Err(anyhow::anyhow!(
-                "Server-based database config for module '{module_name}' missing required 'dbname'"
+                "Server-based database config for gear '{gear_name}' missing required 'dbname'"
             ));
         }
     } else {
         return Err(anyhow::anyhow!(
-            "Server-based database config for module '{module_name}' missing required 'dbname'"
+            "Server-based database config for gear '{gear_name}' missing required 'dbname'"
         ));
     };
 
@@ -1067,53 +1050,53 @@ fn redact_dsn_for_logging(dsn: &str) -> Result<String> {
     }
 }
 
-// ---- OoP Module Configuration Support ----
+// ---- OoP Gear Configuration Support ----
 
-/// Environment variable name for passing rendered module config to `OoP` modules.
+/// Environment variable name for passing rendered gear config to `OoP` gears.
 pub const TOOLKIT_MODULE_CONFIG_ENV: &str = "TOOLKIT_MODULE_CONFIG";
 
-/// Rendered database configuration for `OoP` modules.
-/// Contains both global server templates and module-specific config.
+/// Rendered database configuration for `OoP` gears.
+/// Contains both global server templates and gear-specific config.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenderedDbConfig {
     /// Global database configuration with server templates.
-    /// `OoP` module can use these servers for reference.
+    /// `OoP` gear can use these servers for reference.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub global: Option<GlobalDatabaseConfig>,
-    /// Module-specific database configuration (already merged with server reference in master).
-    /// This is the `modules.<name>.database` section after server merge.
+    /// Gear-specific database configuration (already merged with server reference in master).
+    /// This is the `gears.<name>.database` section after server merge.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub module: Option<DbConnConfig>,
+    pub gear: Option<DbConnConfig>,
 }
 
 impl RenderedDbConfig {
-    /// Create a new `RenderedDbConfig` from global and module database configurations.
+    /// Create a new `RenderedDbConfig` from global and gear database configurations.
     #[must_use]
-    pub fn new(global: Option<GlobalDatabaseConfig>, module: Option<DbConnConfig>) -> Self {
-        Self { global, module }
+    pub fn new(global: Option<GlobalDatabaseConfig>, gear: Option<DbConnConfig>) -> Self {
+        Self { global, gear }
     }
 }
 
-/// Rendered module configuration passed to `OoP` modules via environment variable.
+/// Rendered gear configuration passed to `OoP` gears via environment variable.
 ///
-/// This struct contains everything an `OoP` module needs to initialize:
+/// This struct contains everything an `OoP` gear needs to initialize:
 /// - Database configuration (structured, for field-by-field merge in `OoP`)
-/// - Module config section
+/// - Gear config section
 /// - Logging configuration (for key-by-key merge in `OoP`)
 /// - OpenTelemetry configuration (resource, tracing, metrics)
 ///
 /// The runtime section is excluded as it's only relevant for the master host.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RenderedModuleConfig {
+pub struct RenderedGearConfig {
     /// Rendered database configuration (structured, not resolved DSN).
-    /// `OoP` module will merge this with local --config using field-by-field merge.
+    /// `OoP` gear will merge this with local --config using field-by-field merge.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub database: Option<RenderedDbConfig>,
-    /// Module-specific config section (passed as-is)
+    /// Gear-specific config section (passed as-is)
     #[serde(default)]
     pub config: serde_json::Value,
     /// Logging configuration from master host.
-    /// `OoP` module will merge this with local --config (local keys override master keys).
+    /// `OoP` gear will merge this with local --config (local keys override master keys).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logging: Option<LoggingConfig>,
     /// OpenTelemetry configuration from master host (resource, tracing, metrics).
@@ -1121,77 +1104,74 @@ pub struct RenderedModuleConfig {
     pub opentelemetry: Option<OpenTelemetryConfig>,
 }
 
-impl RenderedModuleConfig {
+impl RenderedGearConfig {
     /// Deserialize from JSON string (used when reading from env var).
     ///
     /// # Errors
     /// Returns an error if JSON parsing fails.
     pub fn from_json(json: &str) -> Result<Self> {
-        serde_json::from_str(json).context("Failed to parse RenderedModuleConfig from JSON")
+        serde_json::from_str(json).context("Failed to parse RenderedGearConfig from JSON")
     }
 
-    /// Serialize to JSON string (used when passing to `OoP` modules via env var).
+    /// Serialize to JSON string (used when passing to `OoP` gears via env var).
     ///
     /// # Errors
     /// Returns an error if serialization fails.
     pub fn to_json(&self) -> Result<String> {
-        serde_json::to_string(self).context("Failed to serialize RenderedModuleConfig to JSON")
+        serde_json::to_string(self).context("Failed to serialize RenderedGearConfig to JSON")
     }
 }
 
-/// Render module configuration for passing to `OoP` module via environment variable.
+/// Render gear configuration for passing to `OoP` gear via environment variable.
 ///
-/// This function prepares a structured configuration that an `OoP` module can use
+/// This function prepares a structured configuration that an `OoP` gear can use
 /// to initialize itself. The configuration includes:
 /// - Database configuration (structured, for field-by-field merge in `OoP`)
-/// - Module config section
+/// - Gear config section
 /// - Logging configuration (for key-by-key merge in `OoP`)
 /// - Tracing configuration for OTEL
 ///
 /// The runtime section is excluded as it's only relevant for the master host.
 ///
-/// `OoP` modules receive this via `TOOLKIT_MODULE_CONFIG` env var and can override
+/// `OoP` gears receive this via `TOOLKIT_MODULE_CONFIG` env var and can override
 /// any section with their local --config file.
 ///
 /// # Errors
-/// Returns an error if module configuration parsing fails.
-pub fn render_module_config_for_oop(
+/// Returns an error if gear configuration parsing fails.
+pub fn render_gear_config_for_oop(
     app: &AppConfig,
-    module_name: &str,
+    gear_name: &str,
     _home_dir: &std::path::Path,
-) -> Result<RenderedModuleConfig> {
-    // Get module's database config (with server reference, but NOT resolved to DSN).
-    // OoP module will use DbManager to resolve this with its local overrides.
-    let module_db_config = parse_module_config(app, module_name)
+) -> Result<RenderedGearConfig> {
+    // Get gear's database config (with server reference, but NOT resolved to DSN).
+    // OoP gear will use DbManager to resolve this with its local overrides.
+    let gear_db_config = parse_gear_config(app, gear_name)
         .ok()
         .and_then(|entry| entry.database);
 
-    // Build database config with global servers and module config (structured, not resolved)
-    let database = if module_db_config.is_some() || app.database.is_some() {
-        Some(RenderedDbConfig::new(
-            app.database.clone(),
-            module_db_config,
-        ))
+    // Build database config with global servers and gear config (structured, not resolved)
+    let database = if gear_db_config.is_some() || app.database.is_some() {
+        Some(RenderedDbConfig::new(app.database.clone(), gear_db_config))
     } else {
         None
     };
 
-    // Get the module's config section (excluding database and runtime)
-    let config = parse_module_config(app, module_name)
+    // Get the gear's config section (excluding database and runtime)
+    let config = parse_gear_config(app, gear_name)
         .map(|entry| entry.config)
         .unwrap_or_default();
 
-    // Pass logging config from master host so OoP modules can merge with their local config
+    // Pass logging config from master host so OoP gears can merge with their local config
     let logging = app.logging.clone();
 
-    // Pass OpenTelemetry config from master host so OoP modules use the same settings
+    // Pass OpenTelemetry config from master host so OoP gears use the same settings
     let opentelemetry = if app.opentelemetry.tracing.enabled || app.opentelemetry.metrics.enabled {
         Some(app.opentelemetry.clone())
     } else {
         None
     };
 
-    Ok(RenderedModuleConfig {
+    Ok(RenderedGearConfig {
         database,
         config,
         logging: Some(logging),
@@ -1199,35 +1179,32 @@ pub fn render_module_config_for_oop(
     })
 }
 
-/// Parse a module config from the config bag.
+/// Parse a gear config from the config bag.
 ///
 /// # Errors
-/// Returns an error if the module is not found or config parsing fails.
-pub fn parse_module_config(app: &AppConfig, module_name: &str) -> Result<ModuleConfig> {
-    let module_raw = app
-        .modules
-        .get(module_name)
+/// Returns an error if the gear is not found or config parsing fails.
+pub fn parse_gear_config(app: &AppConfig, gear_name: &str) -> Result<GearConfig> {
+    let gear_raw = app
+        .gears
+        .get(gear_name)
         .cloned()
-        .ok_or_else(|| anyhow::anyhow!("Module '{module_name}' not found in config"))?;
+        .ok_or_else(|| anyhow::anyhow!("Gear '{gear_name}' not found in config"))?;
 
-    let module_config: ModuleConfig = serde_json::from_value(module_raw)?;
-    Ok(module_config)
+    let gear_config: GearConfig = serde_json::from_value(gear_raw)?;
+    Ok(gear_config)
 }
 
-/// Helper to get runtime config for a module (if present).
+/// Helper to get runtime config for a gear (if present).
 ///
 /// # Errors
-/// Returns an error if module config parsing fails.
-pub fn get_module_runtime_config(
-    app: &AppConfig,
-    module_name: &str,
-) -> Result<Option<ModuleRuntime>> {
-    let entry = parse_module_config(app, module_name)?;
+/// Returns an error if gear config parsing fails.
+pub fn get_gear_runtime_config(app: &AppConfig, gear_name: &str) -> Result<Option<GearRuntime>> {
+    let entry = parse_gear_config(app, gear_name)?;
     Ok(entry.runtime)
 }
 
-/// Merges global + module DB configs into a final, validated DSN and pool config.
-/// Precedence: Global DSN -> Global fields -> Module DSN -> Module fields (fields always win).
+/// Merges global + gear DB configs into a final, validated DSN and pool config.
+/// Precedence: Global DSN -> Global fields -> Gear DSN -> Gear fields (fields always win).
 /// For server-based, returns error if final dbname is missing.
 /// For `SQLite`, builds/normalizes sqlite DSN from file/path or uses a full DSN as-is.
 ///
@@ -1236,24 +1213,24 @@ pub fn get_module_runtime_config(
 ///
 /// # Errors
 /// Returns an error if database configuration is invalid or resolution fails.
-pub fn build_final_db_for_module(
+pub fn build_final_db_for_gear(
     app: &AppConfig,
-    module_name: &str,
+    gear_name: &str,
     home_dir: &Path,
     dry_run: bool,
 ) -> DbConfigResult {
-    // Parse module entry from raw JSON
-    let Some(module_raw) = app.modules.get(module_name) else {
-        return Ok(None); // No module config
+    // Parse gear entry from raw JSON
+    let Some(gear_raw) = app.gears.get(gear_name) else {
+        return Ok(None); // No gear config
     };
 
-    let module_entry: ModuleConfig = serde_json::from_value(module_raw.clone())
-        .with_context(|| format!("Invalid module config structure for '{module_name}'"))?;
+    let gear_entry: GearConfig = serde_json::from_value(gear_raw.clone())
+        .with_context(|| format!("Invalid gear config structure for '{gear_name}'"))?;
 
-    let Some(module_db_config) = module_entry.database else {
+    let Some(gear_db_config) = gear_entry.database else {
         tracing::warn!(
-            "Module '{}' has no database configuration; DB capability disabled",
-            module_name
+            "Gear '{}' has no database configuration; DB capability disabled",
+            gear_name
         );
         return Ok(None);
     };
@@ -1265,31 +1242,31 @@ pub fn build_final_db_for_module(
     let mut builder = DbConfigBuilder::new();
 
     // Step 1: Apply global server config if referenced
-    if let Some(server_name) = &module_db_config.server {
+    if let Some(server_name) = &gear_db_config.server {
         let global_server = global_db_config
             .and_then(|gc| gc.servers.get(server_name))
             .ok_or_else(|| {
                 anyhow::anyhow!("Referenced server '{server_name}' not found in global config")
             })?;
 
-        builder.apply_global_server(global_server, home_dir, module_name, dry_run)?;
+        builder.apply_global_server(global_server, home_dir, gear_name, dry_run)?;
     }
 
-    // Step 2: Apply module DSN (override global)
-    if let Some(module_dsn) = &module_db_config.dsn {
-        builder.apply_module_dsn(module_dsn, home_dir, module_name, dry_run)?;
+    // Step 2: Apply gear DSN (override global)
+    if let Some(gear_dsn) = &gear_db_config.dsn {
+        builder.apply_gear_dsn(gear_dsn, home_dir, gear_name, dry_run)?;
     }
 
-    // Step 3: Apply module fields (override everything)
-    builder.apply_module_fields(&module_db_config)?;
+    // Step 3: Apply gear fields (override everything)
+    builder.apply_gear_fields(&gear_db_config)?;
 
     // Determine backend type and finalize DSN
-    let is_sqlite = decide_backend(&builder, &module_db_config);
+    let is_sqlite = decide_backend(&builder, &gear_db_config);
 
     let result_dsn = if is_sqlite {
-        finalize_sqlite_dsn(&builder, &module_db_config, module_name, home_dir, dry_run)?
+        finalize_sqlite_dsn(&builder, &gear_db_config, gear_name, home_dir, dry_run)?
     } else {
-        finalize_server_dsn(&builder, module_name)?
+        finalize_server_dsn(&builder, gear_name)?
     };
 
     // Validate final DSN
@@ -1299,28 +1276,28 @@ pub fn build_final_db_for_module(
     let log_dsn = redact_dsn_for_logging(&result_dsn)?;
 
     tracing::info!(
-        "Built final DB config for module '{}': {}",
-        module_name,
+        "Built final DB config for gear '{}': {}",
+        gear_name,
         log_dsn
     );
 
     Ok(Some((result_dsn, builder.pool)))
 }
 
-/// Helper function to get module database configuration from `AppConfig`.
-/// Returns the `DbConnConfig` for a module, or None if the module has no database config.
+/// Helper function to get gear database configuration from `AppConfig`.
+/// Returns the `DbConnConfig` for a gear, or None if the gear has no database config.
 #[must_use]
-pub fn get_module_db_config(app: &AppConfig, module_name: &str) -> Option<DbConnConfig> {
-    let module_raw = app.modules.get(module_name)?;
-    let module_entry: ModuleConfig = serde_json::from_value(module_raw.clone()).ok()?;
-    module_entry.database
+pub fn get_gear_db_config(app: &AppConfig, gear_name: &str) -> Option<DbConnConfig> {
+    let gear_raw = app.gears.get(gear_name)?;
+    let gear_entry: GearConfig = serde_json::from_value(gear_raw.clone()).ok()?;
+    gear_entry.database
 }
 
-/// Helper function to resolve module home directory.
-/// Returns the path where module-specific files (like `SQLite` databases) should be stored.
+/// Helper function to resolve gear home directory.
+/// Returns the path where gear-specific files (like `SQLite` databases) should be stored.
 #[must_use]
-pub fn module_home(app: &AppConfig, module_name: &str) -> PathBuf {
-    PathBuf::from(&app.server.home_dir).join(module_name)
+pub fn gear_home(app: &AppConfig, gear_name: &str) -> PathBuf {
+    PathBuf::from(&app.server.home_dir).join(gear_name)
 }
 
 #[cfg(test)]
@@ -1356,8 +1333,8 @@ mod tests {
         assert_eq!(default_section.console_level, Some(Level::INFO));
         assert_eq!(default_section.file().unwrap(), "logs/cf-gears.log");
 
-        // Modules bag is empty by default
-        assert!(config.modules.is_empty());
+        // Gears bag is empty by default
+        assert!(config.gears.is_empty());
     }
 
     #[test]
@@ -1437,7 +1414,7 @@ server:
 
         // Optional sections default to None
         assert!(config.database.is_none());
-        assert!(config.modules.is_empty());
+        assert!(config.gears.is_empty());
     }
 
     #[test]
@@ -1491,15 +1468,15 @@ server:
     }
 
     #[test]
-    fn test_layered_config_loading_with_modules_dir() {
+    fn test_layered_config_loading_with_gears_dir() {
         let tmp = tempdir().unwrap();
-        let cfg_path = tmp.path().join("modules_dir.yaml");
-        let modules_dir = tmp.path().join("modules");
+        let cfg_path = tmp.path().join("gears_dir.yaml");
+        let gears_dir = tmp.path().join("gears");
 
-        fs::create_dir_all(&modules_dir).unwrap();
-        let module_cfg = modules_dir.join("test_module.yaml");
+        fs::create_dir_all(&gears_dir).unwrap();
+        let gear_cfg = gears_dir.join("test_gear.yaml");
         fs::write(
-            &module_cfg,
+            &gear_cfg,
             r#"
 setting1: "value1"
 setting2: 42
@@ -1508,16 +1485,16 @@ setting2: 42
         .unwrap();
 
         // Convert Windows paths to forward slashes for YAML compatibility
-        let modules_dir_str = normalize_path(&modules_dir);
+        let gears_dir_str = normalize_path(&gears_dir);
         let yaml = format!(
             r#"
 server:
-  home_dir: "~/.modules_test"
+  home_dir: "~/.gears_test"
 
-modules_dir: "{modules_dir_str}"
+gears_dir: "{gears_dir_str}"
 
-modules:
-  existing_module:
+gears:
+  existing_gear:
     key: "value"
 "#
         );
@@ -1526,16 +1503,16 @@ modules:
 
         let config = AppConfig::load_layered(&cfg_path).unwrap();
 
-        // Should have loaded the existing module from modules section
-        assert!(config.modules.contains_key("existing_module"));
+        // Should have loaded the existing gear from gears section
+        assert!(config.gears.contains_key("existing_gear"));
 
-        // Should have also loaded the module from modules_dir
-        assert!(config.modules.contains_key("test_module"));
+        // Should have also loaded the gear from gears_dir
+        assert!(config.gears.contains_key("test_gear"));
 
-        // Check the loaded module config
-        let test_module = &config.modules["test_module"];
-        assert_eq!(test_module["setting1"], "value1");
-        assert_eq!(test_module["setting2"], 42);
+        // Check the loaded gear config
+        let test_gear = &config.gears["test_gear"];
+        assert_eq!(test_gear["setting1"], "value1");
+        assert_eq!(test_gear["setting2"], 42);
     }
 
     #[test]
@@ -1581,14 +1558,10 @@ logging:
         }
     }
 
-    /// Helper function to add a module to `AppConfig`
-    fn add_module_to_app(
-        app: &mut AppConfig,
-        module_name: &str,
-        database_config: &serde_json::Value,
-    ) {
-        app.modules.insert(
-            module_name.to_owned(),
+    /// Helper function to add a gear to `AppConfig`
+    fn add_gear_to_app(app: &mut AppConfig, gear_name: &str, database_config: &serde_json::Value) {
+        app.gears.insert(
+            gear_name.to_owned(),
             serde_json::json!({
                 "database": database_config,
                 "config": {}
@@ -1596,10 +1569,10 @@ logging:
         );
     }
 
-    /// Helper function to add a module with custom config to `AppConfig`
-    fn add_module_with_config(app: &mut AppConfig, module_name: &str, config: &serde_json::Value) {
-        app.modules.insert(
-            module_name.to_owned(),
+    /// Helper function to add a gear with custom config to `AppConfig`
+    fn add_gear_with_config(app: &mut AppConfig, gear_name: &str, config: &serde_json::Value) {
+        app.gears.insert(
+            gear_name.to_owned(),
             serde_json::json!({
                 "database": {},
                 "config": config
@@ -1611,7 +1584,7 @@ logging:
     fn create_minimal_app() -> AppConfig {
         AppConfig {
             database: None,
-            modules: HashMap::new(),
+            gears: HashMap::new(),
             ..Default::default()
         }
     }
@@ -1631,16 +1604,16 @@ logging:
             },
         );
 
-        // Module references global server
-        add_module_to_app(
+        // Gear references global server
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server"
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
@@ -1665,16 +1638,16 @@ logging:
             },
         );
 
-        // Module references global server
-        add_module_to_app(
+        // Gear references global server
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server"
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
@@ -1685,62 +1658,62 @@ logging:
     }
 
     #[test]
-    fn test_precedence_module_dsn_only() {
+    fn test_precedence_gear_dsn_only() {
         let tmp = tempdir().unwrap();
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
-                            "dsn": "sqlite://module_test.db?wal=true&synchronous=NORMAL"
+                            "dsn": "sqlite://gear_test.db?wal=true&synchronous=NORMAL"
                         },
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
-        assert!(dsn.contains("module_test.db"));
+        assert!(dsn.contains("gear_test.db"));
         assert!(dsn.contains("wal=true"));
     }
 
     #[test]
-    fn test_precedence_module_fields_only() {
+    fn test_precedence_gear_fields_only() {
         let tmp = tempdir().unwrap();
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
-                            "file": "module_fields.db"
+                            "file": "gear_fields.db"
                         },
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
-        assert!(dsn.contains("module_fields.db"));
+        assert!(dsn.contains("gear_fields.db"));
         // Platform-specific DSN format check
         #[cfg(windows)]
         assert!(dsn.starts_with("sqlite:") && !dsn.starts_with("sqlite://"));
@@ -1765,23 +1738,23 @@ logging:
             },
         );
 
-        // Module also overrides some fields
-        add_module_to_app(
+        // Gear also overrides some fields
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server",
-                "port": 5434  // Module field should override global field
+                "port": 5434  // Gear field should override global field
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
         // Fields should override DSN parts
         assert!(dsn.contains("new_host"));
-        assert!(dsn.contains("5434")); // Module override should win
+        assert!(dsn.contains("5434")); // Gear override should win
         assert!(dsn.contains("new_user"));
         assert!(dsn.contains("new_db"));
         // Old DSN values should not appear
@@ -1809,15 +1782,15 @@ logging:
                 },
             );
 
-            add_module_to_app(
+            add_gear_to_app(
                 &mut app,
-                "test_module",
+                "test_gear",
                 &serde_json::json!({
                     "server": "test_server"
                 }),
             );
 
-            let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+            let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
             assert!(result.is_some());
 
             let (dsn, _pool) = result.unwrap();
@@ -1846,16 +1819,15 @@ logging:
                     },
                 );
 
-                add_module_to_app(
+                add_gear_to_app(
                     &mut app,
-                    "test_module",
+                    "test_gear",
                     &serde_json::json!({
                         "server": "test_server"
                     }),
                 );
 
-                let result =
-                    build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+                let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
                 assert!(result.is_some());
 
                 let (dsn, _pool) = result.unwrap();
@@ -1873,12 +1845,12 @@ logging:
         let tmp = tempdir().unwrap();
         let home_dir = tmp.path();
 
-        // Test 1: file (relative to home_dir/module_name/)
+        // Test 1: file (relative to home_dir/gear_name/)
         let app1 = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "file": "test.db"
@@ -1886,24 +1858,24 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result1 = build_final_db_for_module(&app1, "test_module", home_dir, false).unwrap();
+        let result1 = build_final_db_for_gear(&app1, "test_gear", home_dir, false).unwrap();
         assert!(result1.is_some());
         let (dsn1, _) = result1.unwrap();
-        assert!(dsn1.contains("test_module"));
+        assert!(dsn1.contains("test_gear"));
         assert!(dsn1.contains("test.db"));
 
         // Test 2: path (absolute path)
         let abs_path = tmp.path().join("absolute.db");
         let app2 = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "path": abs_path.to_string_lossy()
@@ -1911,36 +1883,36 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result2 = build_final_db_for_module(&app2, "test_module", home_dir, false).unwrap();
+        let result2 = build_final_db_for_gear(&app2, "test_gear", home_dir, false).unwrap();
         assert!(result2.is_some());
         let (dsn2, _) = result2.unwrap();
         assert!(dsn2.contains("absolute.db"));
 
-        // Test 3: no file or path (should default to module_name.sqlite)
+        // Test 3: no file or path (should default to gear_name.sqlite)
         let app3 = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {},
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result3 = build_final_db_for_module(&app3, "test_module", home_dir, false).unwrap();
+        let result3 = build_final_db_for_gear(&app3, "test_gear", home_dir, false).unwrap();
         assert!(result3.is_some());
         let (dsn3, _) = result3.unwrap();
-        assert!(dsn3.contains("test_module.sqlite"));
+        assert!(dsn3.contains("test_gear.sqlite"));
     }
 
     #[cfg(windows)]
@@ -1950,10 +1922,10 @@ logging:
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "file": "test.db"
@@ -1961,12 +1933,12 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
         let (dsn, _) = result.unwrap();
 
@@ -2010,8 +1982,8 @@ logging:
             auto_provision: None,
         });
 
-        // Module that references the server but overrides the dbname
-        app.modules.insert(
+        // Gear that references the server but overrides the dbname
+        app.gears.insert(
             "users_info".to_owned(),
             serde_json::json!({
                 "database": {
@@ -2022,7 +1994,7 @@ logging:
             }),
         );
 
-        let result = build_final_db_for_module(&app, "users_info", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "users_info", home_dir, false).unwrap();
         assert!(result.is_some());
         let (dsn, _) = result.unwrap();
 
@@ -2052,10 +2024,10 @@ logging:
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "file": "test.db"
@@ -2063,18 +2035,18 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
         let (dsn, _) = result.unwrap();
 
         // On Unix, paths should be absolute
         assert!(dsn.starts_with("sqlite://"));
-        assert!(dsn.contains("/test_module/test.db"));
+        assert!(dsn.contains("/test_gear/test.db"));
     }
 
     #[test]
@@ -2093,68 +2065,68 @@ logging:
             },
         );
 
-        add_module_to_app(
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server"
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false);
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false);
         assert!(result.is_err());
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("missing required 'dbname'"));
     }
 
     #[test]
-    fn test_module_no_database_config() {
+    fn test_gear_no_database_config() {
         let tmp = tempdir().unwrap();
         let home_dir = tmp.path();
 
-        // Module with no database section
+        // Gear with no database section
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "no_db_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "no_db_gear".to_owned(),
                     serde_json::json!({
                         "config": {
                             "some_setting": "value"
                         }
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "no_db_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "no_db_gear", home_dir, false).unwrap();
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_module_empty_database_config() {
+    fn test_gear_empty_database_config() {
         let tmp = tempdir().unwrap();
         let home_dir = tmp.path();
 
-        // Module with empty database section
+        // Gear with empty database section
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "empty_db_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "empty_db_gear".to_owned(),
                     serde_json::json!({
                         "database": null,
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "empty_db_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "empty_db_gear", home_dir, false).unwrap();
         assert!(result.is_none());
     }
 
@@ -2164,10 +2136,10 @@ logging:
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "server": "nonexistent_server"
@@ -2175,12 +2147,12 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false);
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false);
         assert!(result.is_err());
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("Referenced server 'nonexistent_server' not found"));
@@ -2192,10 +2164,10 @@ logging:
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "dsn": "invalid://not-a-valid[url"
@@ -2203,12 +2175,12 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false);
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false);
         assert!(result.is_err());
     }
 
@@ -2229,15 +2201,15 @@ logging:
                 },
             );
 
-            add_module_to_app(
+            add_gear_to_app(
                 &mut app,
-                "test_module",
+                "test_gear",
                 &serde_json::json!({
                     "server": "test_server"
                 }),
             );
 
-            let result = build_final_db_for_module(&app, "test_module", home_dir, false);
+            let result = build_final_db_for_gear(&app, "test_gear", home_dir, false);
             assert!(result.is_err());
             let error_msg = result.unwrap_err().to_string();
             assert!(error_msg.contains("NONEXISTENT_PASSWORD"));
@@ -2250,10 +2222,10 @@ logging:
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "dsn": "sqlite://@file(users.db)"
@@ -2261,16 +2233,16 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
-        assert!(dsn.contains("test_module"));
+        assert!(dsn.contains("test_gear"));
         assert!(dsn.contains("users.db"));
         // Platform-specific DSN format check
         #[cfg(windows)]
@@ -2286,10 +2258,10 @@ logging:
         let abs_path = tmp.path().join("absolute_db.sqlite");
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "dsn": format!("sqlite://@file({})", abs_path.to_string_lossy())
@@ -2297,12 +2269,12 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
@@ -2320,10 +2292,10 @@ logging:
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "dsn": "sqlite://"
@@ -2331,17 +2303,17 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
-        assert!(dsn.contains("test_module"));
-        assert!(dsn.contains("test_module.sqlite"));
+        assert!(dsn.contains("test_gear"));
+        assert!(dsn.contains("test_gear.sqlite"));
         // Platform-specific DSN format check
         #[cfg(windows)]
         assert!(dsn.starts_with("sqlite:") && !dsn.starts_with("sqlite://"));
@@ -2355,10 +2327,10 @@ logging:
         let home_dir = tmp.path();
 
         let app = AppConfig {
-            modules: {
-                let mut modules = HashMap::new();
-                modules.insert(
-                    "test_module".to_owned(),
+            gears: {
+                let mut gears = HashMap::new();
+                gears.insert(
+                    "test_gear".to_owned(),
                     serde_json::json!({
                         "database": {
                             "dsn": "sqlite://@file(missing_closing_paren"
@@ -2366,12 +2338,12 @@ logging:
                         "config": {}
                     }),
                 );
-                modules
+                gears
             },
             ..Default::default()
         };
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false);
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false);
         assert!(result.is_err());
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("Invalid @file() syntax"));
@@ -2395,15 +2367,15 @@ logging:
             },
         );
 
-        add_module_to_app(
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server"
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
@@ -2444,15 +2416,15 @@ logging:
             },
         );
 
-        add_module_to_app(
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server"
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
@@ -2486,15 +2458,15 @@ logging:
             },
         );
 
-        add_module_to_app(
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server"
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (dsn, _pool) = result.unwrap();
@@ -2532,10 +2504,10 @@ logging:
             },
         );
 
-        // Module overrides only max_conns
-        add_module_to_app(
+        // Gear overrides only max_conns
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server",
                 "pool": {
@@ -2544,16 +2516,16 @@ logging:
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (_dsn, pool) = result.unwrap();
-        assert_eq!(pool.max_conns, Some(20)); // Module override wins
+        assert_eq!(pool.max_conns, Some(20)); // Gear override wins
         assert_eq!(pool.acquire_timeout, Some(Duration::from_secs(5))); // Global value preserved
     }
 
     #[test]
-    fn test_pool_config_module_overrides_all() {
+    fn test_pool_config_gear_overrides_all() {
         use std::time::Duration;
 
         let tmp = tempdir().unwrap();
@@ -2577,10 +2549,10 @@ logging:
             },
         );
 
-        // Module overrides both pool settings
-        add_module_to_app(
+        // Gear overrides both pool settings
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server",
                 "pool": {
@@ -2590,7 +2562,7 @@ logging:
             }),
         );
 
-        let result = build_final_db_for_module(&app, "test_module", home_dir, false).unwrap();
+        let result = build_final_db_for_gear(&app, "test_gear", home_dir, false).unwrap();
         assert!(result.is_some());
 
         let (_dsn, pool) = result.unwrap();
@@ -2599,26 +2571,26 @@ logging:
     }
 
     #[test]
-    fn test_list_module_names() {
+    fn test_list_gear_names() {
         let mut app = create_minimal_app();
-        add_module_with_config(&mut app, "zebra_module", &serde_json::json!({}));
-        add_module_with_config(&mut app, "alpha_module", &serde_json::json!({}));
-        add_module_with_config(&mut app, "beta_module", &serde_json::json!({}));
+        add_gear_with_config(&mut app, "zebra_gear", &serde_json::json!({}));
+        add_gear_with_config(&mut app, "alpha_gear", &serde_json::json!({}));
+        add_gear_with_config(&mut app, "beta_gear", &serde_json::json!({}));
 
-        let module_names = list_module_names(&app);
+        let gear_names = list_gear_names(&app);
 
         // Should be sorted alphabetically
-        assert_eq!(module_names.len(), 3);
-        assert_eq!(module_names[0], "alpha_module");
-        assert_eq!(module_names[1], "beta_module");
-        assert_eq!(module_names[2], "zebra_module");
+        assert_eq!(gear_names.len(), 3);
+        assert_eq!(gear_names[0], "alpha_gear");
+        assert_eq!(gear_names[1], "beta_gear");
+        assert_eq!(gear_names[2], "zebra_gear");
     }
 
     #[test]
-    fn test_list_module_names_empty() {
+    fn test_list_gear_names_empty() {
         let app = create_minimal_app();
-        let module_names = list_module_names(&app);
-        assert_eq!(module_names.len(), 0);
+        let gear_names = list_gear_names(&app);
+        assert_eq!(gear_names.len(), 0);
     }
 
     #[test]
@@ -2650,39 +2622,39 @@ logging:
     }
 
     #[test]
-    fn test_render_effective_modules_config() {
+    fn test_render_effective_gears_config() {
         let mut app = create_minimal_app();
-        add_module_with_config(
+        add_gear_with_config(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "my_setting": "my_value",
                 "enabled": true
             }),
         );
 
-        let result = render_effective_modules_config(&app).unwrap();
+        let result = render_effective_gears_config(&app).unwrap();
 
         // Check structure
         assert!(result.is_object());
-        let modules = result.as_object().unwrap();
-        assert!(modules.contains_key("test_module"));
+        let gears = result.as_object().unwrap();
+        assert!(gears.contains_key("test_gear"));
 
-        let test_module = modules.get("test_module").unwrap();
-        assert!(test_module.is_object());
-        let test_module_obj = test_module.as_object().unwrap();
+        let test_gear = gears.get("test_gear").unwrap();
+        assert!(test_gear.is_object());
+        let test_gear_obj = test_gear.as_object().unwrap();
 
         // Should have config section
-        assert!(test_module_obj.contains_key("config"));
+        assert!(test_gear_obj.contains_key("config"));
 
         // Check config section
-        let config = test_module_obj.get("config").unwrap();
+        let config = test_gear_obj.get("config").unwrap();
         assert_eq!(config.get("my_setting").unwrap(), "my_value");
         assert_eq!(config.get("enabled").unwrap(), true);
     }
 
     #[test]
-    fn test_render_effective_modules_config_with_database() {
+    fn test_render_effective_gears_config_with_database() {
         let mut app = create_app_with_server(
             "test_server",
             DbConnConfig {
@@ -2695,22 +2667,22 @@ logging:
             },
         );
 
-        // Module with database config
-        add_module_to_app(
+        // Gear with database config
+        add_gear_to_app(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "server": "test_server"
             }),
         );
 
-        let result = render_effective_modules_config(&app).unwrap();
-        let modules = result.as_object().unwrap();
-        let test_module = modules.get("test_module").unwrap().as_object().unwrap();
+        let result = render_effective_gears_config(&app).unwrap();
+        let gears = result.as_object().unwrap();
+        let test_gear = gears.get("test_gear").unwrap().as_object().unwrap();
 
         // Should have database section
-        assert!(test_module.contains_key("database"));
-        let database = test_module.get("database").unwrap().as_object().unwrap();
+        assert!(test_gear.contains_key("database"));
+        let database = test_gear.get("database").unwrap().as_object().unwrap();
         assert!(database.contains_key("dsn"));
 
         // DSN should be redacted
@@ -2720,55 +2692,55 @@ logging:
     }
 
     #[test]
-    fn test_render_effective_modules_config_minimal() {
-        // Test that modules with minimal/no config can be rendered
+    fn test_render_effective_gears_config_minimal() {
+        // Test that gears with minimal/no config can be rendered
         let mut app = create_minimal_app();
 
-        // Manually add a module with no database or config sections
-        app.modules
-            .insert("minimal_module".to_owned(), serde_json::json!({}));
+        // Manually add a gear with no database or config sections
+        app.gears
+            .insert("minimal_gear".to_owned(), serde_json::json!({}));
 
-        let result = render_effective_modules_config(&app).unwrap();
+        let result = render_effective_gears_config(&app).unwrap();
 
-        // Module should be present in output (or excluded if truly empty)
+        // Gear should be present in output (or excluded if truly empty)
         // Either way, rendering should succeed
         assert!(result.is_object());
     }
 
     #[test]
-    fn test_dump_effective_modules_config_yaml() {
+    fn test_dump_effective_gears_config_yaml() {
         let mut app = create_minimal_app();
-        add_module_with_config(
+        add_gear_with_config(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "setting": "value"
             }),
         );
 
-        let yaml = dump_effective_modules_config_yaml(&app).unwrap();
+        let yaml = dump_effective_gears_config_yaml(&app).unwrap();
 
         // Should be valid YAML
-        assert!(yaml.contains("test_module:"));
+        assert!(yaml.contains("test_gear:"));
         assert!(yaml.contains("config:"));
         assert!(yaml.contains("setting: value"));
     }
 
     #[test]
-    fn test_dump_effective_modules_config_json() {
+    fn test_dump_effective_gears_config_json() {
         let mut app = create_minimal_app();
-        add_module_with_config(
+        add_gear_with_config(
             &mut app,
-            "test_module",
+            "test_gear",
             &serde_json::json!({
                 "setting": "value"
             }),
         );
 
-        let json = dump_effective_modules_config_json(&app).unwrap();
+        let json = dump_effective_gears_config_json(&app).unwrap();
 
         // Should be valid JSON
-        assert!(json.contains("\"test_module\""));
+        assert!(json.contains("\"test_gear\""));
         assert!(json.contains("\"config\""));
         assert!(json.contains("\"setting\""));
         assert!(json.contains("\"value\""));
@@ -2779,19 +2751,19 @@ logging:
     }
 
     #[test]
-    fn test_render_multiple_modules() {
+    fn test_render_multiple_gears() {
         let mut app = create_minimal_app();
-        add_module_with_config(&mut app, "module_a", &serde_json::json!({"a": 1}));
-        add_module_with_config(&mut app, "module_b", &serde_json::json!({"b": 2}));
-        add_module_with_config(&mut app, "module_c", &serde_json::json!({"c": 3}));
+        add_gear_with_config(&mut app, "gear_a", &serde_json::json!({"a": 1}));
+        add_gear_with_config(&mut app, "gear_b", &serde_json::json!({"b": 2}));
+        add_gear_with_config(&mut app, "gear_c", &serde_json::json!({"c": 3}));
 
-        let result = render_effective_modules_config(&app).unwrap();
-        let modules = result.as_object().unwrap();
+        let result = render_effective_gears_config(&app).unwrap();
+        let gears = result.as_object().unwrap();
 
-        assert_eq!(modules.len(), 3);
-        assert!(modules.contains_key("module_a"));
-        assert!(modules.contains_key("module_b"));
-        assert!(modules.contains_key("module_c"));
+        assert_eq!(gears.len(), 3);
+        assert!(gears.contains_key("gear_a"));
+        assert!(gears.contains_key("gear_b"));
+        assert!(gears.contains_key("gear_c"));
     }
 
     // ========== Vendor configuration tests ==========
@@ -3002,10 +2974,10 @@ vendor:
     }
 
     #[test]
-    fn test_vendor_coexists_with_modules() {
+    fn test_vendor_coexists_with_gears() {
         let mut config = AppConfig::default();
-        config.modules.insert(
-            "my_module".to_owned(),
+        config.gears.insert(
+            "my_gear".to_owned(),
             serde_json::json!({ "config": { "some_setting": true } }),
         );
         config.vendor.insert(
@@ -3013,7 +2985,7 @@ vendor:
             serde_json::json!({ "api_token": "acme-token-123" }),
         );
 
-        assert!(config.modules.contains_key("my_module"));
+        assert!(config.gears.contains_key("my_gear"));
         assert!(config.vendor.contains_key("acme"));
 
         let acme: TestVendorConfig = config.vendor_config("acme").unwrap();
@@ -3052,24 +3024,24 @@ vendor: {}
     // ========== Duplicate YAML key rejection tests ==========
 
     #[test]
-    fn test_reject_duplicate_module_names() {
+    fn test_reject_duplicate_gear_names() {
         let tmp = tempdir().unwrap();
         let cfg_path = tmp.path().join("cfg.yaml");
         let yaml = r#"
 server:
   home_dir: "~/.test_dup"
-modules:
-  module1:
+gears:
+  gear1:
     config: {}
-  module2:
+  gear2:
     config: {}
-  module1:
+  gear1:
     config: {}
 "#;
         fs::write(&cfg_path, yaml).unwrap();
 
         let result = AppConfig::load_layered(&cfg_path);
-        assert!(result.is_err(), "duplicate module names should be rejected");
+        assert!(result.is_err(), "duplicate gear names should be rejected");
         let msg = format!("{:?}", result.unwrap_err());
         assert!(
             msg.contains("duplicate") || msg.contains("Duplicate"),
@@ -3078,27 +3050,27 @@ modules:
     }
 
     #[test]
-    fn test_reject_duplicate_keys_in_module_file() {
+    fn test_reject_duplicate_keys_in_gear_file() {
         let tmp = tempdir().unwrap();
-        let modules_dir = tmp.path().join("modules.d");
-        fs::create_dir_all(&modules_dir).unwrap();
+        let gears_dir = tmp.path().join("gears.d");
+        fs::create_dir_all(&gears_dir).unwrap();
 
-        // Module file with duplicate "config:" key
-        let module_yaml = r#"
+        // Gear file with duplicate "config:" key
+        let gear_yaml = r#"
 config:
   key1: "value1"
 config:
   key2: "value2"
 "#;
-        fs::write(modules_dir.join("bad_module.yaml"), module_yaml).unwrap();
+        fs::write(gears_dir.join("bad_gear.yaml"), gear_yaml).unwrap();
 
         let cfg_yaml = format!(
             r#"
 server:
   home_dir: "~/.test_dup_modfile"
-modules_dir: "{}"
+gears_dir: "{}"
 "#,
-            normalize_path(&modules_dir)
+            normalize_path(&gears_dir)
         );
         let cfg_path = tmp.path().join("cfg.yaml");
         fs::write(&cfg_path, cfg_yaml).unwrap();
@@ -3106,7 +3078,7 @@ modules_dir: "{}"
         let result = AppConfig::load_layered(&cfg_path);
         assert!(
             result.is_err(),
-            "duplicate keys in a module file should be rejected"
+            "duplicate keys in a gear file should be rejected"
         );
         let msg = format!("{:?}", result.unwrap_err());
         assert!(
@@ -3116,18 +3088,18 @@ modules_dir: "{}"
     }
 
     #[test]
-    fn test_no_false_positive_on_unique_modules() {
+    fn test_no_false_positive_on_unique_gears() {
         let tmp = tempdir().unwrap();
         let cfg_path = tmp.path().join("cfg.yaml");
         let yaml = r#"
 server:
   home_dir: "~/.test_ok"
-modules:
-  module1:
+gears:
+  gear1:
     config: {}
-  module2:
+  gear2:
     config: {}
-  module3:
+  gear3:
     config: {}
 "#;
         fs::write(&cfg_path, yaml).unwrap();
@@ -3135,7 +3107,7 @@ modules:
         let result = AppConfig::load_layered(&cfg_path);
         assert!(
             result.is_ok(),
-            "unique module names should be accepted: {:?}",
+            "unique gear names should be accepted: {:?}",
             result.unwrap_err()
         );
     }

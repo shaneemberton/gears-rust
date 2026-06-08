@@ -1,6 +1,6 @@
-# API Gateway Module
+# API Gateway Gear
 
-HTTP gateway module that owns the Axum router and collects typed operation specs to emit a single OpenAPI document.
+HTTP gateway gear that owns the Axum router and collects typed operation specs to emit a single OpenAPI document.
 
 ## Overview
 
@@ -13,7 +13,7 @@ The `cf-gears-api-gateway` crate provides:
 ## Configuration
 
 ```yaml
-modules:
+gears:
   api_gateway:
     config:
       bind_addr: "127.0.0.1:8086"

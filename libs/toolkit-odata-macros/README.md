@@ -8,7 +8,7 @@ Automatically generates OData schema boilerplate for DTO structs, including:
 
 - Field enum with variants for each struct field
 - Schema implementation mapping fields to OData names
-- Typed `FieldRef` constructor functions in a snake_case module
+- Typed `FieldRef` constructor functions in a snake_case gear
 
 ### Example
 
@@ -26,7 +26,7 @@ struct User {
 // Generated code includes:
 // - UserField enum with Id, Email, Name, Age variants
 // - UserSchema struct implementing Schema trait
-// - user module with id(), email(), name(), age() constructors
+// - user gear with id(), email(), name(), age() constructors
 
 // Usage:
 use toolkit_sdk::odata::{QueryBuilder, FilterExpr};
@@ -75,7 +75,7 @@ For a struct named `User`, the macro generates:
 
 1. **Field Enum**: `UserField` with a variant for each field
 2. **Schema Struct**: `UserSchema` implementing `toolkit_sdk::odata::Schema`
-3. **Constructor Module**: `user` module with typed constructor functions
+3. **Constructor Gear**: `user` gear with typed constructor functions
 
 ```rust
 // Generated:

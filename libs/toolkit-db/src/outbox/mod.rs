@@ -121,4 +121,4 @@ pub use types::{
     WorkerTuning,
 };
 
-// Internal re-exports for tests and internal modules
+// Internal re-exports for tests and internal gears

@@ -22,8 +22,8 @@ use crate::api::rest::error::MiniChatChatError;
 use crate::api::rest::sse::{StreamEventKind, StreamPhase};
 use crate::domain::service::{StreamError, replay};
 use crate::domain::stream_events::StreamEvent;
+use crate::gear::AppServices;
 use crate::infra::db::entity::chat_turn::Model as TurnModel;
-use crate::module::AppServices;
 
 /// GET /mini-chat/v1/chats/{id}/messages
 #[tracing::instrument(skip(svc, ctx, query), fields(chat_id = %chat_id))]

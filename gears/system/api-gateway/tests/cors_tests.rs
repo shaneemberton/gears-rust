@@ -7,21 +7,21 @@ use async_trait::async_trait;
 use axum::{Router, extract::Json, routing::get};
 use std::sync::Arc;
 use toolkit::{
-    Module, ModuleCtx, RestApiCapability,
+    Gear, GearCtx, RestApiCapability,
     api::OperationBuilder,
     config::ConfigProvider,
     contracts::{ApiGatewayCapability, OpenApiRegistry},
 };
 use uuid::Uuid;
 
-/// Helper to create a test `ModuleCtx` with CORS config
+/// Helper to create a test `GearCtx` with CORS config
 struct TestConfigProvider {
     config: serde_json::Value,
 }
 
 impl ConfigProvider for TestConfigProvider {
-    fn get_module_config(&self, module: &str) -> Option<&serde_json::Value> {
-        if module == "api-gateway" {
+    fn get_gear_config(&self, gear: &str) -> Option<&serde_json::Value> {
+        if gear == "api-gateway" {
             Some(&self.config)
         } else {
             None
@@ -35,7 +35,7 @@ fn wrap_config(config: &serde_json::Value) -> serde_json::Value {
     })
 }
 
-fn create_test_module_ctx_with_cors() -> ModuleCtx {
+fn create_test_gear_ctx_with_cors() -> GearCtx {
     let config = wrap_config(&serde_json::json!({
         "bind_addr": "127.0.0.1:0",
         "cors_enabled": true,
@@ -51,7 +51,7 @@ fn create_test_module_ctx_with_cors() -> ModuleCtx {
 
     let hub = Arc::new(toolkit::ClientHub::new());
 
-    ModuleCtx::new(
+    GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
@@ -60,7 +60,7 @@ fn create_test_module_ctx_with_cors() -> ModuleCtx {
     )
 }
 
-fn create_test_module_ctx_permissive_cors() -> ModuleCtx {
+fn create_test_gear_ctx_permissive_cors() -> GearCtx {
     let config = wrap_config(&serde_json::json!({
         "bind_addr": "127.0.0.1:0",
         "cors_enabled": true,
@@ -69,7 +69,7 @@ fn create_test_module_ctx_permissive_cors() -> ModuleCtx {
 
     let hub = Arc::new(toolkit::ClientHub::new());
 
-    ModuleCtx::new(
+    GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
@@ -84,19 +84,19 @@ struct TestData {
     value: String,
 }
 
-pub struct CorsTestModule;
+pub struct CorsTestGear;
 
 #[async_trait]
-impl Module for CorsTestModule {
-    async fn init(&self, _ctx: &toolkit::ModuleCtx) -> Result<()> {
+impl Gear for CorsTestGear {
+    async fn init(&self, _ctx: &toolkit::GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
-impl RestApiCapability for CorsTestModule {
+impl RestApiCapability for CorsTestGear {
     fn register_rest(
         &self,
-        _ctx: &toolkit::ModuleCtx,
+        _ctx: &toolkit::GearCtx,
         router: axum::Router,
         openapi: &dyn OpenApiRegistry,
     ) -> Result<axum::Router> {
@@ -134,12 +134,12 @@ async fn post_handler(Json(data): Json<TestData>) -> Json<TestData> {
 #[tokio::test]
 async fn test_cors_layer_builds_with_config() {
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_with_cors();
+    let ctx = create_test_gear_ctx_with_cors();
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = CorsTestModule;
+    let gear = CorsTestGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -155,12 +155,12 @@ async fn test_cors_layer_builds_with_config() {
 #[tokio::test]
 async fn test_cors_permissive_mode() {
     let api_gateway = api_gateway::ApiGateway::default();
-    let ctx = create_test_module_ctx_permissive_cors();
+    let ctx = create_test_gear_ctx_permissive_cors();
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = CorsTestModule;
+    let gear = CorsTestGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -181,7 +181,7 @@ async fn test_cors_disabled() {
 
     let hub = Arc::new(toolkit::ClientHub::new());
 
-    let ctx = ModuleCtx::new(
+    let ctx = GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
@@ -192,9 +192,9 @@ async fn test_cors_disabled() {
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&ctx).await.expect("Failed to init");
 
-    let module = CorsTestModule;
+    let gear = CorsTestGear;
     let router = Router::new();
-    let router = module
+    let router = gear
         .register_rest(&ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -223,7 +223,7 @@ async fn test_cors_config_validation() {
 
     let hub = Arc::new(toolkit::ClientHub::new());
 
-    let ctx = ModuleCtx::new(
+    let ctx = GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),

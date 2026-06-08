@@ -1,10 +1,10 @@
-# File Parser Module
+# File Parser Gear
 
-File parsing module for Gears / ToolKit.
+File parsing gear for Gears / ToolKit.
 
 ## Overview
 
-The `cf-gears-file-parser` crate implements the `file-parser` module and registers REST routes.
+The `cf-gears-file-parser` crate implements the `file-parser` gear and registers REST routes.
 
 All document extraction is handled by a single unified backend — [`kreuzberg =4.9.4`](https://github.com/kreuzberg-dev/kreuzberg) — which replaces the previous per-format library set (`tl`, `pdf-extract`, `calamine`, `pptx-to-md`).
 
@@ -20,7 +20,7 @@ Supported formats:
 ## Configuration
 
 ```yaml
-modules:
+gears:
   file-parser:
     config:
       max_file_size_mb: 100
@@ -35,15 +35,15 @@ The `parse-local` endpoints validate requested file paths before any filesystem 
 
 1. Paths containing `..` components are always rejected.
 2. The requested path is canonicalized (symlinks resolved) and must fall under `allowed_local_base_dir`.
-3. `allowed_local_base_dir` is **required** — the module will fail to start if it is missing or the path cannot be resolved.
+3. `allowed_local_base_dir` is **required** — the gear will fail to start if it is missing or the path cannot be resolved.
 
 ## License
 
-This module is licensed under **Apache-2.0**.
+This gear is licensed under **Apache-2.0**.
 
 ### Third-party dependency: kreuzberg
 
-This module depends on [`kreuzberg`](https://github.com/kreuzberg-dev/kreuzberg), pinned at **`=4.9.4`** ([Elastic License 2.0](https://www.elastic.co/licensing/elastic-license)).
+This gear depends on [`kreuzberg`](https://github.com/kreuzberg-dev/kreuzberg), pinned at **`=4.9.4`** ([Elastic License 2.0](https://www.elastic.co/licensing/elastic-license)).
 
 | Version range | License |
 |---------------|---------|

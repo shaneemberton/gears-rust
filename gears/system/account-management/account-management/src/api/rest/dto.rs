@@ -5,7 +5,7 @@
 //!
 //! The metadata entry projection deliberately omits `created_at`. The
 //! upstream [`account_management_sdk::MetadataEntry`] does not expose
-//! it (its module docs document the omission explicitly — only
+//! it (its gear docs document the omission explicitly — only
 //! `updated_at` crosses the public contract for cache validation).
 
 use gts::GtsTypeId;

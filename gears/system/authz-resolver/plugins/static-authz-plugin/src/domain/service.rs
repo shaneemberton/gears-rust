@@ -102,7 +102,7 @@ impl Service {
         // predicate whose property doesn't resolve to a column on the
         // entity being queried -- so the addition is invisible to PEPs
         // that don't advertise the capability and to entities that don't
-        // expose the property. Modules that do not opt-in to
+        // expose the property. Gears that do not opt-in to
         // `Capability::TenantHierarchy` see the baseline shape unchanged.
         if advertises_tenant_hierarchy(request) {
             for prop in [pep_properties::OWNER_TENANT_ID, pep_properties::RESOURCE_ID] {

@@ -7,7 +7,7 @@
 //! * `resource_type` field on [`crate::AccountManagementError`]
 //!   variants (`NotFound`, `FailedPrecondition`) and on the canonical
 //!   envelope they lift to at the REST boundary.
-//! * Future cross-module event consumers and sibling modules that
+//! * Future cross-gear event consumers and sibling gears that
 //!   pattern-match on AM-emitted events (event-bus contract TBD) —
 //!   depending on this SDK instead of the impl crate keeps consumer
 //!   build graphs slim.
@@ -17,7 +17,7 @@
 //! `gts.cf.core.am.{resource}.v1~`. The trailing `~` is the GTS
 //! terminator and is part of the identifier.
 //!
-//! Mirrors the `gts` module layout used by `resource-group-sdk` —
+//! Mirrors the `gts` gear layout used by `resource-group-sdk` —
 //! see `account_management_sdk::lib` rationale for the SDK split.
 //!
 //! # Note on `#[resource_error]` macro arguments
@@ -25,7 +25,7 @@
 //! The `toolkit_canonical_errors::resource_error` proc-macro takes a
 //! literal string at expansion time and cannot resolve constants —
 //! the impl-crate sites that call the macro therefore duplicate
-//! these literals. The `domain::error_tests` module asserts the
+//! these literals. The `domain::error_tests` gear asserts the
 //! impl-crate strings match the constants below, so a divergence
 //! trips at test time, not in production.
 
@@ -75,7 +75,7 @@ pub const USER_RESOURCE_TYPE: &str = "gts.cf.core.am.user.v1~";
 ///   list user-groups (optionally combined with `tenant_id eq <t>`).
 /// * `ResourceGroupClient::create_group({code: <this>, ...})` -- to
 ///   create a new user-group instance.
-/// * AM's `register_user_group_types` at module init.
+/// * AM's `register_user_group_types` at gear init.
 ///
 /// The string lives in RG's type-registry namespace
 /// (`gts.cf.core.rg.type.v1~` prefix) as required by RG's

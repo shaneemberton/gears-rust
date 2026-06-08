@@ -18,7 +18,7 @@ from urllib.error import URLError, HTTPError
 
 import yaml
 
-# Import prereq module for environment validation
+# Import prereq gear for environment validation
 from lib.prereq import check_environment_ready
 from lib.platform import (
     find_binary,
@@ -221,7 +221,7 @@ def make_relative_path(filepath, project_root):
     s = str(filepath).replace("\\", "/")
     if s.startswith("./"):
         s = s[2:]
-    # If it's already a libs/ or modules/ or apps/ relative path, accept it
+    # If it's already a libs/ or gears/ or apps/ relative path, accept it
     if s.startswith("libs/") or s.startswith("gears/") or s.startswith("apps/"):
         return s
     # Otherwise try to relativize
@@ -232,7 +232,7 @@ def make_relative_path(filepath, project_root):
 
 
 def categorize_file(rel_path):
-    """Categorize file into: 'file', 'module', 'lib', or 'external'."""
+    """Categorize file into: 'file', 'gear', 'lib', or 'external'."""
     # Normalize leading './'
     rel_path = rel_path[2:] if rel_path.startswith('./') else rel_path
     if rel_path.startswith('libs/'):
@@ -241,8 +241,8 @@ def categorize_file(rel_path):
         if len(parts) >= 2:
             return 'lib', parts[1]
         return 'file', None
-    elif rel_path.startswith('modules/'):
-        # gears/system/ contains nested submodules (oagw, api-gateway, …).
+    elif rel_path.startswith('gears/'):
+        # gears/system/ contains nested gears (oagw, api-gateway, …).
         # Use the submodule name so each one gets its own report row.
         parts = rel_path.split('/')
         if len(parts) >= 3 and parts[1] == 'system':
@@ -259,10 +259,10 @@ def categorize_file(rel_path):
 
 
 def enumerate_project_rs_files(project_root):
-    """List Rust source files under libs/ and modules/ as relative paths."""
+    """List Rust source files under libs/ and gears/ as relative paths."""
     root = Path(project_root)
     rels = []
-    for top in [root / "libs", root / "modules"]:
+    for top in [root / "libs", root / "gears"]:
         if not top.exists():
             continue
         for p in top.rglob("*.rs"):
@@ -288,7 +288,7 @@ def count_non_empty_lines(abs_path):
 
 def aggregate_coverage_data(files_data, project_root):
     """
-    Aggregate coverage data by files, modules, and libs.
+    Aggregate coverage data by files, gears, and libs.
     Returns: (individual_files, aggregated_groups, total)
     """
     individual_files = []
@@ -329,7 +329,7 @@ def aggregate_coverage_data(files_data, project_root):
         # Add to individual files
         individual_files.append(file_stats)
 
-        # Aggregate into groups (modules/libs)
+        # Aggregate into groups (gears/libs)
         if category in ['module', 'lib'] and group_name:
             if group_name not in groups:
                 groups[group_name] = {
@@ -436,7 +436,7 @@ def format_custom_coverage_report(json_data,
     - Relative file paths
     - Merged columns with 3-line headers
     - Branch coverage
-    - Grouped by files, modules/libs, and total
+    - Grouped by files, gears/libs, and total
     - Optional color coding for coverage thresholds
     """
     data = json_data['data'][0]
@@ -508,9 +508,9 @@ def format_custom_coverage_report(json_data,
             file_stats['path'], file_stats, threshold=threshold, use_color=use_color
         ))
 
-    # Modules & Libs Section
+    # Gears & Libs Section
     lines.append("")
-    lines.extend(format_section_header("Modules & Libraries:"))
+    lines.extend(format_section_header("Gears & Libraries:"))
     for group in sorted(groups, key=lambda x: (x['type'], x['name'])):
         name = f"{group['type']}/{group['name']}"
         lines.append(format_coverage_row(
@@ -609,7 +609,7 @@ def parse_bind_addr_port(config_file):
     with open(target_real, 'r') as f:
         config = yaml.safe_load(f)
 
-    bind_addr = config.get('modules', {}).get('api-gateway', {}).get(
+    bind_addr = config.get('gears', {}).get('api-gateway', {}).get(
         'config', {}).get('bind_addr', '127.0.0.1:8080'
     )
     if ':' not in bind_addr:
@@ -841,7 +841,7 @@ def collect_e2e_local_coverage(
     Args:
         output_dir: Directory to store coverage reports
         config_file: Config file for server
-        test_filter: Optional test path filter (e.g., 'modules/api_gateway')
+        test_filter: Optional test path filter (e.g., 'gears/api_gateway')
         skip_build: If True, skip clean and test execution
 
     Returns:
@@ -1206,7 +1206,7 @@ Examples:
   python scripts/coverage.py e2e-local
 
   # Generate local e2e test coverage for specific module
-  python scripts/coverage.py e2e-local --filter modules/api_gateway
+  python scripts/coverage.py e2e-local --filter gears/api_gateway
 
   # Generate combined coverage (unit + e2e-local)
   python scripts/coverage.py combined
@@ -1266,7 +1266,7 @@ Examples:
         "--filter",
         help=(
             "Filter E2E tests by path relative to testing/e2e "
-            "(e.g., modules/api_gateway)"
+            "(e.g., gears/api_gateway)"
         ),
         default=None
     )

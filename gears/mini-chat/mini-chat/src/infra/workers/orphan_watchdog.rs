@@ -34,7 +34,7 @@ const BATCH_LIMIT: u32 = 100;
 
 /// Run the orphan watchdog under leader election.
 ///
-/// Returns when `cancel` fires (module shutdown) or on unrecoverable error.
+/// Returns when `cancel` fires (gear shutdown) or on unrecoverable error.
 pub async fn run<TR: TurnRepository + 'static, MR: MessageRepository + 'static>(
     elector: Arc<dyn LeaderElector>,
     config: OrphanWatchdogConfig,

@@ -1,12 +1,12 @@
 //! gRPC client transport configuration and connection utilities.
 //!
-//! This module provides production-grade gRPC client configuration with:
+//! This gear provides production-grade gRPC client configuration with:
 //! - Configurable connect and RPC timeouts
 //! - HTTP/2 keepalive settings for connection health
 //! - Tracing spans around connection establishment
 //!
-//! **Note:** This module handles both transport-level configuration and connection retries
-//! ([`connect_with_retry`]). For RPC-level retry logic, see the [`crate::rpc_retry`] module.
+//! **Note:** This gear handles both transport-level configuration and connection retries
+//! ([`connect_with_retry`]). For RPC-level retry logic, see the [`crate::rpc_retry`] gear.
 
 use std::time::Duration;
 
@@ -26,7 +26,7 @@ fn duration_to_u64_ms(duration: Duration) -> u64 {
 ///
 /// This configuration controls transport-level settings such as timeouts and keepalive.
 /// Retry-related fields (`max_retries`, `base_backoff`, `max_backoff`) are stored here
-/// for convenience but are used by the [`crate::rpc_retry`] module, not by the transport layer.
+/// for convenience but are used by the [`crate::rpc_retry`] gear, not by the transport layer.
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct GrpcClientConfig {
@@ -167,7 +167,7 @@ fn build_endpoint(
 ///     &config
 /// ).await?;
 ///
-/// // For retries, use the rpc_retry module:
+/// // For retries, use the rpc_retry gear:
 /// let retry_cfg = Arc::new(RpcRetryConfig::from(&config));
 /// let response = call_with_retry(
 ///     &mut client,

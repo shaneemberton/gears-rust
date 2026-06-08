@@ -1,6 +1,6 @@
 //! Domain Layer Marker Traits
 //!
-//! This module provides marker traits for enforcing domain-driven design boundaries
+//! This gear provides marker traits for enforcing domain-driven design boundaries
 //! at compile time. Types marked with these traits are guaranteed to be free of
 //! infrastructure dependencies (`sqlx`, `sea_orm`, `http`, `axum`, etc.).
 //!

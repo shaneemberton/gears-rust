@@ -1,10 +1,10 @@
 # AuthN Resolver SDK
 
-SDK crate for the AuthN Resolver module, providing public API contracts for authentication in Gears.
+SDK crate for the AuthN Resolver gear, providing public API contracts for authentication in Gears.
 
 ## Overview
 
-This crate defines the transport-agnostic interface for the AuthN Resolver module:
+This crate defines the transport-agnostic interface for the AuthN Resolver gear:
 
 - **`AuthNResolverClient`** — Async trait for consumers (authenticate bearer tokens)
 - **`AuthNResolverPluginClient`** — Async trait for plugin implementations

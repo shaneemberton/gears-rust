@@ -1,12 +1,12 @@
-# Mini-Chat Module
+# mini-chat gear
 
-AI chat module for Gears. Provides a REST API for managing chats, messages (with SSE streaming), models, reactions, and attachments.
+AI chat Gear. Provides a REST API for managing chats, messages (with SSE streaming), models, reactions, and attachments.
 
 ## Directory Structure
 
 ```
-modules/mini-chat/
-├── mini-chat/          # Main module crate
+gears/mini-chat/
+├── mini-chat/          # Main gear crate
 │   └── src/
 │       ├── api/        # REST handlers, routes, DTOs, SSE
 │       ├── domain/     # Business logic, services, repository traits
@@ -26,7 +26,7 @@ make mini-chat
 ```
 
 This starts the server at `http://127.0.0.1:8087` with SQLite, mock auth, and single-tenant mode.
-The example configuration serves the API behind the gateway prefix `/cf`, configured via `modules.api-gateway.config.prefix_path`.
+The example configuration serves the API behind the gateway prefix `/cf`, configured via `gears.api-gateway.config.prefix_path`.
 
 ### Configuration
 
@@ -75,10 +75,10 @@ OpenAPI docs (when server is running): http://127.0.0.1:8087/cf/docs
 
 ```bash
 # All steps (requires a valid API key for SSE streaming)
-python3 modules/mini-chat/scripts/smoke-test-api.py
+python3 gears/mini-chat/scripts/smoke-test-api.py
 
 # Skip SSE streaming (no real API key needed)
-python3 modules/mini-chat/scripts/smoke-test-api.py --no-sse
+python3 gears/mini-chat/scripts/smoke-test-api.py --no-sse
 ```
 
 ## Documentation

@@ -1,8 +1,8 @@
 //! AM-internal "system actor" `SecurityContext` factories.
 //!
 //! Background AM flows have no end-user `SecurityContext` to forward
-//! but still need to call into cross-module clients (Resource Group,
-//! `IdP` plugin) and the platform's `AuthZ` resolver. This module
+//! but still need to call into cross-gear clients (Resource Group,
+//! `IdP` plugin) and the platform's `AuthZ` resolver. This gear
 //! mints the stable, audit-correlatable identity AM uses on those
 //! paths: every system call carries `subject_id =
 //! AM_SYSTEM_ACTOR_UUID` and `subject_type = "am.system"`, mirroring
@@ -41,8 +41,8 @@
 //!
 //! # Today's call sites
 //!
-//! * [`for_module_init`] — RG type-schema registration from
-//!   `module::init`. Platform-scoped (no tenant binding).
+//! * [`for_gear_init`] — RG type-schema registration from
+//!   `gear::init`. Platform-scoped (no tenant binding).
 //! * [`for_bootstrap`] — `provision_tenant` / compensation
 //!   `deprovision_tenant` on the platform root inside the bootstrap
 //!   saga and its step-3 compensator.
@@ -76,7 +76,7 @@ const AM_SYSTEM_SUBJECT_TYPE: &str = "am.system";
 /// system-actor envelope (extra claim, attestation field) lands once.
 ///
 /// `scope_tenant = None` falls back to the platform-root sentinel
-/// ([`Uuid::nil`]) for platform-scoped flows (module init, etc.) —
+/// ([`Uuid::nil`]) for platform-scoped flows (gear init, etc.) —
 /// the same fallback the prior monolithic constructor used.
 ///
 /// # Panics
@@ -96,14 +96,14 @@ fn build_inner(scope_tenant: Option<Uuid>) -> SecurityContext {
         .expect("AM_SYSTEM_ACTOR_UUID + tenant_id are always present")
 }
 
-/// Module init — RG type-schema registration. Platform-scoped (no
+/// gear init — RG type-schema registration. Platform-scoped (no
 /// tenant binding; the registration is a workspace-wide operation
 /// that pre-dates any tenant).
 #[must_use]
-pub(crate) fn for_module_init() -> SecurityContext {
+pub(crate) fn for_gear_init() -> SecurityContext {
     tracing::info!(
         target: "am.system_actor",
-        site = "module_init",
+        site = "gear_init",
         "am system actor constructed",
     );
     build_inner(None)
@@ -179,8 +179,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn module_init_uses_nil_tenant() {
-        let ctx = for_module_init();
+    fn gear_init_uses_nil_tenant() {
+        let ctx = for_gear_init();
         assert_eq!(ctx.subject_id(), AM_SYSTEM_ACTOR_UUID);
         assert_eq!(ctx.subject_type(), Some(AM_SYSTEM_SUBJECT_TYPE));
         assert_eq!(ctx.subject_tenant_id(), Uuid::nil());

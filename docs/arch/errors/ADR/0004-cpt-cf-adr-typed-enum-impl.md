@@ -9,7 +9,7 @@ date: 2026-02-28
 
 ## Context and Problem Statement
 
-The canonical error model requires a single Rust type that all modules use to express failures. This type must carry a category, structured context, and optional metadata. Multiple implementation approaches exist in Rust's type system. Which approach best satisfies compile-time safety, ergonomics, and transport agnosticism?
+The canonical error model requires a single Rust type that all gears use to express failures. This type must carry a category, structured context, and optional metadata. Multiple implementation approaches exist in Rust's type system. Which approach best satisfies compile-time safety, ergonomics, and transport agnosticism?
 
 ## Decision Drivers
 
@@ -35,9 +35,9 @@ Chosen option: **Option A — Typed enum with category-typed constructors**, bec
 * The error library must define a single `CanonicalError` enum with 16 variants, each carrying its specific context type — the enum is the central error type for the entire platform
 * Each context type (`ResourceInfo`, `Validation`, `ErrorInfo`, etc.) must be a separate struct with its own fields — these structs are part of the public API surface
 * Blanket `From` implementations for common library errors (`anyhow`, `sea_orm`, `sqlx`, `serde_json`, `std::io`) must be provided in the error library to enable `?` propagation
-* The `Problem` wire format conversion must be a single exhaustive `match` in one location — all 16 categories are handled centrally, not per-module
+* The `Problem` wire format conversion must be a single exhaustive `match` in one location — all 16 categories are handled centrally, not per-gear
 * Adding a new category in the future adds a new enum variant, which is a breaking change — `#[non_exhaustive]` or major version bump must be decided
-* Modules that need error customisation beyond the 16 categories must do so through context payload specialisation, not through new enum variants
+* Gears that need error customisation beyond the 16 categories must do so through context payload specialisation, not through new enum variants
 * The `#[resource_error]` attribute macro must generate typed constructor functions that delegate to the enum constructors — the macro is a convenience layer, not a separate error type
 
 ### Confirmation
@@ -52,7 +52,7 @@ A single `enum CanonicalError` with 16 variants. Each variant carries `ctx: Cont
 
 * Good, because exhaustive `match` — compiler enforces all categories are handled
 * Good, because each variant has a specific context type — wrong context is a compile error
-* Good, because one `From<CanonicalError> for Problem` impl covers all modules
+* Good, because one `From<CanonicalError> for Problem` impl covers all gears
 * Good, because blanket `From` impls for library errors (anyhow, sea_orm, sqlx, serde_json, io) enable `?`
 * Good, because stack-allocated — no heap allocation for the error itself
 * Neutral, because enum size equals largest variant (acceptable for error types)
@@ -66,14 +66,14 @@ Each error is a separate struct implementing a trait with `STATUS`, `TITLE`, `SC
 * Good, because adding a new error requires no changes to existing code
 * Bad, because 15-20 lines of boilerplate per error type (struct + trait impl)
 * Bad, because no exhaustive match — impossible to verify all errors are handled
-* Bad, because no blanket `From` impls for library errors — each module manually maps each library error
+* Bad, because no blanket `From` impls for library errors — each gear manually maps each library error
 * Bad, because `STATUS: u16` embeds HTTP details in domain code
 
 ### Option C: Trait Object (`Box<dyn CanonicalError>`)
 
 A trait with `fn category(&self) -> Category` and `fn context(&self) -> ContextValue`. Errors are `Box<dyn CanonicalError>`.
 
-* Good, because modules can define their own error structs conforming to the category contract
+* Good, because gears can define their own error structs conforming to the category contract
 * Good, because extensible without modifying the trait
 * Bad, because `Box<dyn>` heap-allocates every error
 * Bad, because no compile-time exhaustiveness — `category()` returns a runtime value
@@ -92,7 +92,7 @@ Library error blanket `From` impls shipped with `toolkit-errors`:
 | `serde_json::Error` | `InvalidArgument` | Serialization failures indicate malformed input at API boundary |
 | `std::io::Error` | `Internal` | IO failures are infrastructure errors |
 
-Modules needing finer-grained mapping (e.g., `sqlx::Error::RowNotFound` → `NotFound`) implement their own `From` instead of relying on the blanket.
+Gears needing finer-grained mapping (e.g., `sqlx::Error::RowNotFound` → `NotFound`) implement their own `From` instead of relying on the blanket.
 
 ## Traceability
 

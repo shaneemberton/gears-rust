@@ -88,7 +88,7 @@ DESIGN LANGUAGE:
 
 ### 1.1 Architectural Vision
 
-CredStore follows the ToolKit Gateway + Plugins pattern (same architecture as `tenant_resolver`). A gateway module (`credstore`) exposes a simple public API to platform consumers, enforces authorization policy, and implements hierarchical secret resolution. Backend-specific storage is implemented as plugins that register via the GTS type system and are selected at runtime by configuration.
+CredStore follows the ToolKit Gateway + Plugins pattern (same architecture as `tenant_resolver`). A gateway gear (`credstore`) exposes a simple public API to platform consumers, enforces authorization policy, and implements hierarchical secret resolution. Backend-specific storage is implemented as plugins that register via the GTS type system and are selected at runtime by configuration.
 
 The SDK crate (`credstore-sdk`) defines two trait boundaries: `CredStoreClientV1` for consumers and `CredStorePluginClientV1` for backend implementations. Consumers depend only on the gateway trait and never interact with plugins directly. This decoupling allows runtime backend selection without changing consumer code.
 
@@ -121,7 +121,7 @@ The `credentials_storage` plugin is an exception to this pattern. It is a standa
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Consumers (OAGW, modules)                │
+│                    Consumers (OAGW, gears)                │
 ├─────────────────────────────────────────────────────────────┤
 │  credstore-sdk    │ Public API traits, models, errors       │
 ├─────────────────────────────────────────────────────────────┤
@@ -154,10 +154,10 @@ The `credentials_storage` plugin is an exception to this pattern. It is a standa
 
 The CredStore design aims to achieve the following objectives:
 
-- Provide secure, hierarchical secret storage for platform modules and tenant administrators
+- Provide secure, hierarchical secret storage for platform gears and tenant administrators
 - Enable flexible sharing modes: `private` (owner-only), `tenant` (tenant-wide, default), `shared` (hierarchical)
 - Support service-to-service secret retrieval (e.g., OAGW retrieving secrets on behalf of customer tenants)
-- Implement authorization and hierarchical resolution in Gateway module (centralized policy enforcement)
+- Implement authorization and hierarchical resolution in Gateway gear (centralized policy enforcement)
 - Support multiple backend storage options via plugin architecture (VendorA Credstore, OS keychain, Credentials Storage microservice)
 - Support pluggable tenant encryption key management via `KeyProvider` abstraction in the Credentials Storage plugin (local DB for dev, external KMS for production key–data separation)
 - Ensure secret values never appear in logs, error messages, or debug traces
@@ -245,7 +245,7 @@ Secret values MUST NOT appear in any log output, error messages, or debug traces
 
 ```mermaid
 graph TB
-    Consumer[Consumers<br/>OAGW, Platform Modules]
+    Consumer[Consumers<br/>OAGW, Platform Gears]
     SDK[credstore-sdk<br/>traits + models]
     GW[credstore<br/>authz + routing]
     AP[credstore_vendor_a_plugin<br/>Credstore REST]
@@ -429,7 +429,7 @@ For `private` secrets, owner match is guaranteed by ExternalID construction (own
 **Compatibility Note**: VendorA Credstore backend schema must support:
 1. Three-value `sharing` enum: `private`, `tenant`, `shared`
 2. `owner_id` UUID field for creator identification
-The VendorA Credstore backend must support these fields before deployment. Backend schema/feature implementation is a prerequisite for launching the credstore module.
+The VendorA Credstore backend must support these fields before deployment. Backend schema/feature implementation is a prerequisite for launching the credstore gear.
 
 **ExternalID Mapping:**
 ```
@@ -488,7 +488,7 @@ This has two practical implications:
 
 The CredStore Gateway supports two distinct integration patterns:
 
-1. **Self-Service Pattern**: Platform modules and tenant admins retrieve secrets for their own tenant. The tenant_id is derived from SecurityCtx.
+1. **Self-Service Pattern**: Platform gears and tenant admins retrieve secrets for their own tenant. The tenant_id is derived from SecurityCtx.
 2. **Service-to-Service Pattern**: Authorized service accounts (e.g., OAGW) retrieve secrets on behalf of arbitrary tenants by constructing an explicit SecurityCtx with the target tenant_id.
 
 #### Service-to-Service Flow (OAGW Example)
@@ -525,7 +525,7 @@ The CredStore Gateway supports two distinct integration patterns:
 - **Transparency**: Hierarchical resolution is identical for both patterns (implemented in Gateway)
 - **Flexibility**: Service accounts can retrieve secrets for any tenant they're authorized to access
 
-**Implementation Note**: OAGW is a ToolKit module that uses the standard CredStore SDK client. There is no separate integration path or direct backend access. All operations flow through Gateway→Plugin→Backend.
+**Implementation Note**: OAGW is a ToolKit gear that uses the standard CredStore SDK client. There is no separate integration path or direct backend access. All operations flow through Gateway→Plugin→Backend.
 
 ### 4.6 Interactions & Sequences
 
@@ -535,7 +535,7 @@ The CredStore Gateway supports two distinct integration patterns:
 
 ```mermaid
 sequenceDiagram
-    participant T as Tenant / Module
+    participant T as Tenant / Gear
     participant GW as credstore
     participant P as Plugin
     participant B as Backend
@@ -572,9 +572,9 @@ sequenceDiagram
 **Key Flows**: Reference use cases from PRD:
 - `cpt-cf-credstore-usecase-create-shared` → Self-Service CRUD (with `sharing: shared`)
 - `cpt-cf-credstore-usecase-crud` → Self-Service CRUD
-- `cpt-cf-credstore-usecase-hierarchical-resolve` → Hierarchical resolution implemented in Gateway module
+- `cpt-cf-credstore-usecase-hierarchical-resolve` → Hierarchical resolution implemented in Gateway gear
 
-**Hierarchical Resolution Implementation**: The Gateway module implements a two-phase walk-up algorithm:
+**Hierarchical Resolution Implementation**: The Gateway gear implements a two-phase walk-up algorithm:
 1. Extract `tenant_id` and `subject_id` from SecurityCtx
 2. Query `tenant_resolver` to get ancestor chain (child → parent → ... → root)
 3. For each tenant in the chain (starting from requesting tenant), perform two-phase lookup:
@@ -606,7 +606,7 @@ This allows User B to access the parent's shared credential. Meanwhile, User A i
 
 ### 4.7 Database schemas & tables
 
-The gateway module has no local database. Secrets are persisted in the external backend (VendorA Credstore or OS keychain). The gateway and the VendorA/OS plugins are stateless.
+The gateway gear has no local database. Secrets are persisted in the external backend (VendorA Credstore or OS keychain). The gateway and the VendorA/OS plugins are stateless.
 
 The `credentials_storage` plugin maintains its own database with tables for schemas, credential definitions, credentials (encrypted), and tenant keys (when `DatabaseKeyProvider` is active). The initial implementation uses PostgreSQL; the storage layer is designed to become database-agnostic in future iterations. The full database schema is specified in the plugin design document (`plugins/credentials-storage/DESIGN.md`, planned).
 
@@ -616,7 +616,7 @@ The `credentials_storage` plugin maintains its own database with tables for sche
 
 ```mermaid
 graph LR
-    Platform["Platform<br/>(OAGW, modules)"] --> GW["credstore +<br/>vendor_a plugin"]
+    Platform["Platform<br/>(OAGW, gears)"] --> GW["credstore +<br/>vendor_a plugin"]
     GW --> CS["VendorA Credstore<br/>(Go svc)"]
     GW --> OAuth["OAuth/OIDC<br/>Provider"]
 ```
@@ -625,7 +625,7 @@ graph LR
 
 ```mermaid
 graph LR
-    Platform["Platform<br/>(OAGW, modules)"] --> GW["credstore +<br/>credentials_storage plugin"]
+    Platform["Platform<br/>(OAGW, gears)"] --> GW["credstore +<br/>credentials_storage plugin"]
     GW --> CSP["Credentials Storage<br/>(Rust svc)"]
     CSP --> PG["PostgreSQL<br/>(credentials)"]
     CSP -->|"mTLS"| KMS["External Key Service<br/>(Vault / KMS)"]
@@ -635,7 +635,7 @@ graph LR
 
 ```mermaid
 graph LR
-    Platform["Platform<br/>(modules)"] --> GW["credstore +<br/>os_storage plugin"]
+    Platform["Platform<br/>(gears)"] --> GW["credstore +<br/>os_storage plugin"]
     GW --> OS["OS Keychain<br/>/ DPAPI"]
 ```
 
@@ -643,7 +643,7 @@ graph LR
 
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
-| Gateway | Axum (REST), ToolKit module macro | Platform standard for HTTP services |
+| Gateway | Axum (REST), ToolKit gear macro | Platform standard for HTTP services |
 | VendorA Plugin | `toolkit-http` (`HttpClient`) | Platform-standard HTTP client with OAuth2 support |
 | OAuth2 | Shared `oauth_token_provider` component | Centralized token acquisition and caching |
 | OS Plugin (P2) | `keyring` crate or platform-native FFI | Cross-platform OS keychain access |
@@ -656,7 +656,7 @@ graph LR
 
 #### Hierarchical Resolution in Gateway (for simple plugins)
 
-**Decision**: Implement hierarchical walk-up algorithm in Gateway module for simple plugins (VendorA Credstore, OS keychain). The `credentials_storage` plugin handles merge resolution internally.
+**Decision**: Implement hierarchical walk-up algorithm in Gateway gear for simple plugins (VendorA Credstore, OS keychain). The `credentials_storage` plugin handles merge resolution internally.
 
 **Trade-offs**:
 - ✅ **Pro**: Centralized policy enforcement for simple plugins — all sharing mode logic and access control is in one place
@@ -890,7 +890,7 @@ All open questions below are documented in detail in PRD.md Section 13 (lines 60
    - **Design Impact**: Requires distinguishing human vs service authentication in SecurityCtx; separate authorization rules; metadata-only response for humans
 
 3. **P2/Future - Audit Trails**: All credential operations should leave audit trails (timestamps, actor, tenant, outcome) with tamper-evident storage
-   - **Design Impact**: New audit module; event emission from Gateway; secure log storage; never log plaintext secret values
+   - **Design Impact**: New audit gear; event emission from Gateway; secure log storage; never log plaintext secret values
 
 4. **P2/Future - Schema Validation**: Should  secrets support JSON schema validation (using GTS)?
    - **Design Impact**: Schema registry; validation hooks in Gateway put operation; structured secret storage
@@ -941,14 +941,14 @@ Following the ToolKit plugin pattern (as documented in `docs/TOOLKIT_PLUGINS.md`
 
 **Gateway:**
 ```yaml
-modules:
+gears:
   credstore:
     vendor: "vendor_a"  # Selects plugin by matching vendor
 ```
 
 **VendorA Plugin:**
 ```yaml
-modules:
+gears:
   credstore_vendor_a_plugin:
     vendor: "vendor_a"
     priority: 100
@@ -965,7 +965,7 @@ modules:
 
 **Credentials Storage Plugin:**
 ```yaml
-modules:
+gears:
   credentials_storage:
     vendor: "credentials_storage"
     priority: 100

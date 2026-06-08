@@ -22,8 +22,8 @@ date: 2026-04-27
   - [Option 3: Per-primitive trait, single trait surface (`ClusterCacheV1: Trait`)](#option-3-per-primitive-trait-single-trait-surface-clustercachev1-trait)
   - [Option 4: Per-primitive facade struct + per-primitive backend trait + per-primitive `*V1` versioning (CHOSEN)](#option-4-per-primitive-facade-struct--per-primitive-backend-trait--per-primitive-v1-versioning-chosen)
   - [Option 5: Trait alias on nightly to bundle re-exports](#option-5-trait-alias-on-nightly-to-bundle-re-exports)
-  - [Option 6: Module-path versioning (`v1::ClusterCache`)](#option-6-module-path-versioning-v1clustercache)
-  - [Option 7: Module-major-version-as-crate-name](#option-7-module-major-version-as-crate-name)
+  - [Option 6: Gear-path versioning (`v1::ClusterCache`)](#option-6-gear-path-versioning-v1clustercache)
+  - [Option 7: Gear-major-version-as-crate-name](#option-7-gear-major-version-as-crate-name)
 - [More Information](#more-information)
 - [Traceability](#traceability)
 
@@ -31,7 +31,7 @@ date: 2026-04-27
 
 ## Context and Problem Statement
 
-The cluster module exposes four coordination primitives — distributed cache, leader election, distributed lock, service discovery — to every Gear. The shape of those four primitives in the Rust type system is the most consequential structural decision in the SDK: it determines what consumers hold, what plugins implement, how operator config maps to code, and what evolution looks like over time.
+The cluster gearxposes four coordination primitives — distributed cache, leader election, distributed lock, service discovery — to every Gear. The shape of those four primitives in the Rust type system is the most consequential structural decision in the SDK: it determines what consumers hold, what plugins implement, how operator config maps to code, and what evolution looks like over time.
 
 Three sub-decisions are unavoidable and tightly coupled:
 
@@ -59,8 +59,8 @@ The facade-plus-backend-trait pattern with per-primitive versioning resolves all
 3. **Per-primitive trait, single trait surface** — `trait ClusterCacheV1 { ... }` is both what consumers depend on AND what plugins implement.
 4. **Per-primitive facade struct + per-primitive backend trait + per-primitive `*V1` versioning** — `ClusterCacheV1` (facade struct) wraps `Arc<dyn ClusterCacheBackend>`; consumers hold the facade, plugins impl the backend trait. (CHOSEN.)
 5. **Trait alias on nightly to bundle re-exports** — `trait ClusterV1 = ClusterCacheV1 + LeaderElectionV1 + ...`
-6. **Module-path versioning** — `v1::ClusterCache`, `v2::ClusterCache` co-exist via module paths.
-7. **Module-major-version-as-crate-name** — `cf-cluster-sdk-1`, `cf-cluster-sdk-2` shipped as separate crates.
+6. **Gear-path versioning** — `v1::ClusterCache`, `v2::ClusterCache` co-exist via gear paths.
+7. **Gear-major-version-as-crate-name** — `cf-cluster-sdk-1`, `cf-cluster-sdk-2` shipped as separate crates.
 
 ## Decision Outcome
 
@@ -124,7 +124,7 @@ trait Cluster {
 }
 ```
 
-- Good, because consumers reference "the cluster" as a single object — feels natural for "this module needs cluster".
+- Good, because consumers reference "the cluster" as a single object — feels natural for "this gear needs cluster".
 - Good, because the consumer-side type is one type, not four.
 - Bad, because every plugin implements all four primitives or panics. A cache-only plugin must stub `leader_election`, `distributed_lock`, `service_discovery` with "unsupported" returns — every consumer of those stubs hits runtime errors instead of startup-time validation.
 - Bad, because per-primitive versioning is impossible. Bumping `ClusterCache` forces `Cluster` to bump. Forcing `Cluster` to bump forces every plugin to acknowledge — even plugins that don't ship the cache primitive.
@@ -214,7 +214,7 @@ trait ClusterV1 = ClusterCacheV1 + LeaderElectionV1 + DistributedLockV1 + Servic
 - Bad, because trait aliases compose by trait inheritance; plugins implementing the alias must implement all four constituent traits — same problem as Option 1.
 - Bad, because adoption requires nightly toolchain everywhere, which is a non-starter.
 
-### Option 6: Module-path versioning (`v1::ClusterCache`)
+### Option 6: Gear-path versioning (`v1::ClusterCache`)
 
 ```rust
 pub mod v1 { pub trait ClusterCache { ... } }
@@ -222,11 +222,11 @@ pub mod v2 { pub trait ClusterCache { ... } }
 ```
 
 - Good, because the version is visible in the path.
-- Bad, because the *type identity* is what matters for ClientHub registration. `v1::ClusterCache` and `v2::ClusterCache` already have different `TypeId`s by virtue of being different types — the module path doesn't add anything that wouldn't already work with `ClusterCacheV1` / `ClusterCacheV2` at the crate root.
+- Bad, because the *type identity* is what matters for ClientHub registration. `v1::ClusterCache` and `v2::ClusterCache` already have different `TypeId`s by virtue of being different types — the gear path doesn't add anything that wouldn't already work with `ClusterCacheV1` / `ClusterCacheV2` at the crate root.
 - Bad, because `use cluster_sdk::v1::ClusterCache as ClusterCache;` is awkward at every consumer site. Putting the version in the type name (`ClusterCacheV1`) reads more naturally and matches Rust ecosystem convention (e.g., `tower-service`, `http`, gRPC stubs).
-- Neutral, because module-path versioning and `*V1` naming are equivalent in capability; we choose the latter for ergonomics.
+- Neutral, because gear-path versioning and `*V1` naming are equivalent in capability; we choose the latter for ergonomics.
 
-### Option 7: Module-major-version-as-crate-name
+### Option 7: Gear-major-version-as-crate-name
 
 `cf-cluster-sdk-1`, `cf-cluster-sdk-2` shipped as separate crates.
 
@@ -234,8 +234,8 @@ pub mod v2 { pub trait ClusterCache { ... } }
 - Good, because Cargo's semver model handles co-existing versions natively.
 - Bad, because a major version bump becomes a *new crate*, not a new release. Doc URLs change, dependency declarations churn, every consumer must add the new crate to `Cargo.toml`.
 - Bad, because shared code between versions (resolver, error types, common helpers) requires a third "core" crate that both versioned crates depend on, multiplying maintenance.
-- Bad, because the cluster module is consumed by every Gear — forcing all of them to update their crate declaration on a major version is a heavyweight migration. `*V1` / `*V2` types in one crate is lighter.
-- Neutral, because this approach is established in some ecosystems (e.g., `axum` 0.6 / 0.7 differences); we choose against it because cluster's audience is internal modules, not external consumers, where lightweight migration matters more than crate-level isolation.
+- Bad, because the cluster gear is consumed by every Gear — forcing all of them to update their crate declaration on a major version is a heavyweight migration. `*V1` / `*V2` types in one crate is lighter.
+- Neutral, because this approach is established in some ecosystems (e.g., `axum` 0.6 / 0.7 differences); we choose against it because cluster's audience is internal gears, not external consumers, where lightweight migration matters more than crate-level isolation.
 
 ## More Information
 

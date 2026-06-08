@@ -6,7 +6,7 @@
 //! - System information (OS, CPU, memory, GPU, battery, host)
 //! - System capabilities (hardware and OS capabilities)
 //!
-//! This is a standalone library that can be used by any module to collect
+//! This is a standalone library that can be used by any gear to collect
 //! information about the current execution environment.
 
 mod hardware_uuid;

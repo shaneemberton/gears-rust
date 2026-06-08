@@ -1,10 +1,10 @@
 # AuthZ Resolver SDK
 
-SDK crate for the AuthZ Resolver module, providing the authorization evaluation API, constraint model, and PEP (Policy Enforcement Point) helpers for Gears.
+SDK crate for the AuthZ Resolver gear, providing the authorization evaluation API, constraint model, and PEP (Policy Enforcement Point) helpers for Gears.
 
 ## Overview
 
-This crate defines the transport-agnostic interface for the AuthZ Resolver module:
+This crate defines the transport-agnostic interface for the AuthZ Resolver gear:
 
 - **`AuthZResolverClient`** — Async trait for evaluating authorization requests
 - **`AuthZResolverPluginClient`** — Async trait for PDP plugin implementations

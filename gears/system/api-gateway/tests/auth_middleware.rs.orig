@@ -23,7 +23,7 @@ use toolkit::{
     ClientHub, Module,
     api::{OperationBuilder, operation_builder::LicenseFeature},
     config::ConfigProvider,
-    context::ModuleCtx,
+    context::GearCtx,
     contracts::{ApiGatewayCapability, OpenApiRegistry, RestApiCapability},
 };
 use toolkit_canonical_errors::Problem;
@@ -61,16 +61,16 @@ struct TestConfigProvider {
 }
 
 impl ConfigProvider for TestConfigProvider {
-    fn get_module_config(&self, module: &str) -> Option<&serde_json::Value> {
-        self.config.get(module)
+    fn get_gear_config(&self, gear: &str) -> Option<&serde_json::Value> {
+        self.config.get(gear)
     }
 }
 
-/// Create test context for `api_gateway` module
-fn create_api_gateway_ctx(config: serde_json::Value) -> ModuleCtx {
+/// Create test context for `api_gateway` gear
+fn create_api_gateway_ctx(config: serde_json::Value) -> GearCtx {
     let hub = Arc::new(ClientHub::new());
 
-    ModuleCtx::new(
+    GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
@@ -79,10 +79,10 @@ fn create_api_gateway_ctx(config: serde_json::Value) -> ModuleCtx {
     )
 }
 
-/// Create test context for other test modules
-fn create_test_module_ctx() -> ModuleCtx {
-    ModuleCtx::new(
-        "test_module",
+/// Create test context for other test gears
+fn create_test_gear_ctx() -> GearCtx {
+    GearCtx::new(
+        "test_gear",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config: json!({}) }),
         Arc::new(ClientHub::new()),
@@ -114,12 +114,12 @@ async fn public_handler() -> Json<TestResponse> {
     })
 }
 
-/// Test module with protected and public routes
-pub struct TestAuthModule;
+/// Test gear with protected and public routes
+pub struct TestAuthGear;
 
 #[async_trait]
-impl Module for TestAuthModule {
-    async fn init(&self, _ctx: &ModuleCtx) -> Result<()> {
+impl Gear for TestAuthGear {
+    async fn init(&self, _ctx: &GearCtx) -> Result<()> {
         Ok(())
     }
 }
@@ -134,10 +134,10 @@ impl AsRef<str> for License {
 
 impl LicenseFeature for License {}
 
-impl RestApiCapability for TestAuthModule {
+impl RestApiCapability for TestAuthGear {
     fn register_rest(
         &self,
-        _ctx: &ModuleCtx,
+        _ctx: &GearCtx,
         router: Router,
         openapi: &dyn OpenApiRegistry,
     ) -> Result<Router> {
@@ -194,15 +194,15 @@ async fn test_auth_disabled_mode() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
-    // Register test module
+    // Register test gear
     let router = Router::new();
-    let test_module = TestAuthModule;
-    let router = test_module
+    let test_gear = TestAuthGear;
+    let router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -262,7 +262,7 @@ async fn test_public_routes_accessible() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
@@ -273,9 +273,9 @@ async fn test_public_routes_accessible() {
         .rest_prepare(&api_ctx, router)
         .expect("Failed to prepare");
 
-    // Then register test module routes
-    let test_module = TestAuthModule;
-    let router = test_module
+    // Then register test gear routes
+    let test_gear = TestAuthGear;
+    let router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -336,7 +336,7 @@ async fn test_public_routes_with_prefix_accessible() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
@@ -347,9 +347,9 @@ async fn test_public_routes_with_prefix_accessible() {
         .rest_prepare(&api_ctx, router)
         .expect("Failed to prepare");
 
-    // Then register test module routes
-    let test_module = TestAuthModule;
-    let router = test_module
+    // Then register test gear routes
+    let test_gear = TestAuthGear;
+    let router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -427,14 +427,14 @@ async fn test_middleware_always_inserts_security_ctx() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let mut router: Router = Router::new();
-    let test_module = TestAuthModule;
-    router = test_module
+    let test_gear = TestAuthGear;
+    router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -476,14 +476,14 @@ async fn test_openapi_includes_security_metadata() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let router = Router::new();
-    let test_module = TestAuthModule;
-    let _router = test_module
+    let test_gear = TestAuthGear;
+    let _router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -538,14 +538,14 @@ async fn test_route_pattern_matching_with_path_params() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let mut router = Router::new();
-    let test_module = TestAuthModule;
-    router = test_module
+    let test_gear = TestAuthGear;
+    router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -606,14 +606,14 @@ async fn test_route_pattern_matching_with_prefix_path_params() {
     });
 
     let api_ctx = create_api_gateway_ctx(config);
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let mut router = Router::new();
-    let test_module = TestAuthModule;
-    router = test_module
+    let test_gear = TestAuthGear;
+    router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 
@@ -689,24 +689,24 @@ impl AuthNResolverClient for MockAuthNResolverClient {
     }
 }
 
-/// Test module for auth-enabled tests.
+/// Test gear for auth-enabled tests.
 ///
 /// Registers both a protected and a public route.
 /// The public route also extracts `SecurityContext` so tests can verify
 /// that anonymous context is injected for public endpoints.
-pub struct TestAuthEnabledModule;
+pub struct TestAuthEnabledGear;
 
 #[async_trait]
-impl Module for TestAuthEnabledModule {
-    async fn init(&self, _ctx: &ModuleCtx) -> Result<()> {
+impl Gear for TestAuthEnabledGear {
+    async fn init(&self, _ctx: &GearCtx) -> Result<()> {
         Ok(())
     }
 }
 
-impl RestApiCapability for TestAuthEnabledModule {
+impl RestApiCapability for TestAuthEnabledGear {
     fn register_rest(
         &self,
-        _ctx: &ModuleCtx,
+        _ctx: &GearCtx,
         router: Router,
         openapi: &dyn OpenApiRegistry,
     ) -> Result<Router> {
@@ -738,21 +738,21 @@ async fn create_router(config: serde_json::Value, mock: MockAuthNResolverClient)
     let hub = Arc::new(ClientHub::new());
     hub.register::<dyn AuthNResolverClient>(Arc::new(mock));
 
-    let api_ctx = ModuleCtx::new(
+    let api_ctx = GearCtx::new(
         "api-gateway",
         Uuid::new_v4(),
         Arc::new(TestConfigProvider { config }),
         hub,
         tokio_util::sync::CancellationToken::new(),
     );
-    let test_ctx = create_test_module_ctx();
+    let test_ctx = create_test_gear_ctx();
 
     let api_gateway = api_gateway::ApiGateway::default();
     api_gateway.init(&api_ctx).await.expect("Failed to init");
 
     let mut router = Router::new();
-    let test_module = TestAuthEnabledModule;
-    router = test_module
+    let test_gear = TestAuthEnabledGear;
+    router = test_gear
         .register_rest(&test_ctx, router, &api_gateway)
         .expect("Failed to register routes");
 

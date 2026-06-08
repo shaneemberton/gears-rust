@@ -1,4 +1,4 @@
-// simulated_dir=/cf-gears/gears/some_module/domain/
+// simulated_dir=/cf-gears/gears/some_gear/domain/
 #![allow(dead_code)]
 
 // Should trigger DE0201 - DTOs only in api/rest

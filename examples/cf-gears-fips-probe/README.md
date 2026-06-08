@@ -206,7 +206,7 @@ No `libaws_lc_fips`, no `libcrypto`, no `libssl`, no `libring`.
   HTTPS at the reverse proxy in production).
 - On macOS the FIPS claim is only valid for **macOS versions whose
   corecrypto cert covers the running OS** — verify the current cert at
-  <https://csrc.nist.gov/projects/cryptographic-module-validation-program/validated-modules/search>.
+  <https://csrc.nist.gov/projects/cryptographic-gear-validation-program/validated-modules/search>.
 
 ## Verify on Windows
 

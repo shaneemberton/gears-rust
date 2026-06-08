@@ -5,9 +5,9 @@
 //!
 //! These tests verify that the DB phase correctly handles:
 //! - Successful migrations
-//! - Modules without DB configuration
+//! - Gears without DB configuration
 //! - Migration failures
-//! - System module priority ordering
+//! - System gear priority ordering
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,9 +33,9 @@ impl DbTestConfigProvider {
         }
     }
 
-    fn with_db_config(mut self, module_name: &str) -> Self {
+    fn with_db_config(mut self, gear_name: &str) -> Self {
         self.configs.insert(
-            module_name.to_owned(),
+            gear_name.to_owned(),
             serde_json::json!({
                 "database": {
                     "dsn": "sqlite::memory:",
@@ -50,8 +50,8 @@ impl DbTestConfigProvider {
 }
 
 impl ConfigProvider for DbTestConfigProvider {
-    fn get_module_config(&self, module_name: &str) -> Option<&serde_json::Value> {
-        self.configs.get(module_name)
+    fn get_gear_config(&self, gear_name: &str) -> Option<&serde_json::Value> {
+        self.configs.get(gear_name)
     }
 }
 
@@ -60,7 +60,7 @@ fn create_test_db_manager() -> Arc<toolkit_db::DbManager> {
     use figment::{Figment, providers::Serialized};
 
     let figment = Figment::new().merge(Serialized::defaults(serde_json::json!({
-        "test_db_module": {
+        "test_db_gear": {
             "database": {
                 "dsn": "sqlite::memory:",
                 "params": {
@@ -77,7 +77,7 @@ fn create_test_db_manager() -> Arc<toolkit_db::DbManager> {
 
 #[tokio::test]
 async fn test_db_phase_with_manager_succeeds() {
-    // Test that modules with DB capability and proper config get migrations run
+    // Test that gears with DB capability and proper config get migrations run
     let cancel = CancellationToken::new();
 
     // Cancel after a brief delay to let phases complete
@@ -88,7 +88,7 @@ async fn test_db_phase_with_manager_succeeds() {
     });
 
     let opts = RunOptions {
-        modules_cfg: Arc::new(DbTestConfigProvider::new().with_db_config("test_db_module")),
+        gears_cfg: Arc::new(DbTestConfigProvider::new().with_db_config("test_db_gear")),
         db: DbOptions::Manager(create_test_db_manager()),
         shutdown: ShutdownOptions::Token(cancel),
         clients: Vec::new(),
@@ -109,7 +109,7 @@ async fn test_db_phase_with_manager_succeeds() {
 
 #[tokio::test]
 async fn test_db_phase_without_config_skips_migration() {
-    // Test that modules without DB config don't fail, they just skip migration
+    // Test that gears without DB config don't fail, they just skip migration
     let cancel = CancellationToken::new();
 
     let cancel_clone = cancel.clone();
@@ -119,7 +119,7 @@ async fn test_db_phase_without_config_skips_migration() {
     });
 
     let opts = RunOptions {
-        modules_cfg: Arc::new(DbTestConfigProvider::new()), // No DB config for any module
+        gears_cfg: Arc::new(DbTestConfigProvider::new()), // No DB config for any gear
         db: DbOptions::Manager(create_test_db_manager()),
         shutdown: ShutdownOptions::Token(cancel),
         clients: Vec::new(),
@@ -134,7 +134,7 @@ async fn test_db_phase_without_config_skips_migration() {
     let run_result = result.unwrap();
     assert!(
         run_result.is_ok(),
-        "Should succeed when modules lack DB config"
+        "Should succeed when gears lack DB config"
     );
 }
 
@@ -150,7 +150,7 @@ async fn test_db_phase_with_none_option() {
     });
 
     let opts = RunOptions {
-        modules_cfg: Arc::new(DbTestConfigProvider::new()),
+        gears_cfg: Arc::new(DbTestConfigProvider::new()),
         db: DbOptions::None,
         shutdown: ShutdownOptions::Token(cancel),
         clients: Vec::new(),
@@ -168,8 +168,8 @@ async fn test_db_phase_with_none_option() {
 
 #[tokio::test]
 async fn test_db_phase_error_propagation() {
-    // This test verifies that if we had a module that fails migration,
-    // the error would be caught. Since we can't inject test modules via inventory,
+    // This test verifies that if we had a gear that fails migration,
+    // the error would be caught. Since we can't inject test gears via inventory,
     // we test the error handling path exists by confirming graceful behavior
     let cancel = CancellationToken::new();
 
@@ -182,7 +182,7 @@ async fn test_db_phase_error_propagation() {
     // Use an invalid DSN to trigger a potential error path
     let bad_figment = figment::Figment::new().merge(figment::providers::Serialized::defaults(
         serde_json::json!({
-            "test_module": {
+            "test_gear": {
                 "database": {
                     "dsn": "invalid://connection/string",
                 }
@@ -203,7 +203,7 @@ async fn test_db_phase_error_propagation() {
     }
 
     let opts = RunOptions {
-        modules_cfg: Arc::new(DbTestConfigProvider::new().with_db_config("test_module")),
+        gears_cfg: Arc::new(DbTestConfigProvider::new().with_db_config("test_gear")),
         db: DbOptions::Manager(Arc::new(db_manager_result.unwrap())),
         shutdown: ShutdownOptions::Token(cancel),
         clients: Vec::new(),
@@ -212,7 +212,7 @@ async fn test_db_phase_error_propagation() {
         shutdown_deadline: None,
     };
 
-    // Run should either succeed (if no modules try to use bad config)
+    // Run should either succeed (if no gears try to use bad config)
     // or fail gracefully
     let result = timeout(Duration::from_millis(500), run(opts)).await;
     assert!(result.is_ok(), "Should not hang on DB errors");
@@ -230,7 +230,7 @@ async fn test_db_phase_completes_before_init() {
     });
 
     let opts = RunOptions {
-        modules_cfg: Arc::new(DbTestConfigProvider::new().with_db_config("test_db_module")),
+        gears_cfg: Arc::new(DbTestConfigProvider::new().with_db_config("test_db_gear")),
         db: DbOptions::Manager(create_test_db_manager()),
         shutdown: ShutdownOptions::Token(cancel),
         clients: Vec::new(),

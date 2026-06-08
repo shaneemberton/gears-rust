@@ -1,17 +1,17 @@
 # CredStore
 
-Credential storage gateway module. Discovers storage backend plugins via the types registry and routes secret operations through the selected plugin with hierarchical tenant resolution.
+Credential storage gateway gear. Discovers storage backend plugins via the types registry and routes secret operations through the selected plugin with hierarchical tenant resolution.
 
 ## Overview
 
-The `cf-gears-credstore` module provides:
+The `cf-gears-credstore` gear provides:
 
 - **Plugin discovery** — finds storage backend plugins via the types registry using a configured vendor
 - **Secret routing** — delegates `get`/`put`/`delete` to the active plugin
 - **Hierarchical resolution** — walks the tenant hierarchy to resolve inherited secrets
-- **ClientHub integration** — registers `CredStoreClientV1` for inter-module use
+- **ClientHub integration** — registers `CredStoreClientV1` for inter-gear use
 
-This module depends on `types-registry`. All storage logic lives in the plugin (e.g. `cf-gears-static-credstore-plugin`).
+This gear depends on `types-registry`. All storage logic lives in the plugin (e.g. `cf-gears-static-credstore-plugin`).
 
 ## Usage
 

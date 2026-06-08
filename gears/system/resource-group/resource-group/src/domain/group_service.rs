@@ -473,7 +473,7 @@ impl<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait> GroupService<GR, TR> {
     /// Get a single group by id without `AuthZ` enforcement.
     ///
     /// **Internal API** — never expose this through a REST handler. Used by
-    /// the seeding path (which runs at module init, before any caller
+    /// the seeding path (which runs at gear init, before any caller
     /// security context exists) to check whether a seeded group is already
     /// present. Mirrors the pattern of the other `*_unscoped` methods.
     pub async fn get_group_unscoped(&self, group_id: Uuid) -> Result<ResourceGroup, DomainError> {
@@ -488,7 +488,7 @@ impl<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait> GroupService<GR, TR> {
     /// Create a group without `AuthZ` enforcement.
     ///
     /// **Internal API** — never expose this through a REST handler. Used by
-    /// the seeding path to provision required groups at module init, before
+    /// the seeding path to provision required groups at gear init, before
     /// any caller security context exists. Domain invariants (type
     /// validation, parent compatibility, tenant scoping, closure table
     /// maintenance) still run because this method calls the same
@@ -939,7 +939,7 @@ impl<GR: GroupRepositoryTrait, TR: TypeRepositoryTrait> GroupService<GR, TR> {
         // @cpt-end:cpt-cf-resource-group-flow-entity-hier-move-group:p1:inst-move-group-4
 
         // Cross-tenant moves are forbidden (`tenant_id` is immutable per the
-        // module-wide invariant). Reject the move when the new parent lives
+        // gear-wide invariant). Reject the move when the new parent lives
         // in a different tenant than the moved group; tenant-type roots have
         // `tenant_id == group_id`, so the equality check covers them too.
         if let Some(new_parent_id) = new_parent_id {

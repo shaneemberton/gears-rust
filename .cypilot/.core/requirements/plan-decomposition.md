@@ -48,7 +48,7 @@ If intent is ambiguous, ask the user to clarify.
 | 4 | Each phase creates or updates one section group |
 
 Grouping rules:
- 
+
 - Group sections with dependencies.
 - Keep the first and final synthesis groups small.
 - Give any section that would exceed 300 compiled lines its own phase.
@@ -67,7 +67,7 @@ Grouping rules:
 Validation pipeline order MUST be: Structural → Semantic → Cross-reference → Traceability → Synthesis.
 
 Grouping rules:
- 
+
 - Structural + semantic MAY combine if checklist size is `< 20`.
 - Cross-reference + traceability MAY combine if external references are few.
 - Synthesis is always final.
@@ -81,7 +81,7 @@ Grouping rules:
 |------|-------|--------|--------------|
 | 1 | Setup | Checklist, file patterns | Design artifact, directory listing |
 | 2 | File-level | Naming/style checks | Source files |
-| 3 | Module-level | Boundary/interface checks | Design artifact, module entry points |
+| 3 | Gear-level | Boundary/interface checks | Design artifact, gear entry points |
 | 4 | Cross-module | Contract/interface checks | Import graphs, related modules |
 | 5 | Traceability | `@cpt-*` rules, ID rules | Design IDs, marked files |
 | 6 | Synthesis | Acceptance criteria | Partial reports |
@@ -91,7 +91,7 @@ MUST inline checklist criteria, codebase rules, `@cpt-*` format, file-pattern me
 MUST runtime-read DESIGN / FEATURE artifacts, source files, directory listings, import graphs, and prior `out/` results.
 
 Grouping rules:
- 
+
 - If codebase has `< 10` files, combine file-level and module-level.
 - If `> 50`, split file-level by top-level directory.
 - Traceability is ALWAYS separate.
@@ -107,7 +107,7 @@ Grouping rules:
 | 4 | Add a final integration phase |
 
 Grouping rules:
- 
+
 - Each flow/algo/state machine is its own phase.
 - Blocks with `< 3` steps MAY combine with related blocks.
 - Blocks that would exceed `> 500` lines MUST split by step groups.
@@ -128,7 +128,7 @@ Enforcement algorithm: compile, count lines, accept if `≤ 500`, warn if `501-1
 When the plan includes a raw-input package under `input/`, its chunk files count as runtime input and MUST be distributed across phases explicitly through `input_files`; do not hide them in generic context estimates.
 
 Splitting rules:
- 
+
 - If Rules is largest, **NEVER trim or summarize rules** — narrow phase scope instead.
 - If Input is largest, split input across more phases.
 - If Task is largest, split task into sequential phases with explicit handoff.

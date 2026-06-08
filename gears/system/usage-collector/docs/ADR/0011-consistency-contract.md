@@ -148,7 +148,7 @@ switch behaviour on the profile.
   floor as the SPI's floor and requires every plugin's deployment guide to
   publish its actual profile (sync, bounded, eventual). No SPI method is
   added.
-- Read-after-write source-module flows (admission control, post-emit summary,
+- Read-after-write source-gear flows (admission control, post-emit summary,
   immediate-readback dashboards) MUST NOT be designed against the Query SPI;
   they MUST use the ingestion ack for same-request outcome. Near-real-time
   observers MUST poll within `cpt-cf-usage-collector-nfr-query-latency` and
@@ -160,7 +160,7 @@ switch behaviour on the profile.
   freshness" is reworded to separate (a) ingestion ack latency bounded by
   `cpt-cf-usage-collector-nfr-ingestion-latency`, from (b) Query SPI
   queryability bounded by the active plugin's published profile with a no-bound
-  module-level floor; this is a PRD wording fix, not a new acceptance gate.
+  gear-level floor; this is a PRD wording fix, not a new acceptance gate.
 - `sdk-trait.md` and the feature documents inherit the floor through a single
   pointer back to DESIGN [§3.10.8](../DESIGN.md#3108-consistency-contract);
   `features/usage-query.md` calls out the no-read-your-writes constraint in
@@ -268,12 +268,12 @@ ingestion ack immediately.
 - Good, because immediate-readback and admission-control flows can be
   designed against the Query SPI directly.
 - Bad, because session affinity is a deployment-substrate concern (operator
-  routing, client pinning, sticky load balancing) that the module cannot
+  routing, client pinning, sticky load balancing) that the gear cannot
   control; making it a floor would push the entire affinity stack into the
   plugin contract.
 - Bad, because the Plugin SPI is fronted by a stateless gateway pool that
   may dispatch the same caller's reads to different plugin connections; the
-  floor cannot be made true at the module boundary, only at the plugin's own
+  floor cannot be made true at the gear boundary, only at the plugin's own
   routing layer.
 - Bad, because the obvious workaround — building read-after-write on the
   ingestion ack path that already exists — is strictly simpler and is what
@@ -317,7 +317,7 @@ ingestion ack immediately.
   - **OPS** — addressed (each plugin's deployment guide MUST publish its
     consistency profile; consumers reading the floor know whether to design
     against the floor or the plugin ceiling).
-  - **MAINT** — addressed (no module-side migration; documentation-only
+  - **MAINT** — addressed (no gear-side migration; documentation-only
     obligation on plugin authors).
   - **TEST** — Not applicable in the ADR body: test design belongs in
     `features/*` (cascade phase) per TEST-ADR-NO-001.

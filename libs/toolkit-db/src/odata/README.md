@@ -1,6 +1,6 @@
 # OData + Secure ORM Integration
 
-This module provides a minimal, ergonomic fluent builder (`OPager`) that combines Secure ORM scoping with OData pagination.
+This gear provide a minimal, ergonomic fluent builder (`OPager`) that combines Secure ORM scoping with OData pagination.
 
 ## Overview
 
@@ -39,7 +39,7 @@ This module provides a minimal, ergonomic fluent builder (`OPager`) that combine
 
 - **`pager.rs`**: The `OPager` fluent builder implementation
 - **`core.rs`**: Core OData → SeaORM translation (filters, cursors, ordering)
-- **`mod.rs`**: Module exports and documentation
+- **`mod.rs`**: Gear exports and documentation
 - **`tests.rs`**: Unit tests (currently disabled, needs refactoring)
 
 ## Usage

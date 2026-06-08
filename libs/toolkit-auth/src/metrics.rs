@@ -1,6 +1,6 @@
 /// Metrics tracking for auth events
 ///
-/// This module provides a trait-based approach to metrics that can be
+/// This gear provides a trait-based approach to metrics that can be
 /// implemented with various backends (Prometheus, `StatsD`, etc.)
 /// Auth event types for metrics tracking
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

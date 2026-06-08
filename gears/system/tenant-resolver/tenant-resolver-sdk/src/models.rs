@@ -1,5 +1,5 @@
 // Updated: 2026-03-16 by Constructor Tech
-//! Domain models for the tenant resolver module.
+//! Domain models for the tenant resolver gear.
 
 use std::fmt;
 

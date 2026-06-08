@@ -43,11 +43,11 @@ info:
     Authentication and authorization are on the synchronous critical path of
     every operation: authentication is owned by the ToolKit gateway upstream of
     the collector, which resolves the caller into a platform `SecurityContext`
-    and supplies it to the handler via `Extension<SecurityContext>` (the module
+    and supplies it to the handler via `Extension<SecurityContext>` (the gear
     NEVER consumes `authn-resolver`), and the platform PDP
     (`cpt-cf-usage-collector-contract-authz-resolver`) authorizes
     the operation against the full attribution tuple — tenant, resource,
-    optional subject, source module, and referenced Metric. Both gates are
+    optional subject, source gear, and referenced Metric. Both gates are
     fail-closed per `cpt-cf-usage-collector-principle-fail-closed`: there is
     no anonymous bypass, no cached PDP decision, and no synthesized identity.
 
@@ -73,10 +73,10 @@ info:
     readers a migration window.
 
     Platform liveness and readiness probes are handled by the ToolKit host
-    above the module boundary; this module exposes no module-local health
+    above the gear boundary; this gear exposes no gear-local health
     endpoints. The former `/metrics` Prometheus scrape endpoint is REMOVED:
     operational telemetry is pushed via OTLP from ToolKit's global
-    `SdkMeterProvider`; module-local scrape is no longer offered (see DESIGN
+    `SdkMeterProvider`; gear-local scrape is no longer offered (see DESIGN
     §3.11.5/§3.11.7).
 
     NOTE — Unified plugin-DB catalog and `gts_id` reference model per
@@ -126,7 +126,7 @@ info:
 
 servers:
   - url: https://api.example.com
-    description: Platform API gateway (deployment-specific). The Usage Collector module is mounted behind the gateway; the gateway terminates TLS and enforces CORS.
+    description: Platform API gateway (deployment-specific). The Usage Collector gear is mounted behind the gateway; the gateway terminates TLS and enforces CORS.
 
 tags:
   - name: Ingestion
@@ -171,9 +171,9 @@ tags:
       and the catalog row; an attempt to delete a referenced metric
       returns the `MetricReferenced` envelope.
 # Default security requirement applied to every operation in this contract.
-# The Usage Collector module itself accepts only a resolved
+# The Usage Collector gear itself accepts only a resolved
 # `SecurityContext` populated upstream by the ToolKit gateway via
-# `OperationBuilder::authenticated()` (the module NEVER consumes `authn-resolver`);
+# `OperationBuilder::authenticated()` (the gear NEVER consumes `authn-resolver`);
 # the `bearerAuth` scheme is
 # `type=http, scheme=bearer`, which under OpenAPI 3.x cannot carry scope
 # arrays (scopes are valid only for `oauth2` / `openIdConnect` schemes).
@@ -197,7 +197,7 @@ paths:
         Per-record processing:
 
         - AuthN + PDP authorize the full attribution tuple (tenant, resource,
-          optional subject, source module, Metric `gts_id`) per
+          optional subject, source gear, Metric `gts_id`) per
           `cpt-cf-usage-collector-fr-ingestion-authorization` before any
           record is accepted.
         - The Metrics Catalog validates Metric existence and Metric Kind per
@@ -240,7 +240,7 @@ paths:
           `(tenant_id, metric_gts_id, idempotency_key)` resolve by
           exact-equality of the caller-supplied canonical fields
           (`value`, `timestamp`, `resource_ref`, `subject_ref`,
-          `source_module`, `metadata`) per
+          `source_gear`, `metadata`) per
           `cpt-cf-usage-collector-fr-idempotency`. An exact-equality
           retry (all canonical fields equal) is silently deduplicated
           and the per-record acknowledgement carries
@@ -301,7 +301,7 @@ paths:
                       resource:
                         resource_id: rsc_compute_vm_001
                         resource_type: compute.vm
-                      source_module: mod_mini_chat
+                      source_gear: mod_mini_chat
               example_compensation:
                 summary: Counter compensation emission (signed-negative)
                 description: |
@@ -326,7 +326,7 @@ paths:
                       resource:
                         resource_id: rsc_compute_vm_001
                         resource_type: compute.vm
-                      source_module: mod_mini_chat
+                      source_gear: mod_mini_chat
       responses:
         "200":
           description: All submitted records were accepted or absorbed as duplicates.
@@ -664,7 +664,7 @@ paths:
         dimensions per
         `cpt-cf-usage-collector-adr-0012-unified-plugin-catalog-and-gts-id-reference`
         (ADR-0012) are the fixed set
-        `{tenant, resource, subject, source_module, timestamp, status}`
+        `{tenant, resource, subject, source_gear, timestamp, status}`
         plus the queried metric's declared keys (the names listed on
         the catalog `metadata_fields`) resolved per request from
         `metric_gts_id`. The shape is closed — undeclared metadata
@@ -1064,7 +1064,7 @@ components:
         `metadata_fields`:
 
         - Fixed-field set always admissible:
-          `tenant`, `resource`, `subject`, `source_module`, `timestamp`
+          `tenant`, `resource`, `subject`, `source_gear`, `timestamp`
           (or `time_bucket` for server-defined bucketing — bucket width
           is implementation-defined and reflected in each
           `AggregationBucket.dimensions.time_bucket` value), `status`.
@@ -1072,7 +1072,7 @@ components:
           metric's `metadata_fields` is also admissible.
 
         The former static enum (`tenant`, `resource`, `subject`,
-        `source_module`, `time_bucket`) was lifted to a plain string so
+        `source_gear`, `time_bucket`) was lifted to a plain string so
         the contract can express both fixed-field names and
         per-metric declared-key names without per-metric schema
         fan-out. Undeclared metadata keys are rejected at ingestion
@@ -1092,7 +1092,7 @@ components:
         structural validation, kind invariants, Metric existence,
         per-record PDP authorization, OR reused an existing dedup key with
         any differing canonical field (`value`, `timestamp`,
-        `resource_ref`, `subject_ref`, `source_module`, `metadata`) — the
+        `resource_ref`, `subject_ref`, `source_gear`, `metadata`) — the
         canonical-field-mismatch Conflict, surfaced fail-closed with
         `context.reason="idempotency_conflict"` per
         `cpt-cf-usage-collector-adr-mandatory-idempotency`; inspect the
@@ -1181,7 +1181,7 @@ components:
         is rejected with `context.reason="metadata_size"`. The Usage
         Collector does NOT aggregate, classify, or interpret metadata
         contents beyond declared-key membership validation. Source
-        modules MUST NOT place PII, payment data, regulated health
+        gears MUST NOT place PII, payment data, regulated health
         data, or credentials into this object per PRD §5.8 Data
         Classification.
 
@@ -1240,7 +1240,7 @@ components:
         - id
         - tenant_id
         - resource
-        - source_module
+        - source_gear
         - metric_gts_id
         - value
         - timestamp
@@ -1291,13 +1291,13 @@ components:
           $ref: "#/components/schemas/ResourceRef"
         subject:
           $ref: "#/components/schemas/SubjectRef"
-        source_module:
+        source_gear:
           type: string
           minLength: 1
           maxLength: 256
           description: |
-            Identity of the emitting source module, used by PDP
-            source-module-to-Metric authorization and downstream
+            Identity of the emitting source gear, used by PDP
+            source-gear-to-Metric authorization and downstream
             diagnostics.
         metric_gts_id:
           type: string
@@ -1345,7 +1345,7 @@ components:
       required:
         - tenant_id
         - resource
-        - source_module
+        - source_gear
         - metric_gts_id
         - value
         - timestamp
@@ -1399,7 +1399,7 @@ components:
           $ref: "#/components/schemas/ResourceRef"
         subject:
           $ref: "#/components/schemas/SubjectRef"
-        source_module:
+        source_gear:
           type: string
           minLength: 1
           maxLength: 256
@@ -1566,7 +1566,7 @@ components:
           $ref: "#/components/schemas/ResourceRef"
         subject:
           $ref: "#/components/schemas/SubjectRef"
-        source_module:
+        source_gear:
           type: string
           minLength: 1
           maxLength: 256
@@ -1585,7 +1585,7 @@ components:
             Admissible item values per
             `cpt-cf-usage-collector-adr-0012-unified-plugin-catalog-and-gts-id-reference`
             (ADR-0012) are the fixed-field set
-            `{tenant, resource, subject, source_module, timestamp, status}`
+            `{tenant, resource, subject, source_gear, timestamp, status}`
             PLUS the queried metric's declared keys (the names
             listed on the catalog `metadata_fields`) resolved per
             request from `metric_gts_id`. The shape is closed per
@@ -1861,7 +1861,7 @@ components:
         discriminator is layered:
 
         - `type` carries the canonical-error category as a `gts://` URI
-          (stable broad-category discriminator across platform modules).
+          (stable broad-category discriminator across platform gears).
         - `status` carries the HTTP status code.
         - `context.reason` carries the finer Usage-Collector-specific
           cause category drawn from the
@@ -1897,7 +1897,7 @@ components:
           compensation arriving mid-deactivation per
           `cpt-cf-usage-collector-algo-event-deactivation-concurrency-guard`).
           All five are `retryable=false` — resubmitting the same
-          divergent reference re-conflicts; the source module must
+          divergent reference re-conflicts; the source gear must
           reconcile the `corrects_id` or the metric kind before retrying.
           The two idempotency reasons are distinct and MUST NOT be
           conflated: `idempotency` is the keyless-record rejection (a
@@ -1906,7 +1906,7 @@ components:
           `idempotency_conflict` is the canonical-field-mismatch
           rejection — a same-key submission whose caller-supplied
           canonical fields (`value`, `timestamp`, `resource_ref`,
-          `subject_ref`, `source_module`, `metadata`) differ from the
+          `subject_ref`, `source_gear`, `metadata`) differ from the
           stored record — and lifts to `AlreadyExists` / `409`
           (DESIGN §3.3) with `context.retryable=false`, because
           resubmitting the same divergent content under the same key
@@ -1932,8 +1932,8 @@ components:
         `usage-collector-sdk` (which owns `UsageCollectorError`) does NOT
         depend on `toolkit-canonical-errors`; the canonical envelope shape
         and the platform discriminator vocabulary come from the platform
-        crate, while the module-specific reason names come from the
-        module's flat SDK error enum.
+        crate, while the gear-specific reason names come from the
+        gear's flat SDK error enum.
       properties:
         type:
           type: string
@@ -1955,7 +1955,7 @@ components:
             Human-readable detail of this specific occurrence. MUST NOT
             include provider-internal diagnostic strings, plugin
             internals, or sensitive identifiers — operator forensics
-            live in module logs correlated by `trace_id`.
+            live in gear logs correlated by `trace_id`.
         instance:
           type: string
           format: uri-reference

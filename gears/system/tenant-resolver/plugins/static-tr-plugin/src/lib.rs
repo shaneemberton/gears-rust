@@ -6,7 +6,7 @@
 //! ## Configuration
 //!
 //! ```yaml
-//! modules:
+//! gears:
 //!   static_tr_plugin:
 //!     vendor: "constructorfabric"
 //!     priority: 100
@@ -24,6 +24,6 @@
 
 pub mod config;
 pub mod domain;
-pub mod module;
+pub mod gear;
 
-pub use module::StaticTrPlugin;
+pub use gear::StaticTrPlugin;

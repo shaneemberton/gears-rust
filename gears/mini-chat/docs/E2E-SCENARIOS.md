@@ -236,7 +236,7 @@ Tests reference scenarios in comments: `# 10-01: Upload Attachment → 201`.
 | 14-11 | No Stuck Reserves After Completion        | test_full_scenario.py     | TestQuotaAccumulation               |
 | 14-12 | Web Search Surcharge in Reserve           | test_web_search_usage.py  | TestWebSearchUsageAccounting        |
 | 14-13 | warning_threshold_pct Configurable        | —                         | GAP (config-level)                  |
-| 14-14 | Invalid Threshold → Module Fails to Start | —                         | GAP (startup test)                  |
+| 14-14 | Invalid Threshold → Gear Fails to Start | —                         | GAP (startup test)                  |
 
 ## 15 — Settlement & Finalization
 

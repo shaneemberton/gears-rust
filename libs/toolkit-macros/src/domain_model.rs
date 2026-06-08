@@ -279,9 +279,9 @@ fn check_forbidden_path(path: &syn::Path) -> Option<String> {
     // Check first two segments for special prefixes (std::fs, tokio::fs)
     if segments.len() >= 2 {
         let second = &segments[1];
-        for &(crate_name, module_name) in FORBIDDEN_PATH_PREFIXES {
-            if first == crate_name && second == module_name {
-                return Some(format!("path '{crate_name}::{module_name}'"));
+        for &(crate_name, gear_name) in FORBIDDEN_PATH_PREFIXES {
+            if first == crate_name && second == gear_name {
+                return Some(format!("path '{crate_name}::{gear_name}'"));
             }
         }
     }
@@ -684,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    fn test_allowed_std_other_modules() {
+    fn test_allowed_std_other_gears() {
         // std::collections, std::sync etc should be allowed
         // (only std::fs is forbidden)
         let input: DeriveInput = parse_quote! {

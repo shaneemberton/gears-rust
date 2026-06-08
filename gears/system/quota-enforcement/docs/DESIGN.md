@@ -99,7 +99,7 @@ Requirements that significantly influence architecture decisions.
 | `cpt-cf-quota-enforcement-fr-quota-metadata`                     | Optional JSON object on `Quota` (≤ 4 KB byte cap enforced at create/update); surfaced to active Engine via `EvaluationContext.applicable_quotas[*].metadata` (ADR-0003).                                                                                                                                                                                                                                                                                                       |
 | `cpt-cf-quota-enforcement-fr-attribute-based-quota-selection`    | Engine consumes `EvaluationContext.request.metadata` and `applicable_quotas[*].metadata`; Policy expressions filter applicable Quotas (e.g., `quota.metadata.region == request.metadata.region`). Worked example: PRD use case `cpt-cf-quota-enforcement-usecase-region-gated-via-metadata`.                                                                                                                                                                                   |
 | `cpt-cf-quota-enforcement-fr-quota-cascade`                      | Two P1 cascade capabilities: (a) **default subject-scope cascade** in the built-in `most-restrictive-wins` Engine — single-entry Debit Plan via subject-scope tier walk (user-scope > tenant-scope in P1); (b) **customizable multi-entry cascade** via `cel` Policies that produce arbitrary sparse or split Debit Plans (cross-tier split, intra-tier cascade, proportional distributions). Worked example: PRD use case `cpt-cf-quota-enforcement-usecase-cascade-via-cel`. |
-| `cpt-cf-quota-enforcement-fr-telemetry`                          | Components emit counters, histograms, gauges, and spans inline via the `tracing` crate (and OpenTelemetry export when `toolkit`'s `otel` feature is enabled); bounded label cardinality (`cpt-cf-quota-enforcement-constraint-bounded-cardinality`) is a coding-discipline invariant, not a wrapper. Module-specific metrics enumerated per PRD §5.16.                                                                                                                          |
+| `cpt-cf-quota-enforcement-fr-telemetry`                          | Components emit counters, histograms, gauges, and spans inline via the `tracing` crate (and OpenTelemetry export when `toolkit`'s `otel` feature is enabled); bounded label cardinality (`cpt-cf-quota-enforcement-constraint-bounded-cardinality`) is a coding-discipline invariant, not a wrapper. Gear-specific metrics enumerated per PRD §5.16.                                                                                                                          |
 
 #### NFR Allocation
 
@@ -164,7 +164,7 @@ graph TB
 | Layer                               | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Technology                                                                                                                          |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | SDK (`quota-enforcement-sdk` crate) | Rust traits for Quota Consumer, Quota Manager, plugin contracts (`QuotaEnforcementStoragePluginV1`, `QuotaResolutionEngineV1`, `QuotaNotificationSinkV1`); domain types (`Quota`, `Lease`, `LeaseHold`, `DebitPlan`, `Decision`); closed error enums.                                                                                                                                                                                                                          | Rust structs + traits; `cargo` workspace member.                                                                                    |
-| Gateway (`quota-enforcement` crate) | REST handler layer mounted into the platform `api-gateway` module via ToolKit `RestApiCapability::register_rest`; QE does not run its own HTTP server. Owns DTO validation; phase-1 PDP integration (admission + LRU cache + fail-closed); tenant-isolation filter; delegates to `QuotaManagementService` / `QuotaEnforcementService`.                                                                                                                                          | Axum handlers + ToolKit `OperationBuilder` (typed-operation registration auto-generates the OpenAPI fragment via `utoipa`); tracing. |
+| Gateway (`quota-enforcement` crate) | REST handler layer mounted into the platform `api-gateway` gear via ToolKit `RestApiCapability::register_rest`; QE does not run its own HTTP server. Owns DTO validation; phase-1 PDP integration (admission + LRU cache + fail-closed); tenant-isolation filter; delegates to `QuotaManagementService` / `QuotaEnforcementService`.                                                                                                                                          | Axum handlers + ToolKit `OperationBuilder` (typed-operation registration auto-generates the OpenAPI fragment via `utoipa`); tracing. |
 | Plugins (separate crates)           | `quota-enforcement-storage-plugin` (transactional persistence via `toolkit-db` per `cpt-cf-quota-enforcement-adr-storage-backend`); `quota-enforcement-coordination-plugin` (leader election / distributed locks, per `cpt-cf-quota-enforcement-adr-coordination-plugin`); `quota-enforcement-engine-most-restrictive`, `quota-enforcement-engine-cel` (built-ins, in-process linkage); `quota-enforcement-notification-plugin` trait (sink implementations operator-supplied). | Rust crates; static linkage at build time per `cpt-cf-quota-enforcement-constraint-in-process-engine-registration`.                 |
 | Background tasks                    | `LeaseSweeper` (physical reclamation tier of `cpt-cf-quota-enforcement-fr-lease-timeout`); `RetentionSweeper` (idempotency / operation log retention); `NotificationDispatcher` (drains outbox to registered sinks).                                                                                                                                                                                                                                                           | Same binary as gateway when bundled, or separate binary in split deployments; singleton coordination via `CoordinationPluginV1`.    |
 | External                            | Persistent backend reached via the storage plugin (P1 backend choice in `cpt-cf-quota-enforcement-adr-storage-backend`); `authz-resolver` (PDP); `types-registry` (metric registration + GTS schema catalogue, including subject type schemas); platform observability stack — `tracing` plus OpenTelemetry export via `toolkit`'s `otel` feature.                                                                                                                              | Existing platform components.                                                                                                       |
@@ -250,9 +250,9 @@ lets third-party Engines integrate without compromising counter integrity.
 
 - [ ] `p1` - **ID**: `cpt-cf-quota-enforcement-constraint-toolkit`
 
-QE is a ToolKit-conformant module: it uses `SecureConn` for all DB access, `ClientHub` for cross-module calls, and the
+QE is a ToolKit-conformant gear: it uses `SecureConn` for all DB access, `ClientHub` for cross-gear calls, and the
 standard ToolKit lifecycle hooks (`init`, `bootstrap`, `shutdown`). It does not bypass `toolkit-db` for raw connections,
-does not invent its own RPC framing, and does not perform cross-module calls outside `ClientHub`.
+does not invent its own RPC framing, and does not perform cross-gear calls outside `ClientHub`.
 
 **ADRs**: none.
 
@@ -313,7 +313,7 @@ per-tenant time-series explosion at 100 M-subject scale per `cpt-cf-quota-enforc
 
 - [ ] `p1` - **ID**: `cpt-cf-quota-enforcement-constraint-in-process-engine-registration`
 
-Engine plugins are registered statically in-process at module bootstrap. P1 ships `most-restrictive-wins` and `cel`;
+Engine plugins are registered statically in-process at gearootstrap. P1 ships `most-restrictive-wins` and `cel`;
 additional engines link into the binary at build time. Runtime registration of new Engines (dynamic loading, RPC
 engines) is out of P1 scope per PRD §5.9. Configuration of an Engine is done via the Quota Resolution Policy
 (`engine_config` field) — the registration set is fixed at deploy time.
@@ -335,7 +335,7 @@ itself only mutates counters according to declarative Quota records and pluggabl
 ### 3.1 Domain Model
 
 **Technology**: Native Rust structs in `quota-enforcement-sdk` crate (per `cpt-cf-quota-enforcement-constraint-toolkit`).
-Plugins are registered in-process at module bootstrap via ClientHub. Domain data shape is Rust-native.
+Plugins are registered in-process at gear bootstrap via ClientHub. Domain data shape is Rust-native.
 
 **Location**: [`quota-enforcement-sdk/src/`](../quota-enforcement-sdk/src/) crate.
 
@@ -456,8 +456,8 @@ graph TB
 
 ##### Why this component exists
 
-REST handler layer of the `quota-enforcement` crate; mounted into the platform `api-gateway` module via ToolKit. QE does
-not run its own HTTP server — the platform `api-gateway` module owns the Axum router and the aggregated OpenAPI
+REST handler layer of the `quota-enforcement` crate; mounted into the platform `api-gateway` gear via ToolKit. QE does
+not run its own HTTP server — the platform `api-gateway` gear owns the Axum router and the aggregated OpenAPI
 document. This is the only QE-side entry point for every external caller (Quota Consumer, Quota Manager, Quota Reader,
 Monitoring System); SDK clients flow through the same operation surface for end-to-end uniformity.
 
@@ -477,7 +477,7 @@ Does not contain business logic (`cpt-cf-quota-enforcement-constraint-no-busines
 Storage directly — delegates to `QuotaManagementService` / `QuotaEnforcementService`, passing the translated
 `&[Constraint]` slice for in-transaction filter composition (phase-2 propagation is owned by `EvaluationOrchestrator`).
 Does not own any persistent state. Does not implement the PDP itself — the actual policy decision lives in the external
-`authz-resolver` module.
+`authz-resolver` gear.
 
 ##### Related components (by ID)
 
@@ -847,7 +847,7 @@ QE exposes three contractual surfaces:
 - The SDK trait ships in the `quota-enforcement-sdk` Cargo crate; semver applies.
 - Plugin contracts (`cpt-cf-quota-enforcement-contract-storage-plugin`,
   `cpt-cf-quota-enforcement-contract-coordination-plugin`, `cpt-cf-quota-enforcement-contract-notification-plugin`,
-  `cpt-cf-quota-enforcement-contract-quota-resolution-engine-plugin`) are versioned with the module's major version;
+  `cpt-cf-quota-enforcement-contract-quota-resolution-engine-plugin`) are versioned with the gear's major version;
   backwards-compatible additive changes are allowed within a major, field removals and semantic changes are
   major-version breaks. All four plugin traits carry a matching `V<major>` suffix — `QuotaEnforcementStoragePluginV1`,
   `CoordinationPluginV1`, `QuotaResolutionEngineV1`, `QuotaNotificationSinkV1`.
@@ -952,7 +952,7 @@ is `Problem`.
 **OpenAPI registration.** Each `OperationBuilder` chain registers expected `Problem` responses via
 `.standard_errors(&registry)` (covers 400 / 401 / 403 / 404 / 409 / 422 / 429 / 500) or per-status
 `.error_400 / 401 / 403 / 404 / 409 / 415 / 422 / 429 / 500`. ToolKit exposes only those status methods; 5xx outcomes
-other than 500 (i.e. 501 / 503 / 504 in this module) are registered under `error_500` for OpenAPI bookkeeping, and the
+other than 500 (i.e. 501 / 503 / 504 in this gear) are registered under `error_500` for OpenAPI bookkeeping, and the
 runtime HTTP status is the AIP-193 fixed status of the canonical category, surfaced via the `Problem` body's `status`
 field.
 
@@ -996,7 +996,7 @@ Two traits split by actor role; every method is async, takes a `SecurityContext`
 | `list_policy_versions(scope, page)`         | `PageResult<PolicyVersionMeta>` | same                                                                                                                                              |
 
 Both traits are implemented by `quota-enforcement-sdk-rest-client` (HTTP transport) and by
-`quota-enforcement-sdk-in-process` (direct in-process call when QE is bundled in the caller's binary). Cross-module
+`quota-enforcement-sdk-in-process` (direct in-process call when QE is bundled in the caller's binary). Cross-gear
 callers MUST use the SDK and MUST NOT depend on the QE gateway's internal types
 (`cpt-cf-quota-enforcement-constraint-toolkit`).
 
@@ -1008,7 +1008,7 @@ callers MUST use the SDK and MUST NOT depend on the QE gateway's internal types
 
 - **Technology**: Rust trait in `quota-enforcement-sdk`; async; tokio.
 
-- **Versioning**: Major-version coupled with module per PRD §7.2.
+- **Versioning**: Major-version coupled with gear per PRD §7.2.
 
 **`QuotaEnforcementStoragePluginV1`** is async (Tokio) and exposes the methods below grouped by concern. Every mutating
 method takes a `SecurityContext` plus an `events: &[Event]` slice that the plugin enqueues into the outbox same-tx with
@@ -1036,7 +1036,7 @@ lifecycle (`CapBelowConsumed`, `QuotaNotFound`, `QuotaDeactivated`, `PeriodClose
 `From<StorageError> for DomainError` is a 1:1 lift for most variants (`LeaseNotActive`, `IdempotencyPayloadMismatch`,
 `CapBelowConsumed`, etc.). Two special cases: `QuotaNotFound` → `NotFound { kind: "quota", id }`; `SubjectOutOfScope` →
 `PdpDenied` (storage-layer defense-in-depth catches what PDP should have denied first). `SchemaVersionMismatch` is
-detected at `bootstrap()` and aborts the module fail-fast (I12 invariant); per the same invariant it MUST NOT surface at
+detected at `bootstrap()` and aborts the gear fail-fast (I12 invariant); per the same invariant it MUST NOT surface at
 runtime, so it has no `DomainError` lift target. The full `DomainError` enum lives in
 `quota-enforcement/src/domain/error.rs` and is canonicalised at the REST boundary per the mapping table in §3.3 above.
 
@@ -1096,7 +1096,7 @@ for sweeper / dispatcher singletons is **not** in this contract; it lives in `Co
 
 - **Technology**: Rust trait in `quota-enforcement-sdk`; async; tokio.
 
-- **Versioning**: Major-version coupled with module per PRD §7.2.
+- **Versioning**: Major-version coupled with gear per PRD §7.2.
 
 **`CoordinationPluginV1`** is a tiny lock-based contract for backend-agnostic singleton coordination of QE background
 tasks. The trait is consumed by `LeaseSweeper`, `RetentionSweeper`, and `NotificationDispatcher` through ClientHub; the
@@ -1142,7 +1142,7 @@ plugin; the realisation is plugin-internal.
 
 - **Technology**: Rust trait in `quota-enforcement-sdk`; sync (no I/O on hot path).
 
-- **Versioning**: Major-version coupled with module.
+- **Versioning**: Major-version coupled with gear.
 
 **`QuotaResolutionEngineV1`** is a sync trait (no I/O on the hot path) with three methods:
 
@@ -1189,7 +1189,7 @@ Engine (`cpt-cf-quota-enforcement-principle-strict-engine-boundary`).
 
 - **Technology**: Rust async trait; tokio.
 
-- **Versioning**: Major-version coupled with module; backwards-compatible additive changes permitted within a major
+- **Versioning**: Major-version coupled with gear; backwards-compatible additive changes permitted within a major
   version.
 
 **`QuotaNotificationSinkV1`** is async (Tokio) with two methods: `id() -> &str` (stable sink identifier used in
@@ -1227,23 +1227,23 @@ deferred to P2 alongside the EventBus migration (PRD §13 EventBus OQ).
 
 ### 3.4 Internal Dependencies
 
-QE depends on six platform components for in-process / cross-module integration. All inter-module communication flows
+QE depends on six platform components for in-process / cross-gear integration. All inter-gear communication flows
 through SDK clients, plugin traits, or `ClientHub` (`cpt-cf-quota-enforcement-constraint-toolkit`).
 
-| Dependency Module                                    | Interface Used                                                                                                                                                                 | Purpose                                                                                                                                                                                              |
+| Dependency Gear                                       | Interface Used                                                                                                                                                                 | Purpose                                                                                                                                                                                              |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `toolkit-db`                                          | `SecureConn` (DB access), Outbox queue                                                                                                                                         | Storage-plugin connectivity per `cpt-cf-quota-enforcement-constraint-toolkit`; outbox queue for notification-event durability (I11). Backend-specific realisations are plugin-internal.               |
 | `quota-enforcement-coordination-plugin` (impl crate) | `CoordinationPluginV1` trait via ClientHub                                                                                                                                     | Sweeper / dispatcher singleton coordination per `cpt-cf-quota-enforcement-contract-coordination-plugin`. Coordination backend is pluggable independently of the storage backend.                     |
 | `types-registry`                                     | `types-registry-sdk` GTS schema lookup; metric-name validation                                                                                                                 | Metric-name validation at Quota create/update (`cpt-cf-quota-enforcement-fr-metric-identity-validation`); GTS schema catalogue host for `gts.cf.qe.subject.type.v1~` Subject Type Registry instances. |
 | `authz-resolver`                                     | `authz-resolver-sdk::PolicyEnforcer`                                                                                                                                           | PDP integration — admission decisions with constraint filters; admission decision before tx, constraint filters consumed inside tx. Realises `cpt-cf-quota-enforcement-fr-authorization`.            |
 | `tracing` + `toolkit` `otel` feature                  | `tracing` macros (info/warn/error, instrument) and metric / span emission re-exported from `toolkit` core when the `otel` feature is enabled (OTLP exporter, span propagation). | Metric and trace emission per `cpt-cf-quota-enforcement-fr-telemetry`. No QE-side adapter wrapper; components emit directly from their hot paths.                                                    |
-| `ClientHub`                                          | RPC primitives                                                                                                                                                                 | Cross-module SDK transport (when QE is consumed via REST from another module's binary, the SDK layers on top of the platform RPC).                                                                   |
+| `ClientHub`                                          | RPC primitives                                                                                                                                                                 | Cross-gear SDK transport (when QE is consumed via REST from another gear's binary, the SDK layers on top of the platform RPC).                                                                   |
 
 **Dependency Rules** (per project conventions):
 
-- No circular dependencies — QE is a leaf module from the consumer side, depending only on platform libraries and
+- No circular dependencies — QE is a leaf gear from the consumer side, depending only on platform libraries and
   storage. Quota Manager depends on QE, not the reverse.
-- All inter-module communication via SDK or contract; no internal-type leakage.
+- All inter-gear communication via SDK or contract; no internal-type leakage.
 - No cross-category sideways deps except through contracts.
 - Only the Storage plugin talks to the persistent backend; gateway never opens its own connection.
 - `SecurityContext` is propagated across every in-process call including plugin traits and background tasks (sweeper /
@@ -2005,7 +2005,7 @@ error (HTTP 400, `reason = "CANNOT_DELETE_SEEDED_GLOBAL_POLICY"`) per the §3.3 
 > isolation level, lock-timeout configuration) are **plugin-internal** and live in the storage-plugin DESIGN document.
 > The list below is the contract-level table inventory: which logical entities the storage plugin must persist, what
 > foreign-key invariants hold across them, and the retention boundaries. The P1 storage-plugin realisation — schema DDL,
-> migrations, indexes — is authored in the storage-plugin DESIGN doc once authored (precedent: a sibling module
+> migrations, indexes — is authored in the storage-plugin DESIGN doc once authored (precedent: a sibling gear
 > pattern).
 
 #### Table inventory
@@ -2113,7 +2113,7 @@ The complete QE-specific metric catalogue exposed alongside the framework baseli
 | `lease_acquisition_wait_seconds`           | Histogram | `metric`                 | Wait time during lease acquisition (successful or rejected); buckets sized for the SLO of `cpt-cf-quota-enforcement-nfr-evaluation-latency` (p95 ≤ 100 ms) — exact bucket configuration is operator-tunable per deployment. |
 | `lease_inflight_limit_exceeded_total`      | Counter   | `metric`                 | Per-(tenant, metric) cap (I7)                                                                                                                                                                                               |
 | `lease_unreclaimed_expired`                | Gauge     | `metric`                 | Sweeper visibility                                                                                                                                                                                                          |
-| `engine_bootstrap_failures_total`          | Counter   | `engine_id`              | Module-bootstrap fail-fast                                                                                                                                                                                                  |
+| `engine_bootstrap_failures_total`          | Counter   | `engine_id`              | Gear-bootstrap fail-fast                                                                                                                                                                                                  |
 | `engine_evaluation_seconds`                | Histogram | `engine_id`              | Engine `evaluate()` latency; bucket sizing aligns with the per-Policy timeout (default 5 ms) — exact bucket configuration is operator-tunable.                                                                              |
 | `debit_plan_invariant_violations_total`    | Counter   | `engine_id`, `invariant` | `invariant` ∈ closed set of 4 (PRD §5.16)                                                                                                                                                                                   |
 | `quota_cap_zero_total`                     | Gauge     | —                        | Active `cap = 0` Quotas (config drift surface)                                                                                                                                                                              |
@@ -2152,10 +2152,10 @@ Quotas):
 | `operation_log`                   | ≈ 1 TB at 30 days                     | **Significant** — partitioned by date; cold-tier migration to a longer-term store is a P2 candidate.                    |
 | `notification_outbox`             | bounded by dispatch lag               | Operator alert on `outbox_pending_rows` > threshold.                                                                    |
 
-Capacity / cost budgets at the deployment level are managed by SRE, not at the QE module level —
+Capacity / cost budgets at the deployment level are managed by SRE, not at the QE gear level —
 `cpt-cf-quota-enforcement-nfr-...` allocations identify the mechanism; absolute infrastructure sizing is governed in the
 platform infrastructure repo. Capacity / cost budgets are managed at deployment level by SRE — `Not applicable` at QE
-module level.
+gear level.
 
 **Storage-plugin tuning** is plugin-internal (connection pooling, buffer sizing, replication knobs, vacuum strategy,
 partitioning). QE-core's contract over the storage plugin is: hot-path admission stays within the SLO of

@@ -1,6 +1,6 @@
 //! Windows Named Pipe transport for gRPC servers.
 //!
-//! This module provides named pipe support for Tonic gRPC servers on Windows platforms.
+//! This gear provides named pipe support for Tonic gRPC servers on Windows platforms.
 
 use tokio::net::windows::named_pipe::ServerOptions;
 use tokio::sync::mpsc;

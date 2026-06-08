@@ -2,7 +2,7 @@
 
 # Resource Group Model — AuthZ Perspective
 
-This document describes how Gears' authorization system uses Resource Groups (RG) for access control. For the full RG module design (domain model, API contracts, database schemas, type system), see [RG Technical Design](../../../gears/system/resource-group/docs/DESIGN.md).
+This document describes how Gears' authorization system uses Resource Groups (RG) for access control. For the full RG gear design (domain model, API contracts, database schemas, type system), see [RG Technical Design](../../../gears/system/resource-group/docs/DESIGN.md).
 
 ---
 
@@ -40,7 +40,7 @@ AuthZ consumes RG data as a **PIP (Policy Information Point)** source. RG is pol
 
 ### Projection Tables
 
-RG tables are the canonical source of truth, owned by the RG module. External consumers (AuthZ resolver, domain services) may maintain **projection copies** in their databases — synchronized from RG via read contracts (`ResourceGroupReadHierarchy`).
+RG tables are the canonical source of truth, owned by the RG gear. External consumers (AuthZ resolver, domain services) may maintain **projection copies** in their databases — synchronized from RG via read contracts (`ResourceGroupReadHierarchy`).
 
 **Projectable tables:**
 
@@ -60,9 +60,9 @@ Whether and which tables to project depends on the deployment topology and acces
 
 > **Important:** When a domain service query includes filters by resource group attributes (e.g., `GET /tasks?status=pending&project={projectX}&after=…&limit=50`), the two-request pattern means N additional round-trips to the RG Membership API (one per filter page or group), not just +1. If this N-request fan-out violates the latency budget, that is the signal to project the membership table locally.
 >
-> **Architecture guidance:** default to consuming degraded `in` predicates from PDP. The `in_group` and `in_group_subtree` predicates are natively executable within the RG module; domain services that choose not to project the membership table rely on PDP capability degradation.
+> **Architecture guidance:** default to consuming degraded `in` predicates from PDP. The `in_group` and `in_group_subtree` predicates are natively executable within the RG gear; domain services that choose not to project the membership table rely on PDP capability degradation.
 
-PEP within the RG module compiles `in_group`/`in_group_subtree` predicates into SQL subqueries using the membership table. Domain services without the membership projection receive degraded `in` predicates and do not need group-related projection tables for authorization filtering.
+PEP within the RG gear compiles `in_group`/`in_group_subtree` predicates into SQL subqueries using the membership table. Domain services without the membership projection receive degraded `in` predicates and do not need group-related projection tables for authorization filtering.
 
 - RG canonical table schemas: [RG DESIGN §Database Schemas](../../../gears/system/resource-group/docs/DESIGN.md#37-database-schemas--tables)
 - When to use which table: [AUTHZ_USAGE_SCENARIOS §Choosing Projection Tables](./AUTHZ_USAGE_SCENARIOS.md#choosing-projection-tables)
@@ -108,7 +108,7 @@ Resource groups operate **within** tenant boundaries — groups are tenant-scope
 
 ## References
 
-- [RG Technical Design](../../../gears/system/resource-group/docs/DESIGN.md) — Full RG module design (domain model, API, database schemas, security, auth modes)
+- [RG Technical Design](../../../gears/system/resource-group/docs/DESIGN.md) — Full RG gear design (domain model, API, database schemas, security, auth modes)
 - [RG PRD](../../../gears/system/resource-group/docs/PRD.md) — Product requirements
 - [RG OpenAPI](../../../gears/system/resource-group/docs/openapi.yaml) — REST API specification
 - [DESIGN.md](./DESIGN.md) — Core authorization design

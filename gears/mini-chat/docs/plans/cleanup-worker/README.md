@@ -19,7 +19,7 @@ and the vector-store ordering invariant (all attachments terminal before vector-
 
 ## Architecture Decisions
 
-- **Outbox-driven, no module-local polling** — per design MUST.
+- **Outbox-driven, no gear-local polling** — per design MUST.
 - **Per-attachment handler** deletes a single provider file (simple, one event = one file).
 - **Chat-level handler** receives a chat-scoped event, iterates pending attachments, then deletes vector store.
 - **Two separate outbox queues** — attachment cleanup partitioned by `tenant_id`, chat cleanup partitioned by `chat_id`.

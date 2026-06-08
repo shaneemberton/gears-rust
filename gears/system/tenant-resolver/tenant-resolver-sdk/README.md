@@ -1,10 +1,10 @@
 # Tenant Resolver SDK
 
-SDK crate for the Tenant Resolver module, providing public API contracts for multi-tenant hierarchy resolution in Gears.
+SDK crate for the Tenant Resolver gear, providing public API contracts for multi-tenant hierarchy resolution in Gears.
 
 ## Overview
 
-This crate defines the transport-agnostic interface for the Tenant Resolver module:
+This crate defines the transport-agnostic interface for the Tenant Resolver gear:
 
 - **`TenantResolverClient`** — Async trait for consumers (get tenants, traverse hierarchy, check ancestry)
 - **`TenantResolverPluginClient`** — Async trait for plugin implementations

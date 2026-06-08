@@ -59,7 +59,7 @@ serde_json.workspace = true
 
 # Error handling
 thiserror.workspace = true
-# Required by the ToolKit `Module` trait (`init() -> anyhow::Result<()>`)
+# Required by the ToolKit `Gear` trait (`init() -> anyhow::Result<()>`)
 anyhow.workspace = true
 humantime.workspace = true
 

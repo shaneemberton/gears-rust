@@ -1,6 +1,6 @@
-//! `CredStore` Gateway Module
+//! `CredStore` Gateway Gear
 //!
-//! Implements the `CredStore` gateway module that:
+//! Implements the `CredStore` gateway gear that:
 //! 1. Registers the `CredStorePluginSpecV1` schema in types-registry
 //! 2. Discovers plugin instances via types-registry (lazy, first-use)
 //! 3. Routes `get`/`put`/`delete` calls through the selected plugin
@@ -9,4 +9,4 @@
 
 pub mod config;
 pub mod domain;
-pub mod module;
+pub mod gear;

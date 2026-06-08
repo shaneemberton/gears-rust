@@ -38,7 +38,7 @@
 
 OAGW is a centralized outbound API gateway that manages all outbound API requests from Gears to external services. It provides routing, authentication, rate limiting, and monitoring through a unified proxy layer that enforces security and observability policies.
 
-The architecture follows a **Control Plane / Data Plane** separation within a single module, where the Control Plane manages configuration data (upstreams, routes, plugins) and the Data Plane orchestrates proxy requests to external services. Both services are implemented as domain traits within a single `oagw` crate, using DDD-Light layering (`domain/infra/api`).
+The architecture follows a **Control Plane / Data Plane** separation within a single gear, where the Control Plane manages configuration data (upstreams, routes, plugins) and the Data Plane orchestrates proxy requests to external services. Both services are implemented as domain traits within a single `oagw` crate, using DDD-Light layering (`domain/infra/api`).
 
 This design satisfies the requirements for centralized outbound traffic management, multi-tenant hierarchical configuration, and extensible plugin-based request processing while remaining practical to implement within Gears' modular monolith architecture.
 
@@ -59,7 +59,7 @@ This design satisfies the requirements for centralized outbound traffic manageme
 
 **Architecture Decision Records**:
 
-- `cpt-cf-oagw-adr-component-architecture` — Single module with internal trait-based service isolation
+- `cpt-cf-oagw-adr-component-architecture` — Single gear with internal trait-based service isolation
 - `cpt-cf-oagw-adr-request-routing` — Path-based routing with alias resolution
 - `cpt-cf-oagw-adr-plugin-system` — Three plugin types with deterministic execution order
 - `cpt-cf-oagw-adr-rate-limiting` — Token bucket algorithm with hierarchical merge
@@ -73,7 +73,7 @@ This design satisfies the requirements for centralized outbound traffic manageme
 - `cpt-cf-oagw-adr-backpressure-queueing` — Bounded queueing with degradation strategies
 - `cpt-cf-oagw-adr-error-source-distinction` — Response header for gateway vs upstream errors
 - `cpt-cf-oagw-adr-grpc-support` — HTTP/2 multiplexing with protocol detection
-- `cpt-cf-oagw-adr-rust-abi-client-library` — Rust ABI client for internal module routing
+- `cpt-cf-oagw-adr-rust-abi-client-library` — Rust ABI client for internal gear routing
 
 ### 1.3 Architecture Layers
 
@@ -84,9 +84,9 @@ This design satisfies the requirements for centralized outbound traffic manageme
 | **Transport** (`api/rest/`) | HTTP handling, request parsing, response serialization | Axum handlers, DTOs, extractors, OperationBuilder route registration |
 | **Domain** (`domain/`) | Business logic, service traits, repository contracts | `ControlPlaneService`, `DataPlaneService`, `AuthPlugin` trait, domain models |
 | **Infrastructure** (`infra/`) | External integrations, persistence, proxy engine | SeaORM repositories, Pingora proxy bridge, plugin registry, type provisioning |
-| **SDK** (`oagw-sdk/`) | Public API for inter-module communication | `ServiceGatewayClientV1` trait, SDK models, error types |
+| **SDK** (`oagw-sdk/`) | Public API for inter-gear communication | `ServiceGatewayClientV1` trait, SDK models, error types |
 
-The module follows DDD-Light layering: domain layer has no infrastructure dependencies; infrastructure implements domain traits; transport layer maps between HTTP and domain types.
+The gear follows DDD-Light layering: domain layer has no infrastructure dependencies; infrastructure implements domain traits; transport layer maps between HTTP and domain types.
 
 **ID**: `cpt-cf-oagw-tech-dependencies`
 
@@ -106,7 +106,7 @@ The module follows DDD-Light layering: domain layer has no infrastructure depend
 
 ```mermaid
 graph TB
-    Client[Client / Internal Module] -->|Management API| APIHandler[API Handler]
+    Client[Client / Internal Gear] -->|Management API| APIHandler[API Handler]
     Client -->|Proxy API| APIHandler
     APIHandler -->|CRUD ops| CP[Control Plane<br/>ControlPlaneService]
     APIHandler -->|Proxy ops| DP[Data Plane<br/>DataPlaneService]
@@ -137,7 +137,7 @@ graph TB
 
 **ID**: `cpt-cf-oagw-principle-tenant-scope`
 
-**Tenant scoping**: All database reads/writes use secure ORM with tenant scoping. No raw SQL in module code.
+**Tenant scoping**: All database reads/writes use secure ORM with tenant scoping. No raw SQL in gear code.
 
 **ID**: `cpt-cf-oagw-principle-plugin-immutable`
 
@@ -159,7 +159,7 @@ Single-executable deployment via ToolKit (Gears middleware requirement).
 
 **ID**: `cpt-cf-oagw-constraint-no-direct-internet`
 
-No direct internet access from internal modules. Security policy: all outbound traffic routes through OAGW.
+No direct internet access from internal gears. Security policy: all outbound traffic routes through OAGW.
 
 **ID**: `cpt-cf-oagw-constraint-multi-sql`
 
@@ -298,7 +298,7 @@ The database stores:
 - `plugin_ref` (TEXT): the canonical plugin identifier string (full GTS identifier).
 - `plugin_uuid` (UUID, nullable): extracted UUID when `plugin_ref` is UUID-backed.
 
-**Named plugins** (built-in or provided by deployed modules):
+**Named plugins** (built-in or provided by deployed gears):
 - API: `gts.cf.core.oagw.{type}_plugin.v1~cf.core.oagw.{name}.v1`
 - Resolved via an in-process plugin registry.
 - Not stored in `oagw_plugin` and not subject to GC.
@@ -324,7 +324,7 @@ The database stores:
 
 **ID**: `cpt-cf-oagw-component-model`
 
-#### Module Structure
+#### Gear Structure
 
 ```text
 gears/system/oagw/
@@ -335,10 +335,10 @@ gears/system/oagw/
 │       ├── models.rs      # SDK types (Upstream, Route, CreateUpstreamRequest, etc.)
 │       └── error.rs       # ServiceGatewayError
 │
-└── oagw/                  # Single module crate with internal service isolation
+└── oagw/                  # Single gear crate with internal service isolation
     └── src/
         ├── lib.rs         # Public exports
-        ├── module.rs      # ToolKit module wiring
+        ├── gear.rs      # ToolKit gear wiring
         ├── config.rs      # OagwConfig
         ├── api/rest/      # Transport layer
         │   ├── handlers/  # Axum HTTP handlers (management + proxy)
@@ -949,7 +949,7 @@ Structured JSON logs to stdout, ingested by centralized logging system (e.g., EL
 5. [Security] TLS certificate pinning — Pin specific certificates/public keys for critical upstreams to prevent MITM attacks
 6. [Security] mTLS support — Mutual TLS for client certificate authentication with upstream services
 7. [Protocol] gRPC support — HTTP/2 multiplexing with content-type detection — [ADR: gRPC Support](./ADR/0014-grpc-support.md) — **Requires prototype**
-8. [Deployment] Registry-only mode — All upstreams, routes, and plugin configs sourced exclusively from type registry (no management API CRUD). The `post_init()` provisioning path already materializes registry entities through the full domain validation pipeline. A registry-only mode would require: (a) config flag to disable or make CRUD endpoints read-only, (b) soft-fail on invalid entities (skip with warning instead of blocking startup), (c) a validation feedback mechanism so config authors can discover rejected entities — e.g., status writeback on GTS entities or a dedicated provisioning status endpoint. This is a platform-level concern: any module consuming GTS entities for configuration faces the same write-time validation gap.
+8. [Deployment] Registry-only mode — All upstreams, routes, and plugin configs sourced exclusively from type registry (no management API CRUD). The `post_init()` provisioning path already materializes registry entities through the full domain validation pipeline. A registry-only mode would require: (a) config flag to disable or make CRUD endpoints read-only, (b) soft-fail on invalid entities (skip with warning instead of blocking startup), (c) a validation feedback mechanism so config authors can discover rejected entities — e.g., status writeback on GTS entities or a dedicated provisioning status endpoint. This is a platform-level concern: any gear consuming GTS entities for configuration faces the same write-time validation gap.
 
 ## 5. Traceability
 

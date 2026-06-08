@@ -1,7 +1,7 @@
-//! Public models for the `types-registry` module.
+//! Public models for the `types-registry` gear.
 //!
 //! These are transport-agnostic data structures that define the contract
-//! between the `types-registry` module and its consumers.
+//! between the `types-registry` gear and its consumers.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

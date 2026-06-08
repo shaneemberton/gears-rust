@@ -42,14 +42,14 @@ _RECTPACK_ALGOS: tuple[Any, ...] = (
 _CATEGORY_STYLE: dict[str, tuple[str, str, str]] = {
     "cypilot": ("rgba(110,60,210,0.06)",  "rgba(110,60,210,0.30)",  "rgba(90,45,190,0.85)"),
     "toolkit":  ("rgba(200,100,10,0.06)",  "rgba(200,100,10,0.30)",  "rgba(165,80,5,0.85)"),
-    "modules": ("rgba(20,145,60,0.06)",   "rgba(20,145,60,0.30)",   "rgba(10,115,40,0.85)"),
+    "gears": ("rgba(20,145,60,0.06)",   "rgba(20,145,60,0.30)",   "rgba(10,115,40,0.85)"),
     "other":   ("rgba(100,100,100,0.04)", "rgba(100,100,100,0.20)", "rgba(60,60,60,0.75)"),
 }
 
 _NODE_COLORS: dict[str, dict[str, str]] = {
     "cypilot": {"background": "#f4eeff", "border": "#7744cc"},
     "toolkit":  {"background": "#fff5e6", "border": "#c07000"},
-    "modules": {"background": "#edfff4", "border": "#28a060"},
+    "gears": {"background": "#edfff4", "border": "#28a060"},
     "other":   {"background": "#f4f4f4", "border": "#888888"},
 }
 
@@ -322,7 +322,7 @@ def scan_markdown(
     files: list[MarkdownFile] = []
     explicit_skip_paths = tuple(normalize_rel(Path(item)) for item in skip_dirs if "/" in str(item).replace("\\", "/"))
     excluded_dir_names = {str(item).strip("/") for item in skip_dirs if "/" not in str(item).replace("\\", "/")}
-    excluded_dir_names |= {".git", "node_modules", ".venv", "venv"}
+    excluded_dir_names |= {".git", "node_gears", ".venv", "venv"}
 
     def is_skipped(path: Path) -> bool:
         rel = path.relative_to(repo)
@@ -2479,7 +2479,7 @@ const options = {{
     others:     {{ color: {{ background: "#eeeeee", border: "#777777" }} }},
     cypilot:    {{ color: {{ background: "#f4eeff", border: "#7744cc" }} }},
     toolkit:     {{ color: {{ background: "#fff5e6", border: "#c07000" }} }},
-    modules:    {{ color: {{ background: "#edfff4", border: "#28a060" }} }},
+    gears:    {{ color: {{ background: "#edfff4", border: "#28a060" }} }},
     other:      {{ color: {{ background: "#f4f4f4", border: "#888888" }} }},
   }},
 }};

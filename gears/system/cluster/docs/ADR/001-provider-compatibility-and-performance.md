@@ -100,7 +100,7 @@ Trade-off: consumers must hold the version from `get()` if they want to write ba
 ### Consequences
 
 - K8s-only deployments have a clear ceiling for cache/lock workloads (~5,000 writes/sec etcd practical limit). Documentation must recommend adding Redis when workloads exceed this.
-- Module authors need guidance: cache for high-count reservations, locks for low-count mutual exclusion, elections for singleton coordination. The wrong choice (locks for 1000 subscribers) performs poorly regardless of backend.
+- Gear authors need guidance: cache for high-count reservations, locks for low-count mutual exclusion, elections for singleton coordination. The wrong choice (locks for 1000 subscribers) performs poorly regardless of backend.
 - Configuration surface increases slightly with profile-based routing and optional prefix-based overrides within a capability.
 - The prefix-routing feature is optional — single-provider shorthand (`provider: redis`) remains the simplest configuration.
 

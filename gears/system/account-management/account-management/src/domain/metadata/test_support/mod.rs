@@ -13,7 +13,7 @@ pub mod repo;
 
 #[allow(
     unused_imports,
-    reason = "FakeMetadataRepo re-export anchors the public surface for later-phase service-level tests; phase 1 only uses the in-module test paths"
+    reason = "FakeMetadataRepo re-export anchors the public surface for later-phase service-level tests; phase 1 only uses the in-gear test paths"
 )]
 pub use repo::FakeMetadataRepo;
 

@@ -1,10 +1,10 @@
 //! Infrastructure layer mapping from type-safe `FilterNode` to `SeaORM` Conditions.
 //!
-//! This module is the ONLY place where we map from DTO-level filter fields to
+//! This gear is the ONLY place where we map from DTO-level filter fields to
 //! `SeaORM` Column types. The API and domain layers work exclusively with `FilterNode`
 //! and do not know about `SeaORM` Column enums.
 //!
-//! This module provides the complete `OData` mapping including filtering, ordering,
+//! This gear provides the complete `OData` mapping including filtering, ordering,
 //! and cursor extraction - all using the type-safe `FilterField` approach.
 
 use sea_orm::Condition;

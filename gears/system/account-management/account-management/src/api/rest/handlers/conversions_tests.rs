@@ -2,7 +2,7 @@
 //! [`super::dispatch_patch`].
 //!
 //! Handler-level integration tests (axum router + service fake) are
-//! out of scope here per the module-level convention; the goal is to
+//! out of scope here per the gear-level convention; the goal is to
 //! pin the pure status-to-method routing the PATCH endpoints share
 //! between own-side and parent-side. A regression that re-wires one
 //! PATCH branch to the wrong service method would surface here as a

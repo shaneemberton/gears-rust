@@ -25,7 +25,7 @@ This ADR captures the workaround: **dependency-graph policy enforced at build ti
 ## Considered Options
 
 * **Option A** — `cargo-deny` `[bans]` policy enforced under a separate config — **chosen**
-* **Option B** — Workspace-wide custom `dylint` rule that refuses `use md5;` / `use sha1;` / etc. at module level
+* **Option B** — Workspace-wide custom `dylint` rule that refuses `use md5;` / `use sha1;` / etc. at gear level
 * **Option C** — Runtime check at `init_crypto_provider`: probe loaded libraries with `dladdr` / `vmmap`, refuse to start if non-validated crypto libs are present
 * **Option D** — Accept the current gap; document as a known limitation
 

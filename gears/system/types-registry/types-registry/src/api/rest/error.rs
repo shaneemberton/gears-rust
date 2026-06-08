@@ -1,4 +1,4 @@
-//! REST error mapping for the Types Registry module.
+//! REST error mapping for the Types Registry gear.
 
 use toolkit_canonical_errors::{CanonicalError, resource_error};
 
@@ -32,7 +32,7 @@ impl From<DomainError> for CanonicalError {
             DomainError::NotInReadyMode => CanonicalError::service_unavailable().create(),
             DomainError::ReadyCommitFailed(errors) => {
                 // Unreachable from REST handlers — `switch_to_ready` runs in
-                // module `post_init` only. Kept for `From` exhaustiveness.
+                // gear `post_init` only. Kept for `From` exhaustiveness.
                 // If it ever surfaces, we want an opaque internal response;
                 // the validation detail is logged server-side and preserved
                 // on the canonical error's diagnostic field.

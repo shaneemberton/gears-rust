@@ -15,7 +15,7 @@ use crate::domain::local_client::{
     addresses::LocalAddressesStreamingClient, cities::LocalCitiesStreamingClient,
     users::LocalUsersStreamingClient,
 };
-use crate::module::ConcreteAppServices;
+use crate::gear::ConcreteAppServices;
 
 /// Local implementation of the object-safe `UsersInfoClientV1`.
 ///

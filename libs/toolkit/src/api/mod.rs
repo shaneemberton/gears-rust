@@ -1,6 +1,6 @@
 //! Type-safe API operation builder with compile-time guarantees
 //!
-//! This module provides a type-state builder pattern that enforces at compile time
+//! This gear provides a type-state builder pattern that enforces at compile time
 //! that API operations cannot be registered unless both a handler and at least one
 //! response are specified.
 
@@ -37,7 +37,7 @@ pub mod canonical_prelude {
     ///
     /// Returns [`CanonicalError`] (not [`Problem`]) so handler `?` chains
     /// resolve through `From<DomainError> for CanonicalError` — the
-    /// long-lived per-module mapping. The canonical error middleware
+    /// long-lived per-gear mapping. The canonical error middleware
     /// (`toolkit::api::canonical_error_middleware`) converts the
     /// `CanonicalError` to a wire `Problem` and fills `instance` /
     /// `trace_id` on the way out, so handlers never need to construct a

@@ -1,4 +1,4 @@
-//! Settings Module Implementation
+//! Settings Gear Implementation
 //!
 //! The public API is defined in `simple_user_settings-sdk` and re-exported here.
 
@@ -7,8 +7,8 @@ pub use simple_user_settings_sdk::{
     SimpleUserSettingsUpdate,
 };
 
-pub mod module;
-pub use module::SettingsModule;
+pub mod gear;
+pub use gear::SettingsGear;
 
 #[doc(hidden)]
 pub mod api;

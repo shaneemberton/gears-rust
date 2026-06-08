@@ -8,7 +8,7 @@
 //! TTL is enabled by default ([`DEFAULT_CACHE_TTL`]). The local client
 //! invalidates its own entries on writes it observes, but registry mutations
 //! can also reach the underlying store from other processes (out-of-process
-//! modules) or from peers in a future distributed deployment — there's no
+//! gears) or from peers in a future distributed deployment — there's no
 //! in-process notification when that happens. TTL bounds how long a stale
 //! entry can survive in those cases. Callers can override with
 //! [`CacheConfig::with_ttl`] / [`CacheConfig::without_ttl`].
@@ -38,7 +38,7 @@ use uuid::Uuid;
 /// This trait gives [`InMemoryCache`] a uniform extractor so it can populate
 /// its internal `uuid → gts_id` reverse index atomically with every `put`.
 ///
-/// Kept private to the cache module — it's an impl detail of
+/// Kept private to the cache gear — it's an impl detail of
 /// [`InMemoryCache`], not part of the SDK contract.
 pub trait HasUuid {
     /// Returns the entity's deterministic UUID v5.
@@ -69,7 +69,7 @@ pub const DEFAULT_CACHE_CAPACITY: usize = 1024;
 /// Default TTL for cached entries: 60 seconds.
 ///
 /// Bounds staleness when the underlying store is mutated outside the local
-/// client's awareness (e.g. by an out-of-process module sharing the registry
+/// client's awareness (e.g. by an out-of-process gear sharing the registry
 /// or a peer node in a future distributed deployment).
 pub const DEFAULT_CACHE_TTL: Duration = Duration::from_mins(1);
 

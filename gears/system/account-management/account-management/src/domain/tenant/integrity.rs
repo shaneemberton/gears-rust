@@ -11,7 +11,7 @@
 //! lifecycle. Together the 8 classifiers emit the 10 fixed-shape
 //! categories enumerated by [`IntegrityCategory::all`].
 //!
-//! This module retains the type vocabulary shared by:
+//! This gear retains the type vocabulary shared by:
 //!
 //! * the `TenantRepo::run_integrity_check` trait surface, which
 //!   returns a flat `Vec<(IntegrityCategory, Violation)>`.

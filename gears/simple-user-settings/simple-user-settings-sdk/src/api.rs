@@ -1,6 +1,6 @@
 //! `SimpleUserSettingsClientV1` trait definition.
 //!
-//! This trait defines the public API for the settings module (Version 1).
+//! This trait defines the public API for the settings gear (Version 1).
 //! All methods require a `SecurityContext` for authorization and access control.
 
 use async_trait::async_trait;
@@ -9,9 +9,9 @@ use toolkit_security::SecurityContext;
 
 use crate::models::{SimpleUserSettings, SimpleUserSettingsPatch, SimpleUserSettingsUpdate};
 
-/// Public API trait for the settings module (Version 1).
+/// Public API trait for the settings gear (Version 1).
 ///
-/// This trait is registered in `ClientHub` by the settings module:
+/// This trait is registered in `ClientHub` by the settings gear:
 /// ```ignore
 /// let settings = hub.get::<dyn SimpleUserSettingsClientV1>()?;
 /// ```

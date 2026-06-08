@@ -32,13 +32,13 @@
 
 ### 1.1 Architectural Vision
 
-Simple Resource Registry follows a layered architecture with a pluggable storage backend. The module exposes a single REST API surface for CRUD operations on typed resources. All resources share a common schema envelope (identity, ownership, timestamps) and an opaque JSON payload. Schema envelope fields are queryable via OData; payload content is opaque and not queryable.
+Simple Resource Registry follows a layered architecture with a pluggable storage backend. The gear exposes a single REST API surface for CRUD operations on typed resources. All resources share a common schema envelope (identity, ownership, timestamps) and an opaque JSON payload. Schema envelope fields are queryable via OData; payload content is opaque and not queryable.
 
 The resource `type` field contains the resource's GTS type identifier in GTS ID format. In other words, the resource `type` value is the same identifier as the resource's GTS type ID (GTS type ID).
 
-The storage layer is abstracted behind a `ResourceStoragePluginClient` trait, allowing the same API to serve different backends. The default implementation is a relational backend (`cpt-cf-srr-fr-default-storage-backend`) described in the [plugin DESIGN](../plugins/srr-rdb-plugin/docs/DESIGN.md). The interface is intentionally minimal: the core module handles authentication, authorization, GTS type resolution, and event/audit emission, while backends handle persistence and query execution. Multiple backends can coexist with per-resource-type routing.
+The storage layer is abstracted behind a `ResourceStoragePluginClient` trait, allowing the same API to serve different backends. The default implementation is a relational backend (`cpt-cf-srr-fr-default-storage-backend`) described in the [plugin DESIGN](../plugins/srr-rdb-plugin/docs/DESIGN.md). The interface is intentionally minimal: the core gear handles authentication, authorization, GTS type resolution, and event/audit emission, while backends handle persistence and query execution. Multiple backends can coexist with per-resource-type routing.
 
-Resource type definitions are managed through GTS (Global Type System) via the Types Registry module. A base GTS schema defines the common envelope and behavioral flags (event/audit configuration). Derived types extend the base schema with type-specific payload definitions. This approach enables runtime discoverability of registered resource types and decouples type definition from storage implementation.
+Resource type definitions are managed through GTS (Global Type System) via the Types Registry gear. A base GTS schema defines the common envelope and behavioral flags (event/audit configuration). Derived types extend the base schema with type-specific payload definitions. This approach enables runtime discoverability of registered resource types and decouples type definition from storage implementation.
 
 ### 1.2 Architecture Drivers
 
@@ -51,8 +51,8 @@ Resource type definitions are managed through GTS (Global Type System) via the T
 | `cpt-cf-srr-fr-list-resources` | OData parser translates query params to backend query filters on schema columns; plugin executes scoped query |
 | `cpt-cf-srr-fr-update-resource` | ResourceService resolves permitted GTS types, storage plugin fetches target resource with backend-level security filters, then domain layer validates payload and updates `updated_at` |
 | `cpt-cf-srr-fr-delete-resource` | Soft-delete via deleted_at timestamp; storage plugin filters soft-deleted records from list queries |
-| `cpt-cf-srr-fr-gts-type-registration` | Base GTS schema registered at module startup; derived types registered by consumer modules via Types Registry SDK |
-| `cpt-cf-srr-fr-default-storage-backend` | Default relational DB backend implemented as a separate plugin module (`srr-rdb-plugin`); declares `odata_support` capability |
+| `cpt-cf-srr-fr-gts-type-registration` | Base GTS schema registered at gear startup; derived types registered by consumer gears via Types Registry SDK |
+| `cpt-cf-srr-fr-default-storage-backend` | Default relational DB backend implemented as a separate plugin gear (`srr-rdb-plugin`); declares `odata_support` capability |
 | `cpt-cf-srr-nfr-scalability` | 100M resources / 100 writes·s⁻¹ / 1000 reads-by-ID·s⁻¹ — achieved via proper indexing in the default backend; storage optimization is a per-backend concern |
 | `cpt-cf-srr-fr-odata-schema-fields` | OData $filter/$orderby limited to schema columns; cursor-based pagination (limit, cursor); payload column excluded from query support |
 | `cpt-cf-srr-fr-gts-access-control` | ResourceService checks caller `Permission` entries (`resource_pattern` + action). Returns 403 for pre-query denials (POST, LIST no-intersection). For individual resources (GET/PUT/DELETE), permissions are enforced via backend query filters and unmatched scope results in 404 |
@@ -108,7 +108,7 @@ Resource type definitions are managed through GTS (Global Type System) via the T
 | API | REST endpoints, request/response serialization, OData query parsing, OpenAPI spec | toolkit REST, OpenAPI 3.0 |
 | Application | Request orchestration, SecurityContext propagation, GTS type resolution, event/audit emission | Rust async services |
 | Domain | Resource entity model, storage plugin trait definition, behavioral flag evaluation | Rust traits, GTS schemas |
-| Infrastructure | Storage implementations, external module SDK clients | Storage Plugin(s), Events Broker SDK, Audit SDK, Types Registry SDK |
+| Infrastructure | Storage implementations, external gear SDK clients | Storage Plugin(s), Events Broker SDK, Audit SDK, Types Registry SDK |
 
 ## 2. Principles & Constraints
 
@@ -134,7 +134,7 @@ Storage plugins implement only persistence and query execution. They receive alr
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-principle-gts-first`
 
-All resource types are defined and registered through GTS. The base resource type and derived types use GTS schema inheritance. Type behavioral flags (event/audit configuration) are stored in the GTS type definition, not in module configuration. This ensures type metadata is discoverable, versionable, and consistent across the platform.
+All resource types are defined and registered through GTS. The base resource type and derived types use GTS schema inheritance. Type behavioral flags (event/audit configuration) are stored in the GTS type definition, not in gear configuration. This ensures type metadata is discoverable, versionable, and consistent across the platform.
 
 ### 2.2 Constraints
 
@@ -142,19 +142,19 @@ All resource types are defined and registered through GTS. The base resource typ
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-constraint-backend-internal-storage`
 
-Storage layout and optimization (table design, indexing, partitioning) are backend-internal concerns. The main module defines a **canonical reference schema** (see §3.8) as the recommended starting point for relational backends — this ensures predictable performance, easier plugin implementations, and consistent migrations. Non-relational backends may use any internal data structure appropriate to their storage technology. For resource types requiring specialized storage (full-text search, dedicated indexing), per-resource-type routing (`cpt-cf-srr-fr-multi-backend-storage`) enables alternative backends.
+Storage layout and optimization (table design, indexing, partitioning) are backend-internal concerns. The main gear defines a **canonical reference schema** (see §3.8) as the recommended starting point for relational backends — this ensures predictable performance, easier plugin implementations, and consistent migrations. Non-relational backends may use any internal data structure appropriate to their storage technology. For resource types requiring specialized storage (full-text search, dedicated indexing), per-resource-type routing (`cpt-cf-srr-fr-multi-backend-storage`) enables alternative backends.
 
 #### No Payload Querying
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-constraint-no-payload-query`
 
-OData queries cannot target payload fields. Consumers requiring payload-level queries must either promote frequently queried fields to the schema level (by extending the module) or use search-capable storage backends (`cpt-cf-srr-fr-search-api`). This constraint is a deliberate trade-off for simplicity and predictable performance.
+OData queries cannot target payload fields. Consumers requiring payload-level queries must either promote frequently queried fields to the schema level (by extending the gear) or use search-capable storage backends (`cpt-cf-srr-fr-search-api`). This constraint is a deliberate trade-off for simplicity and predictable performance.
 
 #### Soft-Delete with Configurable Retention Purge
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-constraint-soft-delete`
 
-Resources are soft-deleted via the API (deleted_at timestamp set). Soft-deleted resources are permanently purged by a Jobs Manager job after a configurable retention period (default 30 days, overridable per resource type via GTS type definition). The module does **not** support automatic soft-deletion of active resources based on a TTL — this is intentionally excluded as error-prone.
+Resources are soft-deleted via the API (deleted_at timestamp set). Soft-deleted resources are permanently purged by a Jobs Manager job after a configurable retention period (default 30 days, overridable per resource type via GTS type definition). The gear does **not** support automatic soft-deletion of active resources based on a TTL — this is intentionally excluded as error-prone.
 
 #### Payload Size Limit
 
@@ -386,7 +386,7 @@ graph TB
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-component-resource-service`
 
-  - **ResourceService**: Core application service. Delegates to GTS Access Control for permission checks and effective type scope resolution, validates GTS type existence via Types Registry (with in-process GTS Type Cache for performance), applies DB-filter-based access semantics (tenant, user, type), evaluates behavioral flags (including flags inherited from parent GTS types), orchestrates storage plugin calls, emits events (`cpt-cf-srr-contract-events`) and audit (`cpt-cf-srr-contract-audit`) per `cpt-cf-srr-fr-notification-events` and `cpt-cf-srr-fr-audit-events`. Exposed to other modules via ClientHub as `SimpleResourceRegistryClient` (`cpt-cf-srr-interface-sdk-client`) through a `LocalClient` adapter (per ToolKit DDD-light pattern).
+  - **ResourceService**: Core application service. Delegates to GTS Access Control for permission checks and effective type scope resolution, validates GTS type existence via Types Registry (with in-process GTS Type Cache for performance), applies DB-filter-based access semantics (tenant, user, type), evaluates behavioral flags (including flags inherited from parent GTS types), orchestrates storage plugin calls, emits events (`cpt-cf-srr-contract-events`) and audit (`cpt-cf-srr-contract-audit`) per `cpt-cf-srr-fr-notification-events` and `cpt-cf-srr-fr-audit-events`. Exposed to other gears via ClientHub as `SimpleResourceRegistryClient` (`cpt-cf-srr-interface-sdk-client`) through a `LocalClient` adapter (per ToolKit DDD-light pattern).
 
 - [ ] `p1` - **ID**: `cpt-cf-srr-component-gts-access-control`
 
@@ -417,8 +417,8 @@ graph TB
 The storage plugin system follows the standard ToolKit plugin pattern:
 
 - **SDK crate** (`simple-resource-registry-sdk`): Defines the public `SimpleResourceRegistryClient` trait (`cpt-cf-srr-interface-sdk-client`), the `ResourceStoragePluginClient` backend trait (`cpt-cf-srr-interface-storage-backend`), and the `ResourceStoragePluginSpecV1` GTS schema type for backend instances.
-- **Main module** (`simple-resource-registry`): Registers the plugin GTS schema in Types Registry during `init()`, resolves plugins via GTS-based discovery, and registers a public client in ClientHub.
-- **Plugin modules** (e.g., `srr-rdb-plugin`): Each plugin registers a GTS instance in Types Registry and a scoped client in ClientHub via `ClientScope::gts_id(&instance_id)`.
+- **Main gear** (`simple-resource-registry`): Registers the plugin GTS schema in Types Registry during `init()`, resolves plugins via GTS-based discovery, and registers a public client in ClientHub.
+- **Plugin gears** (e.g., `srr-rdb-plugin`): Each plugin registers a GTS instance in Types Registry and a scoped client in ClientHub via `ClientScope::gts_id(&instance_id)`.
 
 Plugin discovery uses the standard pattern:
 
@@ -444,7 +444,7 @@ pub enum CreateOutcome {
     Duplicate(Uuid),
 }
 
-/// Plugin API — implemented by plugin modules, called by the main module.
+/// Plugin API — implemented by plugin gears, called by the main gear.
 /// Registered WITH scope (GTS instance ID) in ClientHub.
 #[async_trait]
 pub trait ResourceStoragePluginClient: Send + Sync {
@@ -514,7 +514,7 @@ pub trait ResourceStoragePluginClient: Send + Sync {
 **Public API Trait** (defined in SDK crate):
 
 ```rust
-/// Public API — exposed by the module to other modules.
+/// Public API — exposed by the gear to other gears.
 /// Registered WITHOUT scope in ClientHub.
 #[async_trait]
 pub trait SimpleResourceRegistryClient: Send + Sync {
@@ -526,7 +526,7 @@ pub trait SimpleResourceRegistryClient: Send + Sync {
 }
 ```
 
-**Plugin Resolution** (in main module `ResourceService`):
+**Plugin Resolution** (in main gear `ResourceService`):
 
 ```rust
 // Storage Router resolves plugin per resource type via GTS-based discovery:
@@ -914,18 +914,18 @@ Notes:
 
 ### 3.4 Internal Dependencies
 
-| Dependency Module | Interface Used | Purpose | Needed By |
+| Dependency Gear    | Interface Used | Purpose | Needed By |
 | --- | --- | --- | --- |
 | Types Registry | Types Registry SDK (ClientHub) | Resolve GTS type definitions, validate type, read behavioral flags | `cpt-cf-srr-fr-gts-type-registration`, `cpt-cf-srr-fr-gts-type-validation` |
-| toolkit-db | SecurityContext-based tenant scoping | Tenant-scoped database access infrastructure (indirect — used by database-backed storage plugins, not by the main module directly) | `cpt-cf-srr-fr-default-storage-backend` |
+| toolkit-db | SecurityContext-based tenant scoping | Tenant-scoped database access infrastructure (indirect — used by database-backed storage plugins, not by the main gear directly) | `cpt-cf-srr-fr-default-storage-backend` |
 | gts-rust | Rust crate (library) | GTS ID generation, schema utilities, payload validation against GTS type schemas | `cpt-cf-srr-fr-gts-type-registration`, `cpt-cf-srr-fr-idempotent-resource-create`, `cpt-cf-srr-fr-update-resource` |
 | Events Broker | Events Broker SDK (ClientHub) | Emit domain events for resource lifecycle (fixed schema: id, type, subject_type, subject_id) | `cpt-cf-srr-fr-notification-events` |
-| Audit Module | Audit SDK (ClientHub) | Emit audit events for compliance (fixed schema: id, type, subject_type, subject_id, previous_payload, new_payload) | `cpt-cf-srr-fr-audit-events` |
+| Audit Gear | Audit SDK (ClientHub) | Emit audit events for compliance (fixed schema: id, type, subject_type, subject_id, previous_payload, new_payload) | `cpt-cf-srr-fr-audit-events` |
 
 **Dependency Rules** (per project conventions):
 
 - No circular dependencies
-- Always use SDK modules for inter-module communication
+- Always use SDK gears for inter-gear communication
 - No cross-category sideways deps except through contracts
 - `SecurityContext` must be propagated across all in-process calls
 
@@ -991,7 +991,7 @@ sequenceDiagram
     participant TR as Types Registry
     participant SP as Storage Plugin
     participant EB as Events Broker
-    participant AU as Audit Module
+    participant AU as Audit Gear
 
     C->>API: POST /resources {type, idempotency_key, payload}
     API->>API: Extract SecurityContext
@@ -1130,7 +1130,7 @@ sequenceDiagram
     participant TR as Types Registry
     participant SP as Storage Plugin
     participant EB as Events Broker
-    participant AU as Audit Module
+    participant AU as Audit Gear
 
     C->>API: PUT /resources/{id} {payload}
     API->>API: Extract SecurityContext
@@ -1185,7 +1185,7 @@ sequenceDiagram
     participant TR as Types Registry
     participant SP as Storage Plugin
     participant EB as Events Broker
-    participant AU as Audit Module
+    participant AU as Audit Gear
 
     C->>API: DELETE /resources/{id}
     API->>API: Extract SecurityContext
@@ -1336,11 +1336,11 @@ Other storage backends **MUST** implement equivalent persistence for the `Resour
 
 4. **Payload validation at API boundary**: The Simple Resource Registry service validates resource payloads against the derived GTS type's JSON Schema at create and update time, using the `gts` crate's standard schema validation. Validation failures return 422 Unprocessable Entity. This ensures that all persisted resources conform to their declared GTS type schema, regardless of whether the request originates from the REST API or the SDK client.
 
-5. **No resource versioning**: The module does not maintain a history of resource changes. Only the current state is stored. Consumers needing change history should use audit events (`cpt-cf-srr-fr-audit-events`) for traceability.
+5. **No resource versioning**: The gear does not maintain a history of resource changes. Only the current state is stored. Consumers needing change history should use audit events (`cpt-cf-srr-fr-audit-events`) for traceability.
 
 6. **Retention purge is background-only**: The retention purge task runs periodically, so soft-deleted resources may persist slightly beyond their configured retention period depending on task frequency and batch size. Operators should size the purge interval and batch size appropriately for their workload.
 
-7. **No auto-deletion of active resources**: The module intentionally does not support automatic soft-deletion of active resources based on a TTL. This is an intentional safety decision — automatic deletion of live data is error-prone and must not be accidentally enabled. Consumers requiring resource TTL must implement their own cleanup logic or use workflows.
+7. **No auto-deletion of active resources**: The gear intentionally does not support automatic soft-deletion of active resources based on a TTL. This is an intentional safety decision — automatic deletion of live data is error-prone and must not be accidentally enabled. Consumers requiring resource TTL must implement their own cleanup logic or use workflows.
 
 8. **GTS access control depends on Permission quality**: If the caller's token lacks properly scoped GTS `resource_pattern` entries, all operations will be denied. This is by design — permissive tokens (e.g., `resource_pattern: "*"`) are the responsibility of the identity provider and policy engine.
 
@@ -1352,7 +1352,7 @@ Other storage backends **MUST** implement equivalent persistence for the `Resour
 | External object reflections | Entries representing objects from external systems (CRM contacts, ticketing issues) |
 | Domain model consistency | Partial representations of external resources for internal domain model coherence |
 | Agent execution artifacts | Intermediate or final results from agent pipeline execution |
-| Tenant configuration objects | Custom tenant-level settings not covered by dedicated modules |
+| Tenant configuration objects | Custom tenant-level settings not covered by dedicated gears |
 | User preferences | Per-user settings or state for platform features |
 
 ### 4.3 Storage Routing Configuration (`cpt-cf-srr-fr-storage-routing`)

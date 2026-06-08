@@ -460,5 +460,5 @@ MVP uses per-instance rate limiting and concurrency control (no distributed coor
 - **Degrade strategy**: Deferred to Phase 3-4 per `cpt-cf-oagw-adr-backpressure-queueing`. Only `reject` and `queue` strategies implemented.
 - **Health check based proactive detection**: Not included — circuit breaker is reactive only per `cpt-cf-oagw-adr-circuit-breaker`.
 - **Structured audit logging**: Rate limit exceeded and circuit breaker state transition events are logged per DESIGN.md §4.3 but structured audit logging integration belongs to `cpt-cf-oagw-feature-observability`.
-- **UX/Accessibility**: Not applicable — OAGW is a backend API module with no user interface.
+- **UX/Accessibility**: Not applicable — OAGW is a backend API gear with no user interface.
 - **Compliance/Privacy**: OAGW does not handle PII directly. No additional regulatory compliance beyond standard platform requirements.

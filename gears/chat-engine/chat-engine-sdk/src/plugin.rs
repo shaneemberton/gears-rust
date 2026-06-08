@@ -79,7 +79,7 @@ pub fn stream_from_events(events: Vec<StreamingEvent>) -> PluginStream {
     stream::iter(events.into_iter().map(Ok)).boxed()
 }
 
-#[allow(clippy::module_name_repetitions)]
+#[allow(clippy::gear_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct SessionPluginCtx {
     pub session_type_id: Uuid,
@@ -97,7 +97,7 @@ pub struct SessionPluginCtx {
 /// The summary surfaces `len` and a per-role count so observability is
 /// preserved without leaking text. `call_ctx` keeps its own redaction (see
 /// `PluginCallContext::Debug`).
-#[allow(clippy::module_name_repetitions)]
+#[allow(clippy::gear_name_repetitions)]
 #[derive(Clone)]
 pub struct MessagePluginCtx {
     pub session_id: Uuid,
@@ -141,7 +141,7 @@ impl std::fmt::Debug for MessagePluginCtx {
 /// secrets (API keys, webhook auth, credentials) that must never hit logs.
 /// Wrappers `SessionPluginCtx` / `MessagePluginCtx` derive `Debug` and
 /// transitively inherit this redaction.
-#[allow(clippy::module_name_repetitions)]
+#[allow(clippy::gear_name_repetitions)]
 #[derive(Clone)]
 pub struct PluginCallContext {
     /// Correlation ID for this plugin invocation. Used for log correlation and

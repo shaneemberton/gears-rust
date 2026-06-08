@@ -4,7 +4,7 @@
 //! `gears/system/account-management/docs/features/feature-platform-bootstrap.md`).
 //!
 //! The bootstrap saga is invoked exactly once per platform start from the
-//! module lifecycle entry path and **MUST** complete before the runtime
+//! gear lifecycle entry path and **MUST** complete before the runtime
 //! starts serving so that the retention + reaper background loops never
 //! observe the platform without a root tenant.
 

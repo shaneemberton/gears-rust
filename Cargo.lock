@@ -1932,6 +1932,7 @@ version = "0.1.5"
 dependencies = [
  "async-trait",
  "cf-gears-toolkit",
+ "cf-gears-toolkit-canonical-errors",
  "cf-gears-toolkit-gts",
  "cf-gears-toolkit-odata",
  "cf-gears-toolkit-odata-macros",
@@ -1955,6 +1956,7 @@ dependencies = [
  "cf-gears-resource-group-sdk",
  "cf-gears-tenant-resolver-sdk",
  "cf-gears-toolkit",
+ "cf-gears-toolkit-canonical-errors",
  "cf-gears-toolkit-macros",
  "cf-gears-toolkit-odata",
  "cf-gears-toolkit-security",

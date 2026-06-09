@@ -51,3 +51,7 @@ inventory = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
+# Test fakes synthesize the `CanonicalError` envelope the RG trait now
+# returns (ADR 0005). Production code only projects it via the SDK's
+# `ResourceGroupError::from`, so this is dev-only.
+toolkit-canonical-errors = { workspace = true }

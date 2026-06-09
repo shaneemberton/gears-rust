@@ -23,6 +23,14 @@ odata = [
 ]
 
 [dependencies]
+# Per ADR 0005 the trait boundary is `CanonicalError`; the SDK ships
+# `ResourceGroupError` as an opt-in `From<CanonicalError>` projection
+# (see src/error.rs). The single AIP-193 ladder
+# (`From<DomainError> for CanonicalError`) lives in the impl crate's
+# `api::rest::error`; this SDK depends on the canonical-errors crate to
+# project that envelope into the typed view.
+toolkit-canonical-errors = { workspace = true }
+
 # Core dependencies for API trait
 thiserror = { workspace = true }
 serde = { workspace = true }

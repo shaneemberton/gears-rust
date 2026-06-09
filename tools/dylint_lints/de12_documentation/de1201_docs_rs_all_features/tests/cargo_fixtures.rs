@@ -37,9 +37,6 @@ fn run_fixture_with_env(name: &str, extra_env: &[(&str, &str)]) -> Output {
     let fixture = fixtures_dir().join(name);
     let manifest_path = fixture.join("Cargo.toml");
     let lint_parent_dir = lint_parent_dir();
-    let target_dir = fixture
-        .join("target")
-        .join(target_dir_name(name, extra_env));
 
     let mut command = Command::new("cargo");
     command
@@ -51,7 +48,7 @@ fn run_fixture_with_env(name: &str, extra_env: &[(&str, &str)]) -> Output {
         .arg("--manifest-path")
         .arg(&manifest_path)
         .arg("--no-deps")
-        .env("CARGO_TARGET_DIR", target_dir)
+        .env_remove("CARGO_TARGET_DIR")
         .env_remove(ENV_EXCLUDED_CRATES)
         .env_remove("DYLINT_RUSTFLAGS")
         .env_remove("DYLINT_TOML")
@@ -92,20 +89,6 @@ fn remove_fixture_lockfile(fixture: &Path) {
             fixture.display()
         ),
     }
-}
-
-fn target_dir_name(name: &str, extra_env: &[(&str, &str)]) -> String {
-    if extra_env.is_empty() {
-        return format!("dylint-fixture-{name}");
-    }
-
-    let env_suffix = extra_env
-        .iter()
-        .map(|(key, value)| format!("{key}-{value}"))
-        .collect::<Vec<_>>()
-        .join("-");
-
-    format!("dylint-fixture-{name}-{env_suffix}")
 }
 
 fn assert_success(name: &str, output: &Output) {

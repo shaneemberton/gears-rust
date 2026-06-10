@@ -51,3 +51,7 @@ zeroize = { workspace = true }
 bytes = { workspace = true }
 http-body-util = { workspace = true }
 httpmock = { workspace = true }
+# Enable toolkit-http's `otel` feature for examples/tests so the
+# `with_otel_metrics*` builder methods are available (see examples/oauth2_metrics.rs).
+# Dev-only: a plain `cargo build` of the library does not pull this in.
+toolkit-http = { workspace = true, features = ["otel"] }

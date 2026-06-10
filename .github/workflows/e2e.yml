@@ -60,10 +60,12 @@ jobs:
         run: pip install -r testing/e2e/requirements.txt
 
       - name: Run E2E tests
+        env:
+          INPUT_MODE: ${{ inputs.mode }}
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             make e2e-local            # nightly — full suite
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.mode }}" = "full" ]; then
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$INPUT_MODE" = "full" ]; then
             make e2e-local            # manual — full suite
           else
             make e2e-local            # PR / manual-smoke, TODO: switch to e2e-local-smoke later

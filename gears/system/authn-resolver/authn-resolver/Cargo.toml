@@ -20,7 +20,7 @@ workspace = true
 [dependencies]
 # Local dependencies
 authn-resolver-sdk = { package = "cf-gears-authn-resolver-sdk", version = "0.3.16", path = "../authn-resolver-sdk" }
-types-registry-sdk = { package = "cf-gears-types-registry-sdk", version = "0.2.2", path = "../../types-registry/types-registry-sdk" }
+types-registry-sdk = { package = "cf-gears-types-registry-sdk", version = "0.2.3", path = "../../types-registry/types-registry-sdk" }
 
 # ToolKit dependencies
 toolkit = { workspace = true }

@@ -9,6 +9,30 @@ release-plz updates this file in the Release PR.
 
 ## [Unreleased]
 
+## [0.6.6](https://github.com/constructorfabric/gears-rust/compare/cf-gears-toolkit-http-v0.6.5...cf-gears-toolkit-http-v0.6.6) - 2026-06-10
+
+### Other
+
+- updated the following local packages: cf-gears-rustls-corecrypto-provider, cf-gears-rustls-fips-shim
+
+## [0.1.2](https://github.com/constructorfabric/gears-rust/compare/cf-gears-account-management-v0.1.1...cf-gears-account-management-v0.1.2) - 2026-06-10
+
+### Other
+
+- updated the following local packages: cf-gears-toolkit-gts, cf-gears-types-registry-sdk, cf-gears-types-registry-sdk, cf-gears-toolkit, cf-gears-tenant-resolver-sdk, cf-gears-account-management-sdk, cf-gears-authz-resolver-sdk, cf-gears-resource-group-sdk
+
+## [0.1.2](https://github.com/constructorfabric/gears-rust/compare/cf-gears-account-management-sdk-v0.1.1...cf-gears-account-management-sdk-v0.1.2) - 2026-06-10
+
+### Other
+
+- updated the following local packages: cf-gears-toolkit-gts, cf-gears-toolkit, cf-gears-tenant-resolver-sdk
+
+## [0.6.11](https://github.com/constructorfabric/gears-rust/compare/cf-gears-toolkit-v0.6.10...cf-gears-toolkit-v0.6.11) - 2026-06-10
+
+### Other
+
+- updated the following local packages: cf-gears-rustls-corecrypto-provider, cf-gears-rustls-fips-shim, cf-gears-toolkit-gts
+
 ## [0.1.0](https://github.com/constructorfabric/gears-rust/releases/tag/cf-gears-oidc-authn-plugin-v0.1.0) - 2026-06-09
 
 ### Other

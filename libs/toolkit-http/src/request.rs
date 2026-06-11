@@ -21,6 +21,36 @@ enum BodyKind {
     Form(Bytes),
 }
 
+/// Per-request label for the `request_type` metrics attribute.
+///
+/// Attach to a request via [`RequestBuilder::with_request_type`] to break down
+/// `http.client.request.duration` metrics by logical operation (e.g.
+/// `"tenants_resolve"`, `"token_fetch"`). This is the Rust analogue of
+/// go-appkit's `NewContextWithRequestType` / `GetRequestTypeFromContext`.
+///
+/// The metrics layer reads this from request extensions when the `otel` feature
+/// is enabled; setting it without the feature is a safe no-op.
+///
+/// # Example
+///
+/// ```ignore
+/// client
+///     .get("https://api.example.com/tenants/123")
+///     .with_request_type("tenants_resolve")
+///     .send()
+///     .await?;
+/// ```
+#[derive(Clone, Debug)]
+pub struct RequestType(pub std::borrow::Cow<'static, str>);
+
+impl RequestType {
+    /// Create a request type label from a static string.
+    #[must_use]
+    pub fn new(t: impl Into<std::borrow::Cow<'static, str>>) -> Self {
+        Self(t.into())
+    }
+}
+
 /// HTTP request builder with fluent API
 ///
 /// Created by [`HttpClient::get`], [`HttpClient::post`], etc.
@@ -86,6 +116,8 @@ pub struct RequestBuilder {
     error: Option<HttpError>,
     /// Transport security mode for URL scheme validation
     transport_security: TransportSecurity,
+    /// Optional per-request metrics label (read by the metrics layer)
+    request_type: Option<RequestType>,
 }
 
 impl RequestBuilder {
@@ -106,6 +138,7 @@ impl RequestBuilder {
             body: BodyKind::Empty,
             error: None,
             transport_security,
+            request_type: None,
         }
     }
 
@@ -180,6 +213,30 @@ impl RequestBuilder {
                 }
             }
         }
+        self
+    }
+
+    /// Attach a `request_type` label for metrics.
+    ///
+    /// The label is added as a `request_type` attribute on the
+    /// `http.client.request.duration` histogram when the `otel` feature and a
+    /// metrics layer are configured. This mirrors go-appkit's
+    /// `NewContextWithRequestType` / `GetRequestTypeFromContext` pattern and lets
+    /// you break down metrics by logical operation rather than route alone.
+    ///
+    /// Setting this without a metrics layer is a safe no-op.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// client
+    ///     .get("https://api.example.com/tenants/123")
+    ///     .with_request_type("tenants_resolve")
+    ///     .send()
+    ///     .await?;
+    /// ```
+    pub fn with_request_type(mut self, t: impl Into<std::borrow::Cow<'static, str>>) -> Self {
+        self.request_type = Some(RequestType::new(t));
         self
     }
 
@@ -381,6 +438,12 @@ impl RequestBuilder {
         // we skipped the default above and only their header is added here.
         for (name, value) in self.headers {
             builder = builder.header(name, value);
+        }
+
+        // Attach request_type extension so the metrics layer can read it without
+        // accessing the request body or headers (go-appkit analogue: context value).
+        if let Some(rt) = self.request_type {
+            builder = builder.extension(rt);
         }
 
         // Build body

@@ -215,6 +215,53 @@ impl HttpClientBuilder {
         self
     }
 
+    /// Record OpenTelemetry client metrics using the default route classifier.
+    ///
+    /// Emits `http.client.request.duration` (a histogram, in seconds) for each
+    /// logical request. `client_type` names the instrumentation scope (the
+    /// meter), like the server-side gear name. The default classifier labels
+    /// each request `"METHOD host"` via the `http.route` attribute — a bounded
+    /// value that never contains a raw path, so metric cardinality stays
+    /// controlled. Use [`with_metrics_by`](Self::with_metrics_by)
+    /// to supply route templates.
+    ///
+    /// Like [`with_metrics_layer`](Self::with_metrics_layer), the layer sits
+    /// outside the retry loop, so it observes one logical request, not each
+    /// attempt.
+    #[cfg(feature = "otel")]
+    #[must_use]
+    pub fn with_metrics(self, client_type: impl Into<String>) -> Self {
+        self.with_metrics_by(client_type, crate::layers::default_classify)
+    }
+
+    /// Record OpenTelemetry client metrics with a custom route classifier.
+    ///
+    /// Like [`with_metrics`](Self::with_metrics) but accepts a classifier — `classify` produces the
+    /// `http.route` attribute for each request (the Rust analogue of go-appkit's
+    /// `ClassifyRequest`). It MUST return a bounded set of values (e.g.
+    /// `"GET /users/{id}"`), never raw paths, to avoid unbounded metric
+    /// cardinality.
+    #[cfg(feature = "otel")]
+    #[must_use]
+    pub fn with_metrics_by(
+        self,
+        client_type: impl Into<String>,
+        classify: impl Fn(&http::Request<Full<Bytes>>) -> std::borrow::Cow<'static, str>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        let client_type = client_type.into();
+        let classify: crate::layers::ClassifyFn = std::sync::Arc::new(classify);
+        let layer = crate::layers::MetricsLayer::new(&client_type, classify);
+        self.with_metrics_layer(move |svc| {
+            ServiceBuilder::new()
+                .layer(layer)
+                .service(svc)
+                .boxed_clone()
+        })
+    }
+
     /// Set the buffer capacity for concurrent request handling
     ///
     /// The HTTP client uses an internal buffer to allow concurrent requests

@@ -62,10 +62,12 @@ pub use config::{
     is_idempotent_method,
 };
 pub use error::{HttpError, InvalidUriKind};
+#[cfg(feature = "otel")]
+pub use layers::{ClassifyFn, MetricsLayer, MetricsService, default_classify};
 pub use layers::{
     OtelLayer, OtelService, RETRY_ATTEMPT_HEADER, RetryLayer, RetryService, SecureRedirectPolicy,
     UserAgentLayer, UserAgentService,
 };
-pub use request::RequestBuilder;
+pub use request::{RequestBuilder, RequestType};
 pub use response::{HttpResponse, LimitedBody, ResponseBody};
 pub use tls::TlsConfigError;

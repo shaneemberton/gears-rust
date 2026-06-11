@@ -99,7 +99,7 @@ rustls-cng-crypto = { workspace = true, optional = true }
 httpmock = { workspace = true }
 rcgen = { workspace = true }
 tempfile = { workspace = true }
-opentelemetry_sdk = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
 tracing-subscriber = { workspace = true }
 flate2 = { workspace = true }
 url = { workspace = true }

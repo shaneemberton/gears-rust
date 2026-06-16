@@ -283,6 +283,23 @@ type = "directory"
 user_modifiable = true
 
 [[kits.resources]]
+id = "change_impact_config"
+kind = "script"
+source = "studio-kit-gears/scripts/change-impact-analysis.toml"
+install_path = "scripts/change-impact-analysis.toml"
+type = "file"
+user_modifiable = true
+
+[[kits.resources]]
+id = "agents"
+kind = "rule"
+source = "studio-kit-gears/AGENTS.md"
+install_path = "AGENTS.md"
+type = "file"
+user_modifiable = true
+public = true
+
+[[kits.resources]]
 id = "constraints"
 kind = "constraints"
 source = "studio-kit-gears/constraints.toml"
@@ -319,12 +336,3 @@ examples = "feature_example"
 template = "upstream_reqs_template"
 checklist = "upstream_reqs_checklist"
 examples = "upstream_reqs_example"
-
-[[kits.resources]]
-id = "agents"
-kind = "rule"
-source = "studio-kit-gears/AGENTS.md"
-install_path = "AGENTS.md"
-type = "file"
-user_modifiable = true
-public = true

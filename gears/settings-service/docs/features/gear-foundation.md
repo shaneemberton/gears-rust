@@ -106,7 +106,7 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 **Output**: A parsed key value object carrying its value-type half and instance half, or a validation problem
 
 **Steps**:
-1. [ ] - `p1` - Split the candidate on the last `~` that terminates the value-type half, giving a left value-type segment and a right instance segment - `inst-gf-key-1`
+1. [ ] - `p1` - Split the candidate on the first `~`, giving a left value-type segment and a right instance segment; splitting on the first rather than the last terminator is what lets a key whose right half still ends in `~` be reported as a type-where-an-instance-was-expected instead of an empty instance - `inst-gf-key-1`
 2. [ ] - `p1` - **IF** no such separator is present → **RETURN** validation problem stating the key must be a GTS instance identifier of the form value-type then instance - `inst-gf-key-2`
 3. [ ] - `p1` - Assert the left half is a GTS type id terminated by `~` - `inst-gf-key-3`
 4. [ ] - `p1` - Assert the right half is an instance id with no trailing `~` - `inst-gf-key-4`

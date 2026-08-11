@@ -137,6 +137,12 @@ The service is delivered as a **Constructor Fabric Gear** — the platform's uni
 | `cpt-cf-settings-service-nfr-ops-set-monitoring` | Aggregate change-failure visibility | Metrics | `settings_value_write_failure_ratio` on shared dashboards plus an alert-routing rule | Dashboard and alert-rule review |
 | `cpt-cf-settings-service-nfr-versatility-gts-scope-class` | New types and gear declarations need no core change | Type Validator + Reconciler | Values validated against a curated catalog value type; declarations arrive at runtime | Add a value type and a gear declaration without touching the gear |
 
+#### Architecture Decision Records
+
+| ADR ID | Title |
+| --- | --- |
+| `cpt-cf-settings-service-adr-setting-key-gts-instance-id` | [Setting Key Is a GTS Instance Identifier](ADR/ADR-001-setting-key-gts-instance-id.md) — `<value-type>~<setting-instance-id>` for both authoring parties; only value types are registered; category embedded in the key, so re-categorizing re-keys |
+
 ### 1.3 Architecture Layers
 
 ```

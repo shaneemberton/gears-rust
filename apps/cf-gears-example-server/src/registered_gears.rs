@@ -17,6 +17,7 @@ use gear_orchestrator as _;
 use grpc_hub as _;
 use nodes_registry as _;
 use resource_group as _;
+use settings_service as _;
 #[cfg(not(feature = "oop-example"))]
 use simple_user_settings as _;
 use tenant_resolver as _;

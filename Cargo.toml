@@ -87,6 +87,7 @@ members = [
     "gears/simple-user-settings/simple-user-settings-sdk",
     "gears/simple-user-settings/simple-user-settings",
     "gears/settings-service/settings-service-sdk",
+    "gears/settings-service/settings-service",
     "gears/system/tenant-resolver/tenant-resolver-sdk",
     "gears/system/tenant-resolver/tenant-resolver",
     "gears/system/tenant-resolver/plugins/static-tr-plugin",
@@ -318,6 +319,9 @@ bss-ledger-sdk = { path = "gears/bss/ledger/ledger-sdk" }
 coord = { path = "gears/bss/libs/coord" }
 # FIPS-validated SHA-256 for the ledger idempotency payload fingerprint.
 aws-lc-rs = "1.17"
+
+# settings-service
+settings-service-sdk = { package = "cf-gears-settings-service-sdk", version = "0.1.0", path = "gears/settings-service/settings-service-sdk" }
 
 # credstore
 credstore-sdk = { package = "cf-gears-credstore-sdk", version = "0.2.6", path = "gears/credstore/credstore-sdk" }

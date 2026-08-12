@@ -25,8 +25,11 @@
 #![deny(rust_2018_idioms)]
 
 pub mod config;
+pub mod domain;
+pub mod field;
 pub mod gear;
 pub mod infra;
+pub mod precondition;
 
 pub use config::SettingsServiceConfig;
 pub use gear::SettingsService;

@@ -32,10 +32,27 @@ fn the_accessor_errors_name_the_gear() {
 }
 
 #[test]
-fn the_gear_declares_no_migrations_yet() {
-    // Phase-scoped: the schema arrives with the persistence adapter. Asserted so
-    // that adding migrations is a deliberate change rather than a silent one.
+fn the_gear_hands_its_migrations_to_the_capability() {
+    // The capability is the only route by which ToolKit learns there is a schema
+    // to apply. A harness that existed but was never handed over would leave the
+    // gear starting cleanly against a database it had never migrated.
+    use sea_orm_migration::MigratorTrait;
     use toolkit::DatabaseCapability;
+
     let gear = SettingsService::default();
-    assert!(gear.migrations().is_empty());
+    let handed_over: Vec<String> = gear
+        .migrations()
+        .iter()
+        .map(|m| m.name().to_owned())
+        .collect();
+    let harness: Vec<String> = crate::infra::storage::migrations::Migrator::migrations()
+        .iter()
+        .map(|m| m.name().to_owned())
+        .collect();
+
+    assert!(!handed_over.is_empty());
+    assert_eq!(
+        handed_over, harness,
+        "the capability must expose the harness itself, not a separate list"
+    );
 }

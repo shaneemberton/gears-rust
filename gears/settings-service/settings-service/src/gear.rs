@@ -94,13 +94,16 @@ impl Gear for SettingsService {
 impl DatabaseCapability for SettingsService {
     // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-4
     // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-5
-    /// No migrations yet — the schema arrives with the persistence adapter.
+    /// The gear's migrations, run to completion before it serves.
     ///
-    /// `ToolKit` runs whatever is returned here to completion before the gear
-    /// serves, and aborts startup if one fails, so steps 4 and 5 of gear init
-    /// are satisfied by handing over the list rather than by driving it here.
+    /// `ToolKit` runs whatever is outstanding here and aborts startup if one
+    /// fails, so steps 4 and 5 of gear init are satisfied by handing over the
+    /// list rather than by driving it here — and a partially migrated schema is
+    /// unreachable because no request is accepted until every migration has
+    /// succeeded.
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        Vec::new()
+        use sea_orm_migration::MigratorTrait;
+        crate::infra::storage::migrations::Migrator::migrations()
     }
     // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-5
     // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-4

@@ -53,10 +53,17 @@ Chosen option: **"The setting key is a GTS instance identifier"**, because it is
 The GTS specification makes the type/instance split explicit: a **type** ends with `~` and must be registered; an **instance** has no trailing `~` and its registration is not mandated. The reference implementation confirms the pattern — the `resource-group` gear registers types and stores concrete groups as unregistered rows keyed inside the gear.
 
 1. A setting's `key` is a GTS **instance** identifier `<value-type>~<setting-instance-id>`, the same shape for module and admin settings.
-   * **Left** (`<value-type>`, ends with `~`): a curated value type from the catalog `gts.cf.toolkit.settings.types.*~`. This is the **only** part registered in GTS. It defines the shape.
+   * **Left** (`<value-type>`, ends with `~`): a curated value type from the catalog `gts.cf.settings.types.*~`. This is the **only** part registered in GTS. It defines the shape.
    * **Right** (`<setting-instance-id>`, no trailing `~`): the setting's own instance id, authored by the deploying party.
+   * Only the **first** segment carries the `gts.` prefix; the segment after `~` does not repeat it. Each segment carries exactly **four name tokens** before its version — `vendor.package.namespace.type.vMAJOR[.MINOR]` — which is what bounds the shapes below. A worked key:
+
+     ```text
+     gts.cf.settings.types.bool_flag.v1~acme.settings.network.enable_proxy.v1
+      seg1 vendor=cf   package=settings ns=types   type=bool_flag   (a type)
+                            seg2 vendor=acme package=settings ns=network type=enable_proxy
+     ```
 2. The setting is a GTS instance and is **not** registered. Only value types occupy the Registry. Per-tenant values, overrides, and cascade stay in the Settings DB, off the Registry hot path.
-3. **Admin instance id**: `gts.<vendor>.toolkit.settings.<category>.<name>.v1` — the admin supplies `<vendor>` and the leaf `<name>`; `<category>` is the slug of the category the setting is created in.
+3. **Admin instance id**: `<vendor>.settings.<category>.<name>.v1` — the admin supplies `<vendor>` and the leaf `<name>`; `<category>` is the slug of the category the setting is created in.
 4. **Module instance id**: the module supplies its own GTS instance id; the reconciler extracts the category from the namespace segment at the `<category>` position. No per-setting type is registered — the module references a catalog value type through the key's left half.
 5. **Uniqueness lives in the Settings DB**: `key` is globally unique (`uq_declaration_key`) and the leaf name is unique within its category (`UNIQUE(category_id, leaf_slug)`). There is no separate `gts_type_id` column — the value type is literally the left half of the key.
 6. **Category rename or move is a re-key, for both authoring parties**, because the category segment is embedded in every key. The old key does not resolve; there is no succession or redirect.
@@ -69,12 +76,15 @@ The GTS specification makes the type/instance split explicit: a **type** ends wi
 * A value type must be registered **before** a setting referencing it can be created, so declaration creation is fail-closed on a Registry outage.
 * Re-categorizing a setting is a breaking re-key. This is accepted: it mirrors GTS identifier immutability, and a reader gets a clean signal rather than a silent redirect to different content.
 * The category slug becomes load-bearing beyond grouping, so it must be validated against the GTS grammar at category creation and treated as immutable thereafter.
+* The four-token grammar caps how much structure a key may carry. `settings` occupies the package position and the category the namespace position, which leaves no room for a nested category path — flat categories are therefore a consequence of the identifier grammar, not only a product simplification.
+* Grammar validation belongs to the platform GTS identifier library, not to this service. Re-implementing it produces a second source of truth that drifts: an early hand-rolled validator here accepted five-token segments the platform validator rejects, and nothing caught it until the two were compared.
 * No `gts_type_id` column exists on the declaration; any code needing the value type derives it from the key's left half.
 * Admin key composition needs a `<vendor>` from the operator, since the instance id carries one. This is supplied input, not a platform-invented pseudo-vendor.
 
 ### Confirmation
 
 * SDK unit tests on the setting-key value object assert the `<value-type>~<instance-id>` split, the trailing-`~` rule on each half, GTS grammar rejection, byte-identical round-tripping, and that re-categorizing produces a different key.
+* The SDK delegates grammar validation to the platform GTS identifier library, so conformance to this decision is checked by that library rather than by a local copy of the rules. A key shape that this ADR permits but the library rejects is a defect in the ADR.
 * Database constraints `uq_declaration_key` and `UNIQUE(category_id, leaf_slug)` enforce the uniqueness rules independently of application code.
 * Design and code review confirm that no per-setting GTS type is registered and that no `gts_type_id` column is introduced.
 

@@ -20,3 +20,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 gts-id = { workspace = true }
+async-trait = { workspace = true }
+toolkit-canonical-errors = { workspace = true }
+toolkit-security = { workspace = true }

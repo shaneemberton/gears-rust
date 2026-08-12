@@ -87,15 +87,15 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 **Output**: A gear ready to serve, with its client traits resolvable through `ClientHub`
 
 **Steps**:
-1. [ ] - `p1` - Read deployment-owned bootstrap configuration from ToolKit config: database endpoint, broker endpoint, service identity, TLS material, ports - `inst-gf-init-1`
-2. [ ] - `p1` - **IF** any required bootstrap value is absent → **RETURN** startup failure, because bootstrap configuration is deployment-owned and is never itself a managed setting - `inst-gf-init-2`
-3. [ ] - `p1` - Establish the PostgreSQL connection pool and construct the `SecureConn` and `DBRunner` handles - `inst-gf-init-3`
-4. [ ] - `p1` - Run outstanding schema migrations to completion - `inst-gf-init-4`
-5. [ ] - `p1` - **IF** a migration fails → **RETURN** startup failure without serving traffic, so no request observes a partially migrated schema - `inst-gf-init-5`
+1. [x] - `p1` - Read deployment-owned bootstrap configuration from ToolKit config: database endpoint, broker endpoint, service identity, TLS material, ports - `inst-gf-init-1`
+2. [x] - `p1` - **IF** any required bootstrap value is absent → **RETURN** startup failure, because bootstrap configuration is deployment-owned and is never itself a managed setting - `inst-gf-init-2`
+3. [x] - `p1` - Establish the PostgreSQL connection pool and construct the `SecureConn` and `DBRunner` handles - `inst-gf-init-3`
+4. [x] - `p1` - Run outstanding schema migrations to completion - `inst-gf-init-4`
+5. [x] - `p1` - **IF** a migration fails → **RETURN** startup failure without serving traffic, so no request observes a partially migrated schema - `inst-gf-init-5`
 6. [ ] - `p1` - Resolve the `TypesRegistryClient` and the Policy Decision client through `ClientHub` - `inst-gf-init-6`
 7. [ ] - `p1` - Register the gear's own `SettingsReaderClient` and `SettingsContributionClient` implementations into `ClientHub` - `inst-gf-init-7`
 8. [ ] - `p1` - Bind each registered trait according to the active deployment profile: the in-process implementation when co-located, the same trait over REST when out of process - `inst-gf-init-8`
-9. [ ] - `p1` - Mark the gear ready and begin serving - `inst-gf-init-9`
+9. [x] - `p1` - Mark the gear ready and begin serving - `inst-gf-init-9`
 
 ### Setting Key Parsing and Validation
 

@@ -9,7 +9,7 @@
 //! only decision this file makes is *which category*, and that decision is what
 //! the caller sees as an HTTP status.
 
-use toolkit_canonical_errors::{CanonicalError, resource_error};
+use toolkit_canonical_errors::{CanonicalError, Http, resource_error};
 
 use crate::domain::error::DomainError;
 use crate::precondition;
@@ -35,9 +35,29 @@ impl From<DomainError> for CanonicalError {
                 // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-4
             }
 
+            // 428 — no `If-Match` at all. RFC 9110 reserves this status for
+            // exactly this case; without the override it would render as 400
+            // and be indistinguishable from a malformed body.
+            DomainError::PreconditionRequired { detail } => SettingsResource::invalid_argument()
+                .with_field_violation(
+                    crate::api::precondition::IF_MATCH_HEADER,
+                    detail,
+                    crate::field::IF_MATCH_REQUIRED,
+                )
+                .with_override(Http::status_code(428))
+                .create(),
+
             // 412 — a conditional write whose precondition no longer holds.
+            //
+            // The canonical model has no precondition-failed status: the
+            // category defaults to 400, which a caller cannot distinguish from
+            // a malformed body. RFC 9110 gives conditional requests 412, and
+            // clients retry on it by re-reading and re-sending, so the status
+            // is overridden explicitly. The category is unchanged — the
+            // override only moves the status within the same 4xx class.
             DomainError::PreconditionFailed { detail } => SettingsResource::failed_precondition()
                 .with_precondition_violation("setting", detail, precondition::ETAG_MISMATCH)
+                .with_override(Http::status_code(412))
                 .create(),
 
             // 409 — the request conflicts with current state.

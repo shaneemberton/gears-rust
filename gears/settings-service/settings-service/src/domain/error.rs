@@ -41,6 +41,17 @@ pub enum DomainError {
         message: String,
     },
 
+    /// A mutating request arrived with no `If-Match` at all. Renders as `428`.
+    ///
+    /// Distinct from [`DomainError::PreconditionFailed`] on purpose: a stale tag
+    /// means re-read and retry, an absent one means the client must change.
+    /// Telling a broken client to retry would have it retry forever.
+    #[error("precondition required: {detail}")]
+    PreconditionRequired {
+        /// What the request must carry.
+        detail: String,
+    },
+
     /// A conditional write lost its `If-Match` check. Renders as `412`.
     #[error("precondition failed: {detail}")]
     PreconditionFailed {

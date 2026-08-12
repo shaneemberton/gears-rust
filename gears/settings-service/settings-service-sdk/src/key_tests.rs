@@ -232,3 +232,44 @@ fn deserializing_a_malformed_key_fails() {
         "the parse error should surface"
     );
 }
+
+#[test]
+fn an_anonymous_uuid_instance_is_refused() {
+    // `gts-id` allows a trailing UUID tail for machine-generated instances, and
+    // answers `""` for its namespace and type tokens. Accepting one would build
+    // a key with an empty category and leaf that still round-tripped and still
+    // compared equal to itself — a setting nobody could find by name.
+    let key = format!("{VALID_VALUE_TYPE}550e8400-e29b-41d4-a716-446655440000");
+    assert!(matches!(
+        SettingKey::parse(&key),
+        Err(SettingKeyError::AnonymousInstance)
+    ));
+}
+
+#[test]
+fn surrounding_whitespace_is_refused_rather_than_trimmed() {
+    // The GTS parser trims before validating. This type stores the candidate
+    // verbatim, so a trimmed-then-accepted key would give one setting two
+    // spellings and shift the value-type split point.
+    for candidate in [
+        format!(" {VALID_KEY}"),
+        format!("{VALID_KEY} "),
+        format!("\t{VALID_KEY}\n"),
+    ] {
+        assert!(
+            matches!(
+                SettingKey::parse(&candidate),
+                Err(SettingKeyError::SurroundingWhitespace)
+            ),
+            "`{candidate:?}` must be refused"
+        );
+    }
+}
+
+#[test]
+fn a_padded_key_never_becomes_a_second_spelling_of_a_valid_one() {
+    // The consequence the guard above exists to prevent, stated directly.
+    let padded = format!(" {VALID_KEY}");
+    assert!(SettingKey::parse(VALID_KEY).is_ok());
+    assert!(SettingKey::parse(&padded).is_err());
+}

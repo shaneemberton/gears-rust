@@ -74,6 +74,28 @@ pub enum SettingKeyError {
         /// What the GTS validator objected to.
         cause: String,
     },
+
+    /// The instance half is an anonymous UUID rather than an authored name.
+    ///
+    /// GTS allows a trailing UUID tail for machine-generated instances. A
+    /// setting is not one: its category and leaf name are what an administrator
+    /// browses and a module author writes down, and a UUID supplies neither.
+    #[error("a setting key names its instance; an anonymous UUID instance has no category or leaf")]
+    AnonymousInstance,
+
+    /// The candidate carries leading or trailing whitespace.
+    ///
+    /// Refused rather than trimmed: this type stores the key verbatim so a
+    /// stored key and a supplied key compare byte-identically, and quietly
+    /// accepting a padded form would make two spellings of one key.
+    #[error("a setting key carries no leading or trailing whitespace")]
+    SurroundingWhitespace,
+}
+
+/// `None` for the empty string, which is how `gts-id` reports a token that the
+/// segment shape does not carry.
+fn non_empty(token: &str) -> Option<String> {
+    (!token.is_empty()).then(|| token.to_owned())
 }
 
 impl From<gts_id::GtsIdError> for SettingKeyError {
@@ -81,19 +103,17 @@ impl From<gts_id::GtsIdError> for SettingKeyError {
         // Flattened rather than wrapped: `GtsIdError` is neither `Clone` nor
         // `PartialEq`, and keeping a third-party error out of this SDK's public
         // surface means a `gts-id` version bump cannot break our consumers.
-        match err {
-            gts_id::GtsIdError::Id { cause, .. } => Self::InvalidId { cause },
-            gts_id::GtsIdError::Segment {
-                num,
-                offset,
-                segment,
-                cause,
-            } => Self::InvalidSegment {
-                num,
-                offset,
-                segment,
-                cause,
+        // `GtsIdError` is one struct with an optional segment locator, not two
+        // variants: its presence is what distinguishes a segment-level failure
+        // from an identifier-level one.
+        match err.segment {
+            Some(segment) => Self::InvalidSegment {
+                num: segment.num,
+                offset: segment.offset,
+                segment: segment.segment,
+                cause: err.cause,
             },
+            None => Self::InvalidId { cause: err.cause },
         }
     }
 }
@@ -124,7 +144,14 @@ impl SettingKey {
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-1
         // Wildcards are a pattern-matching feature; a concrete setting key never has one.
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-2
-        let segments = gts_id::validate_gts_id(raw, false)?;
+        // `GtsId::try_new` trims before parsing. This type stores the candidate
+        // verbatim, so accepting surrounding whitespace would both break the
+        // byte-identical round-trip and shift every byte offset below by the
+        // length of the leading run. Refuse it instead of silently normalizing.
+        if raw != raw.trim() {
+            return Err(SettingKeyError::SurroundingWhitespace);
+        }
+        let segments = gts_id::GtsId::try_new(raw)?.into_segments();
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-2
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-1
 
@@ -137,13 +164,13 @@ impl SettingKey {
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-3
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-4
-        if !value_type.is_type {
+        if !value_type.is_type() {
             return Err(SettingKeyError::ValueTypeNotAType);
         }
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-4
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-5
-        if instance.is_type {
+        if instance.is_type() {
             return Err(SettingKeyError::TrailingSeparator);
         }
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-5
@@ -151,13 +178,31 @@ impl SettingKey {
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-6
         // The instance segment's namespace token is the owning category and its
         // type token is the leaf name, for admin and module authors alike.
-        let category = instance.namespace.clone();
-        let leaf = instance.type_name.clone();
+        //
+        // An anonymous-instance UUID tail carries neither: `namespace()` and
+        // `type_name()` answer `""` for it, so accepting one would produce a key
+        // with an empty category and leaf that still compared equal to itself.
+        // A setting is named by its author, never generated.
+        let (Some(category), Some(leaf)) = (
+            non_empty(instance.namespace()),
+            non_empty(instance.type_name()),
+        ) else {
+            return Err(SettingKeyError::AnonymousInstance);
+        };
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-6
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-7
-        // The value-type segment ends with its terminator; that byte is the split point.
-        let separator = value_type.offset + value_type.raw.len() - TYPE_TERMINATOR.len_utf8();
+        // The value-type segment ends with its terminator, and the checks above
+        // established there are exactly two segments of which the first is the
+        // type — so the first terminator in the candidate is the split point.
+        //
+        // Located in the candidate rather than derived from segment lengths:
+        // `gts-id` reports segment #1 without the `gts.` prefix, and any future
+        // change to how a segment renders itself would silently shift an
+        // arithmetic offset while this stays correct.
+        let separator = raw
+            .find(TYPE_TERMINATOR)
+            .ok_or(SettingKeyError::ValueTypeNotAType)?;
         Ok(Self {
             raw: raw.to_owned(),
             separator,

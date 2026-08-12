@@ -139,10 +139,10 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 **Output**: An RFC-9457 problem document and its HTTP status
 
 **Steps**:
-1. [ ] - `p1` - Map the `DomainError` variant to its HTTP status and its stable `gts://` type URI - `inst-gf-problem-1`
+1. [ ] - `p1` - Map the `DomainError` variant to a canonical error category, from which the platform derives the HTTP status and the stable `gts://` type URI - `inst-gf-problem-1`
 2. [ ] - `p1` - Set `Content-Type` to `application/problem+json` - `inst-gf-problem-2`
 3. [ ] - `p1` - Populate the required members `type`, `title`, `status`, and `trace_id`, taking `trace_id` from the ambient request trace context - `inst-gf-problem-3`
-4. [ ] - `p1` - **IF** the status is `422` → attach a field-level `errors` array, each entry carrying `field`, `code`, and `message` - `inst-gf-problem-4`
+4. [ ] - `p1` - **IF** the failure is a field-level validation rejection → attach one violation per offending field, each carrying the field, a stable machine-readable reason, and a human-readable description - `inst-gf-problem-4`
 5. [ ] - `p1` - **IF** the error carries an authorization or entitlement denial → emit the denial without disclosing whether the target resource exists - `inst-gf-problem-5`
 6. [ ] - `p1` - **IF** the variant is unrecognized → map to `500` with a generic title, never leaking an internal message into the response body - `inst-gf-problem-6`
 7. [ ] - `p1` - **RETURN** the problem document and status - `inst-gf-problem-7`
@@ -233,7 +233,16 @@ Variant count **MUST** be driven by what a consumer does differently, not by the
 
 - [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-problem-mapping`
 
-The system **MUST** render every 4xx and 5xx response as `application/problem+json` carrying `type` as a `gts://` URI, `title`, `status`, and `trace_id`, and **MUST** include a field-level `errors` array on every `422`. An unrecognized internal error **MUST** map to `500` without leaking an internal message.
+The system **MUST** render every 4xx and 5xx response as `application/problem+json` carrying `type` as a `gts://` URI, `title`, `status`, and `trace_id`, and **MUST** carry field-level violations on a validation rejection, each naming the field, a stable machine-readable reason, and a human-readable description. An unrecognized internal error **MUST** map to `500` without leaking an internal message.
+
+The gear **MUST NOT** render the document itself. Under the platform ADR on SDK error surfaces the gear's only decision is which **canonical error category** a `DomainError` maps to; the status, the `gts://` type URI, the title, and the placement of field violations are derived from that category by the platform renderer. A gear that minted its own status or its own type URI would put a second source of truth beside the platform's, which is what fixing the boundary at the canonical error exists to prevent.
+
+Two consequences follow, and they are why this DoD no longer names `422` or an `errors` array:
+
+- a validation rejection is the canonical *invalid-argument* category, which the platform renders as **`400`**, not `422`;
+- field violations are carried in the problem document's context under the platform's own member and key names, not as a top-level `errors` array of `field`/`code`/`message`.
+
+`DESIGN.md` §4.3 *Error Response Format* still shows the pre-ADR shape — a `422`, a service-minted `gts://…settings.error_validation.v1~` type, and a top-level `errors` array. **DESIGN is what needs correcting**, not this mapping; until it is, DESIGN §4.3's example is not implementable.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-gear-foundation-problem-mapping`
@@ -245,7 +254,11 @@ The system **MUST** render every 4xx and 5xx response as `application/problem+js
 
 - [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-persistence`
 
-The system **MUST** provide SeaORM entity scaffolding over PostgreSQL with `SecureConn` and `DBRunner` wiring and a migration harness that runs outstanding migrations at startup. A failed migration **MUST** prevent the gear from serving traffic rather than leaving a partially migrated schema reachable.
+The system **MUST** provide a migration harness that runs outstanding migrations at startup, and **MUST** establish the schema prerequisites and persistence conventions that every settings table depends on — the database extensions their DDL assumes, and access through `SecureConn` with repositories generic over `DBRunner` rather than over a raw pool. A failed migration **MUST** prevent the gear from serving traffic rather than leaving a partially migrated schema reachable.
+
+This DoD **MUST NOT** create a domain table or the SeaORM entity over it. `DECOMPOSITION.md` entry 2.1 scopes this feature to *"migration harness and shared schema conventions; no domain tables in this feature"*: `categories` belongs to entry 2.2, `setting_declarations` to 2.3, and `setting_values` to 2.5, so that a table and the code that reads it arrive together and neither outlives a later decision to reshape it. What cannot belong to any one feature is what lands here — a database extension is shared, idempotent, and would otherwise have every feature racing to create it.
+
+An earlier wording required *"SeaORM entity scaffolding"* here. That could not be satisfied while the same wave excluded domain tables, since an entity requires a table to be an entity of.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-gear-foundation-gear-init`
@@ -328,7 +341,8 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [ ] An identifier-level fault — missing `gts.` prefix, uppercase — is reported as identifier-level, and a segment-level fault such as `/` in a token is reported with its segment number
 - [ ] A segment carrying five name tokens before the version is rejected, since the GTS grammar admits exactly four
 - [ ] Every 4xx and 5xx response carries `Content-Type: application/problem+json` with `type`, `title`, `status`, and `trace_id` populated
-- [ ] A `422` response carries a field-level `errors` array with `field`, `code`, and `message` per entry
+- [ ] A validation rejection carries one field violation per offending field, each naming the field, a stable machine-readable reason, and a human-readable description
+- [ ] The gear selects a canonical error category and never mints its own HTTP status or `gts://` type URI
 - [ ] An unrecognized internal error maps to `500` and its response body contains no internal message
 - [ ] A mutating `PATCH` or `DELETE` without `If-Match` returns `428`
 - [ ] A mutating `PATCH` or `DELETE` with a stale `If-Match` returns `412`

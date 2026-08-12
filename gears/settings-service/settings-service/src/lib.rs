@@ -26,6 +26,7 @@
 
 pub mod config;
 pub mod gear;
+pub mod infra;
 
 pub use config::SettingsServiceConfig;
 pub use gear::SettingsService;

@@ -125,10 +125,10 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 **Output**: Proceed verdict, or the precondition problem to return
 
 **Steps**:
-1. [ ] - `p1` - **IF** the operation is a mutating `PATCH` or `DELETE` and no `If-Match` header is present → **RETURN** `428` precondition required - `inst-gf-precond-1`
+1. [x] - `p1` - **IF** the operation is a mutating `PATCH` or `DELETE` and no `If-Match` header is present → **RETURN** `428` precondition required - `inst-gf-precond-1`
 2. [ ] - `p1` - Compute the current ETag from the target's persisted representation - `inst-gf-precond-2`
-3. [ ] - `p1` - **IF** the supplied `If-Match` does not equal the current ETag → **RETURN** `412` precondition failed - `inst-gf-precond-3`
-4. [ ] - `p1` - **RETURN** proceed, and carry the computed ETag forward so the handler can emit a refreshed value on success - `inst-gf-precond-4`
+3. [x] - `p1` - **IF** the supplied `If-Match` does not equal the current ETag → **RETURN** `412` precondition failed - `inst-gf-precond-3`
+4. [x] - `p1` - **RETURN** proceed, and carry the computed ETag forward so the handler can emit a refreshed value on success - `inst-gf-precond-4`
 
 ### Domain Error to Problem Mapping
 

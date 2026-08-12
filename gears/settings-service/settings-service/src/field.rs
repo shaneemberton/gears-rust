@@ -17,3 +17,6 @@ pub const VALUE_NOT_CANONICAL: &str = "value_not_canonical";
 
 /// A supplied value exceeds the configured size cap.
 pub const VALUE_TOO_LARGE: &str = "value_too_large";
+
+/// A mutating request omitted the mandatory `If-Match` header.
+pub const IF_MATCH_REQUIRED: &str = "if_match_required";

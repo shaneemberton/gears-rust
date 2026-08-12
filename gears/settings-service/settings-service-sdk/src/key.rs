@@ -2,101 +2,99 @@
 // @cpt-algo:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1
 //! The setting key value object.
 //!
-//! A setting key is a GTS instance identifier `<value-type>~<setting-instance-id>`.
-//! The left half is a curated value type terminated by `~`; the right half is the
-//! setting's own instance id and carries no trailing `~`.
+//! A setting key is a GTS instance identifier made of exactly two segments:
+//! `<value-type>~<setting-instance-id>`. The first segment is a curated value
+//! type terminated by `~`; the second is the setting's own instance id and
+//! carries no trailing `~`.
+//!
+//! ```text
+//! gts.cf.settings.types.bool_flag.v1~acme.settings.network.enable_proxy.v1
+//!  seg1 vendor=cf   package=settings ns=types   type=bool_flag
+//!                        seg2 vendor=acme package=settings ns=network type=enable_proxy
+//! ```
+//!
+//! Grammar validation is delegated to `gts-id`, the platform's single source of
+//! truth for GTS identifiers. This module adds only the rules `gts-id` cannot
+//! know about: that a setting key is exactly a type followed by an instance,
+//! and where the category and leaf name sit within the instance segment.
 //!
 //! Catalog membership of the value type — that it comes from
-//! `gts.cf.toolkit.settings.types.*~` — is deliberately **not** checked here. A
-//! syntactically valid key may name a value type that does not exist, and
-//! resolving that requires the types registry, so it belongs to declaration
-//! creation rather than to key parsing.
+//! `gts.cf.settings.types.*~` — is deliberately not checked here. Resolving it
+//! requires the types registry, so it belongs to declaration creation.
 
 use std::fmt;
 use std::str::FromStr;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Prefix every GTS identifier starts with.
-pub const GTS_PREFIX: &str = "gts.";
-
 /// Terminator that marks the end of a GTS **type** segment.
 pub const TYPE_TERMINATOR: char = '~';
 
-/// Reserved path separator. Never valid inside any GTS segment.
-pub const RESERVED_SEPARATOR: char = '/';
+/// Number of segments a setting key must have: a value type and an instance.
+const SETTING_KEY_SEGMENTS: usize = 2;
 
 /// Why a candidate setting key was rejected.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SettingKeyError {
-    /// No `~` present, so the value-type half cannot be separated from the instance half.
-    #[error("setting key has no `~` separating the value type from the instance id")]
-    MissingSeparator,
+    /// The identifier is not a value type followed by an instance id.
+    #[error(
+        "a setting key must be a value type followed by an instance id ({SETTING_KEY_SEGMENTS} segments), got {count}"
+    )]
+    SegmentCount {
+        /// How many GTS segments the identifier actually had.
+        count: usize,
+    },
 
-    /// The value-type half is empty.
-    #[error("the value-type half of the setting key is empty")]
-    EmptyValueType,
+    /// The first segment is not a GTS type.
+    #[error("the value-type half must be a GTS type, so it must end with `{TYPE_TERMINATOR}`")]
+    ValueTypeNotAType,
 
-    /// The instance half is empty.
-    #[error("the instance half of the setting key is empty")]
-    EmptyInstance,
-
-    /// The instance half ends with `~`, which would make it a type rather than an instance.
-    #[error("the instance half must not end with `~`; a trailing `~` marks a GTS type")]
+    /// The second segment ends with `~`, making it a type rather than an instance.
+    #[error(
+        "the instance half must not end with `{TYPE_TERMINATOR}`; a trailing terminator marks a GTS type"
+    )]
     TrailingSeparator,
 
-    /// The value type is chained, so the key carries more than two halves.
-    #[error(
-        "the value type `{value_type}` is chained; a setting's value type must be a single catalog type"
-    )]
-    ChainedValueType {
-        /// The chained value type, as supplied.
-        value_type: String,
+    /// The identifier as a whole is not a valid GTS id.
+    #[error("invalid GTS identifier: {cause}")]
+    InvalidId {
+        /// What the GTS validator objected to.
+        cause: String,
     },
 
-    /// An identifier did not begin with the `gts.` prefix.
-    ///
-    /// This is an identifier-level fault, not a segment-level one, which is why
-    /// it does not travel as a [`SegmentRejection`].
-    #[error("`{id}` is not a GTS identifier: it must begin with `{GTS_PREFIX}`")]
-    MissingGtsPrefix {
-        /// The identifier that lacked the prefix.
-        id: String,
-    },
-
-    /// A segment violated the GTS grammar.
-    #[error("segment `{segment}` is not a valid GTS segment: {reason}")]
+    /// One segment of the identifier is invalid.
+    #[error("segment #{num} `{segment}` is invalid: {cause}")]
     InvalidSegment {
+        /// 1-based segment number.
+        num: usize,
+        /// Byte offset of the segment within the full identifier.
+        offset: usize,
         /// The offending segment, reported so the caller can point at it.
         segment: String,
-        /// Why it was rejected.
-        reason: SegmentRejection,
+        /// What the GTS validator objected to.
+        cause: String,
     },
 }
 
-/// The specific grammar rule a segment broke.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SegmentRejection {
-    /// Contained an uppercase character.
-    Uppercase,
-    /// Contained the reserved `/` separator.
-    ReservedSeparator,
-    /// Contained a character outside the permitted set.
-    IllegalCharacter,
-    /// Was empty.
-    Empty,
-}
-
-impl fmt::Display for SegmentRejection {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Self::Uppercase => "must be lowercase",
-            Self::ReservedSeparator => "must not contain the reserved `/` separator",
-            // `.` separates segments, so it can never appear inside one.
-            Self::IllegalCharacter => "contains a character outside [a-z0-9_]",
-            Self::Empty => "must not be empty",
-        };
-        f.write_str(s)
+impl From<gts_id::GtsIdError> for SettingKeyError {
+    fn from(err: gts_id::GtsIdError) -> Self {
+        // Flattened rather than wrapped: `GtsIdError` is neither `Clone` nor
+        // `PartialEq`, and keeping a third-party error out of this SDK's public
+        // surface means a `gts-id` version bump cannot break our consumers.
+        match err {
+            gts_id::GtsIdError::Id { cause, .. } => Self::InvalidId { cause },
+            gts_id::GtsIdError::Segment {
+                num,
+                offset,
+                segment,
+                cause,
+            } => Self::InvalidSegment {
+                num,
+                offset,
+                segment,
+                cause,
+            },
+        }
     }
 }
 
@@ -107,102 +105,91 @@ impl fmt::Display for SegmentRejection {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SettingKey {
     raw: String,
-    /// Byte index of the `~` that terminates the value-type half.
+    /// Byte index of the `~` that terminates the value-type segment.
     separator: usize,
+    /// Namespace token of the instance segment: the owning category's slug.
+    category: String,
+    /// Type token of the instance segment: the setting's own leaf name.
+    leaf: String,
 }
 
 impl SettingKey {
     /// Parse a candidate setting key.
     ///
-    /// The key is split at the **first** `~`: everything up to and including it
-    /// is the value type, everything after is the instance id. Settings value
-    /// types are flat catalog entries, so a chained value type is rejected
-    /// rather than silently mis-split.
-    ///
     /// # Errors
     ///
-    /// Returns [`SettingKeyError`] when the candidate is not a well-formed
-    /// `<value-type>~<instance-id>` pair, naming the offending segment.
+    /// Returns [`SettingKeyError`] when the candidate is not a valid GTS
+    /// identifier, or is valid but is not a value type followed by an instance.
     pub fn parse(raw: &str) -> Result<Self, SettingKeyError> {
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-1
-        let separator = raw
-            .find(TYPE_TERMINATOR)
-            // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-2
-            .ok_or(SettingKeyError::MissingSeparator)?;
+        // Wildcards are a pattern-matching feature; a concrete setting key never has one.
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-2
+        let segments = gts_id::validate_gts_id(raw, false)?;
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-2
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-1
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-3
-        if separator == 0 {
-            return Err(SettingKeyError::EmptyValueType);
-        }
+        let [value_type, instance] = segments.as_slice() else {
+            return Err(SettingKeyError::SegmentCount {
+                count: segments.len(),
+            });
+        };
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-3
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-4
-        let instance = &raw[separator + TYPE_TERMINATOR.len_utf8()..];
-        if instance.is_empty() {
-            return Err(SettingKeyError::EmptyInstance);
-        }
-        if instance.ends_with(TYPE_TERMINATOR) {
-            return Err(SettingKeyError::TrailingSeparator);
-        }
-        // A further `~` inside the instance half means the value type was chained,
-        // so the split produced a fragment rather than a whole instance id.
-        if instance.contains(TYPE_TERMINATOR) {
-            return Err(SettingKeyError::ChainedValueType {
-                value_type: raw[..=separator].to_owned(),
-            });
+        if !value_type.is_type {
+            return Err(SettingKeyError::ValueTypeNotAType);
         }
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-4
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-5
-        // The value type is a GTS *type*; validate its body without the terminator.
-        validate_gts_id(&raw[..separator])?;
-        // The setting is a GTS *instance*; per ADR-001 it is a full `gts.`-prefixed id.
-        validate_gts_id(instance)?;
+        if instance.is_type {
+            return Err(SettingKeyError::TrailingSeparator);
+        }
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-5
 
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-6
+        // The instance segment's namespace token is the owning category and its
+        // type token is the leaf name, for admin and module authors alike.
+        let category = instance.namespace.clone();
+        let leaf = instance.type_name.clone();
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-6
+
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-7
+        // The value-type segment ends with its terminator; that byte is the split point.
+        let separator = value_type.offset + value_type.raw.len() - TYPE_TERMINATOR.len_utf8();
         Ok(Self {
             raw: raw.to_owned(),
             separator,
+            category,
+            leaf,
         })
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-7
     }
 
     /// Compose an admin-authored key.
     ///
-    /// Builds the instance id as `gts.<vendor>.toolkit.settings.<category>.<name>.v1`
-    /// and joins it to `value_type`, which must already end with `~`.
+    /// Builds the instance id as `<vendor>.settings.<category>.<name>.v1` and
+    /// joins it to `value_type`, which must already end with `~`.
     ///
     /// # Errors
     ///
-    /// Returns [`SettingKeyError`] when `value_type` is not a single well-formed
-    /// GTS type, or when any supplied segment breaks the GTS grammar.
+    /// Returns [`SettingKeyError`] when `value_type` is not a GTS type, or when
+    /// the composed key is not a valid setting key.
     pub fn compose(
         value_type: &str,
         vendor: &str,
         category: &str,
         name: &str,
     ) -> Result<Self, SettingKeyError> {
-        // Validate the caller's own inputs before splicing them together, so an
-        // error names what the caller passed rather than a synthesized string.
-        let body = value_type
-            .strip_suffix(TYPE_TERMINATOR)
-            .ok_or(SettingKeyError::MissingSeparator)?;
-        if body.contains(TYPE_TERMINATOR) {
-            return Err(SettingKeyError::ChainedValueType {
-                value_type: value_type.to_owned(),
-            });
+        // Checked before splicing so the error names the caller's own input
+        // rather than a position inside the joined string.
+        if !value_type.ends_with(TYPE_TERMINATOR) {
+            return Err(SettingKeyError::ValueTypeNotAType);
         }
-        validate_gts_id(body)?;
-
-        for segment in [vendor, category, name] {
-            validate_segment(segment)?;
-        }
-
-        let instance = format!("{GTS_PREFIX}{vendor}.toolkit.settings.{category}.{name}.v1");
-        Self::parse(&format!("{value_type}{instance}"))
+        Self::parse(&format!(
+            "{value_type}{vendor}.settings.{category}.{name}.v1"
+        ))
     }
 
     /// The full key, byte-identical to what was parsed.
@@ -223,46 +210,21 @@ impl SettingKey {
         &self.raw[self.separator + TYPE_TERMINATOR.len_utf8()..]
     }
 
-    /// The category slug embedded in an admin instance id, when present.
+    /// The owning category's slug.
     ///
-    /// Returns `None` for a module-supplied instance id that does not follow the
-    /// admin shape; the reconciler derives the category from its own namespace.
+    /// Always present: the GTS grammar guarantees the instance segment carries a
+    /// namespace token, and that position is the category for both authoring
+    /// parties — an admin key puts it there by construction, and the reconciler
+    /// reads a module's category from the same position.
     #[must_use]
-    pub fn category_slug(&self) -> Option<&str> {
-        self.admin_parts().map(|(category, _)| category)
+    pub fn category_slug(&self) -> &str {
+        &self.category
     }
 
-    /// The leaf name embedded in an admin instance id, when present.
-    ///
-    /// This is the value uniqueness is enforced on within a category.
+    /// The setting's own leaf name, which uniqueness is enforced on within a category.
     #[must_use]
-    pub fn leaf_slug(&self) -> Option<&str> {
-        self.admin_parts().map(|(_, name)| name)
-    }
-
-    /// The category and leaf segments, but only for the admin instance shape
-    /// `gts.<vendor>.toolkit.settings.<category>.<name>.v1`.
-    ///
-    /// Walks the segment iterator rather than collecting, because both public
-    /// accessors sit on the SDK read path.
-    fn admin_parts(&self) -> Option<(&str, &str)> {
-        let mut segments = self.instance_id().split('.');
-        segments.next()?; // gts
-        segments.next()?; // vendor
-        if segments.next()? != "toolkit" {
-            return None;
-        }
-        if segments.next()? != "settings" {
-            return None;
-        }
-        let category = segments.next()?;
-        let name = segments.next()?;
-        segments.next()?; // version
-        // Anything further means this is not the admin shape.
-        if segments.next().is_some() {
-            return None;
-        }
-        Some((category, name))
+    pub fn leaf_slug(&self) -> &str {
+        &self.leaf
     }
 }
 
@@ -294,49 +256,6 @@ impl<'de> Deserialize<'de> for SettingKey {
         let raw = String::deserialize(deserializer)?;
         Self::parse(&raw).map_err(serde::de::Error::custom)
     }
-}
-
-/// Validate a whole GTS identifier body: `gts.`-prefixed, all segments legal.
-fn validate_gts_id(candidate: &str) -> Result<(), SettingKeyError> {
-    if !candidate.starts_with(GTS_PREFIX) {
-        return Err(SettingKeyError::MissingGtsPrefix {
-            id: candidate.to_owned(),
-        });
-    }
-    for segment in candidate.split('.') {
-        validate_segment(segment)?;
-    }
-    Ok(())
-}
-
-/// Validate one dot-separated GTS segment.
-fn validate_segment(segment: &str) -> Result<(), SettingKeyError> {
-    let reject = |reason| {
-        Err(SettingKeyError::InvalidSegment {
-            segment: segment.to_owned(),
-            reason,
-        })
-    };
-
-    // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-6
-    if segment.is_empty() {
-        return reject(SegmentRejection::Empty);
-    }
-    for ch in segment.chars() {
-        // `/` is checked first: it is reserved everywhere, and reporting it as a
-        // generic illegal character would hide why it can never be used.
-        if ch == RESERVED_SEPARATOR {
-            return reject(SegmentRejection::ReservedSeparator);
-        }
-        if ch.is_ascii_uppercase() {
-            return reject(SegmentRejection::Uppercase);
-        }
-        if !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_') {
-            return reject(SegmentRejection::IllegalCharacter);
-        }
-    }
-    // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-key-parse:p1:inst-gf-key-6
-    Ok(())
 }
 
 #[cfg(test)]

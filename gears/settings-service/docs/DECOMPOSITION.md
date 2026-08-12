@@ -165,7 +165,7 @@ Both sit downstream of Apply, so neither blocks any feature in this wave. Both m
 
 - **Scope**:
   - `SettingDeclaration` entity and the `setting_declarations` table, including the `category_id` foreign key declared `ON DELETE RESTRICT`, which is the authoritative guard behind 2.2's no-orphan rule
-  - Key construction: the admin supplies `value_type_id`, a `vendor`, and a leaf `name`; the service builds the instance id `gts.<vendor>.toolkit.settings.<category>.<name>.v1` and the full `key` as `<value_type_id>~<instance-id>`, validating each segment against the GTS grammar and rejecting violations with `422`
+  - Key construction: the admin supplies `value_type_id`, a `vendor`, and a leaf `name`; the service builds the instance id `<vendor>.settings.<category>.<name>.v1` and the full `key` as `<value_type_id>~<instance-id>`, validating each segment against the GTS grammar and rejecting violations with `422`
   - Uniqueness: `uq_declaration_key` globally, and `UNIQUE(category_id, leaf_slug)` within a category
   - `ScopeClass` (`global`, `cascading`, `local`) and the scope-class engine deriving cascade and override behaviour
   - `DeclarationSource`, `DeclarationStatus`, and `DomainAffinity` enums

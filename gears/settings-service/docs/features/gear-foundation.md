@@ -103,16 +103,18 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 
 **Input**: Candidate setting key string
 
-**Output**: A parsed key value object carrying its value-type half and instance half, or a validation problem
+**Output**: A parsed key value object carrying its value-type segment, instance segment, category, and leaf name, or a validation problem
+
+GTS grammar is **not** re-implemented here. The platform GTS identifier library is the single source of truth for the prefix, the lowercase rule, the permitted character set, and the four-name-token-per-segment shape. This algorithm adds only what that library cannot know: that a setting key is exactly a type followed by an instance, and where the category and leaf name sit inside the instance segment.
 
 **Steps**:
-1. [ ] - `p1` - Split the candidate on the first `~`, giving a left value-type segment and a right instance segment; splitting on the first rather than the last terminator is what lets a key whose right half still ends in `~` be reported as a type-where-an-instance-was-expected instead of an empty instance - `inst-gf-key-1`
-2. [ ] - `p1` - **IF** no such separator is present → **RETURN** validation problem stating the key must be a GTS instance identifier of the form value-type then instance - `inst-gf-key-2`
-3. [ ] - `p1` - Assert the left half is a GTS type id terminated by `~` - `inst-gf-key-3`
-4. [ ] - `p1` - Assert the right half is an instance id with no trailing `~` - `inst-gf-key-4`
-5. [ ] - `p1` - Validate every dot-separated segment of both halves against the GTS grammar: lowercase, restricted to the permitted character set, and containing no `/` - `inst-gf-key-5`
-6. [ ] - `p1` - **IF** any segment violates the grammar → **RETURN** validation problem naming the offending segment - `inst-gf-key-6`
-7. [ ] - `p1` - **RETURN** the parsed key value object exposing both halves without re-normalizing the input, so a stored key and a supplied key compare identically - `inst-gf-key-7`
+1. [ ] - `p1` - Validate the whole candidate as a GTS identifier through the platform GTS validator, disallowing wildcards, since a concrete setting key never carries one - `inst-gf-key-1`
+2. [ ] - `p1` - **IF** validation fails → **RETURN** its problem unchanged in substance, preserving whether the fault was identifier-level or segment-level and, for a segment fault, the segment number and byte offset it reported - `inst-gf-key-2`
+3. [ ] - `p1` - **IF** the identifier does not consist of exactly two segments → **RETURN** a validation problem stating that a setting key is a value type followed by an instance id, naming how many segments were found - `inst-gf-key-3`
+4. [ ] - `p1` - **IF** the first segment is not a GTS type → **RETURN** a validation problem, because the value-type half must be a registered type - `inst-gf-key-4`
+5. [ ] - `p1` - **IF** the second segment is a GTS type → **RETURN** a validation problem, because the setting is an instance and a trailing terminator would make it a type - `inst-gf-key-5`
+6. [ ] - `p1` - Read the owning category from the instance segment's namespace token and the leaf name from its type token; both authoring parties place them in those positions - `inst-gf-key-6`
+7. [ ] - `p1` - **RETURN** the parsed key value object exposing both segments without re-normalizing the input, so a stored key and a supplied key compare identically - `inst-gf-key-7`
 
 ### Optimistic Concurrency Precondition Evaluation
 
@@ -295,8 +297,12 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [ ] `get_effective_bulk` returns an independent outcome per key, and one failing key does not fail the others in the batch
 - [ ] `Unavailable`, `Retired`, and `NotFound` are distinguishable by a consumer without string matching
 - [ ] A reader failure never returns a substituted Schema Default in place of an error
-- [ ] A well-formed setting key parses into its value-type half and instance half, and the parsed key round-trips to a byte-identical string
-- [ ] A key with no value-type separator, a trailing `~` on the instance half, an uppercase segment, or a `/` in any segment is rejected with a validation problem naming the offending segment
+- [ ] A well-formed setting key parses into its value-type segment and instance segment, and the parsed key round-trips to a byte-identical string
+- [ ] The category and leaf name are recoverable from the instance segment's namespace and type tokens, for a module-supplied key as well as an admin-composed one
+- [ ] A bare value type, or a key with three or more segments, is rejected as not being a value type followed by an instance id
+- [ ] A trailing `~` on the instance segment is rejected, because that would make it a type
+- [ ] An identifier-level fault — missing `gts.` prefix, uppercase — is reported as identifier-level, and a segment-level fault such as `/` in a token is reported with its segment number
+- [ ] A segment carrying five name tokens before the version is rejected, since the GTS grammar admits exactly four
 - [ ] Every 4xx and 5xx response carries `Content-Type: application/problem+json` with `type`, `title`, `status`, and `trace_id` populated
 - [ ] A `422` response carries a field-level `errors` array with `field`, `code`, and `message` per entry
 - [ ] An unrecognized internal error maps to `500` and its response body contains no internal message

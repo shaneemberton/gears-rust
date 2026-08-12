@@ -25,7 +25,7 @@
 - [5. Definitions of Done](#5-definitions-of-done)
   - [SDK Crate, Models and Value Objects](#sdk-crate-models-and-value-objects)
   - [SDK Trait Contracts](#sdk-trait-contracts)
-  - [Error Taxonomy and Reader Degradation Contract](#error-taxonomy-and-reader-degradation-contract)
+  - [Reader Degradation Contract and Typed Projection](#reader-degradation-contract-and-typed-projection)
   - [RFC-9457 Problem Mapping](#rfc-9457-problem-mapping)
   - [Persistence Adapter and Migration Harness](#persistence-adapter-and-migration-harness)
   - [Gear Scaffold and ClientHub Registration](#gear-scaffold-and-clienthub-registration)
@@ -40,7 +40,7 @@
 
 ### 1.1 Overview
 
-Establishes the `settings-service-sdk` crate and the gear scaffold that every later Settings Service feature is built on: SDK models and trait contracts, the error taxonomy and its RFC-9457 Problem mapping, PostgreSQL persistence with a migration harness, REST and OData infrastructure, the `PolicyEnforcer` PEP with credential step-up, and the Audit Emitter.
+Establishes the `settings-service-sdk` crate and the gear scaffold that every later Settings Service feature is built on: SDK models and trait contracts, the reader degradation contract with its typed projection over the platform canonical error, the RFC-9457 Problem mapping, PostgreSQL persistence with a migration harness, REST and OData infrastructure, the `PolicyEnforcer` PEP with credential step-up, and the Audit Emitter.
 
 ### 1.2 Purpose
 
@@ -99,7 +99,7 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 
 ### Setting Key Parsing and Validation
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-gear-foundation-key-parse`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-gear-foundation-key-parse`
 
 **Input**: Candidate setting key string
 
@@ -108,13 +108,13 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 GTS grammar is **not** re-implemented here. The platform GTS identifier library is the single source of truth for the prefix, the lowercase rule, the permitted character set, and the four-name-token-per-segment shape. This algorithm adds only what that library cannot know: that a setting key is exactly a type followed by an instance, and where the category and leaf name sit inside the instance segment.
 
 **Steps**:
-1. [ ] - `p1` - Validate the whole candidate as a GTS identifier through the platform GTS validator, disallowing wildcards, since a concrete setting key never carries one - `inst-gf-key-1`
-2. [ ] - `p1` - **IF** validation fails → **RETURN** its problem unchanged in substance, preserving whether the fault was identifier-level or segment-level and, for a segment fault, the segment number and byte offset it reported - `inst-gf-key-2`
-3. [ ] - `p1` - **IF** the identifier does not consist of exactly two segments → **RETURN** a validation problem stating that a setting key is a value type followed by an instance id, naming how many segments were found - `inst-gf-key-3`
-4. [ ] - `p1` - **IF** the first segment is not a GTS type → **RETURN** a validation problem, because the value-type half must be a registered type - `inst-gf-key-4`
-5. [ ] - `p1` - **IF** the second segment is a GTS type → **RETURN** a validation problem, because the setting is an instance and a trailing terminator would make it a type - `inst-gf-key-5`
-6. [ ] - `p1` - Read the owning category from the instance segment's namespace token and the leaf name from its type token; both authoring parties place them in those positions - `inst-gf-key-6`
-7. [ ] - `p1` - **RETURN** the parsed key value object exposing both segments without re-normalizing the input, so a stored key and a supplied key compare identically - `inst-gf-key-7`
+1. [x] - `p1` - Validate the whole candidate as a GTS identifier through the platform GTS validator, disallowing wildcards, since a concrete setting key never carries one - `inst-gf-key-1`
+2. [x] - `p1` - **IF** validation fails → **RETURN** its problem unchanged in substance, preserving whether the fault was identifier-level or segment-level and, for a segment fault, the segment number and byte offset it reported - `inst-gf-key-2`
+3. [x] - `p1` - **IF** the identifier does not consist of exactly two segments → **RETURN** a validation problem stating that a setting key is a value type followed by an instance id, naming how many segments were found - `inst-gf-key-3`
+4. [x] - `p1` - **IF** the first segment is not a GTS type → **RETURN** a validation problem, because the value-type half must be a registered type - `inst-gf-key-4`
+5. [x] - `p1` - **IF** the second segment is a GTS type → **RETURN** a validation problem, because the setting is an instance and a trailing terminator would make it a type - `inst-gf-key-5`
+6. [x] - `p1` - Read the owning category from the instance segment's namespace token and the leaf name from its type token; both authoring parties place them in those positions - `inst-gf-key-6`
+7. [x] - `p1` - **RETURN** the parsed key value object exposing both segments without re-normalizing the input, so a stored key and a supplied key compare identically - `inst-gf-key-7`
 
 ### Optimistic Concurrency Precondition Evaluation
 
@@ -190,7 +190,11 @@ The system **MUST** provide a `settings-service-sdk` crate carrying the domain m
 
 - [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-sdk-traits`
 
-The system **MUST** define `SettingsReaderClient` with `get_effective`, `get_effective_bulk`, `resolve_secret`, and `watch`, and `SettingsContributionClient` with `register_declarations` and `retire_declarations`. `get_effective_bulk` **MUST** return an independent per-key outcome so a mixed batch never fails wholesale. The traits **MUST** facade local against remote so `ClientHub` can bind either without the consumer changing.
+The system **MUST** define `SettingsReaderClient` with `get_effective`, `get_effective_bulk`, and `resolve_secret`, and `SettingsContributionClient` with `register_declarations` and `retire_declarations`. `get_effective_bulk` **MUST** return an independent per-key outcome so a mixed batch never fails wholesale. The traits **MUST** facade local against remote so `ClientHub` can bind either without the consumer changing.
+
+Every fallible trait method **MUST** return `Result<_, CanonicalError>`, the platform-wide error type. No settings-specific error type may appear in a trait signature: the platform ADR on SDK error surfaces fixes the boundary at canonical precisely so that adding a failure mode later is not a breaking change for every consuming gear. The typed view lives beside the trait, never inside it.
+
+`watch` — the fourth reader method in DESIGN.md §4.6 — is **deferred to the consumer-activation wave** and **MUST NOT** be declared here. Declaring it means fixing the change-notification and acknowledgement payloads, and those are owned by the [Settings Activation](../DESIGN-activation.md) design whose `cpt-cf-settings-service-fr-consumer-activation` requirement DECOMPOSITION records as an open **design** gap: consumer registration of interest, identifier-only notification payloads, delivery-until-confirmed, and the per-apply account of which consumers confirmed are all unspecified. Payload types invented ahead of that design would be redefined when it lands, breaking implementors exactly as a later method addition would — but silently, by changing what the payloads mean rather than by failing to compile. A method that does not exist yet is the more honest contract.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-gear-foundation-gear-init`
@@ -200,17 +204,30 @@ The system **MUST** define `SettingsReaderClient` with `get_effective`, `get_eff
 **Touches**:
 - Entities: `SettingsReaderClient`, `SettingsContributionClient`
 
-### Error Taxonomy and Reader Degradation Contract
+### Reader Degradation Contract and Typed Projection
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-error-taxonomy`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-error-taxonomy`
 
-The system **MUST** define an error taxonomy whose reader-facing failures are mutually distinguishable: `Unavailable` when the value could not be resolved and a retry may succeed, `Retired` when the declaration was withdrawn and a retry will not help, and `NotFound` when no declaration row exists. The service **MUST NOT** substitute a Schema Default on failure, since the default lives in the same database and is equally unreachable.
+Reader-facing failures **MUST** be mutually distinguishable, because each demands a different response from the consuming gear: `Unavailable` when the value could not be resolved and a retry may succeed; `Retired` when the declaration was withdrawn, so a retry will never help and the consumer should drop the dependency; and `NotFound` when no declaration row exists, which the consumer resolves against its own boot ordering. The service **MUST NOT** substitute a Schema Default on failure, since the default lives in the same database and is equally unreachable.
+
+This distinction **MUST** be delivered as a typed projection over `CanonicalError`, not as a parallel error taxonomy. Two of the three outcomes have no canonical category of their own — `Retired` is not a canonical concept, and the credential-absent case of `resolve_secret` collides with the resolver's own `NotFound` — so without a projection a consumer would have to compare context strings to satisfy a contract this document makes mandatory.
+
+The projection **MUST**:
+
+- be infallible, built from `CanonicalError` rather than fallibly parsed from it
+- carry a catch-all `Other { canonical }` variant, so a canonical category the SDK does not model still reaches the consumer with full fidelity and adding one later breaks nobody
+- distinguish the credential-absent outcome of `resolve_secret` from the resolver's `NotFound`, since a consumer that mistakes one for the other will hand a non-secret placeholder to a backend as if it were a credential
+- carry no transport fields; `instance` and `trace_id` belong to the Problem envelope
+- keep each wire-string constant beside the typed value it projects into, with conversions in both directions, so the two cannot drift apart
+- be pinned by round-trip Problem tests that assert every wire-string constant appears at its expected JSON path
+
+Variant count **MUST** be driven by what a consumer does differently, not by the service's internal vocabulary.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-gear-foundation-problem-mapping`
 
 **Touches**:
-- Entities: error taxonomy
+- Entities: reader degradation contract, typed projection, wire-string vocabulary
 
 ### RFC-9457 Problem Mapping
 
@@ -295,7 +312,14 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [ ] `SettingsReaderClient` and `SettingsContributionClient` resolve through `ClientHub` after initialization
 - [ ] The same consumer code compiles and runs against both the in-process and the REST binding of `SettingsReaderClient`
 - [ ] `get_effective_bulk` returns an independent outcome per key, and one failing key does not fail the others in the batch
-- [ ] `Unavailable`, `Retired`, and `NotFound` are distinguishable by a consumer without string matching
+- [x] Every fallible trait method returns `CanonicalError`; no settings-specific error type appears in any trait signature
+- [x] `Unavailable`, `Retired`, and `NotFound` are distinguishable by a consumer without string matching
+- [x] The credential-absent outcome of `resolve_secret` is a different variant from the resolver's `NotFound`, so a placeholder can never be mistaken for a configured credential
+- [x] A canonical category the projection does not model arrives as the catch-all variant with its canonical value intact, rather than being dropped or collapsed
+- [x] Adding a variant to the projection leaves every trait signature unchanged
+- [x] Each wire-string constant converts to its typed value and back, and an unrecognised string is preserved rather than discarded
+- [x] A round-trip Problem test asserts every wire-string constant appears at its expected JSON path
+- [x] The projection carries no `instance` or `trace_id` field
 - [ ] A reader failure never returns a substituted Schema Default in place of an error
 - [ ] A well-formed setting key parses into its value-type segment and instance segment, and the parsed key round-trips to a byte-identical string
 - [ ] The category and leaf name are recoverable from the instance segment's namespace and type tokens, for a module-supplied key as well as an admin-composed one

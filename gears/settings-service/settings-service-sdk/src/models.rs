@@ -1,12 +1,15 @@
 // Created: 2026-08-11 by Constructor Tech
-// @cpt-dod:cpt-cf-settings-service-dod-gear-foundation-sdk-models:p1
 //! Public models exchanged with settings consumers.
 //!
-//! Phase 1 delivers the opaque secret handle and the effective-source
-//! vocabulary. The reader request and response shapes arrive with the trait
-//! contracts in phase 2.
+//! The opaque secret handle and the effective-source vocabulary, the reader
+//! request and response shapes, and the declaration-contribution shapes.
+//!
+//! The change-notification payloads belong to Settings Activation and are not
+//! modelled here; see the [`crate::api`] module docs for why.
 
 use serde::{Deserialize, Serialize};
+
+use crate::SettingKey;
 
 /// Where an effective value resolved from.
 ///
@@ -72,6 +75,57 @@ impl std::fmt::Debug for SecretHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("SecretHandle(<redacted>)")
     }
+}
+
+/// A request for one setting's effective value at a scope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetEffectiveRequest {
+    /// The setting to resolve.
+    pub key: SettingKey,
+    /// The scope to resolve it for.
+    pub scope: String,
+}
+
+/// A resolved effective value with the trace of where it came from.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EffectiveValueResponse {
+    /// The setting that was resolved.
+    pub key: SettingKey,
+    /// The scope it was resolved for.
+    pub scope: String,
+    /// The resolved value. A secret-backed setting carries its masked handle.
+    pub value: serde_json::Value,
+    /// Where the value came from. Read this, not the value, to tell a
+    /// configured setting from an untouched one.
+    pub source: EffectiveSource,
+    /// The scope that supplied the value; absent for a Schema Default.
+    pub source_scope: Option<String>,
+}
+
+/// One declaration a module contributes at install or upgrade.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContributedDeclaration {
+    /// The setting key the module supplies.
+    pub key: SettingKey,
+    /// The Schema Default, validated against the key's value type.
+    pub default_value: serde_json::Value,
+}
+
+/// Outcome of one reconcile pass over a module's declarations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReconcileResult {
+    /// Declarations newly inserted.
+    pub registered: usize,
+    /// Declarations updated in place.
+    pub updated: usize,
+    /// Declarations moved to retired.
+    pub retired: usize,
+    /// Declarations revived from retired.
+    pub reactivated: usize,
 }
 
 #[cfg(test)]

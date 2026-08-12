@@ -3038,6 +3038,9 @@ dependencies = [
 name = "cf-gears-settings-service-sdk"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "cf-gears-toolkit-canonical-errors",
+ "cf-gears-toolkit-security",
  "gts-id",
  "serde",
  "serde_json",

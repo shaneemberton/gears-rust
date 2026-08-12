@@ -1,4 +1,5 @@
 // Created: 2026-08-12 by Constructor Tech
+// @cpt-dod:cpt-cf-settings-service-dod-gear-foundation-problem-mapping:p1
 //! The single conversion from [`DomainError`] to the platform error type.
 //!
 //! One arm per variant, deliberately flat: a reviewer checks this against the
@@ -19,15 +20,20 @@ struct SettingsResource;
 
 impl From<DomainError> for CanonicalError {
     fn from(err: DomainError) -> Self {
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-1
         match err {
             // 422 — the only path that carries field-level detail.
             DomainError::Validation {
                 field,
                 code,
                 message,
-            } => SettingsResource::invalid_argument()
-                .with_field_violation(field, message, code)
-                .create(),
+            } => {
+                // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-4
+                SettingsResource::invalid_argument()
+                    .with_field_violation(field, message, code)
+                    .create()
+                // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-4
+            }
 
             // 412 — a conditional write whose precondition no longer holds.
             DomainError::PreconditionFailed { detail } => SettingsResource::failed_precondition()
@@ -42,9 +48,11 @@ impl From<DomainError> for CanonicalError {
             // 403 — carries nothing about the target, by construction: the
             // variant holds no identifier to leak, so a denial for a setting
             // that exists is byte-identical to one for a setting that does not.
+            // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-5
             DomainError::Unauthorized => SettingsResource::permission_denied()
                 .with_reason("SETTING_NOT_ENTITLED")
                 .create(),
+            // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-5
 
             // 404 — names the kind of resource, never the caller's identifier.
             DomainError::NotFound { resource } => {
@@ -61,8 +69,11 @@ impl From<DomainError> for CanonicalError {
 
             // 500 — the diagnostic goes to the in-process channel the platform
             // strips from the wire, so nothing internal reaches the caller.
+            // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-6
             DomainError::Internal { diagnostic } => CanonicalError::internal(diagnostic).create(),
+            // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-6
         }
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-1
     }
 }
 

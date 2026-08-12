@@ -139,12 +139,12 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 **Output**: An RFC-9457 problem document and its HTTP status
 
 **Steps**:
-1. [ ] - `p1` - Map the `DomainError` variant to a canonical error category, from which the platform derives the HTTP status and the stable `gts://` type URI - `inst-gf-problem-1`
+1. [x] - `p1` - Map the `DomainError` variant to a canonical error category, from which the platform derives the HTTP status and the stable `gts://` type URI - `inst-gf-problem-1`
 2. [ ] - `p1` - Set `Content-Type` to `application/problem+json` - `inst-gf-problem-2`
 3. [ ] - `p1` - Populate the required members `type`, `title`, `status`, and `trace_id`, taking `trace_id` from the ambient request trace context - `inst-gf-problem-3`
-4. [ ] - `p1` - **IF** the failure is a field-level validation rejection → attach one violation per offending field, each carrying the field, a stable machine-readable reason, and a human-readable description - `inst-gf-problem-4`
-5. [ ] - `p1` - **IF** the error carries an authorization or entitlement denial → emit the denial without disclosing whether the target resource exists - `inst-gf-problem-5`
-6. [ ] - `p1` - **IF** the variant is unrecognized → map to `500` with a generic title, never leaking an internal message into the response body - `inst-gf-problem-6`
+4. [x] - `p1` - **IF** the failure is a field-level validation rejection → attach one violation per offending field, each carrying the field, a stable machine-readable reason, and a human-readable description - `inst-gf-problem-4`
+5. [x] - `p1` - **IF** the error carries an authorization or entitlement denial → emit the denial without disclosing whether the target resource exists - `inst-gf-problem-5`
+6. [x] - `p1` - **IF** the variant is unrecognized → map to `500` with a generic title, never leaking an internal message into the response body - `inst-gf-problem-6`
 7. [ ] - `p1` - **RETURN** the problem document and status - `inst-gf-problem-7`
 
 ### Authorization Enforcement and Credential Step-Up
@@ -231,7 +231,7 @@ Variant count **MUST** be driven by what a consumer does differently, not by the
 
 ### RFC-9457 Problem Mapping
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-problem-mapping`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-problem-mapping`
 
 The system **MUST** render every 4xx and 5xx response as `application/problem+json` carrying `type` as a `gts://` URI, `title`, `status`, and `trace_id`, and **MUST** carry field-level violations on a validation rejection, each naming the field, a stable machine-readable reason, and a human-readable description. An unrecognized internal error **MUST** map to `500` without leaking an internal message.
 
@@ -252,7 +252,7 @@ Two consequences follow, and they are why this DoD no longer names `422` or an `
 
 ### Persistence Adapter and Migration Harness
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-persistence`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-persistence`
 
 The system **MUST** provide a migration harness that runs outstanding migrations at startup, and **MUST** establish the schema prerequisites and persistence conventions that every settings table depends on — the database extensions their DDL assumes, and access through `SecureConn` with repositories generic over `DBRunner` rather than over a raw pool. A failed migration **MUST** prevent the gear from serving traffic rather than leaving a partially migrated schema reachable.
 
@@ -341,9 +341,9 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [ ] An identifier-level fault — missing `gts.` prefix, uppercase — is reported as identifier-level, and a segment-level fault such as `/` in a token is reported with its segment number
 - [ ] A segment carrying five name tokens before the version is rejected, since the GTS grammar admits exactly four
 - [ ] Every 4xx and 5xx response carries `Content-Type: application/problem+json` with `type`, `title`, `status`, and `trace_id` populated
-- [ ] A validation rejection carries one field violation per offending field, each naming the field, a stable machine-readable reason, and a human-readable description
-- [ ] The gear selects a canonical error category and never mints its own HTTP status or `gts://` type URI
-- [ ] An unrecognized internal error maps to `500` and its response body contains no internal message
+- [x] A validation rejection carries one field violation per offending field, each naming the field, a stable machine-readable reason, and a human-readable description
+- [x] The gear selects a canonical error category and never mints its own HTTP status or `gts://` type URI
+- [x] An unrecognized internal error maps to `500` and its response body contains no internal message
 - [ ] A mutating `PATCH` or `DELETE` without `If-Match` returns `428`
 - [ ] A mutating `PATCH` or `DELETE` with a stale `If-Match` returns `412`
 - [ ] An OData expression on an unmapped field or with an unsupported operator is rejected rather than ignored

@@ -56,3 +56,11 @@ fn the_gear_hands_its_migrations_to_the_capability() {
         "the capability must expose the harness itself, not a separate list"
     );
 }
+
+#[test]
+fn an_uninitialized_gear_refuses_to_hand_out_the_enforcer() {
+    // Handing back a permissive default here would turn every unenforced
+    // handler into an allow. There is no default to hand back.
+    let gear = SettingsService::default();
+    assert!(gear.enforcer().is_err());
+}

@@ -1,0 +1,54 @@
+// Created: 2026-08-13 by Constructor Tech
+//! Tests for the category service's decidable rules.
+//!
+//! # Why this file is small
+//!
+//! Every service operation takes a [`DBRunner`](toolkit_db::secure::DBRunner),
+//! and `toolkit-db` exposes no public constructor for one — `Db`, `SecureConn`
+//! and `DbConn` are all sealed so a raw database handle cannot escape the
+//! framework. That is a deliberate security property, and its consequence is
+//! that a gear cannot drive its own services from a unit test, even against a
+//! stub repository.
+//!
+//! So the rules that can be stated without a connection are extracted and
+//! pinned here. The orchestration around them — that the precondition is
+//! evaluated before the orphan guard, that a refused delete never reaches the
+//! repository — is exercised by the E2E suite against a real database, and is
+//! recorded in the FEATURE's acceptance criteria rather than here.
+
+use super::is_rename_collision;
+use crate::domain::category::CategoryKey;
+
+fn key(s: &str) -> CategoryKey {
+    CategoryKey::parse(s).expect("valid fixture key")
+}
+
+#[test]
+fn keeping_your_own_key_is_never_a_collision() {
+    // The re-check must exclude the row being updated. Without this, renaming a
+    // category's display name would be impossible while keeping its key — the
+    // key would always be found as "taken", by itself.
+    assert!(!is_rename_collision(&key("network"), &key("network"), true));
+}
+
+#[test]
+fn renaming_onto_another_categorys_key_is_a_collision() {
+    assert!(is_rename_collision(&key("network"), &key("storage"), true));
+}
+
+#[test]
+fn a_free_key_is_never_a_collision() {
+    assert!(!is_rename_collision(
+        &key("network"),
+        &key("storage"),
+        false
+    ));
+}
+
+#[test]
+fn collision_is_decided_by_the_key_not_the_display_name() {
+    // Two keys differing only by case are different keys, because keys are
+    // stored verbatim. A collision check that folded case would refuse a
+    // legitimate rename.
+    assert!(is_rename_collision(&key("network"), &key("Network"), true));
+}

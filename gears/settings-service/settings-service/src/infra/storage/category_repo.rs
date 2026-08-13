@@ -63,6 +63,30 @@ fn map_write_error(err: &toolkit_db::secure::ScopeError) -> DomainError {
     }
 }
 
+/// Project a delete failure.
+///
+/// A foreign-key rejection means a declaration still references the category.
+/// `ON DELETE RESTRICT` is the **authoritative** guard: the service's advisory
+/// check runs first for a better message, but a declaration created between
+/// that check and this delete is caught only here. Reporting it as an internal
+/// error would turn a correct refusal into a 500.
+fn map_delete_error(err: &toolkit_db::secure::ScopeError) -> DomainError {
+    let is_fk_violation = matches!(
+        err,
+        toolkit_db::secure::ScopeError::Db(db) if matches!(
+            db.sql_err(),
+            Some(sea_orm::SqlErr::ForeignKeyConstraintViolation(_))
+        )
+    );
+    if is_fk_violation {
+        DomainError::Conflict {
+            detail: "the category still has declarations referencing it".to_owned(),
+        }
+    } else {
+        map_write_error(err)
+    }
+}
+
 fn now() -> time::OffsetDateTime {
     time::OffsetDateTime::now_utc()
 }
@@ -207,7 +231,7 @@ impl CategoryRepository for CategoryRepo {
             .scope_with(scope)
             .exec(conn)
             .await
-            .map_err(|err| map_write_error(&err))?;
+            .map_err(|err| map_delete_error(&err))?;
         if outcome.rows_affected == 0 {
             return Err(DomainError::NotFound {
                 resource: "category",

@@ -159,8 +159,8 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 5. [ ] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-delete-5`
 6. [ ] - `p1` - Evaluate the `If-Match` precondition using the shared precondition helper - `inst-cat-delete-6`
 7. [ ] - `p1` - **IF** `If-Match` is absent → **RETURN** `428`; **IF** stale → **RETURN** `412` - `inst-cat-delete-7`
-8. [ ] - `p1` - Invoke the no-orphan deletion guard for this category - `inst-cat-delete-8`
-9. [ ] - `p1` - **IF** the guard reports referencing declarations → **RETURN** `409 CategoryNotEmpty` - `inst-cat-delete-9`
+8. [x] - `p1` - Invoke the no-orphan deletion guard for this category - `inst-cat-delete-8`
+9. [x] - `p1` - **IF** the guard reports referencing declarations → **RETURN** `409 CategoryNotEmpty` - `inst-cat-delete-9`
 10. [ ] - `p1` - DB: DELETE FROM categories WHERE id = {id} - `inst-cat-delete-10`
 11. [ ] - `p1` - **IF** the declaration foreign key `ON DELETE RESTRICT` rejects the delete → **RETURN** `409 CategoryNotEmpty`, covering a declaration inserted between the guard and the delete - `inst-cat-delete-11`
 12. [ ] - `p1` - Emit a category-deleted audit record carrying the pre-image - `inst-cat-delete-12`

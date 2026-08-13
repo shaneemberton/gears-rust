@@ -576,6 +576,7 @@ testing/e2e/logs/
 *.backup*
 .cf-studio/config/kits/sdlc/*
 .cf-studio/.cache/explore/*
+.cf-studio/.cache/planning/*
 
 # code-ranker reports
 .code-ranker/

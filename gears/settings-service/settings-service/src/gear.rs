@@ -8,6 +8,7 @@
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
+use authz_resolver_sdk::{AuthZResolverClient, PolicyEnforcer};
 use sea_orm_migration::MigrationTrait;
 use toolkit::{DatabaseCapability, Gear, GearCtx};
 use toolkit_db::{DBProvider, DbError};
@@ -19,10 +20,11 @@ use crate::config::SettingsServiceConfig;
 ///
 /// Holds what initialization resolves, so later phases can hang services off it
 /// without changing the startup contract.
-#[toolkit::gear(name = "settings-service", capabilities = [db])]
+#[toolkit::gear(name = "settings-service", deps = [authz_resolver], capabilities = [db])]
 pub struct SettingsService {
     config: OnceLock<Arc<SettingsServiceConfig>>,
     db: OnceLock<Arc<DBProvider<DbError>>>,
+    enforcer: OnceLock<Arc<PolicyEnforcer>>,
 }
 
 impl Default for SettingsService {
@@ -30,6 +32,7 @@ impl Default for SettingsService {
         Self {
             config: OnceLock::new(),
             db: OnceLock::new(),
+            enforcer: OnceLock::new(),
         }
     }
 }
@@ -52,6 +55,21 @@ impl SettingsService {
     /// Returns an error when called before [`Gear::init`].
     pub fn db(&self) -> anyhow::Result<Arc<DBProvider<DbError>>> {
         self.db
+            .get()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
+    }
+
+    /// The authorization enforcement point, once initialization has run.
+    ///
+    /// Every handler obtains its `AccessScope` through this rather than
+    /// consulting the decision point directly, so the fail-closed projection in
+    /// [`crate::api::authz`] cannot be bypassed by a handler that forgets it.
+    ///
+    /// # Errors
+    /// Returns an error when called before [`Gear::init`].
+    pub fn enforcer(&self) -> anyhow::Result<Arc<PolicyEnforcer>> {
+        self.enforcer
             .get()
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
@@ -81,6 +99,20 @@ impl Gear for SettingsService {
 
         self.db
             .set(db)
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
+        // Resolved at init, not per request: a decision point that cannot be
+        // resolved must stop the gear coming up, rather than surfacing later as
+        // a request-time denial indistinguishable from a real policy decision.
+        let authz = ctx
+            .client_hub()
+            .get::<dyn AuthZResolverClient>()
+            .map_err(|e| anyhow::anyhow!("failed to resolve the AuthZ resolver: {e}"))?;
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
+
+        self.enforcer
+            .set(Arc::new(PolicyEnforcer::new(authz)))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-9

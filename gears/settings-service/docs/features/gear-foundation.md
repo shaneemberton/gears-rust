@@ -92,7 +92,7 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 3. [x] - `p1` - Establish the PostgreSQL connection pool and construct the `SecureConn` and `DBRunner` handles - `inst-gf-init-3`
 4. [x] - `p1` - Run outstanding schema migrations to completion - `inst-gf-init-4`
 5. [x] - `p1` - **IF** a migration fails → **RETURN** startup failure without serving traffic, so no request observes a partially migrated schema - `inst-gf-init-5`
-6. [ ] - `p1` - Resolve the `TypesRegistryClient` and the Policy Decision client through `ClientHub` - `inst-gf-init-6`
+6. [x] - `p1` - Resolve the `TypesRegistryClient` and the Policy Decision client through `ClientHub` - `inst-gf-init-6`
 7. [ ] - `p1` - Register the gear's own `SettingsReaderClient` and `SettingsContributionClient` implementations into `ClientHub` - `inst-gf-init-7`
 8. [ ] - `p1` - Bind each registered trait according to the active deployment profile: the in-process implementation when co-located, the same trait over REST when out of process - `inst-gf-init-8`
 9. [x] - `p1` - Mark the gear ready and begin serving - `inst-gf-init-9`
@@ -158,13 +158,13 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 **Steps**:
 1. [ ] - `p1` - Require an authenticated principal on the request context - `inst-gf-authz-1`
 2. [ ] - `p1` - **IF** authentication is absent or invalid → **RETURN** denial - `inst-gf-authz-2`
-3. [ ] - `p1` - Ask the Policy Decision client for a decision on the action against the target GTS resource type - `inst-gf-authz-3`
-4. [ ] - `p1` - **IF** the decision cannot be obtained → **RETURN** denial, failing closed rather than proceeding on an unknown verdict - `inst-gf-authz-4`
-5. [ ] - `p1` - **IF** the decision is deny → **RETURN** denial - `inst-gf-authz-5`
+3. [x] - `p1` - Ask the Policy Decision client for a decision on the action against the target GTS resource type - `inst-gf-authz-3`
+4. [x] - `p1` - **IF** the decision cannot be obtained → **RETURN** denial, failing closed rather than proceeding on an unknown verdict - `inst-gf-authz-4`
+5. [x] - `p1` - **IF** the decision is deny → **RETURN** denial - `inst-gf-authz-5`
 6. [ ] - `p1` - **IF** the action is behavior-affecting → require a valid credential step-up assertion established at the identity provider - `inst-gf-authz-6`
 7. [ ] - `p1` - **IF** the step-up assertion is absent, expired, or not bound to this principal → **RETURN** denial - `inst-gf-authz-7`
-8. [ ] - `p1` - Build the `AccessScope` from the decision's constraints - `inst-gf-authz-8`
-9. [ ] - `p1` - **RETURN** the `AccessScope` for the handler to apply as a query and visibility predicate - `inst-gf-authz-9`
+8. [x] - `p1` - Build the `AccessScope` from the decision's constraints - `inst-gf-authz-8`
+9. [x] - `p1` - **RETURN** the `AccessScope` for the handler to apply as a query and visibility predicate - `inst-gf-authz-9`
 
 ## 4. States (CDSL)
 

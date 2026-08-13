@@ -30,6 +30,7 @@
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]
 
+pub mod activation;
 pub mod api;
 pub mod error;
 pub mod gts;
@@ -37,6 +38,10 @@ pub mod key;
 pub mod models;
 pub mod precondition;
 
+pub use activation::{
+    ActivationOutcome, SettingChangeHandler, SettingChangeNotification, SettingsActivationClient,
+    SubscriptionHandle,
+};
 pub use api::{BulkOutcome, BulkSelector, SettingsContributionClient, SettingsReaderClient};
 pub use error::SettingsError;
 pub use key::{SettingKey, SettingKeyError};

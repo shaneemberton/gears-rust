@@ -11,6 +11,7 @@ use toolkit_db::secure::DBRunner;
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
+use super::visibility::{self, DomainVisibility};
 use super::{Category, CategoryDraft, CategoryRepository};
 use crate::api::precondition::{self, ETag};
 use crate::domain::error::DomainError;
@@ -56,12 +57,32 @@ impl<R: CategoryRepository> CategoryService<R> {
         scope: &AccessScope,
         id: Uuid,
     ) -> Result<Category, DomainError> {
-        self.repo
-            .find(conn, scope, id)
-            .await?
-            .ok_or(DomainError::NotFound {
-                resource: "category",
-            })
+        let found = self.repo.find(conn, scope, id).await?;
+
+        // @cpt-begin:cpt-cf-settings-service-algo-category-management-visibility-filter:p1:inst-cat-visfilter-3
+        // The row-level arm of the visibility rule. `list` applies it as a SQL
+        // predicate; a single-row fetch has no query to augment, so it is
+        // applied here — and applied as *not found* rather than *forbidden*,
+        // because a distinct denial would confirm the category exists.
+        let visible = visibility::domain_visibility(scope);
+        let found = found.filter(|category| {
+            visibility::is_visible(&visible, category.domain_affinity.as_deref())
+        });
+        // @cpt-end:cpt-cf-settings-service-algo-category-management-visibility-filter:p1:inst-cat-visfilter-3
+
+        found.ok_or(DomainError::NotFound {
+            resource: "category",
+        })
+    }
+
+    /// The caller's domain restriction, for a handler to fold into a list query.
+    ///
+    /// Exposed rather than applied here because `list` must put the predicate
+    /// **inside** the query: filtering a page after the fact gives short pages
+    /// and a cursor that skips rows the caller was entitled to.
+    #[must_use]
+    pub fn visibility(scope: &AccessScope) -> DomainVisibility {
+        visibility::domain_visibility(scope)
     }
 
     /// Create a category.

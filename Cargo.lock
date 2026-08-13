@@ -2420,6 +2420,7 @@ dependencies = [
  "cf-gears-toolkit-db",
  "cf-gears-toolkit-db-macros",
  "cf-gears-toolkit-macros",
+ "cf-gears-toolkit-odata",
  "cf-gears-toolkit-security",
  "inventory",
  "sea-orm",
@@ -2439,6 +2440,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "cf-gears-toolkit-canonical-errors",
+ "cf-gears-toolkit-odata",
+ "cf-gears-toolkit-odata-macros",
  "cf-gears-toolkit-security",
  "gts-id",
  "serde",

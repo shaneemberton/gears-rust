@@ -33,6 +33,7 @@ thiserror = { workspace = true }
 
 sea-orm = { workspace = true }
 toolkit-db-macros = { workspace = true }
+toolkit-odata = { workspace = true }
 time = { workspace = true }
 sea-orm-migration = { workspace = true }
 

@@ -1,4 +1,5 @@
 // Created: 2026-08-11 by Constructor Tech
+// @cpt-dod:cpt-cf-settings-service-dod-gear-foundation-sdk-models:p1
 //! Public models exchanged with settings consumers.
 //!
 //! The opaque secret handle and the effective-source vocabulary, the reader

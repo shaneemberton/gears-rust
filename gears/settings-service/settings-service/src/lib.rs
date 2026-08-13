@@ -25,6 +25,7 @@
 #![deny(rust_2018_idioms)]
 
 pub mod api;
+pub mod audit;
 pub mod config;
 pub mod domain;
 pub mod field;

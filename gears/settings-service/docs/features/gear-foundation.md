@@ -351,4 +351,4 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [ ] A request whose authorization decision cannot be obtained is denied rather than allowed
 - [ ] A behavior-affecting action without a valid step-up assertion is denied, and one with a step-up assertion bound to a different principal is also denied
 - [ ] An `AccessScope` returned by the PEP is applied as a query predicate and not merely as a post-filter
-- [ ] The Audit Emitter records a mutation with both pre-image and post-image available to the caller
+- [x] The Audit Emitter records a mutation with both pre-image and post-image available to the caller

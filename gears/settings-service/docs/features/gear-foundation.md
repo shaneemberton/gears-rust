@@ -174,7 +174,7 @@ Not applicable. This feature introduces no domain entity and therefore no lifecy
 
 ### SDK Crate, Models and Value Objects
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-sdk-models`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-sdk-models`
 
 The system **MUST** provide a `settings-service-sdk` crate carrying the domain models exchanged with consumers, including the request and response shapes of the reader trait, the effective-value response with its `source` member, the opaque secret handle type, and a parsed setting-key value object. Models **MUST** serialize stably, because consuming gears depend on that wire shape.
 
@@ -334,12 +334,12 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [x] A round-trip Problem test asserts every wire-string constant appears at its expected JSON path
 - [x] The projection carries no `instance` or `trace_id` field
 - [ ] A reader failure never returns a substituted Schema Default in place of an error
-- [ ] A well-formed setting key parses into its value-type segment and instance segment, and the parsed key round-trips to a byte-identical string
-- [ ] The category and leaf name are recoverable from the instance segment's namespace and type tokens, for a module-supplied key as well as an admin-composed one
-- [ ] A bare value type, or a key with three or more segments, is rejected as not being a value type followed by an instance id
-- [ ] A trailing `~` on the instance segment is rejected, because that would make it a type
-- [ ] An identifier-level fault — missing `gts.` prefix, uppercase — is reported as identifier-level, and a segment-level fault such as `/` in a token is reported with its segment number
-- [ ] A segment carrying five name tokens before the version is rejected, since the GTS grammar admits exactly four
+- [x] A well-formed setting key parses into its value-type segment and instance segment, and the parsed key round-trips to a byte-identical string
+- [x] The category and leaf name are recoverable from the instance segment's namespace and type tokens, for a module-supplied key as well as an admin-composed one
+- [x] A bare value type, or a key with three or more segments, is rejected as not being a value type followed by an instance id
+- [x] A trailing `~` on the instance segment is rejected, because that would make it a type
+- [x] An identifier-level fault — missing `gts.` prefix, uppercase — is reported as identifier-level, and a segment-level fault such as `/` in a token is reported with its segment number
+- [x] A segment carrying five name tokens before the version is rejected, since the GTS grammar admits exactly four
 - [ ] Every 4xx and 5xx response carries `Content-Type: application/problem+json` with `type`, `title`, `status`, and `trace_id` populated
 - [x] A validation rejection carries one field violation per offending field, each naming the field, a stable machine-readable reason, and a human-readable description
 - [x] The gear selects a canonical error category and never mints its own HTTP status or `gts://` type URI

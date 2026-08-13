@@ -7,10 +7,24 @@ use toolkit_db::secure::{DBRunner, SecureDeleteExt, SecureEntityExt, SecureUpdat
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
+use toolkit_db::odata::{LimitCfg, paginate_odata};
+use toolkit_odata::{ODataQuery, Page, SortDir};
+
 use crate::api::precondition::ETag;
+use crate::domain::category::visibility::DomainVisibility;
 use crate::domain::category::{Category, CategoryDraft, CategoryKey, CategoryRepository};
 use crate::domain::error::DomainError;
 use crate::infra::storage::entity::category::{self, Entity as CategoryEntity};
+use crate::infra::storage::odata_mapper::CategoryODataMapper;
+use settings_service_sdk::odata::CategoryFilterField;
+
+/// Page bounds for category listings. The platform ceiling is
+/// `ODataLimits::max_top` (1000); these are this resource's own default and
+/// clamp, chosen for an administrative listing where a page shows tens of rows.
+const CATEGORY_LIMIT_CFG: LimitCfg = LimitCfg {
+    default: 25,
+    max: 200,
+};
 
 /// Persistence for categories.
 pub struct CategoryRepo;
@@ -238,6 +252,63 @@ impl CategoryRepository for CategoryRepo {
             });
         }
         Ok(())
+    }
+
+    async fn list<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        visibility: &DomainVisibility,
+        query: &ODataQuery,
+    ) -> Result<Page<Category>, DomainError> {
+        let mut select = CategoryEntity::find();
+
+        // @cpt-begin:cpt-cf-settings-service-algo-category-management-visibility-filter:p1:inst-cat-visfilter-4
+        // Inside the query, before pagination runs. Applied to the page after
+        // the fact, this would return short pages and a cursor pointing past
+        // rows the caller was entitled to see.
+        //
+        // The null arm is what keeps an undomained category universally
+        // visible; without it every category with no domain vanishes for every
+        // scoped administrator.
+        if let DomainVisibility::Restricted(domains) = visibility {
+            select = select.filter(
+                category::Column::DomainAffinity
+                    .is_null()
+                    .or(category::Column::DomainAffinity.is_in(domains.clone())),
+            );
+        }
+        // @cpt-end:cpt-cf-settings-service-algo-category-management-visibility-filter:p1:inst-cat-visfilter-4
+
+        let base = select.secure().scope_with(scope);
+
+        // Tiebreaker is `name`: the caller-visible order is `sort_order` then
+        // `name`, and `sort_order` is not unique, so the cursor needs a unique
+        // column to resume from or a page boundary can repeat or skip a row.
+        let page = paginate_odata::<CategoryFilterField, CategoryODataMapper, _, _, _, _>(
+            base,
+            conn,
+            query,
+            ("name", SortDir::Asc),
+            CATEGORY_LIMIT_CFG,
+            |m: category::Model| m,
+        )
+        .await
+        .map_err(|err| DomainError::Validation {
+            field: "query".to_owned(),
+            code: crate::field::ODATA_QUERY,
+            message: err.to_string(),
+        })?;
+
+        let items = page
+            .items
+            .into_iter()
+            .map(to_domain)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Page {
+            items,
+            page_info: page.page_info,
+        })
     }
 
     async fn has_referencing_declarations<C: DBRunner>(

@@ -18,6 +18,7 @@
 
 use super::is_rename_collision;
 use crate::domain::category::CategoryKey;
+use crate::domain::error::DomainError;
 
 fn key(s: &str) -> CategoryKey {
     CategoryKey::parse(s).expect("valid fixture key")
@@ -51,4 +52,28 @@ fn collision_is_decided_by_the_key_not_the_display_name() {
     // stored verbatim. A collision check that folded case would refuse a
     // legitimate rename.
     assert!(is_rename_collision(&key("network"), &key("Network"), true));
+}
+
+#[test]
+fn select_is_refused_rather_than_ignored() {
+    // A caller whose projection was silently dropped receives every field
+    // believing it asked for two -- the same failure the declared filter
+    // surface exists to prevent.
+    let query = toolkit_odata::ODataQuery {
+        select: Some(vec!["key".to_owned(), "name".to_owned()]),
+        ..Default::default()
+    };
+    match super::reject_unsupported_options(&query) {
+        Err(DomainError::Validation { field, code, .. }) => {
+            assert_eq!(field, "$select");
+            assert_eq!(code, crate::field::ODATA_UNSUPPORTED_OPTION);
+        }
+        other => panic!("expected $select to be refused, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_query_without_select_is_accepted() {
+    let query = toolkit_odata::ODataQuery::default();
+    assert!(super::reject_unsupported_options(&query).is_ok());
 }

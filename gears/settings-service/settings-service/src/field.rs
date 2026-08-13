@@ -26,3 +26,10 @@ pub const CATEGORY_KEY_LENGTH: &str = "category_key_length";
 
 /// A category key contains the reserved `/` separator.
 pub const CATEGORY_KEY_RESERVED_SEPARATOR: &str = "category_key_reserved_separator";
+
+/// An `OData` expression referenced an unmapped field, used an unsupported
+/// operator, or carried a cursor that no longer decodes.
+pub const ODATA_QUERY: &str = "odata_query";
+
+/// A request used an `OData` option this resource does not implement.
+pub const ODATA_UNSUPPORTED_OPTION: &str = "odata_unsupported_option";

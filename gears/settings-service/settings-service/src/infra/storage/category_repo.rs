@@ -1,0 +1,236 @@
+// Created: 2026-08-13 by Constructor Tech
+//! SeaORM-backed category persistence.
+
+use async_trait::async_trait;
+use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use toolkit_db::secure::{DBRunner, SecureDeleteExt, SecureEntityExt, SecureUpdateExt};
+use toolkit_security::AccessScope;
+use uuid::Uuid;
+
+use crate::api::precondition::ETag;
+use crate::domain::category::{Category, CategoryDraft, CategoryKey, CategoryRepository};
+use crate::domain::error::DomainError;
+use crate::infra::storage::entity::category::{self, Entity as CategoryEntity};
+
+/// Persistence for categories.
+pub struct CategoryRepo;
+
+/// Derive the entity tag from the row's last write.
+///
+/// `updated_at` is refreshed on every write and stored to microsecond
+/// precision, so two writes to one row cannot share a tag. Deriving it rather
+/// than storing a separate version column keeps the tag and the row impossible
+/// to desynchronise: there is no second field to forget to bump.
+fn etag_of(model: &category::Model) -> ETag {
+    ETag::new(format!("{}", model.updated_at.unix_timestamp_nanos()))
+}
+
+fn to_domain(model: category::Model) -> Result<Category, DomainError> {
+    let etag = etag_of(&model);
+    Ok(Category {
+        id: model.id,
+        // A key that failed validation cannot have been written through this
+        // service, so a stored key that will not parse means the row was
+        // written by something else — an internal fault, not a bad request.
+        key: CategoryKey::parse(&model.key).map_err(|err| DomainError::Internal {
+            diagnostic: format!("stored category key `{}` is invalid: {err}", model.key),
+        })?,
+        name: model.name,
+        description: model.description,
+        domain_affinity: model.domain_affinity,
+        sort_order: model.sort_order,
+        icon: model.icon,
+        etag,
+    })
+}
+
+/// Project a write failure.
+///
+/// Uniqueness is decided by `uq_category_key` / `uq_category_name`, never by a
+/// prior read: two administrators creating the same key concurrently can both
+/// pass a check-then-insert, and only the index catches the second. The driver
+/// classifies the violation by SQLSTATE, so this does not sniff message text —
+/// a wording change upstream would otherwise turn a conflict into a 500.
+fn map_write_error(err: &toolkit_db::secure::ScopeError) -> DomainError {
+    if err.is_unique_violation() {
+        DomainError::Conflict {
+            detail: "a category with this key or name already exists".to_owned(),
+        }
+    } else {
+        DomainError::Internal {
+            diagnostic: err.to_string(),
+        }
+    }
+}
+
+fn now() -> time::OffsetDateTime {
+    time::OffsetDateTime::now_utc()
+}
+
+fn active_from(draft: &CategoryDraft) -> category::ActiveModel {
+    category::ActiveModel {
+        key: Set(draft.key.as_str().to_owned()),
+        name: Set(draft.name.clone()),
+        description: Set(draft.description.clone()),
+        domain_affinity: Set(draft.domain_affinity.clone()),
+        sort_order: Set(draft.sort_order),
+        icon: Set(draft.icon.clone()),
+        updated_at: Set(now()),
+        ..Default::default()
+    }
+}
+
+#[async_trait]
+impl CategoryRepository for CategoryRepo {
+    async fn find<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        id: Uuid,
+    ) -> Result<Option<Category>, DomainError> {
+        let found = CategoryEntity::find_by_id(id)
+            .secure()
+            .scope_with(scope)
+            .one(conn)
+            .await
+            .map_err(|err| DomainError::Internal {
+                diagnostic: err.to_string(),
+            })?;
+        found.map(to_domain).transpose()
+    }
+
+    async fn find_by_key<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        key: &CategoryKey,
+    ) -> Result<Option<Category>, DomainError> {
+        let found = CategoryEntity::find()
+            .filter(category::Column::Key.eq(key.as_str()))
+            .secure()
+            .scope_with(scope)
+            .one(conn)
+            .await
+            .map_err(|err| DomainError::Internal {
+                diagnostic: err.to_string(),
+            })?;
+        found.map(to_domain).transpose()
+    }
+
+    async fn insert<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        draft: CategoryDraft,
+    ) -> Result<Category, DomainError> {
+        let mut active = active_from(&draft);
+        active.id = Set(Uuid::new_v4());
+        active.created_at = Set(now());
+
+        let model = toolkit_db::secure::secure_insert::<CategoryEntity>(active, scope, conn)
+            .await
+            .map_err(|err| map_write_error(&err))?;
+        to_domain(model)
+    }
+
+    async fn update<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        id: Uuid,
+        draft: CategoryDraft,
+    ) -> Result<Category, DomainError> {
+        // `update_many` rather than `update`: the secure extension scopes a
+        // filtered update, and scoping is the point — an id the caller cannot
+        // see must not become an update they can perform. Filtered to one id,
+        // so it touches at most one row.
+        let outcome = CategoryEntity::update_many()
+            .col_expr(
+                category::Column::Key,
+                sea_orm::sea_query::Expr::value(draft.key.as_str()),
+            )
+            .col_expr(
+                category::Column::Name,
+                sea_orm::sea_query::Expr::value(draft.name.clone()),
+            )
+            .col_expr(
+                category::Column::Description,
+                sea_orm::sea_query::Expr::value(draft.description.clone()),
+            )
+            .col_expr(
+                category::Column::DomainAffinity,
+                sea_orm::sea_query::Expr::value(draft.domain_affinity.clone()),
+            )
+            .col_expr(
+                category::Column::SortOrder,
+                sea_orm::sea_query::Expr::value(draft.sort_order),
+            )
+            .col_expr(
+                category::Column::Icon,
+                sea_orm::sea_query::Expr::value(draft.icon.clone()),
+            )
+            .col_expr(
+                category::Column::UpdatedAt,
+                sea_orm::sea_query::Expr::value(now()),
+            )
+            .filter(category::Column::Id.eq(id))
+            .secure()
+            .scope_with(scope)
+            .exec(conn)
+            .await
+            .map_err(|err| map_write_error(&err))?;
+
+        if outcome.rows_affected == 0 {
+            return Err(DomainError::NotFound {
+                resource: "category",
+            });
+        }
+
+        // Re-read so the caller receives the refreshed `updated_at`, and with it
+        // the new ETag. Returning the draft instead would hand back a tag that
+        // does not match what a subsequent `If-Match` would be compared against.
+        self.find(conn, scope, id)
+            .await?
+            .ok_or(DomainError::NotFound {
+                resource: "category",
+            })
+    }
+
+    async fn delete<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        id: Uuid,
+    ) -> Result<(), DomainError> {
+        let outcome = CategoryEntity::delete_by_id(id)
+            .secure()
+            .scope_with(scope)
+            .exec(conn)
+            .await
+            .map_err(|err| map_write_error(&err))?;
+        if outcome.rows_affected == 0 {
+            return Err(DomainError::NotFound {
+                resource: "category",
+            });
+        }
+        Ok(())
+    }
+
+    async fn has_referencing_declarations<C: DBRunner>(
+        &self,
+        _conn: &C,
+        _id: Uuid,
+    ) -> Result<bool, DomainError> {
+        // `setting_declarations` does not exist until entry 2.3, so there is
+        // nothing that can reference a category yet and the honest answer is
+        // "no". This is not the guard being disabled: the service still calls
+        // it and still refuses a delete when it answers yes, which is what the
+        // service-level tests exercise against a stub.
+        //
+        // DECOMPOSITION 2.2 records the consequence — the no-orphan rule cannot
+        // be verified end to end until 2.3 creates the table and the foreign
+        // key. Replacing this body is that entry's job, and the signature it
+        // must satisfy is already fixed here.
+        Ok(false)
+    }
+}

@@ -17,7 +17,10 @@ use toolkit_db::secure::DBRunner;
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
+use toolkit_odata::{ODataQuery, Page};
+
 use super::CategoryKey;
+use super::visibility::DomainVisibility;
 use crate::domain::error::DomainError;
 
 /// A category as the domain sees it.
@@ -128,6 +131,25 @@ pub trait CategoryRepository: Send + Sync {
         scope: &AccessScope,
         id: Uuid,
     ) -> Result<(), DomainError>;
+
+    /// List categories, filtered and paginated.
+    ///
+    /// `visibility` is applied **inside** the query alongside the caller's
+    /// scope, never to the returned page: filtering afterwards yields short
+    /// pages and a cursor that skips rows the caller was entitled to.
+    ///
+    /// Ordered by `sort_order` then `name` so the cursor is deterministic.
+    ///
+    /// # Errors
+    /// [`DomainError::Validation`] when the query references an unmapped field
+    /// or carries an undecodable cursor; [`DomainError`] when the read fails.
+    async fn list<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        visibility: &DomainVisibility,
+        query: &ODataQuery,
+    ) -> Result<Page<Category>, DomainError>;
 
     /// Whether any declaration still references this category.
     ///

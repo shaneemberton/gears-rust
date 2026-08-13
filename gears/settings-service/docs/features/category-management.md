@@ -244,7 +244,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 ### Category Visibility and Domain Filter
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-category-management-visibility-filter`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-category-management-visibility-filter`
 
 **Input**: Caller `AccessScope` constraints, and a loaded category row or a pending query
 
@@ -254,7 +254,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 1. [x] - `p1` - Read the administrative-domain constraints carried on the caller's `AccessScope` - `inst-cat-visfilter-1`
 2. [x] - `p1` - **IF** the scope carries no domain restriction → **RETURN** the input unchanged - `inst-cat-visfilter-2`
 3. [x] - `p1` - Build a predicate matching categories whose `domain_affinity` is null or falls within the permitted domain set, so an undomained category stays universally visible - `inst-cat-visfilter-3`
-4. [ ] - `p1` - Apply the predicate inside the query rather than as a post-filter, so pagination counts and cursors reflect only visible rows - `inst-cat-visfilter-4`
+4. [x] - `p1` - Apply the predicate inside the query rather than as a post-filter, so pagination counts and cursors reflect only visible rows - `inst-cat-visfilter-4`
 5. [x] - `p1` - **RETURN** the filtered row or the augmented query predicate - `inst-cat-visfilter-5`
 
 ## 4. States (CDSL)

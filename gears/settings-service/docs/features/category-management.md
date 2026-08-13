@@ -216,17 +216,17 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 ### Category Key Validation
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-category-management-key-validation`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-category-management-key-validation`
 
 **Input**: Candidate category `key` string
 
 **Output**: Accepted key, or a validation problem naming the violated rule
 
 **Steps**:
-1. [ ] - `p1` - Take the key verbatim without trimming or case-folding, so a stored key and a supplied key compare identically - `inst-cat-keyval-1`
-2. [ ] - `p1` - **IF** length falls outside 1..128 → **RETURN** validation problem for the length bound - `inst-cat-keyval-2`
-3. [ ] - `p1` - **IF** the key contains `/` → **RETURN** validation problem stating the separator is reserved because the key becomes the single category segment of an admin setting key - `inst-cat-keyval-3`
-4. [ ] - `p1` - **RETURN** the accepted key - `inst-cat-keyval-4`
+1. [x] - `p1` - Take the key verbatim without trimming or case-folding, so a stored key and a supplied key compare identically - `inst-cat-keyval-1`
+2. [x] - `p1` - **IF** length falls outside 1..128 → **RETURN** validation problem for the length bound - `inst-cat-keyval-2`
+3. [x] - `p1` - **IF** the key contains `/` → **RETURN** validation problem stating the separator is reserved because the key becomes the single category segment of an admin setting key - `inst-cat-keyval-3`
+4. [x] - `p1` - **RETURN** the accepted key - `inst-cat-keyval-4`
 
 ### No-Orphan Deletion Guard
 

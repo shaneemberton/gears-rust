@@ -20,3 +20,9 @@ pub const VALUE_TOO_LARGE: &str = "value_too_large";
 
 /// A mutating request omitted the mandatory `If-Match` header.
 pub const IF_MATCH_REQUIRED: &str = "if_match_required";
+
+/// A category key falls outside the 1..128 character bound.
+pub const CATEGORY_KEY_LENGTH: &str = "category_key_length";
+
+/// A category key contains the reserved `/` separator.
+pub const CATEGORY_KEY_RESERVED_SEPARATOR: &str = "category_key_reserved_separator";

@@ -8,16 +8,18 @@
 //! precondition. What a caller may set and what the service assigns are
 //! different sets, so they are different types.
 
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domain::category::{Category, CategoryDraft, CategoryKey};
 use crate::domain::error::DomainError;
 
 /// A category as returned to a caller.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+///
+/// Field naming is `snake_case`, applied by `#[toolkit_macros::api_dto]` rather
+/// than chosen here: every gear's DTOs serialize the same way, so a client does
+/// not have to know which service produced a payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[toolkit_macros::api_dto(response)]
 pub struct CategoryDto {
     /// Server-assigned identity, stable across a rename.
     pub id: Uuid,
@@ -56,8 +58,9 @@ impl From<Category> for CategoryDto {
 }
 
 /// What a caller supplies to create a category.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[toolkit_macros::api_dto(request)]
+#[serde(deny_unknown_fields)]
 pub struct CreateCategoryRequest {
     /// The stable slug. Validated before anything else touches it.
     pub key: String,
@@ -83,8 +86,9 @@ pub struct CreateCategoryRequest {
 /// field clears it rather than leaving it untouched. A partial update would
 /// need a distinct shape that can tell "absent" from "set to null", and the
 /// design does not ask for one.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[toolkit_macros::api_dto(request)]
+#[serde(deny_unknown_fields)]
 pub struct UpdateCategoryRequest {
     /// The stable slug.
     pub key: String,

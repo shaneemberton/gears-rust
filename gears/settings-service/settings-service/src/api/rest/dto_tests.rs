@@ -39,16 +39,22 @@ fn absent_optionals_are_omitted_rather_than_null() {
     let json = serde_json::to_value(CategoryDto::from(category())).expect("serializes");
     assert!(json.get("description").is_none());
     assert!(json.get("icon").is_none());
-    assert_eq!(json["domainAffinity"], "infra");
+    assert_eq!(json["domain_affinity"], "infra");
 }
 
 #[test]
-fn the_wire_shape_is_camel_case() {
-    // Consuming clients match on these names; a rename is a breaking change.
+fn the_wire_shape_is_snake_case() {
+    // The platform convention, enforced by `#[toolkit_macros::api_dto]` rather
+    // than chosen here -- every gear's DTOs serialize the same way, so a client
+    // does not need to know which service it is talking to. Consuming clients
+    // match on these names; a rename is a breaking change.
     let json = serde_json::to_value(CategoryDto::from(category())).expect("serializes");
     let mut fields: Vec<_> = json.as_object().expect("object").keys().cloned().collect();
     fields.sort();
-    assert_eq!(fields, ["domainAffinity", "id", "key", "name", "sortOrder"]);
+    assert_eq!(
+        fields,
+        ["domain_affinity", "id", "key", "name", "sort_order"]
+    );
 }
 
 #[test]
@@ -56,10 +62,10 @@ fn a_request_refuses_an_unknown_field() {
     // `deny_unknown_fields`: a mistyped `sortOrder` would otherwise be silently
     // dropped and the category created with a weight the caller never chose.
     let err = serde_json::from_value::<CreateCategoryRequest>(serde_json::json!({
-        "key": "network", "name": "Network", "sortOrde": 5
+        "key": "network", "name": "Network", "sort_orde": 5
     }))
     .expect_err("must not parse");
-    assert!(err.to_string().contains("sortOrde"), "got `{err}`");
+    assert!(err.to_string().contains("sort_orde"), "got `{err}`");
 }
 
 #[test]

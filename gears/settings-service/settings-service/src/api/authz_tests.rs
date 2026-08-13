@@ -15,6 +15,7 @@ use toolkit_canonical_errors::{CanonicalError, Problem};
 
 use super::{deny, resource};
 use crate::domain::error::DomainError;
+use settings_service_sdk::gts;
 
 fn problem_of(err: DomainError) -> Value {
     serde_json::to_value(Problem::from(CanonicalError::from(err))).expect("serializes")
@@ -44,7 +45,10 @@ fn every_enforcement_failure_denies() {
     for err in every_failure() {
         let label = format!("{err:?}");
         assert!(
-            matches!(deny(&err), DomainError::Unauthorized),
+            matches!(
+                deny(&resource::CATEGORY, &err),
+                DomainError::Unauthorized { .. }
+            ),
             "`{label}` must deny"
         );
     }
@@ -58,7 +62,10 @@ fn an_unreachable_decision_point_denies_rather_than_defaults() {
     let err = EnforcerError::EvaluationFailed(AuthZResolverError::ServiceUnavailable(
         "connection refused".to_owned(),
     ));
-    assert!(matches!(deny(&err), DomainError::Unauthorized));
+    assert!(matches!(
+        deny(&resource::CATEGORY, &err),
+        DomainError::Unauthorized { .. }
+    ));
 }
 
 #[test]
@@ -69,7 +76,10 @@ fn uncompilable_constraints_deny_rather_than_widen() {
     let err = EnforcerError::CompileFailed(ConstraintCompileError::AllConstraintsFailed {
         reason: "unknown constraint operator".to_owned(),
     });
-    assert!(matches!(deny(&err), DomainError::Unauthorized));
+    assert!(matches!(
+        deny(&resource::CATEGORY, &err),
+        DomainError::Unauthorized { .. }
+    ));
 }
 
 #[test]
@@ -79,7 +89,7 @@ fn all_denials_are_indistinguishable_on_the_wire() {
     // specifically, and — combined with a probe — whether the resource exists.
     let rendered: Vec<Value> = every_failure()
         .into_iter()
-        .map(|err| problem_of(deny(&err)))
+        .map(|err| problem_of(deny(&resource::CATEGORY, &err)))
         .collect();
     let first = &rendered[0];
     for other in &rendered[1..] {
@@ -89,7 +99,10 @@ fn all_denials_are_indistinguishable_on_the_wire() {
 
 #[test]
 fn a_denial_discloses_nothing_about_the_target() {
-    let doc = problem_of(deny(&EnforcerError::Denied { deny_reason: None }));
+    let doc = problem_of(deny(
+        &resource::CATEGORY,
+        &EnforcerError::Denied { deny_reason: None },
+    ));
     let rendered = serde_json::to_string(&doc).expect("serializes");
     assert_eq!(doc["status"], 403);
     for leak in [
@@ -119,4 +132,20 @@ fn the_resource_vocabulary_is_the_gts_type_ids() {
         resource::CATEGORY.name(),
         "gts.cf.toolkit.settings.category.v1~"
     );
+}
+
+#[test]
+fn a_denial_names_the_resource_that_was_enforced() {
+    // Found by running the service: every denial used to carry the declaration
+    // type, so a category request was refused with the wrong resource in its
+    // context -- not a leak, but wrong metadata for anyone reading a log or an
+    // audit trail.
+    for (resource, expected) in [
+        (&resource::CATEGORY, gts::CATEGORY_SCHEMA),
+        (&resource::VALUE, gts::VALUE_SCHEMA),
+        (&resource::DECLARATION, gts::DECLARATION_SCHEMA),
+    ] {
+        let doc = problem_of(deny(resource, &EnforcerError::Denied { deny_reason: None }));
+        assert_eq!(doc["context"]["resource_type"], expected);
+    }
 }

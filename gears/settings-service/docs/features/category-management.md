@@ -179,14 +179,14 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Category does not exist, or exists but falls outside the caller's domain or visibility scope
 
 **Steps**:
-1. [ ] - `p1` - Actor sends GET /v1/categories/{id} - `inst-cat-get-1`
-2. [ ] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-get-2`
-3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-get-3`
-4. [ ] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-get-4`
-5. [ ] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-get-5`
+1. [x] - `p1` - Actor sends GET /v1/categories/{id} - `inst-cat-get-1`
+2. [x] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-get-2`
+3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-get-3`
+4. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-get-4`
+5. [x] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-get-5`
 6. [ ] - `p1` - Apply the domain and visibility filter to the loaded row - `inst-cat-get-6`
 7. [ ] - `p1` - **IF** the category is filtered out → **RETURN** `404` rather than `403`, so a hidden category's existence is not disclosed - `inst-cat-get-7`
-8. [ ] - `p1` - **RETURN** `200` with the Category and its ETag - `inst-cat-get-8`
+8. [x] - `p1` - **RETURN** `200` with the Category and its ETag - `inst-cat-get-8`
 
 ### List Categories
 
@@ -202,15 +202,15 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Malformed or expired pagination cursor
 
 **Steps**:
-1. [ ] - `p1` - Actor sends GET /v1/categories with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-cat-list-1`
-2. [ ] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-list-2`
-3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-list-3`
+1. [x] - `p1` - Actor sends GET /v1/categories with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-cat-list-1`
+2. [x] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-list-2`
+3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-list-3`
 4. [ ] - `p1` - Parse the OData expressions against the category field mapping - `inst-cat-list-4`
 5. [ ] - `p1` - **IF** an expression references an unmapped field or an unsupported operator → **RETURN** `422` - `inst-cat-list-5`
 6. [ ] - `p1` - Derive the domain and visibility predicate from the `AccessScope` constraints - `inst-cat-list-6`
 7. [ ] - `p1` - DB: SELECT categories with the combined predicate applied in the query, ordered by `sort_order` then `name` so the cursor is deterministic - `inst-cat-list-7`
 8. [ ] - `p1` - **IF** the supplied cursor is malformed or no longer decodable → **RETURN** `422` - `inst-cat-list-8`
-9. [ ] - `p1` - **RETURN** `200` with the page and a next-page cursor when further rows remain - `inst-cat-list-9`
+9. [x] - `p1` - **RETURN** `200` with the page and a next-page cursor when further rows remain - `inst-cat-list-9`
 
 ## 3. Processes / Business Logic (CDSL)
 

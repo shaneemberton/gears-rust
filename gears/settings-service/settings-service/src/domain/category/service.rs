@@ -33,6 +33,30 @@ pub(crate) fn is_rename_collision(
     draft != current && key_is_taken
 }
 
+/// Refuse query options this resource does not implement.
+///
+/// `$select` is parsed by the platform but not honoured here: supporting it
+/// means a response whose shape varies per request, and no caller has asked
+/// for it. Refusing is deliberate rather than ignoring — a caller whose
+/// projection was silently dropped receives every field believing it asked for
+/// two, which is the same failure the declared filter surface exists to
+/// prevent.
+///
+/// # Errors
+/// [`DomainError::Validation`] naming the unsupported option.
+fn reject_unsupported_options(query: &toolkit_odata::ODataQuery) -> Result<(), DomainError> {
+    if query.select.is_some() {
+        return Err(DomainError::Validation {
+            field: "$select".to_owned(),
+            code: crate::field::ODATA_UNSUPPORTED_OPTION,
+            message: "$select is not supported on categories; omit it to receive the full \
+                      representation"
+                .to_owned(),
+        });
+    }
+    Ok(())
+}
+
 /// Category create, read, update and delete.
 pub struct CategoryService<R> {
     repo: R,
@@ -83,6 +107,23 @@ impl<R: CategoryRepository> CategoryService<R> {
     #[must_use]
     pub fn visibility(scope: &AccessScope) -> DomainVisibility {
         visibility::domain_visibility(scope)
+    }
+
+    /// List categories for the caller.
+    ///
+    /// # Errors
+    /// [`DomainError::Validation`] when the query names an unmapped field, uses
+    /// an unsupported operator, requests an unsupported option, or carries an
+    /// undecodable cursor.
+    pub async fn list<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        query: &toolkit_odata::ODataQuery,
+    ) -> Result<toolkit_odata::Page<Category>, DomainError> {
+        reject_unsupported_options(query)?;
+        let visible = visibility::domain_visibility(scope);
+        self.repo.list(conn, scope, &visible, query).await
     }
 
     /// Create a category.

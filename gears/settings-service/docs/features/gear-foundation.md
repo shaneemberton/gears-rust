@@ -172,6 +172,20 @@ Not applicable. This feature introduces no domain entity and therefore no lifecy
 
 ## 5. Definitions of Done
 
+**Five of these close in a later entry, by design.** This feature builds infrastructure and, per [DECOMPOSITION](../DECOMPOSITION.md) entry 2.1, owns **no domain table** — so the clauses below that require a resource to be enforced, bound, or queried have nothing here to demonstrate against. They are satisfied by the first entry that exercises them, in the same way entry 2.2's no-orphan rule becomes enforceable only when 2.3 creates the foreign key.
+
+| Definition of Done | Clause awaiting a consumer | Closes in |
+|---|---|---|
+| SDK Trait Contracts | the traits facade local against remote so `ClientHub` can bind either | 2.5 |
+| Gear Scaffold and ClientHub Registration | registering the client traits into `ClientHub` | 2.5 |
+| REST and OData Infrastructure | rejecting an expression on an unmapped field or unsupported operator | 2.2 |
+| Policy Enforcement Point and Step-Up Gate | enforcing against a target resource type; applying `AccessScope` as a query predicate | 2.2 |
+| Audit Emitter | publishing domain events alongside audit records | the Apply-side wave |
+
+`SettingsReaderClient` is the reason two of these wait until 2.5 rather than 2.2: it is the effective-**value** read path, so nothing implements it until value resolution exists, and there is nothing to register before then.
+
+The step-up half of *Policy Enforcement Point and Step-Up Gate* waits on a contract this service does not own at all — DESIGN.md §4.2 assigns it to `authn-resolver`. See the DECOMPOSITION note on the Apply-side wave.
+
 ### SDK Crate, Models and Value Objects
 
 - [x] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-sdk-models`

@@ -217,7 +217,7 @@ C4Container
 - **Exactly-once delivery** — the model tolerates at-least-once (Event Broker durability): on every notification the consumer re-reads the effective value and converges to it, so a repeat is **re-applied and re-acknowledged**, never suppressed (§4.2 *Consumer Activation SDK*). No global ordering guarantee across applies.
 - **Central execution of heavier reactions — not in the model.** Activation never centrally reloads/restarts a consumer, nor classifies a per-setting "effect." Heavier reactions (rebuild a pool, re-render a config file, restart) are the consumer's **own**, done in its handler on the signal — a consumer that cannot apply in place restarts itself (exit → supervisor restarts it → reads the current value on boot, §4.6). See §4.2 *Heavier consumer reactions*. (Coordinated **rolling** restart across replicas is a deployment/rollout concern — RMS — not activation.)
 - **A response deadline / time-boxed wait** — the Settings Service does **not** impose a deadline on a bundle; it waits **unboundedly** for every await-record to resolve (how long to keep waiting is an administrator decision, §6). A restart-only consumer leaves its await-records **unanswered**; on **re-subscribe after boot** the service **re-publishes** the notification and the consumer acknowledges then (§4.2 *Apply Outcome Tracker*).
-- **Namespace/prefix subscriptions** — not supported. Subscription (and the consumer-facing `watch`, DESIGN.md §4.5) is per **exact** setting key (§4.2 *Subscription Manager*), never a namespace prefix or category.
+- **Namespace/prefix subscriptions** — not supported. Subscription is per **exact** setting key (§4.2 *Subscription Manager*), never a namespace prefix or category.
 
 ## 3. Principles & Constraints
 

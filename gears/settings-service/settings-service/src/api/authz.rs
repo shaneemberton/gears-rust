@@ -57,7 +57,7 @@ pub mod resource {
 /// denied them, or whether the resource exists at all — and it should not: each
 /// of those is information about a resource it has not been granted.
 #[must_use]
-pub fn deny(err: &EnforcerError) -> DomainError {
+pub fn deny(resource: &ResourceType, err: &EnforcerError) -> DomainError {
     match err {
         // The decision point said no.
         EnforcerError::Denied { .. }
@@ -67,7 +67,25 @@ pub fn deny(err: &EnforcerError) -> DomainError {
         // A decision arrived but its constraints could not be compiled into a
         // scope. Allowing here would mean applying no predicate at all, which
         // is broader than any decision the policy point could have returned.
-        | EnforcerError::CompileFailed { .. } => DomainError::Unauthorized,
+        | EnforcerError::CompileFailed { .. } => DomainError::Unauthorized {
+            resource: resource_kind(resource),
+        },
+    }
+}
+
+/// The GTS type id a resource is known by, as a `'static` string.
+///
+/// `ResourceType::name` borrows; the error variant holds `&'static str` so it
+/// cannot carry a caller-supplied value even by accident.
+fn resource_kind(resource: &ResourceType) -> &'static str {
+    match resource.name() {
+        n if n == settings_service_sdk::gts::CATEGORY_SCHEMA => {
+            settings_service_sdk::gts::CATEGORY_SCHEMA
+        }
+        n if n == settings_service_sdk::gts::VALUE_SCHEMA => {
+            settings_service_sdk::gts::VALUE_SCHEMA
+        }
+        _ => settings_service_sdk::gts::DECLARATION_SCHEMA,
     }
 }
 
@@ -91,7 +109,7 @@ pub async fn access_scope(
         .await
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-4
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-5
-        .map_err(|err| deny(&err))?;
+        .map_err(|err| deny(resource, &err))?;
     // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-5
     // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-4
     // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-9

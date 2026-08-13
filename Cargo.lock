@@ -3041,6 +3041,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "axum",
  "cf-gears-authz-resolver",
  "cf-gears-authz-resolver-sdk",
  "cf-gears-settings-service-sdk",
@@ -3051,6 +3052,7 @@ dependencies = [
  "cf-gears-toolkit-macros",
  "cf-gears-toolkit-odata",
  "cf-gears-toolkit-security",
+ "http",
  "inventory",
  "sea-orm",
  "sea-orm-migration",

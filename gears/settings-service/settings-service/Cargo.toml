@@ -19,6 +19,9 @@ workspace = true
 # Trait boundaries of consumed SDKs are `CanonicalError` (ADR 0005).
 toolkit-canonical-errors = { workspace = true }
 settings-service-sdk = { workspace = true }
+authz-resolver-sdk = { workspace = true }
+authz-resolver = { workspace = true }
+uuid = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }

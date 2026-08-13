@@ -7,7 +7,12 @@
 //! of an object-safe trait. The cost is a type parameter; the benefit is that
 //! every operation below can run in a transaction when its caller needs one.
 
+use std::sync::Arc;
+
 use toolkit_db::secure::DBRunner;
+use toolkit_security::SecurityContext;
+
+use crate::audit::{AuditEmitter, AuditRecord, AuditScope, AuditValue};
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
@@ -57,15 +62,77 @@ fn reject_unsupported_options(query: &toolkit_odata::ODataQuery) -> Result<(), D
     Ok(())
 }
 
+/// Who performed a mutation and under which request.
+///
+/// The two always travel together — an audit record needs both, and splitting
+/// them across parameters invites a call site that supplies one and forgets the
+/// other.
+#[derive(Clone, Copy)]
+pub struct Actor<'a> {
+    /// The authenticated caller.
+    pub ctx: &'a SecurityContext,
+    /// The id correlating this mutation with the response the caller saw.
+    pub request_id: &'a str,
+}
+
+/// The audited representation of a category.
+///
+/// The pre/post images record what a reader needs to see what changed, which is
+/// the mutable state — not the surrogate id, which never changes, nor the tag,
+/// which is derived from the write itself.
+fn snapshot(category: &Category) -> serde_json::Value {
+    serde_json::json!({
+        "key": category.key.as_str(),
+        "name": category.name,
+        "description": category.description,
+        "domain_affinity": category.domain_affinity,
+        "sort_order": category.sort_order,
+        "icon": category.icon,
+    })
+}
+
 /// Category create, read, update and delete.
 pub struct CategoryService<R> {
     repo: R,
+    audit: Arc<dyn AuditEmitter>,
 }
 
 impl<R: CategoryRepository> CategoryService<R> {
-    /// Build the service over a repository.
-    pub const fn new(repo: R) -> Self {
-        Self { repo }
+    /// Build the service over a repository and an audit destination.
+    ///
+    /// The emitter is required, not optional. An `Option` here would make
+    /// "no audit configured" a supported state, and a mutation could then
+    /// succeed leaving no trail — which is precisely what DESIGN.md §4.2's
+    /// fail-closed rule forbids.
+    pub fn new(repo: R, audit: Arc<dyn AuditEmitter>) -> Self {
+        Self { repo, audit }
+    }
+
+    /// Record a mutation, failing the operation if the trail cannot be written.
+    async fn record(
+        &self,
+        key: &super::CategoryKey,
+        action: &'static str,
+        pre: Option<AuditValue>,
+        post: Option<AuditValue>,
+        actor: Actor<'_>,
+    ) -> Result<(), DomainError> {
+        // Categories are platform-global -- the table has no tenant column --
+        // so their audit scope is the platform row rather than a tenant's.
+        let mut rec = AuditRecord::new(
+            key.as_str(),
+            AuditScope::Platform,
+            actor.ctx.subject_id().to_string(),
+            action,
+            actor.request_id,
+        );
+        if let Some(pre) = pre {
+            rec = rec.with_pre_image(pre);
+        }
+        if let Some(post) = post {
+            rec = rec.with_post_image(post);
+        }
+        self.audit.audit(rec).await
     }
 
     /// Fetch one category.
@@ -135,6 +202,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         conn: &C,
         scope: &AccessScope,
         draft: CategoryDraft,
+        actor: Actor<'_>,
     ) -> Result<Category, DomainError> {
         // A courtesy check, not the guarantee. `uq_category_key` decides, and
         // the repository surfaces its violation — two administrators creating
@@ -151,7 +219,19 @@ impl<R: CategoryRepository> CategoryService<R> {
                 detail: format!("a category with key `{}` already exists", draft.key),
             });
         }
-        self.repo.insert(conn, scope, draft).await
+        let created = self.repo.insert(conn, scope, draft).await?;
+
+        // A create has no pre-image. Audited after the write commits, so the
+        // record describes what exists rather than what was attempted.
+        self.record(
+            &created.key,
+            "category.create",
+            None,
+            Some(AuditValue::record(snapshot(&created), false)),
+            actor,
+        )
+        .await?;
+        Ok(created)
     }
 
     /// Update a category, guarded by `If-Match`.
@@ -167,6 +247,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         id: Uuid,
         if_match: Option<&str>,
         draft: CategoryDraft,
+        actor: Actor<'_>,
     ) -> Result<Category, DomainError> {
         let current = self.get(conn, scope, id).await?;
         precondition::evaluate(if_match, &current.etag)?;
@@ -184,7 +265,16 @@ impl<R: CategoryRepository> CategoryService<R> {
             });
         }
 
-        self.repo.update(conn, scope, id, draft).await
+        let updated = self.repo.update(conn, scope, id, draft).await?;
+        self.record(
+            &updated.key,
+            "category.update",
+            Some(AuditValue::record(snapshot(&current), false)),
+            Some(AuditValue::record(snapshot(&updated), false)),
+            actor,
+        )
+        .await?;
+        Ok(updated)
     }
 
     /// Delete a category, guarded by `If-Match` and the no-orphan rule.
@@ -199,6 +289,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         scope: &AccessScope,
         id: Uuid,
         if_match: Option<&str>,
+        actor: Actor<'_>,
     ) -> Result<(), DomainError> {
         let current = self.get(conn, scope, id).await?;
         precondition::evaluate(if_match, &current.etag)?;
@@ -222,7 +313,19 @@ impl<R: CategoryRepository> CategoryService<R> {
         }
         // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-9
 
-        self.repo.delete(conn, scope, id).await
+        self.repo.delete(conn, scope, id).await?;
+
+        // A delete has no post-image. The pre-image is what makes the trail
+        // useful: after the row is gone it is the only record of what was
+        // removed.
+        self.record(
+            &current.key,
+            "category.delete",
+            Some(AuditValue::record(snapshot(&current), false)),
+            None,
+            actor,
+        )
+        .await
     }
 
     /// The tag a caller must echo to mutate this category.

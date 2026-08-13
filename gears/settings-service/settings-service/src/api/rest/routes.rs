@@ -25,7 +25,7 @@ const TAG: &str = "settings-categories";
 /// Register the category routes.
 ///
 /// The service, the database handle and the enforcement point travel as
-/// extensions so a handler receives them as ordinary arguments — in particular
+/// extensions so a handler receives them as ordinary arguments -- in particular
 /// the enforcer, which is what makes obtaining an `AccessScope` the only way to
 /// reach the service.
 pub fn register_routes(
@@ -88,6 +88,105 @@ pub fn register_routes(
         .error_503(openapi)
         .register(router, openapi);
     // @cpt-end:cpt-cf-settings-service-flow-category-management-get:p1:inst-cat-get-1
+
+    let router = OperationBuilder::post("/settings-service/v1/categories")
+        .operation_id("settings_service.create_category")
+        .summary("Create a settings category")
+        .description(
+            "Create a category. The key becomes the category segment of every setting \
+             key declared under it, so it is stored verbatim and may not contain `/`.",
+        )
+        .tag(TAG)
+        .authenticated()
+        .no_license_required()
+        .json_request::<crate::api::rest::dto::CreateCategoryRequest>(
+            openapi,
+            "The category to create",
+        )
+        .handler(handlers::create_category::<CategoryRepo>)
+        .json_response_with_schema::<CategoryDto>(
+            openapi,
+            StatusCode::CREATED,
+            "The created category, with its ETag and Location",
+        )
+        .error_400(openapi)
+        .error_401(openapi)
+        .error_403(openapi)
+        .error_409(openapi)
+        .error_500(openapi)
+        .error_503(openapi)
+        .register(router, openapi);
+
+    let router = OperationBuilder::patch("/settings-service/v1/categories/{id}")
+        .operation_id("settings_service.update_category")
+        .summary("Update a settings category")
+        .description(
+            "Replace a category's mutable fields. Requires `If-Match`: the header is \
+             mandatory, so a write that never read the current state is refused rather \
+             than silently overwriting a concurrent edit.",
+        )
+        .tag(TAG)
+        .authenticated()
+        .no_license_required()
+        .json_request::<crate::api::rest::dto::UpdateCategoryRequest>(
+            openapi,
+            "The replacement representation",
+        )
+        .handler(handlers::update_category::<CategoryRepo>)
+        .json_response_with_schema::<CategoryDto>(
+            openapi,
+            StatusCode::OK,
+            "The updated category, with its refreshed ETag",
+        )
+        .error_400(openapi)
+        .error_401(openapi)
+        .error_403(openapi)
+        .error_404(openapi)
+        .error_409(openapi)
+        .problem_response(
+            openapi,
+            StatusCode::PRECONDITION_FAILED,
+            "The supplied If-Match is stale: re-read and retry",
+        )
+        .problem_response(
+            openapi,
+            StatusCode::PRECONDITION_REQUIRED,
+            "If-Match is required on a conditional write",
+        )
+        .error_500(openapi)
+        .error_503(openapi)
+        .register(router, openapi);
+
+    let router = OperationBuilder::delete("/settings-service/v1/categories/{id}")
+        .operation_id("settings_service.delete_category")
+        .summary("Delete a settings category")
+        .description(
+            "Delete a category. Requires `If-Match`. Refused with 409 while any \
+             declaration still references it, including retired ones -- a retired \
+             declaration keeps its category and would otherwise be orphaned.",
+        )
+        .tag(TAG)
+        .authenticated()
+        .no_license_required()
+        .handler(handlers::delete_category::<CategoryRepo>)
+        .no_content_response(StatusCode::NO_CONTENT, "The category was deleted")
+        .error_401(openapi)
+        .error_403(openapi)
+        .error_404(openapi)
+        .error_409(openapi)
+        .problem_response(
+            openapi,
+            StatusCode::PRECONDITION_FAILED,
+            "The supplied If-Match is stale: re-read and retry",
+        )
+        .problem_response(
+            openapi,
+            StatusCode::PRECONDITION_REQUIRED,
+            "If-Match is required on a conditional write",
+        )
+        .error_500(openapi)
+        .error_503(openapi)
+        .register(router, openapi);
 
     router
         .layer(axum::Extension(service))

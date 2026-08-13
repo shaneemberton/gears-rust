@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use crate::api::authz::{self, resource};
 use crate::api::rest::dto::CategoryDto;
+use crate::domain::category::service::Actor;
 use crate::domain::category::{CategoryRepository, CategoryService};
 use crate::domain::error::DomainError;
 
@@ -25,6 +26,9 @@ pub type ConcreteCategoryService =
 
 /// The action names authorization decisions are made against.
 const READ: &str = "read";
+const CREATE: &str = "create";
+const UPDATE: &str = "update";
+const DELETE: &str = "delete";
 
 /// `GET /settings-service/v1/categories/{id}`
 ///
@@ -106,4 +110,145 @@ pub async fn list_categories<R: CategoryRepository>(
         page_info: page.page_info,
     }))
     // @cpt-end:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-9
+}
+
+/// Read the `If-Match` header, if the client sent one.
+///
+/// Returned as `Option` rather than defaulted: an absent header and an empty
+/// one are different answers, and only the precondition evaluator may decide
+/// which is which.
+fn if_match(headers: &axum::http::HeaderMap) -> Option<&str> {
+    headers
+        .get(axum::http::header::IF_MATCH)
+        .and_then(|v| v.to_str().ok())
+}
+
+/// The id correlating a mutation's audit record with its problem document.
+///
+/// Taken from the same headers the canonical error middleware reads, so an
+/// audit entry and the response a caller saw carry one id, not two.
+fn request_id(headers: &axum::http::HeaderMap) -> String {
+    toolkit::api::error_layer::extract_trace_id(headers).unwrap_or_default()
+}
+
+/// `POST /settings-service/v1/categories`
+///
+/// # Errors
+/// `400` on a malformed key, `403` when not entitled, `409` when the key or
+/// name is taken.
+pub async fn create_category<R: CategoryRepository>(
+    Extension(ctx): Extension<SecurityContext>,
+    Extension(svc): Extension<Arc<CategoryService<R>>>,
+    Extension(db): Extension<Arc<toolkit_db::DBProvider<toolkit_db::DbError>>>,
+    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<crate::api::rest::dto::CreateCategoryRequest>,
+) -> ApiResult<impl IntoResponse> {
+    // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-2
+    let scope = authz::access_scope(&enforcer, &ctx, &resource::CATEGORY, CREATE, None).await?;
+    // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-2
+
+    // Validated before anything is authorized against it or written.
+    let draft = body.into_draft()?;
+
+    let conn = db.conn().map_err(|err| DomainError::Internal {
+        diagnostic: err.to_string(),
+    })?;
+    let created = svc
+        .create(
+            &conn,
+            &scope,
+            draft,
+            Actor {
+                ctx: &ctx,
+                request_id: &request_id(&headers),
+            },
+        )
+        .await?;
+
+    let etag = created.etag.as_str().to_owned();
+    let location = format!("/settings-service/v1/categories/{}", created.id);
+    Ok((
+        StatusCode::CREATED,
+        [
+            (axum::http::header::ETAG, etag),
+            (axum::http::header::LOCATION, location),
+        ],
+        Json(CategoryDto::from(created)),
+    ))
+}
+
+/// `PATCH /settings-service/v1/categories/{id}`
+///
+/// # Errors
+/// `400` on a malformed key, `403` when not entitled, `404` when not visible,
+/// `409` on a key or name collision, `412` on a stale `If-Match`, `428` when
+/// the header is absent.
+pub async fn update_category<R: CategoryRepository>(
+    Extension(ctx): Extension<SecurityContext>,
+    Extension(svc): Extension<Arc<CategoryService<R>>>,
+    Extension(db): Extension<Arc<toolkit_db::DBProvider<toolkit_db::DbError>>>,
+    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Path(id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<crate::api::rest::dto::UpdateCategoryRequest>,
+) -> ApiResult<impl IntoResponse> {
+    let scope = authz::access_scope(&enforcer, &ctx, &resource::CATEGORY, UPDATE, Some(id)).await?;
+    let draft = body.into_draft()?;
+
+    let conn = db.conn().map_err(|err| DomainError::Internal {
+        diagnostic: err.to_string(),
+    })?;
+    let updated = svc
+        .update(
+            &conn,
+            &scope,
+            id,
+            if_match(&headers),
+            draft,
+            Actor {
+                ctx: &ctx,
+                request_id: &request_id(&headers),
+            },
+        )
+        .await?;
+
+    let etag = updated.etag.as_str().to_owned();
+    Ok((
+        [(axum::http::header::ETAG, etag)],
+        Json(CategoryDto::from(updated)),
+    ))
+}
+
+/// `DELETE /settings-service/v1/categories/{id}`
+///
+/// # Errors
+/// `403` when not entitled, `404` when not visible, `409` while any declaration
+/// references it, `412` on a stale `If-Match`, `428` when the header is absent.
+pub async fn delete_category<R: CategoryRepository>(
+    Extension(ctx): Extension<SecurityContext>,
+    Extension(svc): Extension<Arc<CategoryService<R>>>,
+    Extension(db): Extension<Arc<toolkit_db::DBProvider<toolkit_db::DbError>>>,
+    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Path(id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
+) -> ApiResult<impl IntoResponse> {
+    let scope = authz::access_scope(&enforcer, &ctx, &resource::CATEGORY, DELETE, Some(id)).await?;
+
+    let conn = db.conn().map_err(|err| DomainError::Internal {
+        diagnostic: err.to_string(),
+    })?;
+    svc.delete(
+        &conn,
+        &scope,
+        id,
+        if_match(&headers),
+        Actor {
+            ctx: &ctx,
+            request_id: &request_id(&headers),
+        },
+    )
+    .await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }

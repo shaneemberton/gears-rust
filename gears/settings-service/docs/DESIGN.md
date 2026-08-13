@@ -1259,21 +1259,33 @@ The parent **`GET /v1/applies/{apply_id}`** is a thin summary linking both, livi
 
 All 4xx/5xx responses use `Content-Type: application/problem+json` (RFC 9457).
 
-**Required fields:** `type` (`gts://...` URI), `title`, `status`, `trace_id`. Every `422` includes a field-level `errors` array. `PATCH`/`DELETE` on categories and declarations return the `If-Match` preconditions `428` (missing) / `412` (stale) (§4.3).
+**The service does not compose these documents.** Under the platform canonical-error ADRs a gear maps its internal error to one of the **16 canonical categories**, and the platform derives `type`, `title`, `status`, and the placement of any detail from that category. The service therefore **MUST NOT** mint its own `gts://` type URI or choose its own status: doing so would put a second source of truth beside the platform renderer.
 
-**Example — `422 Validation failed`:**
+**Required fields:** `type` (`gts://...` URI naming the *canonical category*), `title`, `status`, `trace_id`.
+
+**Field-level detail.** A validation rejection is the canonical **invalid-argument** category, which renders as **`400`** — there is no `422` category. Per-field detail travels in the document's `context.field_violations`, each entry carrying `field`, a stable machine-readable `reason`, and a human-readable `description`. Tooling matches on `reason`, never on prose.
+
+**Example — validation rejection:**
 
 ```json
 {
- "type": "gts://gts.cf.toolkit.settings.error_validation.v1~",
- "title": "Validation failed",
- "status": 422,
+ "type": "gts://gts.cf.core.errors.err.v1~cf.core.err.invalid_argument.v1~",
+ "title": "Invalid Argument",
+ "status": 400,
+ "detail": "Request validation failed",
  "trace_id": "01JXYZ...",
- "errors": [
- { "field": "value", "code": "format_uri", "message": "value must be a valid uri" }
- ]
+ "context": {
+  "resource_type": "gts.cf.toolkit.settings.declaration.v1~",
+  "field_violations": [
+   { "field": "value", "reason": "value_not_canonical", "description": "value must be a valid uri" }
+  ]
+ }
 }
 ```
+
+**Statuses with no canonical category.** `PATCH`/`DELETE` on categories and declarations return the `If-Match` preconditions **`428`** (header missing) / **`412`** (stale). Neither status has a canonical category — both nearest categories default to `400`, which a caller cannot distinguish from a malformed body. RFC 9110 reserves these two statuses for exactly these cases, so each is set as an explicit **HTTP transport override** on the canonical error. An override moves only the status, never the category, and only within the same status class.
+
+The two are deliberately different answers: a **stale** tag means re-read and retry, an **absent** one means the client itself must change. Collapsing them would tell a broken client to retry forever.
 
 ### 4.4 External Interfaces & Protocols
 

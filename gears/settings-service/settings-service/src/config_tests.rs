@@ -1,9 +1,28 @@
 // Created: 2026-08-12 by Constructor Tech
-//! Tests for the fail-closed bootstrap contract.
+//! Tests for the bootstrap contract.
 //!
 //! Acceptance criteria: FEATURE `gear-foundation.md` §6 — *a gear start with a
 //! missing required bootstrap value fails at startup rather than falling back to
 //! a default* — and CDSL step `inst-gf-init-2`.
+//!
+//! # No deployment-owned value is required today
+//!
+//! The gear reads its section with `ctx.config()`, not `config_or_default()`, so
+//! the section must exist and every field must deserialize. But the only field
+//! left is a design-fixed backstop with a default, so there is currently nothing
+//! a deployment can omit and be refused for.
+//!
+//! That is a statement about scope, not a weakening: the step-up values that
+//! were required here traced to no PRD requirement, and one of them could
+//! weaken a requirement that has no carve-out. The machinery stays so the first
+//! genuinely required field inherits it, and the tests below pin what remains
+//! observable: unknown keys and wrong-typed values are refused.
+//!
+//! The absence of a struct-level `#[serde(default)]` is deliberately *not*
+//! asserted here. While every field carries its own default there is no input
+//! that distinguishes the two, so any such test would pass for the wrong
+//! reason. It becomes testable the day a required field is added — which is
+//! also the day it starts to matter.
 
 use super::SettingsServiceConfig;
 
@@ -13,73 +32,33 @@ fn parse(json: serde_json::Value) -> Result<SettingsServiceConfig, serde_json::E
 
 #[test]
 fn a_complete_config_parses() {
-    let cfg = parse(serde_json::json!({
-        "jwks_endpoint": "https://idp.example/.well-known/jwks.json",
-        "step_up_freshness_seconds": 300,
-        "cache_ttl_seconds": 15,
-    }))
-    .expect("parses");
-    assert_eq!(
-        cfg.jwks_endpoint,
-        "https://idp.example/.well-known/jwks.json"
-    );
-    assert_eq!(cfg.step_up_freshness_seconds, 300);
+    let cfg = parse(serde_json::json!({ "cache_ttl_seconds": 15 })).expect("parses");
     assert_eq!(cfg.cache_ttl_seconds, 15);
 }
 
 #[test]
-fn a_missing_jwks_endpoint_is_refused() {
-    // Not defaulted to empty, not defaulted to a well-known URL. Without it the
-    // Apply path cannot verify step-up, and a service that came up anyway would
-    // accept applies it cannot vouch for.
-    let err =
-        parse(serde_json::json!({ "step_up_freshness_seconds": 300 })).expect_err("must not parse");
-    assert!(
-        err.to_string().contains("jwks_endpoint"),
-        "the error must name the absent field, got `{err}`"
-    );
-}
-
-#[test]
-fn a_missing_step_up_window_is_refused() {
-    let err = parse(serde_json::json!({ "jwks_endpoint": "https://idp.example/jwks" }))
-        .expect_err("must not parse");
-    assert!(
-        err.to_string().contains("step_up_freshness_seconds"),
-        "the error must name the absent field, got `{err}`"
-    );
-}
-
-#[test]
-fn an_empty_config_is_refused_rather_than_wholly_defaulted() {
-    // The struct-level `#[serde(default)]` that every other gear carries would
-    // make this succeed and start the service with invented security settings.
-    assert!(parse(serde_json::json!({})).is_err());
-}
-
-#[test]
 fn the_cache_backstop_defaults_because_the_design_fixes_it() {
-    // The one value that is not a deployment decision. DESIGN.md §4.2 sets 30s.
-    let cfg = parse(serde_json::json!({
-        "jwks_endpoint": "https://idp.example/jwks",
-        "step_up_freshness_seconds": 300,
-    }))
-    .expect("parses without the optional field");
+    // DESIGN.md §4.2 sets 30s and says this cache owns the knob. A default here
+    // is a real answer rather than a guess, which is why it is the one field
+    // allowed to have one.
+    let cfg = parse(serde_json::json!({})).expect("parses without the optional field");
     assert_eq!(cfg.cache_ttl_seconds, 30);
 }
 
 #[test]
 fn a_mistyped_key_is_refused_rather_than_ignored() {
     // Without `deny_unknown_fields` this would start the service with the
-    // default window while the operator believed they had set 60s.
-    let err = parse(serde_json::json!({
-        "jwks_endpoint": "https://idp.example/jwks",
-        "step_up_freshness_seconds": 300,
-        "step_up_freshness_second": 60,
-    }))
-    .expect_err("must not parse");
+    // default TTL while the operator believed they had set 60.
+    let err = parse(serde_json::json!({ "cache_ttl_second": 60 })).expect_err("must not parse");
     assert!(
-        err.to_string().contains("step_up_freshness_second"),
+        err.to_string().contains("cache_ttl_second"),
         "the error must name the unknown key, got `{err}`"
     );
+}
+
+#[test]
+fn a_wrong_typed_value_is_refused_rather_than_coerced() {
+    // A TTL of "thirty" is a deployment error. Coercing or defaulting it would
+    // start the service with a staleness bound nobody chose.
+    assert!(parse(serde_json::json!({ "cache_ttl_seconds": "thirty" })).is_err());
 }

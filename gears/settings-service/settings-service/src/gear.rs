@@ -127,6 +127,7 @@ impl Gear for SettingsService {
         self.categories
             .set(Arc::new(crate::domain::category::CategoryService::new(
                 crate::infra::storage::category_repo::CategoryRepo,
+                Arc::new(crate::infra::audit_emitter::TracingAuditEmitter),
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 

@@ -11,3 +11,4 @@
 pub mod category_repo;
 pub mod entity;
 pub mod migrations;
+pub mod odata_mapper;

@@ -20,7 +20,7 @@
 //! compiling.
 
 use authz_resolver_sdk::EnforcerError;
-use authz_resolver_sdk::pep::ResourceType;
+use authz_resolver_sdk::pep::{AccessRequest, ResourceType};
 use toolkit_security::AccessScope;
 
 use crate::domain::error::DomainError;
@@ -104,8 +104,25 @@ pub async fn access_scope(
     // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-3
     // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-8
     // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-9
+    // `require_constraints(false)`: these resources are platform-global. A
+    // category has no tenant column and declares no PEP property, so there is
+    // nothing a scope constraint could clamp to. Under the default the compiler
+    // fails such a request closed -- `ConstraintsRequiredButAbsent` -- and the
+    // static plugin logs exactly that: "PEP requires constraints but declares
+    // none of the properties this plugin constrains".
+    //
+    // This does not widen anything. An unconstrained scope over a resource with
+    // no tenant dimension is the correct answer, and the decision itself is
+    // still the PDP's: a deny is still a deny. When `setting_values` arrives it
+    // *does* carry `tenant_id`, and that resource must keep the default.
     let scope = enforcer
-        .access_scope(ctx, resource, action, resource_id)
+        .access_scope_with(
+            ctx,
+            resource,
+            action,
+            resource_id,
+            &AccessRequest::new().require_constraints(false),
+        )
         .await
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-4
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-5

@@ -161,13 +161,19 @@ impl CategoryRepository for CategoryRepo {
         scope: &AccessScope,
         draft: CategoryDraft,
     ) -> Result<Category, DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-8
+        // `active_from` already stamped `updated_at`; a fresh row carries the
+        // same instant in both columns.
         let mut active = active_from(&draft);
         active.id = Set(Uuid::new_v4());
         active.created_at = Set(now());
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-8
 
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-9
         let model = toolkit_db::secure::secure_insert::<CategoryEntity>(active, scope, conn)
             .await
             .map_err(|err| map_write_error(&err))?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-9
         to_domain(model)
     }
 
@@ -182,6 +188,7 @@ impl CategoryRepository for CategoryRepo {
         // filtered update, and scoping is the point — an id the caller cannot
         // see must not become an update they can perform. Filtered to one id,
         // so it touches at most one row.
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-12
         let outcome = CategoryEntity::update_many()
             .col_expr(
                 category::Column::Key,
@@ -217,6 +224,7 @@ impl CategoryRepository for CategoryRepo {
             .exec(conn)
             .await
             .map_err(|err| map_write_error(&err))?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-12
 
         if outcome.rows_affected == 0 {
             return Err(DomainError::NotFound {
@@ -240,12 +248,14 @@ impl CategoryRepository for CategoryRepo {
         scope: &AccessScope,
         id: Uuid,
     ) -> Result<(), DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-10
         let outcome = CategoryEntity::delete_by_id(id)
             .secure()
             .scope_with(scope)
             .exec(conn)
             .await
             .map_err(|err| map_delete_error(&err))?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-10
         if outcome.rows_affected == 0 {
             return Err(DomainError::NotFound {
                 resource: "category",

@@ -89,6 +89,7 @@ pub fn register_routes(
         .register(router, openapi);
     // @cpt-end:cpt-cf-settings-service-flow-category-management-get:p1:inst-cat-get-1
 
+    // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-1
     let router = OperationBuilder::post("/settings-service/v1/categories")
         .operation_id("settings_service.create_category")
         .summary("Create a settings category")
@@ -116,7 +117,9 @@ pub fn register_routes(
         .error_500(openapi)
         .error_503(openapi)
         .register(router, openapi);
+    // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-1
 
+    // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-1
     let router = OperationBuilder::patch("/settings-service/v1/categories/{id}")
         .operation_id("settings_service.update_category")
         .summary("Update a settings category")
@@ -156,7 +159,9 @@ pub fn register_routes(
         .error_500(openapi)
         .error_503(openapi)
         .register(router, openapi);
+    // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-1
 
+    // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-1
     let router = OperationBuilder::delete("/settings-service/v1/categories/{id}")
         .operation_id("settings_service.delete_category")
         .summary("Delete a settings category")
@@ -187,6 +192,7 @@ pub fn register_routes(
         .error_500(openapi)
         .error_503(openapi)
         .register(router, openapi);
+    // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-1
 
     router
         .layer(axum::Extension(service))

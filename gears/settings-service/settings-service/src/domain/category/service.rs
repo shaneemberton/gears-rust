@@ -209,6 +209,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         // the same key concurrently both pass here and only one insert wins.
         // Skipping this would be correct but would report the collision as a
         // database error rather than as the conflict it is.
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-10
         if self
             .repo
             .find_by_key(conn, scope, &draft.key)
@@ -219,10 +220,12 @@ impl<R: CategoryRepository> CategoryService<R> {
                 detail: format!("a category with key `{}` already exists", draft.key),
             });
         }
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-10
         let created = self.repo.insert(conn, scope, draft).await?;
 
         // A create has no pre-image. Audited after the write commits, so the
         // record describes what exists rather than what was attempted.
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-11
         self.record(
             &created.key,
             "category.create",
@@ -231,6 +234,7 @@ impl<R: CategoryRepository> CategoryService<R> {
             actor,
         )
         .await?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-11
         Ok(created)
     }
 
@@ -249,8 +253,22 @@ impl<R: CategoryRepository> CategoryService<R> {
         draft: CategoryDraft,
         actor: Actor<'_>,
     ) -> Result<Category, DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-5
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-6
+        // One call answers both: the row lookup and the not-found verdict,
+        // including a row hidden by the visibility rule.
         let current = self.get(conn, scope, id).await?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-6
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-5
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-7
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-8
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-9
+        // Absent and stale are different statuses (428 vs 412); the shared
+        // evaluator owns that distinction so no handler re-decides it.
         precondition::evaluate(if_match, &current.etag)?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-9
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-8
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-7
 
         // Re-checked against the *other* rows: a rename onto a key another
         // category already holds is a conflict, but keeping your own key is not.
@@ -259,13 +277,16 @@ impl<R: CategoryRepository> CategoryService<R> {
             .find_by_key(conn, scope, &draft.key)
             .await?
             .is_some();
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-13
         if is_rename_collision(&current.key, &draft.key, key_is_taken) {
             return Err(DomainError::Conflict {
                 detail: format!("a category with key `{}` already exists", draft.key),
             });
         }
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-13
 
         let updated = self.repo.update(conn, scope, id, draft).await?;
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-14
         self.record(
             &updated.key,
             "category.update",
@@ -274,6 +295,7 @@ impl<R: CategoryRepository> CategoryService<R> {
             actor,
         )
         .await?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-14
         Ok(updated)
     }
 
@@ -291,8 +313,16 @@ impl<R: CategoryRepository> CategoryService<R> {
         if_match: Option<&str>,
         actor: Actor<'_>,
     ) -> Result<(), DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-4
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-5
         let current = self.get(conn, scope, id).await?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-5
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-4
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-6
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-7
         precondition::evaluate(if_match, &current.etag)?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-7
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-6
 
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-8
         // Advisory, by design. The foreign key's `ON DELETE RESTRICT` is the
@@ -318,6 +348,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         // A delete has no post-image. The pre-image is what makes the trail
         // useful: after the row is gone it is the only record of what was
         // removed.
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-12
         self.record(
             &current.key,
             "category.delete",
@@ -326,6 +357,7 @@ impl<R: CategoryRepository> CategoryService<R> {
             actor,
         )
         .await
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-12
     }
 
     /// The tag a caller must echo to mutate this category.

@@ -90,18 +90,18 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Duplicate `key` or duplicate `name`
 
 **Steps**:
-1. [ ] - `p1` - Actor sends POST /v1/categories with `key`, `name`, optional `description`, optional `domain_affinity`, `sort_order`, optional `icon` - `inst-cat-create-1`
-2. [ ] - `p1` - Authorize `create` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-create-2`
-3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-create-3`
-4. [ ] - `p1` - Invoke category key validation on the supplied `key` - `inst-cat-create-4`
+1. [x] - `p1` - Actor sends POST /v1/categories with `key`, `name`, optional `description`, optional `domain_affinity`, `sort_order`, optional `icon` - `inst-cat-create-1`
+2. [x] - `p1` - Authorize `create` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-create-2`
+3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-create-3`
+4. [x] - `p1` - Invoke category key validation on the supplied `key` - `inst-cat-create-4`
 5. [ ] - `p1` - **IF** key validation fails → **RETURN** `422` with a field-level error naming `key` - `inst-cat-create-5`
 6. [ ] - `p1` - Validate `name` within 1..256 and `description` within 0..4096 - `inst-cat-create-6`
 7. [ ] - `p1` - **IF** field validation fails → **RETURN** `422` with field-level errors - `inst-cat-create-7`
-8. [ ] - `p1` - Generate the category identifier and set `created_at` and `updated_at` to the current UTC instant - `inst-cat-create-8`
-9. [ ] - `p1` - DB: INSERT INTO categories (id, key, name, description, domain_affinity, sort_order, icon, created_at, updated_at) - `inst-cat-create-9`
-10. [ ] - `p1` - **IF** unique violation on `uq_category_key` or `uq_category_name` → **RETURN** `409` naming the conflicting field - `inst-cat-create-10`
-11. [ ] - `p1` - Emit a category-created audit record through the Audit Emitter - `inst-cat-create-11`
-12. [ ] - `p1` - **RETURN** `201` with the created Category and its ETag - `inst-cat-create-12`
+8. [x] - `p1` - Generate the category identifier and set `created_at` and `updated_at` to the current UTC instant - `inst-cat-create-8`
+9. [x] - `p1` - DB: INSERT INTO categories (id, key, name, description, domain_affinity, sort_order, icon, created_at, updated_at) - `inst-cat-create-9`
+10. [x] - `p1` - **IF** unique violation on `uq_category_key` or `uq_category_name` → **RETURN** `409` naming the conflicting field - `inst-cat-create-10`
+11. [x] - `p1` - Emit a category-created audit record through the Audit Emitter - `inst-cat-create-11`
+12. [x] - `p1` - **RETURN** `201` with the created Category and its ETag - `inst-cat-create-12`
 
 ### Update Category
 
@@ -120,21 +120,21 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Updated `name` collides with an existing category
 
 **Steps**:
-1. [ ] - `p1` - Actor sends PATCH /v1/categories/{id} with `If-Match` and any of `name`, `description`, `domain_affinity`, `sort_order`, `icon` - `inst-cat-update-1`
-2. [ ] - `p1` - Authorize `update` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-update-2`
-3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-update-3`
+1. [x] - `p1` - Actor sends PATCH /v1/categories/{id} with `If-Match` and any of `name`, `description`, `domain_affinity`, `sort_order`, `icon` - `inst-cat-update-1`
+2. [x] - `p1` - Authorize `update` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-update-2`
+3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-update-3`
 4. [ ] - `p1` - **IF** the request body carries `key` → **RETURN** `422`, because `key` is immutable once settings are keyed through it - `inst-cat-update-4`
-5. [ ] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-update-5`
-6. [ ] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-update-6`
-7. [ ] - `p1` - Evaluate the `If-Match` precondition against the current representation using the shared precondition helper - `inst-cat-update-7`
-8. [ ] - `p1` - **IF** `If-Match` is absent → **RETURN** `428` - `inst-cat-update-8`
-9. [ ] - `p1` - **IF** `If-Match` is stale → **RETURN** `412` - `inst-cat-update-9`
+5. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-update-5`
+6. [x] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-update-6`
+7. [x] - `p1` - Evaluate the `If-Match` precondition against the current representation using the shared precondition helper - `inst-cat-update-7`
+8. [x] - `p1` - **IF** `If-Match` is absent → **RETURN** `428` - `inst-cat-update-8`
+9. [x] - `p1` - **IF** `If-Match` is stale → **RETURN** `412` - `inst-cat-update-9`
 10. [ ] - `p1` - Validate the supplied updatable fields against their length bounds - `inst-cat-update-10`
 11. [ ] - `p1` - **IF** field validation fails → **RETURN** `422` with field-level errors - `inst-cat-update-11`
-12. [ ] - `p1` - DB: UPDATE categories SET {supplied fields}, updated_at = now() WHERE id = {id} - `inst-cat-update-12`
-13. [ ] - `p1` - **IF** unique violation on `uq_category_name` → **RETURN** `409` - `inst-cat-update-13`
-14. [ ] - `p1` - Emit a category-updated audit record carrying the changed field set with pre-image and post-image - `inst-cat-update-14`
-15. [ ] - `p1` - **RETURN** `200` with the updated Category and its refreshed ETag - `inst-cat-update-15`
+12. [x] - `p1` - DB: UPDATE categories SET {supplied fields}, updated_at = now() WHERE id = {id} - `inst-cat-update-12`
+13. [x] - `p1` - **IF** unique violation on `uq_category_name` → **RETURN** `409` - `inst-cat-update-13`
+14. [x] - `p1` - Emit a category-updated audit record carrying the changed field set with pre-image and post-image - `inst-cat-update-14`
+15. [x] - `p1` - **RETURN** `200` with the updated Category and its refreshed ETag - `inst-cat-update-15`
 
 ### Delete Category
 
@@ -152,19 +152,19 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Category still contains one or more declarations, active or retired
 
 **Steps**:
-1. [ ] - `p1` - Actor sends DELETE /v1/categories/{id} with `If-Match` - `inst-cat-delete-1`
-2. [ ] - `p1` - Authorize `delete` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-delete-2`
-3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-delete-3`
-4. [ ] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-delete-4`
-5. [ ] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-delete-5`
-6. [ ] - `p1` - Evaluate the `If-Match` precondition using the shared precondition helper - `inst-cat-delete-6`
-7. [ ] - `p1` - **IF** `If-Match` is absent → **RETURN** `428`; **IF** stale → **RETURN** `412` - `inst-cat-delete-7`
+1. [x] - `p1` - Actor sends DELETE /v1/categories/{id} with `If-Match` - `inst-cat-delete-1`
+2. [x] - `p1` - Authorize `delete` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-delete-2`
+3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-delete-3`
+4. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-delete-4`
+5. [x] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-delete-5`
+6. [x] - `p1` - Evaluate the `If-Match` precondition using the shared precondition helper - `inst-cat-delete-6`
+7. [x] - `p1` - **IF** `If-Match` is absent → **RETURN** `428`; **IF** stale → **RETURN** `412` - `inst-cat-delete-7`
 8. [x] - `p1` - Invoke the no-orphan deletion guard for this category - `inst-cat-delete-8`
 9. [x] - `p1` - **IF** the guard reports referencing declarations → **RETURN** `409 CategoryNotEmpty` - `inst-cat-delete-9`
-10. [ ] - `p1` - DB: DELETE FROM categories WHERE id = {id} - `inst-cat-delete-10`
+10. [x] - `p1` - DB: DELETE FROM categories WHERE id = {id} - `inst-cat-delete-10`
 11. [ ] - `p1` - **IF** the declaration foreign key `ON DELETE RESTRICT` rejects the delete → **RETURN** `409 CategoryNotEmpty`, covering a declaration inserted between the guard and the delete - `inst-cat-delete-11`
-12. [ ] - `p1` - Emit a category-deleted audit record carrying the pre-image - `inst-cat-delete-12`
-13. [ ] - `p1` - **RETURN** `204` - `inst-cat-delete-13`
+12. [x] - `p1` - Emit a category-deleted audit record carrying the pre-image - `inst-cat-delete-12`
+13. [x] - `p1` - **RETURN** `204` - `inst-cat-delete-13`
 
 ### Get Category
 

@@ -115,7 +115,10 @@ impl CreateCategoryRequest {
     /// [`DomainError::Validation`] when the key breaks its format rules.
     pub fn into_draft(self) -> Result<CategoryDraft, DomainError> {
         Ok(CategoryDraft {
+            // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-4
+            // Validated on the way in, before the draft can reach a repository.
             key: CategoryKey::parse(&self.key)?,
+            // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-4
             name: self.name,
             description: self.description,
             domain_affinity: self.domain_affinity,

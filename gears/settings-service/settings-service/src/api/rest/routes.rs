@@ -46,7 +46,11 @@ pub fn register_routes(
              is rejected rather than ignored.",
         )
         .tag(TAG)
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
         .authenticated()
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
         .no_license_required()
         .handler(handlers::list_categories::<CategoryRepo>)
         .json_response_with_schema::<toolkit_odata::Page<CategoryDto>>(
@@ -73,7 +77,11 @@ pub fn register_routes(
              PATCH or DELETE must echo in `If-Match`.",
         )
         .tag(TAG)
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
         .authenticated()
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
         .no_license_required()
         .handler(handlers::get_category::<CategoryRepo>)
         .json_response_with_schema::<CategoryDto>(
@@ -98,7 +106,11 @@ pub fn register_routes(
              key declared under it, so it is stored verbatim and may not contain `/`.",
         )
         .tag(TAG)
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
         .authenticated()
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
         .no_license_required()
         .json_request::<crate::api::rest::dto::CreateCategoryRequest>(
             openapi,
@@ -129,7 +141,11 @@ pub fn register_routes(
              than silently overwriting a concurrent edit.",
         )
         .tag(TAG)
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
         .authenticated()
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
         .no_license_required()
         .json_request::<crate::api::rest::dto::UpdateCategoryRequest>(
             openapi,
@@ -171,7 +187,11 @@ pub fn register_routes(
              declaration keeps its category and would otherwise be orphaned.",
         )
         .tag(TAG)
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
         .authenticated()
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
         .no_license_required()
         .handler(handlers::delete_category::<CategoryRepo>)
         .no_content_response(StatusCode::NO_CONTENT, "The category was deleted")
@@ -199,3 +219,7 @@ pub fn register_routes(
         .layer(axum::Extension(db))
         .layer(axum::Extension(enforcer))
 }
+
+#[cfg(test)]
+#[path = "routes_tests.rs"]
+mod routes_tests;

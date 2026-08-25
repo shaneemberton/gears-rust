@@ -1,4 +1,5 @@
 // Created: 2026-08-13 by Constructor Tech
+// @cpt-dod:cpt-cf-settings-service-dod-category-management-authorization:p1
 //! The authorization enforcement point.
 //!
 //! Every handler that touches a settings resource obtains its [`AccessScope`]

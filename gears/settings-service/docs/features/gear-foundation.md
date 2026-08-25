@@ -358,11 +358,11 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [x] A validation rejection carries one field violation per offending field, each naming the field, a stable machine-readable reason, and a human-readable description
 - [x] The gear selects a canonical error category and never mints its own HTTP status or `gts://` type URI
 - [x] An unrecognized internal error maps to `500` and its response body contains no internal message
-- [ ] A mutating `PATCH` or `DELETE` without `If-Match` returns `428`
-- [ ] A mutating `PATCH` or `DELETE` with a stale `If-Match` returns `412`
+- [x] A mutating `PATCH` or `DELETE` without `If-Match` returns `428`
+- [x] A mutating `PATCH` or `DELETE` with a stale `If-Match` returns `412`
 - [ ] An OData expression on an unmapped field or with an unsupported operator is rejected rather than ignored
 - [ ] A pagination cursor round-trips and reproduces a stable order across pages
-- [ ] A request whose authorization decision cannot be obtained is denied rather than allowed
+- [x] A request whose authorization decision cannot be obtained is denied rather than allowed
 - [ ] A behavior-affecting action without a valid step-up assertion is denied, and one with a step-up assertion bound to a different principal is also denied
 - [ ] An `AccessScope` returned by the PEP is applied as a query predicate and not merely as a post-filter
 - [x] The Audit Emitter records a mutation with both pre-image and post-image available to the caller

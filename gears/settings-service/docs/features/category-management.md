@@ -94,9 +94,9 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 2. [x] - `p1` - Authorize `create` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-create-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-create-3`
 4. [x] - `p1` - Invoke category key validation on the supplied `key` - `inst-cat-create-4`
-5. [ ] - `p1` - **IF** key validation fails → **RETURN** `422` with a field-level error naming `key` - `inst-cat-create-5`
+5. [x] - `p1` - **IF** key validation fails → **RETURN** `400` with a field-level error naming `key` - `inst-cat-create-5`
 6. [ ] - `p1` - Validate `name` within 1..256 and `description` within 0..4096 - `inst-cat-create-6`
-7. [ ] - `p1` - **IF** field validation fails → **RETURN** `422` with field-level errors - `inst-cat-create-7`
+7. [ ] - `p1` - **IF** field validation fails → **RETURN** `400` with field-level errors - `inst-cat-create-7`
 8. [x] - `p1` - Generate the category identifier and set `created_at` and `updated_at` to the current UTC instant - `inst-cat-create-8`
 9. [x] - `p1` - DB: INSERT INTO categories (id, key, name, description, domain_affinity, sort_order, icon, created_at, updated_at) - `inst-cat-create-9`
 10. [x] - `p1` - **IF** unique violation on `uq_category_key` or `uq_category_name` → **RETURN** `409` naming the conflicting field - `inst-cat-create-10`
@@ -123,14 +123,14 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 1. [x] - `p1` - Actor sends PATCH /v1/categories/{id} with `If-Match` and any of `name`, `description`, `domain_affinity`, `sort_order`, `icon` - `inst-cat-update-1`
 2. [x] - `p1` - Authorize `update` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-update-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-update-3`
-4. [ ] - `p1` - **IF** the request body carries `key` → **RETURN** `422`, because `key` is immutable once settings are keyed through it - `inst-cat-update-4`
+4. [x] - `p1` - **IF** the request body carries `key` → **RETURN** `400`, because `key` is immutable once settings are keyed through it - `inst-cat-update-4`
 5. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-update-5`
 6. [x] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-update-6`
 7. [x] - `p1` - Evaluate the `If-Match` precondition against the current representation using the shared precondition helper - `inst-cat-update-7`
 8. [x] - `p1` - **IF** `If-Match` is absent → **RETURN** `428` - `inst-cat-update-8`
 9. [x] - `p1` - **IF** `If-Match` is stale → **RETURN** `412` - `inst-cat-update-9`
 10. [ ] - `p1` - Validate the supplied updatable fields against their length bounds - `inst-cat-update-10`
-11. [ ] - `p1` - **IF** field validation fails → **RETURN** `422` with field-level errors - `inst-cat-update-11`
+11. [ ] - `p1` - **IF** field validation fails → **RETURN** `400` with field-level errors - `inst-cat-update-11`
 12. [x] - `p1` - DB: UPDATE categories SET {supplied fields}, updated_at = now() WHERE id = {id} - `inst-cat-update-12`
 13. [x] - `p1` - **IF** unique violation on `uq_category_name` → **RETURN** `409` - `inst-cat-update-13`
 14. [x] - `p1` - Emit a category-updated audit record carrying the changed field set with pre-image and post-image - `inst-cat-update-14`
@@ -206,10 +206,10 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 2. [x] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-list-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-list-3`
 4. [ ] - `p1` - Parse the OData expressions against the category field mapping - `inst-cat-list-4`
-5. [ ] - `p1` - **IF** an expression references an unmapped field or an unsupported operator → **RETURN** `422` - `inst-cat-list-5`
+5. [ ] - `p1` - **IF** an expression references an unmapped field or an unsupported operator → **RETURN** `400` - `inst-cat-list-5`
 6. [ ] - `p1` - Derive the domain and visibility predicate from the `AccessScope` constraints - `inst-cat-list-6`
 7. [ ] - `p1` - DB: SELECT categories with the combined predicate applied in the query, ordered by `sort_order` then `name` so the cursor is deterministic - `inst-cat-list-7`
-8. [ ] - `p1` - **IF** the supplied cursor is malformed or no longer decodable → **RETURN** `422` - `inst-cat-list-8`
+8. [ ] - `p1` - **IF** the supplied cursor is malformed or no longer decodable → **RETURN** `400` - `inst-cat-list-8`
 9. [x] - `p1` - **RETURN** `200` with the page and a next-page cursor when further rows remain - `inst-cat-list-9`
 
 ## 3. Processes / Business Logic (CDSL)
@@ -383,10 +383,10 @@ The system **MUST** emit an audit record through the Audit Emitter for every suc
 - [ ] Creating a category with unique `key` and `name` returns `201` with an identifier, populated timestamps, and an ETag
 - [ ] Creating a category whose `key` duplicates an existing category returns `409` naming `key` as the conflicting field
 - [ ] Creating a category whose `name` duplicates an existing category returns `409` naming `name` as the conflicting field
-- [ ] Creating a category whose `key` contains `/` returns `422` with a field-level error and inserts no row
-- [ ] Creating a category whose `key` is empty or exceeds 128 characters returns `422`
+- [ ] Creating a category whose `key` contains `/` returns `400` with a field-level error and inserts no row
+- [ ] Creating a category whose `key` is empty or exceeds 128 characters returns `400`
 - [ ] A `key` supplied with surrounding whitespace or mixed case is stored verbatim and matches only an identical string
-- [ ] A `PATCH` carrying `key` returns `422` and the stored `key` is unchanged
+- [ ] A `PATCH` carrying `key` returns `400` and the stored `key` is unchanged
 - [ ] A `PATCH` without `If-Match` returns `428` and modifies no row
 - [ ] A `PATCH` with a stale `If-Match` returns `412` and modifies no row
 - [ ] A `PATCH` with a current `If-Match` returns `200` and an ETag different from the one the request carried
@@ -400,8 +400,8 @@ The system **MUST** emit an audit record through the Audit Emitter for every suc
 - [ ] A category with null `domain_affinity` is visible to a caller whose `AccessScope` restricts domains
 - [ ] Listing returns categories ordered by `sort_order` then `name`, and that order is reproduced across cursor pages
 - [ ] Listing applies the visibility predicate inside the query, so a page is never short by the number of rows filtered out afterwards
-- [ ] Listing with an OData filter on an unmapped field or an unsupported operator returns `422`
-- [ ] Listing with a malformed pagination cursor returns `422`
-- [ ] Every error response is `application/problem+json` carrying `type`, `title`, `status`, and `trace_id`, and every `422` carries a field-level `errors` array
+- [ ] Listing with an OData filter on an unmapped field or an unsupported operator returns `400`
+- [ ] Listing with a malformed pagination cursor returns `400`
+- [ ] Every error response is `application/problem+json` carrying `type`, `title`, `status`, and `trace_id`, and every validation failure carries a field-level `errors` array
 - [ ] A category operation whose authorization decision cannot be obtained is denied rather than allowed
 - [ ] Every successful create, update, and delete produces exactly one audit record; the update record names the changed fields with pre-image and post-image, and the delete record carries the pre-image

@@ -122,8 +122,12 @@ impl CreateCategoryRequest {
     pub fn into_draft(self) -> Result<CategoryDraft, DomainError> {
         Ok(CategoryDraft {
             // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-4
+            // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-5
             // Validated on the way in, before the draft can reach a repository.
+            // The rejection carries `key` as its field, so the problem document
+            // points at what the caller sent rather than at the body as a whole.
             key: CategoryKey::parse(&self.key)?,
+            // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-5
             // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-4
             name: self.name,
             description: self.description,

@@ -94,15 +94,49 @@ fn a_request_validates_its_key_on_the_way_in() {
     }
 }
 
-#[test]
-fn update_validates_its_key_the_same_way() {
-    let req = UpdateCategoryRequest {
-        key: String::new(),
+fn update_req(key: Option<&str>) -> UpdateCategoryRequest {
+    UpdateCategoryRequest {
+        key: key.map(str::to_owned),
         name: "Network".to_owned(),
         description: None,
         domain_affinity: None,
         sort_order: 0,
         icon: None,
-    };
-    assert!(req.into_draft().is_err());
+    }
+}
+
+#[test]
+fn an_update_carrying_a_key_is_refused_as_immutable() {
+    // Not a parse failure: the field exists and is returned in every response,
+    // so the caller must be told it may not change -- not that it is unknown.
+    match update_req(Some("network")).into_patch() {
+        Err(DomainError::Validation { field, code, .. }) => {
+            assert_eq!(field, "key");
+            assert_eq!(code, crate::field::CATEGORY_KEY_IMMUTABLE);
+        }
+        other => panic!("expected an immutability violation, got {other:?}"),
+    }
+}
+
+#[test]
+fn an_echoed_key_is_refused_just_the_same() {
+    // Even a key identical to the stored one. The contract is that an update
+    // carries no key at all; accepting an echo would make it depend on a value
+    // the caller has no way to change.
+    assert!(update_req(Some("network")).into_patch().is_err());
+}
+
+#[test]
+fn an_update_without_a_key_yields_a_patch() {
+    let patch = update_req(None).into_patch().expect("no key supplied");
+    assert_eq!(patch.name, "Network");
+}
+
+#[test]
+fn key_is_optional_on_the_wire() {
+    // `deny_unknown_fields` is on, so this also pins that omitting `key`
+    // deserializes rather than failing as a missing field.
+    let req: UpdateCategoryRequest =
+        serde_json::from_value(serde_json::json!({ "name": "Network" })).expect("parses");
+    assert!(req.key.is_none());
 }

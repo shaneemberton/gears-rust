@@ -12,7 +12,9 @@ use toolkit_odata::{ODataQuery, Page, SortDir};
 
 use crate::api::precondition::ETag;
 use crate::domain::category::visibility::DomainVisibility;
-use crate::domain::category::{Category, CategoryDraft, CategoryKey, CategoryRepository};
+use crate::domain::category::{
+    Category, CategoryDraft, CategoryKey, CategoryPatch, CategoryRepository,
+};
 use crate::domain::error::DomainError;
 use crate::infra::storage::entity::category::{self, Entity as CategoryEntity};
 use crate::infra::storage::odata_mapper::CategoryODataMapper;
@@ -182,37 +184,36 @@ impl CategoryRepository for CategoryRepo {
         conn: &C,
         scope: &AccessScope,
         id: Uuid,
-        draft: CategoryDraft,
+        patch: CategoryPatch,
     ) -> Result<Category, DomainError> {
         // `update_many` rather than `update`: the secure extension scopes a
         // filtered update, and scoping is the point — an id the caller cannot
         // see must not become an update they can perform. Filtered to one id,
         // so it touches at most one row.
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-12
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-13
+        // Uniqueness on `name` is the index's call, surfaced by `map_write_error`
+        // as a conflict. `key` is not re-checked here: the patch cannot carry one.
         let outcome = CategoryEntity::update_many()
             .col_expr(
-                category::Column::Key,
-                sea_orm::sea_query::Expr::value(draft.key.as_str()),
-            )
-            .col_expr(
                 category::Column::Name,
-                sea_orm::sea_query::Expr::value(draft.name.clone()),
+                sea_orm::sea_query::Expr::value(patch.name.clone()),
             )
             .col_expr(
                 category::Column::Description,
-                sea_orm::sea_query::Expr::value(draft.description.clone()),
+                sea_orm::sea_query::Expr::value(patch.description.clone()),
             )
             .col_expr(
                 category::Column::DomainAffinity,
-                sea_orm::sea_query::Expr::value(draft.domain_affinity.clone()),
+                sea_orm::sea_query::Expr::value(patch.domain_affinity.clone()),
             )
             .col_expr(
                 category::Column::SortOrder,
-                sea_orm::sea_query::Expr::value(draft.sort_order),
+                sea_orm::sea_query::Expr::value(patch.sort_order),
             )
             .col_expr(
                 category::Column::Icon,
-                sea_orm::sea_query::Expr::value(draft.icon.clone()),
+                sea_orm::sea_query::Expr::value(patch.icon.clone()),
             )
             .col_expr(
                 category::Column::UpdatedAt,
@@ -224,6 +225,7 @@ impl CategoryRepository for CategoryRepo {
             .exec(conn)
             .await
             .map_err(|err| map_write_error(&err))?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-13
         // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-12
 
         if outcome.rows_affected == 0 {

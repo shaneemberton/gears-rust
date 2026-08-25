@@ -338,7 +338,7 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [ ] A gear start with a missing required bootstrap value fails at startup rather than falling back to a default
 - [ ] `SettingsReaderClient` and `SettingsContributionClient` resolve through `ClientHub` after initialization
 - [ ] The same consumer code compiles and runs against both the in-process and the REST binding of `SettingsReaderClient`
-- [ ] `get_effective_bulk` returns an independent outcome per key, and one failing key does not fail the others in the batch
+- [x] `get_effective_bulk` returns an independent outcome per key, and one failing key does not fail the others in the batch
 - [x] Every fallible trait method returns `CanonicalError`; no settings-specific error type appears in any trait signature
 - [x] `Unavailable`, `Retired`, and `NotFound` are distinguishable by a consumer without string matching
 - [x] The credential-absent outcome of `resolve_secret` is a different variant from the resolver's `NotFound`, so a placeholder can never be mistaken for a configured credential
@@ -347,7 +347,7 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [x] Each wire-string constant converts to its typed value and back, and an unrecognised string is preserved rather than discarded
 - [x] A round-trip Problem test asserts every wire-string constant appears at its expected JSON path
 - [x] The projection carries no `instance` or `trace_id` field
-- [ ] A reader failure never returns a substituted Schema Default in place of an error
+- [x] A reader failure never returns a substituted Schema Default in place of an error
 - [x] A well-formed setting key parses into its value-type segment and instance segment, and the parsed key round-trips to a byte-identical string
 - [x] The category and leaf name are recoverable from the instance segment's namespace and type tokens, for a module-supplied key as well as an admin-composed one
 - [x] A bare value type, or a key with three or more segments, is rejected as not being a value type followed by an instance id

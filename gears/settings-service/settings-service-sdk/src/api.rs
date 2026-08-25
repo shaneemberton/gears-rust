@@ -141,3 +141,7 @@ pub trait SettingsContributionClient: Send + Sync {
         keys: Vec<SettingKey>,
     ) -> Result<crate::models::ReconcileResult, CanonicalError>;
 }
+
+#[cfg(test)]
+#[path = "api_tests.rs"]
+mod api_tests;

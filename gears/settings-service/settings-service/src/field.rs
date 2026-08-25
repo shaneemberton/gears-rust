@@ -24,6 +24,12 @@ pub const IF_MATCH_REQUIRED: &str = "if_match_required";
 /// A category key falls outside the 1..128 character bound.
 pub const CATEGORY_KEY_LENGTH: &str = "category_key_length";
 
+/// A category name falls outside the 1..256 character bound.
+pub const CATEGORY_NAME_LENGTH: &str = "category_name_length";
+
+/// A category description exceeds the 4096 character bound.
+pub const CATEGORY_DESCRIPTION_LENGTH: &str = "category_description_length";
+
 /// A caller tried to change a category `key`, which is immutable.
 pub const CATEGORY_KEY_IMMUTABLE: &str = "category_key_immutable";
 

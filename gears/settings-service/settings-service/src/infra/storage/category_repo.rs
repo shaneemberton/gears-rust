@@ -294,9 +294,25 @@ impl CategoryRepository for CategoryRepo {
 
         let base = select.secure().scope_with(scope);
 
-        // Tiebreaker is `name`: the caller-visible order is `sort_order` then
-        // `name`, and `sort_order` is not unique, so the cursor needs a unique
-        // column to resume from or a page boundary can repeat or skip a row.
+        // Tiebreaker is `name`, which is unique, so a page boundary can neither
+        // repeat nor skip a row.
+        //
+        // Note this is the *whole* default order, not a tiebreaker after
+        // `sort_order`: `ensure_tiebreaker` appends, and every order key must
+        // resolve through `CategoryFilterField`, which deliberately omits
+        // `sort_order`. The FEATURE asks for `sort_order` then `name`
+        // (`inst-cat-list-7`); delivering that means declaring `sort_order` on
+        // the OData surface, which is a decision the narrow-surface rule in
+        // `settings-service-sdk/src/odata.rs` owns. Left unimplemented and
+        // unticked rather than quietly redefined.
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-4
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-5
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-8
+        // One gate for three refusals: an unmapped `$filter` field, an
+        // unsupported operator, and a cursor that no longer decodes all
+        // surface here as a validation failure rather than as an empty page.
+        // Reporting any of them as "no results" would let an administrator
+        // read a broken query as an empty catalogue.
         let page = paginate_odata::<CategoryFilterField, CategoryODataMapper, _, _, _, _>(
             base,
             conn,
@@ -311,6 +327,9 @@ impl CategoryRepository for CategoryRepo {
             code: crate::field::ODATA_QUERY,
             message: err.to_string(),
         })?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-8
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-5
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-4
 
         let items = page
             .items

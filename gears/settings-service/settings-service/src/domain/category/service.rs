@@ -134,6 +134,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         let found = self.repo.find(conn, scope, id).await?;
 
         // @cpt-begin:cpt-cf-settings-service-algo-category-management-visibility-filter:p1:inst-cat-visfilter-3
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-get:p1:inst-cat-get-6
         // The row-level arm of the visibility rule. `list` applies it as a SQL
         // predicate; a single-row fetch has no query to augment, so it is
         // applied here — and applied as *not found* rather than *forbidden*,
@@ -142,11 +143,16 @@ impl<R: CategoryRepository> CategoryService<R> {
         let found = found.filter(|category| {
             visibility::is_visible(&visible, category.domain_affinity.as_deref())
         });
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-get:p1:inst-cat-get-6
         // @cpt-end:cpt-cf-settings-service-algo-category-management-visibility-filter:p1:inst-cat-visfilter-3
 
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-get:p1:inst-cat-get-7
+        // Not-found, not forbidden: a distinct denial would confirm that a
+        // category the caller may not see exists.
         found.ok_or(DomainError::NotFound {
             resource: "category",
         })
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-get:p1:inst-cat-get-7
     }
 
     /// The caller's domain restriction, for a handler to fold into a list query.
@@ -172,7 +178,9 @@ impl<R: CategoryRepository> CategoryService<R> {
         query: &toolkit_odata::ODataQuery,
     ) -> Result<toolkit_odata::Page<Category>, DomainError> {
         reject_unsupported_options(query)?;
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-6
         let visible = visibility::domain_visibility(scope);
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-6
         self.repo.list(conn, scope, &visible, query).await
     }
 

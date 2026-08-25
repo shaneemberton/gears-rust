@@ -1,6 +1,7 @@
 // Created: 2026-08-13 by Constructor Tech
 //! Category management.
 
+pub mod bounds;
 pub mod key;
 pub mod repo;
 pub mod service;

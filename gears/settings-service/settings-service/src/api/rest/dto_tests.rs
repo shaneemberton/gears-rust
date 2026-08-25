@@ -140,3 +140,48 @@ fn key_is_optional_on_the_wire() {
         serde_json::from_value(serde_json::json!({ "name": "Network" })).expect("parses");
     assert!(req.key.is_none());
 }
+
+#[test]
+fn create_enforces_the_descriptive_bounds() {
+    // Wiring, not the rule itself: `bounds` owns the rule and has its own tests.
+    // What matters here is that the create path actually consults it.
+    let req = CreateCategoryRequest {
+        key: "network".to_owned(),
+        name: "n".repeat(257),
+        description: None,
+        domain_affinity: None,
+        sort_order: 0,
+        icon: None,
+    };
+    match req.into_draft() {
+        Err(DomainError::Validation { field, code, .. }) => {
+            assert_eq!(field, "name");
+            assert_eq!(code, crate::field::CATEGORY_NAME_LENGTH);
+        }
+        other => panic!("expected a name violation, got {other:?}"),
+    }
+}
+
+#[test]
+fn update_enforces_the_descriptive_bounds_too() {
+    let mut req = update_req(None);
+    req.description = Some("d".repeat(4097));
+    match req.into_patch() {
+        Err(DomainError::Validation { field, .. }) => assert_eq!(field, "description"),
+        other => panic!("expected a description violation, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_key_refusal_precedes_the_bounds_check() {
+    // A body that breaks both must report the immutable key: it is a contract
+    // violation, while an over-long name is merely a value the caller can fix.
+    let mut req = update_req(Some("network"));
+    req.name = "n".repeat(257);
+    match req.into_patch() {
+        Err(DomainError::Validation { code, .. }) => {
+            assert_eq!(code, crate::field::CATEGORY_KEY_IMMUTABLE);
+        }
+        other => panic!("expected the key refusal, got {other:?}"),
+    }
+}

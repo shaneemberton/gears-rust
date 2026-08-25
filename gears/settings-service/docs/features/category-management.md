@@ -75,7 +75,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 ### Create Category
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-flow-category-management-create`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-flow-category-management-create`
 
 **Actor**: `cpt-cf-settings-service-actor-platform-admin`
 
@@ -95,8 +95,8 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-create-3`
 4. [x] - `p1` - Invoke category key validation on the supplied `key` - `inst-cat-create-4`
 5. [x] - `p1` - **IF** key validation fails → **RETURN** `400` with a field-level error naming `key` - `inst-cat-create-5`
-6. [ ] - `p1` - Validate `name` within 1..256 and `description` within 0..4096 - `inst-cat-create-6`
-7. [ ] - `p1` - **IF** field validation fails → **RETURN** `400` with field-level errors - `inst-cat-create-7`
+6. [x] - `p1` - Validate `name` within 1..256 and `description` within 0..4096 - `inst-cat-create-6`
+7. [x] - `p1` - **IF** field validation fails → **RETURN** `400` with field-level errors - `inst-cat-create-7`
 8. [x] - `p1` - Generate the category identifier and set `created_at` and `updated_at` to the current UTC instant - `inst-cat-create-8`
 9. [x] - `p1` - DB: INSERT INTO categories (id, key, name, description, domain_affinity, sort_order, icon, created_at, updated_at) - `inst-cat-create-9`
 10. [x] - `p1` - **IF** unique violation on `uq_category_key` or `uq_category_name` → **RETURN** `409` naming the conflicting field - `inst-cat-create-10`
@@ -105,7 +105,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 ### Update Category
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-flow-category-management-update`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-flow-category-management-update`
 
 **Actor**: `cpt-cf-settings-service-actor-platform-admin`
 
@@ -129,8 +129,8 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 7. [x] - `p1` - Evaluate the `If-Match` precondition against the current representation using the shared precondition helper - `inst-cat-update-7`
 8. [x] - `p1` - **IF** `If-Match` is absent → **RETURN** `428` - `inst-cat-update-8`
 9. [x] - `p1` - **IF** `If-Match` is stale → **RETURN** `412` - `inst-cat-update-9`
-10. [ ] - `p1` - Validate the supplied updatable fields against their length bounds - `inst-cat-update-10`
-11. [ ] - `p1` - **IF** field validation fails → **RETURN** `400` with field-level errors - `inst-cat-update-11`
+10. [x] - `p1` - Validate the supplied updatable fields against their length bounds - `inst-cat-update-10`
+11. [x] - `p1` - **IF** field validation fails → **RETURN** `400` with field-level errors - `inst-cat-update-11`
 12. [x] - `p1` - DB: UPDATE categories SET {supplied fields}, updated_at = now() WHERE id = {id} - `inst-cat-update-12`
 13. [x] - `p1` - **IF** unique violation on `uq_category_name` → **RETURN** `409` - `inst-cat-update-13`
 14. [x] - `p1` - Emit a category-updated audit record carrying the changed field set with pre-image and post-image - `inst-cat-update-14`

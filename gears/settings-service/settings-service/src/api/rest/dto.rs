@@ -10,7 +10,7 @@
 
 use uuid::Uuid;
 
-use crate::domain::category::{Category, CategoryDraft, CategoryKey, CategoryPatch};
+use crate::domain::category::{Category, CategoryDraft, CategoryKey, CategoryPatch, bounds};
 use crate::domain::error::DomainError;
 
 /// A category as returned to a caller.
@@ -120,6 +120,14 @@ impl CreateCategoryRequest {
     /// # Errors
     /// [`DomainError::Validation`] when the key breaks its format rules.
     pub fn into_draft(self) -> Result<CategoryDraft, DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-6
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-7
+        // Checked here rather than left to the column: the driver reports an
+        // over-long value as an opaque write failure, which `map_write_error`
+        // can only classify as internal.
+        bounds::validate(&self.name, self.description.as_deref())?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-7
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-6
         Ok(CategoryDraft {
             // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-4
             // @cpt-begin:cpt-cf-settings-service-flow-category-management-create:p1:inst-cat-create-5
@@ -158,6 +166,13 @@ impl UpdateCategoryRequest {
             });
         }
         // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-4
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-10
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-11
+        // The same bounds as create: an update is a full replacement, so
+        // every field it carries faces the rule its column enforces.
+        bounds::validate(&self.name, self.description.as_deref())?;
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-11
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-10
         Ok(CategoryPatch {
             name: self.name,
             description: self.description,

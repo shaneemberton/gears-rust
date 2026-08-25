@@ -138,7 +138,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 ### Delete Category
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-flow-category-management-delete`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-flow-category-management-delete`
 
 **Actor**: `cpt-cf-settings-service-actor-platform-admin`
 
@@ -162,7 +162,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 8. [x] - `p1` - Invoke the no-orphan deletion guard for this category - `inst-cat-delete-8`
 9. [x] - `p1` - **IF** the guard reports referencing declarations → **RETURN** `409 CategoryNotEmpty` - `inst-cat-delete-9`
 10. [x] - `p1` - DB: DELETE FROM categories WHERE id = {id} - `inst-cat-delete-10`
-11. [ ] - `p1` - **IF** the declaration foreign key `ON DELETE RESTRICT` rejects the delete → **RETURN** `409 CategoryNotEmpty`, covering a declaration inserted between the guard and the delete - `inst-cat-delete-11`
+11. [x] - `p1` - **IF** the declaration foreign key `ON DELETE RESTRICT` rejects the delete → **RETURN** `409 CategoryNotEmpty`, covering a declaration inserted between the guard and the delete - `inst-cat-delete-11`
 12. [x] - `p1` - Emit a category-deleted audit record carrying the pre-image - `inst-cat-delete-12`
 13. [x] - `p1` - **RETURN** `204` - `inst-cat-delete-13`
 
@@ -230,17 +230,17 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 ### No-Orphan Deletion Guard
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-category-management-no-orphan-guard`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-category-management-no-orphan-guard`
 
 **Input**: Category identifier
 
 **Output**: Empty verdict, or a non-empty verdict carrying the referencing declaration count
 
 **Steps**:
-1. [ ] - `p1` - DB: SELECT the count of rows FROM setting_declarations WHERE category_id = {id} - `inst-cat-orphan-1`
-2. [ ] - `p1` - Count declarations of every `status`, because a retired declaration still occupies its category and its values are retained - `inst-cat-orphan-2`
-3. [ ] - `p1` - **IF** the count is greater than zero → **RETURN** non-empty verdict carrying the count - `inst-cat-orphan-3`
-4. [ ] - `p1` - **RETURN** empty verdict, treating it as advisory only: the foreign key `ON DELETE RESTRICT` remains the authoritative guard at delete time - `inst-cat-orphan-4`
+1. [x] - `p1` - DB: SELECT the count of rows FROM setting_declarations WHERE category_id = {id} - `inst-cat-orphan-1`
+2. [x] - `p1` - Count declarations of every `status`, because a retired declaration still occupies its category and its values are retained - `inst-cat-orphan-2`
+3. [x] - `p1` - **IF** the count is greater than zero → **RETURN** non-empty verdict carrying the count - `inst-cat-orphan-3`
+4. [x] - `p1` - **RETURN** empty verdict, treating it as advisory only: the foreign key `ON DELETE RESTRICT` remains the authoritative guard at delete time - `inst-cat-orphan-4`
 
 ### Category Visibility and Domain Filter
 
@@ -299,7 +299,7 @@ The system **MUST** expose create, get, list, update, and delete over categories
 
 ### No-Orphan Deletion Rule
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-no-orphan`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-no-orphan`
 
 The system **MUST** refuse to delete a category while any setting declaration references it, returning `409 CategoryNotEmpty`, and **MUST** apply that refusal regardless of the referencing declaration's `status`, including `retired`. The declaration-to-category foreign key **MUST** be declared `ON DELETE RESTRICT` so the database enforces the rule independently, and the handler **MUST** translate that database rejection into the same `409` so a declaration inserted between the guard and the delete cannot produce a `500`.
 

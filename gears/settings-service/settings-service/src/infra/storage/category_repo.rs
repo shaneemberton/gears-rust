@@ -37,9 +37,11 @@ pub struct CategoryRepo;
 /// precision, so two writes to one row cannot share a tag. Deriving it rather
 /// than storing a separate version column keeps the tag and the row impossible
 /// to desynchronise: there is no second field to forget to bump.
+// @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-precondition:p1:inst-gf-precond-2
 fn etag_of(model: &category::Model) -> ETag {
     ETag::new(format!("{}", model.updated_at.unix_timestamp_nanos()))
 }
+// @cpt-end:cpt-cf-settings-service-algo-gear-foundation-precondition:p1:inst-gf-precond-2
 
 fn to_domain(model: category::Model) -> Result<Category, DomainError> {
     let etag = etag_of(&model);

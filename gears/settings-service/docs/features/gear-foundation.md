@@ -118,7 +118,7 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 
 ### Optimistic Concurrency Precondition Evaluation
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-gear-foundation-precondition`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-gear-foundation-precondition`
 
 **Input**: Request `If-Match` header and the current representation of the target resource
 
@@ -126,7 +126,7 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 
 **Steps**:
 1. [x] - `p1` - **IF** the operation is a mutating `PATCH` or `DELETE` and no `If-Match` header is present → **RETURN** `428` precondition required - `inst-gf-precond-1`
-2. [ ] - `p1` - Compute the current ETag from the target's persisted representation - `inst-gf-precond-2`
+2. [x] - `p1` - Compute the current ETag from the target's persisted representation - `inst-gf-precond-2`
 3. [x] - `p1` - **IF** the supplied `If-Match` does not equal the current ETag → **RETURN** `412` precondition failed - `inst-gf-precond-3`
 4. [x] - `p1` - **RETURN** proceed, and carry the computed ETag forward so the handler can emit a refreshed value on success - `inst-gf-precond-4`
 
@@ -156,8 +156,8 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 **Output**: An `AccessScope` for the caller, or a denial
 
 **Steps**:
-1. [ ] - `p1` - Require an authenticated principal on the request context - `inst-gf-authz-1`
-2. [ ] - `p1` - **IF** authentication is absent or invalid → **RETURN** denial - `inst-gf-authz-2`
+1. [x] - `p1` - Require an authenticated principal on the request context - `inst-gf-authz-1`
+2. [x] - `p1` - **IF** authentication is absent or invalid → **RETURN** denial - `inst-gf-authz-2`
 3. [x] - `p1` - Ask the Policy Decision client for a decision on the action against the target GTS resource type - `inst-gf-authz-3`
 4. [x] - `p1` - **IF** the decision cannot be obtained → **RETURN** denial, failing closed rather than proceeding on an unknown verdict - `inst-gf-authz-4`
 5. [x] - `p1` - **IF** the decision is deny → **RETURN** denial - `inst-gf-authz-5`

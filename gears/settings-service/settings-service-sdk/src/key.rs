@@ -217,6 +217,13 @@ impl SettingKey {
     /// Builds the instance id as `<vendor>.settings.<category>.<name>.v1` and
     /// joins it to `value_type`, which must already end with `~`.
     ///
+    /// The category slug sits **inside** the key, which makes the key a function
+    /// of its category: moving a setting to another category, or renaming the
+    /// category itself, re-keys the setting, and no alias to the old key is
+    /// retained. That is why a category key is refused on update rather than
+    /// merely discouraged — an in-place change would re-key every declaration
+    /// filed under it with nothing left pointing at the old name.
+    ///
     /// # Errors
     ///
     /// Returns [`SettingKeyError`] when `value_type` is not a GTS type, or when
@@ -227,14 +234,33 @@ impl SettingKey {
         category: &str,
         name: &str,
     ) -> Result<Self, SettingKeyError> {
+        // @cpt-begin:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-4
         // Checked before splicing so the error names the caller's own input
         // rather than a position inside the joined string.
         if !value_type.ends_with(TYPE_TERMINATOR) {
             return Err(SettingKeyError::ValueTypeNotAType);
         }
-        Self::parse(&format!(
-            "{value_type}{vendor}.settings.{category}.{name}.v1"
-        ))
+
+        // @cpt-begin:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-3
+        // The settings namespace is fixed rather than supplied: an admin-authored
+        // instance id always sits at `<vendor>.settings.<category>.<name>.v1`.
+        let instance = format!("{vendor}.settings.{category}.{name}.v1");
+        // @cpt-end:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-3
+
+        // @cpt-begin:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-1
+        // @cpt-begin:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-2
+        // @cpt-begin:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-5
+        // @cpt-begin:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-6
+        // Grammar validation, the segment-level rejection, the leaf slug and the
+        // embedded category slug all come from one parse of the composed
+        // candidate. Validating the parts separately would let a composed key and
+        // a parsed one disagree about any of them.
+        Self::parse(&format!("{value_type}{instance}"))
+        // @cpt-end:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-6
+        // @cpt-end:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-5
+        // @cpt-end:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-2
+        // @cpt-end:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-1
+        // @cpt-end:cpt-cf-settings-service-algo-setting-declarations-key-construction:p1:inst-decl-key-4
     }
 
     /// The full key, byte-identical to what was parsed.

@@ -1,4 +1,5 @@
 // Created: 2026-08-13 by Constructor Tech
+// @cpt-dod:cpt-cf-settings-service-dod-category-management-entity-schema:p1
 //! The `categories` table.
 //!
 //! Shape from DESIGN.md §4.7. Categories are **flat** — no parent column, no

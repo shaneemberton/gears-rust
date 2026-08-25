@@ -1,4 +1,5 @@
 // Created: 2026-08-13 by Constructor Tech
+// @cpt-dod:cpt-cf-settings-service-dod-category-management-crud:p1
 //! Category route registration.
 //!
 //! Every route is built through `OperationBuilder` rather than mounted on the

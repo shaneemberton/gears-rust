@@ -265,7 +265,7 @@ Not applicable. The `Category` entity carries no lifecycle status column and no 
 
 ### Category Entity and Schema
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-entity-schema`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-entity-schema`
 
 The system **MUST** persist categories in a `categories` table with a UUID primary key, `key` unique via `uq_category_key`, `name` unique via `uq_category_name`, nullable `description`, `domain_affinity`, and `icon`, non-null `sort_order` defaulting to `0`, and non-null `created_at` and `updated_at`, together with the `idx_categories_name_trgm` GIN trigram index on `name` that later search builds on.
 
@@ -278,7 +278,7 @@ The system **MUST** persist categories in a `categories` table with a UUID prima
 
 ### Category CRUD Operations
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-crud`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-crud`
 
 The system **MUST** expose create, get, list, update, and delete over categories. Partial update **MUST** be restricted to `name`, `description`, `domain_affinity`, `sort_order`, and `icon`, and `key` **MUST** be rejected as immutable, because settings are keyed through the category slug and an in-place change would silently re-key every setting in the category.
 
@@ -314,7 +314,7 @@ The system **MUST** refuse to delete a category while any setting declaration re
 
 ### Key Format Enforcement
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-key-format`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-key-format`
 
 The system **MUST** reject a category `key` that is empty, exceeds 128 characters, or contains `/`, and **MUST** store it verbatim without trimming or case-folding so a stored key and a supplied key compare identically.
 
@@ -327,7 +327,7 @@ The system **MUST** reject a category `key` that is empty, exceeds 128 character
 
 ### Authorization on Category Operations
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-authorization`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-authorization`
 
 The system **MUST** authorize every category operation as per-resource-type CRUD on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP, **MUST** apply the caller's `AccessScope` domain constraints inside the query rather than as a post-filter, and **MUST** deny when a decision cannot be obtained. A category filtered out by the visibility gate **MUST** be reported as absent rather than as forbidden.
 
@@ -344,7 +344,7 @@ The system **MUST** authorize every category operation as per-resource-type CRUD
 
 ### Optimistic Concurrency on Mutations
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-concurrency`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-concurrency`
 
 The system **MUST** require `If-Match` on `PATCH` and `DELETE`, returning `428` when the header is absent and `412` when it is stale, and **MUST** return a refreshed ETag on every successful read and update.
 

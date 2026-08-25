@@ -1,4 +1,5 @@
 // Created: 2026-08-13 by Constructor Tech
+// @cpt-dod:cpt-cf-settings-service-dod-category-management-key-format:p1
 //! The category key value object.
 //!
 //! A category key is not a display label. It becomes the **category segment of

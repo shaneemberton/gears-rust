@@ -107,13 +107,13 @@ The hardest constraint here is not any single field but the rule connecting them
 4. [ ] - `p1` - DB: SELECT the target category WHERE id = {category_id} - `inst-decl-create-4`
 5. [ ] - `p1` - **IF** the category does not exist → **RETURN** `404` - `inst-decl-create-5`
 6. [ ] - `p1` - Invoke setting instance key construction using `value_type_id`, `vendor`, the category's slug, and the leaf `name` - `inst-decl-create-6`
-7. [ ] - `p1` - **IF** any segment violates the GTS grammar → **RETURN** `422` naming the offending segment - `inst-decl-create-7`
+7. [ ] - `p1` - **IF** any segment violates the GTS grammar → **RETURN** `400` naming the offending segment - `inst-decl-create-7`
 8. [ ] - `p1` - Resolve the value type's trait set through the Type Validator trait - `inst-decl-create-8`
 9. [ ] - `p1` - Invoke classification and secret-trait derivation using the resolved traits and any author-supplied `data_classification` - `inst-decl-create-9`
-10. [ ] - `p1` - **IF** derivation rejects the combination → **RETURN** `422` - `inst-decl-create-10`
-11. [ ] - `p1` - **IF** `has_secret_trait` is true **AND** `default_value` is non-empty → **RETURN** `422`, because a secret setting has no secret default - `inst-decl-create-11`
+10. [ ] - `p1` - **IF** derivation rejects the combination → **RETURN** `400` - `inst-decl-create-10`
+11. [ ] - `p1` - **IF** `has_secret_trait` is true **AND** `default_value` is non-empty → **RETURN** `400`, because a secret setting has no secret default - `inst-decl-create-11`
 12. [ ] - `p1` - **IF** `has_secret_trait` is false → validate `default_value` against `value_type_id` through the Type Validator trait - `inst-decl-create-12`
-13. [ ] - `p1` - **IF** Schema Default validation fails → **RETURN** `422` with the validator's field-level errors - `inst-decl-create-13`
+13. [ ] - `p1` - **IF** Schema Default validation fails → **RETURN** `400` with the validator's field-level errors - `inst-decl-create-13`
 14. [ ] - `p1` - **IF** `scope_class` is `global` → force `tenant_overridable` to false rather than rejecting, since the class derives the behaviour - `inst-decl-create-14`
 15. [ ] - `p1` - Set `source` to `admin_authored`, `status` to `active`, `mode` to its default when unsupplied, and `created_by` from the authenticated principal - `inst-decl-create-15`
 16. [ ] - `p1` - DB: INSERT INTO setting_declarations with the constructed `key`, `leaf_slug`, `value_type_id`, `category_id`, and derived columns - `inst-decl-create-16`
@@ -146,10 +146,10 @@ The hardest constraint here is not any single field but the rule connecting them
 6. [ ] - `p1` - **IF** `source` is `module_contributed` → **RETURN** `409 ContributedDeclarationImmutable`, because gear declarations change only through their owning module - `inst-decl-update-6`
 7. [ ] - `p1` - Evaluate the `If-Match` precondition; **IF** absent → **RETURN** `428`; **IF** stale → **RETURN** `412` - `inst-decl-update-7`
 8. [ ] - `p1` - Invoke declaration mutation class resolution over every field present in the request - `inst-decl-update-8`
-9. [ ] - `p1` - **IF** any field resolves to the immutable class → **RETURN** `422` naming the field and stating that the change is expressible only as a replacement declaration - `inst-decl-update-9`
+9. [ ] - `p1` - **IF** any field resolves to the immutable class → **RETURN** `400` naming the field and stating that the change is expressible only as a replacement declaration - `inst-decl-update-9`
 10. [ ] - `p1` - **IF** any field resolves to the step-up class → require a valid credential step-up assertion - `inst-decl-update-10`
 11. [ ] - `p1` - **IF** step-up is required and absent or invalid → **RETURN** `403` - `inst-decl-update-11`
-12. [ ] - `p1` - **IF** `scope_class` is `global` **AND** the request sets `tenant_overridable` true → **RETURN** `422`, preserving the database check as the backstop - `inst-decl-update-12`
+12. [ ] - `p1` - **IF** `scope_class` is `global` **AND** the request sets `tenant_overridable` true → **RETURN** `400`, preserving the database check as the backstop - `inst-decl-update-12`
 13. [ ] - `p1` - DB: UPDATE setting_declarations SET {supplied metadata}, `last_change_at` = now(), `updated_at` = now() WHERE id = {id} - `inst-decl-update-13`
 14. [ ] - `p1` - Emit a declaration-updated audit record with pre-image and post-image - `inst-decl-update-14`
 15. [ ] - `p1` - **RETURN** `200` with the updated declaration and a refreshed ETag - `inst-decl-update-15`
@@ -229,8 +229,8 @@ The hardest constraint here is not any single field but the rule connecting them
 2. [ ] - `p2` - Authorize the declaration action through the `PolicyEnforcer` PEP - `inst-decl-depgrp-2`
 3. [ ] - `p2` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-depgrp-3`
 4. [ ] - `p2` - Resolve every member key to an active declaration - `inst-decl-depgrp-4`
-5. [ ] - `p2` - **IF** any member key does not resolve → **RETURN** `422` naming the unresolved key - `inst-decl-depgrp-5`
-6. [ ] - `p2` - **IF** a group already exists under this name → **RETURN** `422`, because a group definition and its constraint are behavior-affecting and change only through a replacement declaration - `inst-decl-depgrp-6`
+5. [ ] - `p2` - **IF** any member key does not resolve → **RETURN** `400` naming the unresolved key - `inst-decl-depgrp-5`
+6. [ ] - `p2` - **IF** a group already exists under this name → **RETURN** `400`, because a group definition and its constraint are behavior-affecting and change only through a replacement declaration - `inst-decl-depgrp-6`
 7. [ ] - `p2` - Restrict membership to declarations of a single `source`, so an admin group cannot capture a gear's contributed settings - `inst-decl-depgrp-7`
 8. [ ] - `p2` - Persist the group and its constraint - `inst-decl-depgrp-8`
 9. [ ] - `p2` - Emit a dependency-group-declared audit record - `inst-decl-depgrp-9`
@@ -254,7 +254,7 @@ The hardest constraint here is not any single field but the rule connecting them
 2. [ ] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.declaration.v1~` and obtain the `AccessScope` constraints - `inst-decl-read-2`
 3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-read-3`
 4. [ ] - `p1` - Derive the combined visibility, domain-affinity, and licence predicate from the `AccessScope` constraints and the caller's entitlements - `inst-decl-read-4`
-5. [ ] - `p1` - **IF** an OData expression references an unmapped field or an unsupported operator → **RETURN** `422` - `inst-decl-read-5`
+5. [ ] - `p1` - **IF** an OData expression references an unmapped field or an unsupported operator → **RETURN** `400` - `inst-decl-read-5`
 6. [ ] - `p1` - DB: SELECT declarations with the combined predicate applied inside the query - `inst-decl-read-6`
 7. [ ] - `p1` - **IF** a single-declaration read is filtered out → **RETURN** `404` rather than `403`, so a gated declaration's existence is not disclosed - `inst-decl-read-7`
 8. [ ] - `p1` - Resolve each returned declaration's trait set for client rendering - `inst-decl-read-8`
@@ -264,19 +264,19 @@ The hardest constraint here is not any single field but the rule connecting them
 
 ### Setting Instance Key Construction
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-setting-declarations-key-construction`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-setting-declarations-key-construction`
 
 **Input**: `value_type_id`, `vendor`, the owning category's slug, and the leaf `name`
 
 **Output**: The full setting key and its leaf slug, or a validation problem naming the offending segment
 
 **Steps**:
-1. [ ] - `p1` - Validate `vendor`, the category slug, and the leaf `name` against the GTS grammar: lowercase, the permitted character set only, and no `/` - `inst-decl-key-1`
-2. [ ] - `p1` - **IF** any segment violates the grammar → **RETURN** validation problem naming that segment - `inst-decl-key-2`
-3. [ ] - `p1` - Build the instance id by composing the vendor, the settings namespace, the category slug, and the leaf name with the version suffix - `inst-decl-key-3`
-4. [ ] - `p1` - Compose the full key as the `value_type_id` terminated by its separator, followed by the instance id carrying no trailing separator - `inst-decl-key-4`
-5. [ ] - `p1` - Set the leaf slug to the leaf `name`, which is what uniqueness within the category is enforced on - `inst-decl-key-5`
-6. [ ] - `p1` - **RETURN** the key and leaf slug, recording that the embedded category slug makes the key a function of its category, so moving or renaming the category re-keys the setting with no alias retained - `inst-decl-key-6`
+1. [x] - `p1` - Validate `vendor`, the category slug, and the leaf `name` against the GTS grammar: lowercase, the permitted character set only, and no `/` - `inst-decl-key-1`
+2. [x] - `p1` - **IF** any segment violates the grammar → **RETURN** validation problem naming that segment - `inst-decl-key-2`
+3. [x] - `p1` - Build the instance id by composing the vendor, the settings namespace, the category slug, and the leaf name with the version suffix - `inst-decl-key-3`
+4. [x] - `p1` - Compose the full key as the `value_type_id` terminated by its separator, followed by the instance id carrying no trailing separator - `inst-decl-key-4`
+5. [x] - `p1` - Set the leaf slug to the leaf `name`, which is what uniqueness within the category is enforced on - `inst-decl-key-5`
+6. [x] - `p1` - **RETURN** the key and leaf slug, recording that the embedded category slug makes the key a function of its category, so moving or renaming the category re-keys the setting with no alias retained - `inst-decl-key-6`
 
 ### Declaration Mutation Class Resolution
 
@@ -502,17 +502,17 @@ The system **MUST** emit an audit record through the Audit Emitter for every dec
 
 - [ ] Creating a declaration against an existing category returns `201` with a key composed of the value type and the instance id, and with the instance id carrying no trailing separator
 - [ ] Creating a declaration against a missing category returns `404`
-- [ ] A `vendor`, category slug, or leaf name containing uppercase, `/`, or a character outside the permitted set returns `422` naming the offending segment
+- [ ] A `vendor`, category slug, or leaf name containing uppercase, `/`, or a character outside the permitted set returns `400` naming the offending segment
 - [ ] Two declarations with the same leaf name in the same category conflict on `uq_declaration_category_slug`
 - [ ] Two declarations with the same leaf name in different categories both succeed, and their keys differ by the category segment
 - [ ] A declaration created with `scope_class` of `global` is stored with `tenant_overridable` false, and a direct database insert setting both is rejected by the check constraint
-- [ ] A Schema Default that fails validation against the value type returns `422` with field-level errors and inserts no row
+- [ ] A Schema Default that fails validation against the value type returns `400` with field-level errors and inserts no row
 - [ ] A structured object or array Schema Default is accepted
-- [ ] A declaration on a secret-trait value type with a non-empty Schema Default returns `422`
+- [ ] A declaration on a secret-trait value type with a non-empty Schema Default returns `400`
 - [ ] A declaration on a secret-trait value type is stored with `data_classification` of `secret` even though the author supplied nothing
-- [ ] An author-supplied `secret` classification on a non-secret value type returns `422`
+- [ ] An author-supplied `secret` classification on a non-secret value type returns `400`
 - [ ] A direct database insert with `data_classification` of `secret` and `has_secret_trait` false is rejected by the equivalence check
-- [ ] A `PATCH` carrying `default_value`, the value type, or `scope_class` returns `422` and modifies no row
+- [ ] A `PATCH` carrying `default_value`, the value type, or `scope_class` returns `400` and modifies no row
 - [ ] A `PATCH` carrying an unrecognized field is rejected rather than silently applied
 - [ ] A `PATCH` tightening `data_classification` from `public` to `pii` succeeds without step-up
 - [ ] A `PATCH` loosening `data_classification` from `pii` to `public` without step-up returns `403`, and succeeds with a valid step-up assertion
@@ -524,7 +524,7 @@ The system **MUST** emit an audit record through the Audit Emitter for every dec
 - [ ] A retired declaration still blocks deletion of its category
 - [ ] Re-declaring a retired key with step-up revives the row to `active` and its retained values participate in resolution again
 - [ ] Re-declaring a key that is already `active` returns `409`
-- [ ] A Dependency Group naming a key that resolves to no active declaration returns `422`
+- [ ] A Dependency Group naming a key that resolves to no active declaration returns `400`
 - [ ] An attempt to edit an existing Dependency Group or its constraint in place is rejected
 - [ ] A declaration read outside the caller's visibility, domain, or licence gate returns `404` rather than `403`
 - [ ] Every declaration read returns the `key`, the `value_type_id`, and the resolved trait set

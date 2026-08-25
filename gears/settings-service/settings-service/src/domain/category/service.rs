@@ -301,6 +301,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-6
 
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-8
+        // @cpt-begin:cpt-cf-settings-service-algo-category-management-no-orphan-guard:p1:inst-cat-orphan-4
         // Advisory, by design. The foreign key's `ON DELETE RESTRICT` is the
         // authoritative guard and catches a declaration created between this
         // check and the delete; what this adds is a specific message instead of
@@ -308,15 +309,23 @@ impl<R: CategoryRepository> CategoryService<R> {
         //
         // The check answering `Err` still denies: the guard exists to prevent an
         // orphan, and an unanswerable question is not a negative answer.
-        let referenced = self.repo.has_referencing_declarations(conn, id).await?;
+        let referencing = self.repo.count_referencing_declarations(conn, id).await?;
+        // @cpt-end:cpt-cf-settings-service-algo-category-management-no-orphan-guard:p1:inst-cat-orphan-4
         // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-8
 
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-9
-        if referenced {
+        // @cpt-begin:cpt-cf-settings-service-algo-category-management-no-orphan-guard:p1:inst-cat-orphan-3
+        // The count travels into the message: an administrator who must clear
+        // the category first is told how much is in the way, not merely that
+        // something is.
+        if referencing > 0 {
             return Err(DomainError::Conflict {
-                detail: "the category still has declarations referencing it".to_owned(),
+                detail: format!(
+                    "the category still has {referencing} declaration(s) referencing it"
+                ),
             });
         }
+        // @cpt-end:cpt-cf-settings-service-algo-category-management-no-orphan-guard:p1:inst-cat-orphan-3
         // @cpt-end:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-9
 
         self.repo.delete(conn, scope, id).await?;

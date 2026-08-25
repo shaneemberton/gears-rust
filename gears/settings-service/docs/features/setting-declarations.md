@@ -333,7 +333,7 @@ The hardest constraint here is not any single field but the rule connecting them
 
 ### Declaration Entity and Schema
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-setting-declarations-entity-schema`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-setting-declarations-entity-schema`
 
 The system **MUST** persist declarations in a `setting_declarations` table carrying `key` unique via `uq_declaration_key`, `leaf_slug` unique per category via `uq_declaration_category_slug`, a non-null `category_id` foreign key to `categories` declared `ON DELETE RESTRICT`, a **non-null** `default_value`, and check constraints enforcing the `scope_class`, `mode`, `status`, `source`, and `data_classification` vocabularies. Two cross-field checks **MUST** hold in the database, not only in application code: a `global` declaration may not be `tenant_overridable`, and `data_classification` being `secret` must be equivalent to `has_secret_trait`.
 

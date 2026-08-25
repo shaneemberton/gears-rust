@@ -7,6 +7,6 @@ pub mod service;
 pub mod visibility;
 
 pub use key::CategoryKey;
-pub use repo::{Category, CategoryDraft, CategoryRepository};
+pub use repo::{Category, CategoryDraft, CategoryPatch, CategoryRepository};
 pub use service::CategoryService;
 pub use visibility::{DomainVisibility, domain_visibility, is_visible};

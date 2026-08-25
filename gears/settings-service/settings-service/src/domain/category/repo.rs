@@ -44,7 +44,28 @@ pub struct Category {
     pub etag: crate::api::precondition::ETag,
 }
 
-/// What a create or update supplies.
+/// What a caller may change on an existing category.
+///
+/// `key` is absent by construction, not by convention: a category's key is the
+/// `<category>` segment of every setting declared under it, so changing it in
+/// place would re-key each of them with no cascade and no tombstone
+/// (DESIGN.md "Stale keys resolve as `NotFound`"). Making the field unreachable
+/// from the update path is what keeps that from being one typo away.
+#[derive(Debug, Clone)]
+pub struct CategoryPatch {
+    /// Display name.
+    pub name: String,
+    /// Optional long-form description.
+    pub description: Option<String>,
+    /// Optional domain affinity.
+    pub domain_affinity: Option<String>,
+    /// Ordering weight.
+    pub sort_order: i32,
+    /// Optional icon reference.
+    pub icon: Option<String>,
+}
+
+/// What a create supplies.
 ///
 /// Separate from [`Category`] because a caller cannot set `id` or `etag`: both
 /// are the service's to assign, and accepting them would let a client claim an
@@ -118,7 +139,7 @@ pub trait CategoryRepository: Send + Sync {
         conn: &C,
         scope: &AccessScope,
         id: Uuid,
-        draft: CategoryDraft,
+        patch: CategoryPatch,
     ) -> Result<Category, DomainError>;
 
     /// Remove a category.

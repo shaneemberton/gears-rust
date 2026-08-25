@@ -10,7 +10,7 @@
 
 use uuid::Uuid;
 
-use crate::domain::category::{Category, CategoryDraft, CategoryKey};
+use crate::domain::category::{Category, CategoryDraft, CategoryKey, CategoryPatch};
 use crate::domain::error::DomainError;
 
 /// A category as returned to a caller.
@@ -82,16 +82,22 @@ pub struct CreateCategoryRequest {
 
 /// What a caller supplies to replace a category's mutable fields.
 ///
-/// The same shape as create: this is a full replacement, so an omitted optional
-/// field clears it rather than leaving it untouched. A partial update would
-/// need a distinct shape that can tell "absent" from "set to null", and the
-/// design does not ask for one.
+/// A full replacement, so an omitted optional field clears it rather than
+/// leaving it untouched. A partial update would need a distinct shape that can
+/// tell "absent" from "set to null", and the design does not ask for one.
+///
+/// `key` is accepted by the parser and then refused, rather than removed from
+/// the shape. `deny_unknown_fields` would reject a supplied `key` as an
+/// *unknown* field, which is untrue -- the field exists, it is returned in
+/// every response, and it simply may not be changed. A caller deserves to be
+/// told that, not that we have never heard of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[toolkit_macros::api_dto(request)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateCategoryRequest {
-    /// The stable slug.
-    pub key: String,
+    /// The stable slug. Accepted only to be refused: see the type docs.
+    #[serde(default)]
+    pub key: Option<String>,
     /// Display name.
     pub name: String,
     /// Optional long-form description.
@@ -129,13 +135,26 @@ impl CreateCategoryRequest {
 }
 
 impl UpdateCategoryRequest {
-    /// Validate into a draft.
+    /// Validate into a patch.
     ///
     /// # Errors
-    /// [`DomainError::Validation`] when the key breaks its format rules.
-    pub fn into_draft(self) -> Result<CategoryDraft, DomainError> {
-        Ok(CategoryDraft {
-            key: CategoryKey::parse(&self.key)?,
+    /// [`DomainError::Validation`] when the body carries a `key`.
+    pub fn into_patch(self) -> Result<CategoryPatch, DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-4
+        // Refused whether or not it matches the current key: the rule is that an
+        // update does not carry one, and accepting an echo would make the wire
+        // contract depend on a value the caller cannot change anyway.
+        if self.key.is_some() {
+            return Err(DomainError::Validation {
+                field: "key".to_owned(),
+                code: crate::field::CATEGORY_KEY_IMMUTABLE,
+                message: "a category key is immutable: settings are keyed through it, \
+                          and changing it here would re-key every setting in the category"
+                    .to_owned(),
+            });
+        }
+        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-4
+        Ok(CategoryPatch {
             name: self.name,
             description: self.description,
             domain_affinity: self.domain_affinity,

@@ -24,6 +24,9 @@ pub const IF_MATCH_REQUIRED: &str = "if_match_required";
 /// A category key falls outside the 1..128 character bound.
 pub const CATEGORY_KEY_LENGTH: &str = "category_key_length";
 
+/// A caller tried to change a category `key`, which is immutable.
+pub const CATEGORY_KEY_IMMUTABLE: &str = "category_key_immutable";
+
 /// A category key contains the reserved `/` separator.
 pub const CATEGORY_KEY_RESERVED_SEPARATOR: &str = "category_key_reserved_separator";
 

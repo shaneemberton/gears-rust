@@ -17,26 +17,9 @@ use toolkit_security::AccessScope;
 use uuid::Uuid;
 
 use super::visibility::{self, DomainVisibility};
-use super::{Category, CategoryDraft, CategoryRepository};
+use super::{Category, CategoryDraft, CategoryPatch, CategoryRepository};
 use crate::api::precondition::{self, ETag};
 use crate::domain::error::DomainError;
-
-/// Whether a draft renames onto a key another category already holds.
-///
-/// Extracted so the rule is testable: every operation below takes a
-/// [`DBRunner`], and `toolkit-db` deliberately exposes no way to construct one
-/// outside a live gear, so the orchestration around this can only be exercised
-/// end to end. The rule itself is the part worth pinning — a re-check that
-/// forgot to exclude the row being updated would make renaming a category
-/// impossible without also changing its key.
-#[must_use]
-pub(crate) fn is_rename_collision(
-    current: &super::CategoryKey,
-    draft: &super::CategoryKey,
-    key_is_taken: bool,
-) -> bool {
-    draft != current && key_is_taken
-}
 
 /// Refuse query options this resource does not implement.
 ///
@@ -250,7 +233,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         scope: &AccessScope,
         id: Uuid,
         if_match: Option<&str>,
-        draft: CategoryDraft,
+        patch: CategoryPatch,
         actor: Actor<'_>,
     ) -> Result<Category, DomainError> {
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-5
@@ -270,22 +253,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-8
         // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-7
 
-        // Re-checked against the *other* rows: a rename onto a key another
-        // category already holds is a conflict, but keeping your own key is not.
-        let key_is_taken = self
-            .repo
-            .find_by_key(conn, scope, &draft.key)
-            .await?
-            .is_some();
-        // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-13
-        if is_rename_collision(&current.key, &draft.key, key_is_taken) {
-            return Err(DomainError::Conflict {
-                detail: format!("a category with key `{}` already exists", draft.key),
-            });
-        }
-        // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-13
-
-        let updated = self.repo.update(conn, scope, id, draft).await?;
+        let updated = self.repo.update(conn, scope, id, patch).await?;
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-14
         self.record(
             &updated.key,

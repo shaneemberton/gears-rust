@@ -206,7 +206,7 @@ pub async fn update_category<R: CategoryRepository>(
     let scope = authz::access_scope(&enforcer, &ctx, &resource::CATEGORY, UPDATE, Some(id)).await?;
     // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-3
     // @cpt-end:cpt-cf-settings-service-flow-category-management-update:p1:inst-cat-update-2
-    let draft = body.into_draft()?;
+    let patch = body.into_patch()?;
 
     let conn = db.conn().map_err(|err| DomainError::Internal {
         diagnostic: err.to_string(),
@@ -217,7 +217,7 @@ pub async fn update_category<R: CategoryRepository>(
             &scope,
             id,
             if_match(&headers),
-            draft,
+            patch,
             Actor {
                 ctx: &ctx,
                 request_id: &request_id(&headers),

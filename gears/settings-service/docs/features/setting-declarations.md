@@ -250,15 +250,15 @@ The hardest constraint here is not any single field but the rule connecting them
 - Unsupported OData filter or ordering expression
 
 **Steps**:
-1. [ ] - `p1` - Actor sends GET /v1/declarations/{id} or GET /v1/declarations with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-decl-read-1`
-2. [ ] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.declaration.v1~` and obtain the `AccessScope` constraints - `inst-decl-read-2`
-3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-read-3`
+1. [x] - `p1` - Actor sends GET /v1/declarations/{id} or GET /v1/declarations with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-decl-read-1`
+2. [x] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.declaration.v1~` and obtain the `AccessScope` constraints - `inst-decl-read-2`
+3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-read-3`
 4. [ ] - `p1` - Derive the combined visibility, domain-affinity, and licence predicate from the `AccessScope` constraints and the caller's entitlements - `inst-decl-read-4`
-5. [ ] - `p1` - **IF** an OData expression references an unmapped field or an unsupported operator → **RETURN** `400` - `inst-decl-read-5`
-6. [ ] - `p1` - DB: SELECT declarations with the combined predicate applied inside the query - `inst-decl-read-6`
-7. [ ] - `p1` - **IF** a single-declaration read is filtered out → **RETURN** `404` rather than `403`, so a gated declaration's existence is not disclosed - `inst-decl-read-7`
-8. [ ] - `p1` - Resolve each returned declaration's trait set for client rendering - `inst-decl-read-8`
-9. [ ] - `p1` - **RETURN** `200` with the declaration or page, each carrying `key`, `value_type_id`, and resolved traits - `inst-decl-read-9`
+5. [x] - `p1` - **IF** an OData expression references an unmapped field or an unsupported operator → **RETURN** `400` - `inst-decl-read-5`
+6. [x] - `p1` - DB: SELECT declarations with the combined predicate applied inside the query - `inst-decl-read-6`
+7. [x] - `p1` - **IF** a single-declaration read is filtered out → **RETURN** `404` rather than `403`, so a gated declaration's existence is not disclosed - `inst-decl-read-7`
+8. [x] - `p1` - Resolve each returned declaration's trait set for client rendering - `inst-decl-read-8`
+9. [x] - `p1` - **RETURN** `200` with the declaration or page, each carrying `key`, `value_type_id`, and resolved traits - `inst-decl-read-9`
 
 ## 3. Processes / Business Logic (CDSL)
 

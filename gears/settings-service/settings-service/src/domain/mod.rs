@@ -2,4 +2,6 @@
 //! Domain layer.
 
 pub mod category;
+pub mod declaration;
 pub mod error;
+pub mod odata;

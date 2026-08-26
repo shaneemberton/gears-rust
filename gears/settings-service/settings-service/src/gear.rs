@@ -14,6 +14,7 @@ use toolkit::api::OpenApiRegistry;
 use toolkit::{DatabaseCapability, Gear, GearCtx, RestApiCapability};
 use toolkit_db::{DBProvider, DbError};
 use tracing::info;
+use types_registry_sdk::TypesRegistryClient;
 
 use crate::config::SettingsServiceConfig;
 
@@ -21,11 +22,12 @@ use crate::config::SettingsServiceConfig;
 ///
 /// Holds what initialization resolves, so later phases can hang services off it
 /// without changing the startup contract.
-#[toolkit::gear(name = "settings-service", deps = [authz_resolver], capabilities = [db, rest])]
+#[toolkit::gear(name = "settings-service", deps = [types_registry, authz_resolver], capabilities = [db, rest])]
 pub struct SettingsService {
     config: OnceLock<Arc<SettingsServiceConfig>>,
     db: OnceLock<Arc<DBProvider<DbError>>>,
     enforcer: OnceLock<Arc<PolicyEnforcer>>,
+    types: OnceLock<Arc<dyn TypesRegistryClient>>,
     categories: OnceLock<
         Arc<
             crate::domain::category::CategoryService<
@@ -41,6 +43,7 @@ impl Default for SettingsService {
             config: OnceLock::new(),
             db: OnceLock::new(),
             enforcer: OnceLock::new(),
+            types: OnceLock::new(),
             categories: OnceLock::new(),
         }
     }
@@ -83,6 +86,23 @@ impl SettingsService {
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
     }
+
+    /// The GTS types registry, once initialization has run.
+    ///
+    /// A declaration's value type lives in the registry, not here: the read
+    /// surface resolves its trait set for rendering, and declaration creation
+    /// checks the type is a real catalogue entry. `has_secret_trait` is
+    /// denormalised onto the row for masking precisely so that hot path does
+    /// *not* come back through this client.
+    ///
+    /// # Errors
+    /// Returns an error when called before [`Gear::init`].
+    pub fn types(&self) -> anyhow::Result<Arc<dyn TypesRegistryClient>> {
+        self.types
+            .get()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
+    }
 }
 
 #[async_trait]
@@ -111,13 +131,22 @@ impl Gear for SettingsService {
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
-        // Resolved at init, not per request: a decision point that cannot be
-        // resolved must stop the gear coming up, rather than surfacing later as
-        // a request-time denial indistinguishable from a real policy decision.
+        // Both resolved at init, not per request. A decision point that cannot
+        // be resolved must stop the gear coming up rather than surface later as
+        // a request-time denial indistinguishable from a real policy decision;
+        // and a registry that is absent must not first be discovered by a read
+        // that has already passed authorization and reached the database.
         let authz = ctx
             .client_hub()
             .get::<dyn AuthZResolverClient>()
             .map_err(|e| anyhow::anyhow!("failed to resolve the AuthZ resolver: {e}"))?;
+        let types = ctx
+            .client_hub()
+            .get::<dyn TypesRegistryClient>()
+            .map_err(|e| anyhow::anyhow!("failed to resolve the types registry: {e}"))?;
+        self.types
+            .set(types)
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
 
         self.enforcer

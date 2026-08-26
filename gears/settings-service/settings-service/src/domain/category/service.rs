@@ -21,30 +21,6 @@ use super::{Category, CategoryDraft, CategoryPatch, CategoryRepository};
 use crate::api::precondition::{self, ETag};
 use crate::domain::error::DomainError;
 
-/// Refuse query options this resource does not implement.
-///
-/// `$select` is parsed by the platform but not honoured here: supporting it
-/// means a response whose shape varies per request, and no caller has asked
-/// for it. Refusing is deliberate rather than ignoring — a caller whose
-/// projection was silently dropped receives every field believing it asked for
-/// two, which is the same failure the declared filter surface exists to
-/// prevent.
-///
-/// # Errors
-/// [`DomainError::Validation`] naming the unsupported option.
-fn reject_unsupported_options(query: &toolkit_odata::ODataQuery) -> Result<(), DomainError> {
-    if query.select.is_some() {
-        return Err(DomainError::Validation {
-            field: "$select".to_owned(),
-            code: crate::field::ODATA_UNSUPPORTED_OPTION,
-            message: "$select is not supported on categories; omit it to receive the full \
-                      representation"
-                .to_owned(),
-        });
-    }
-    Ok(())
-}
-
 /// Who performed a mutation and under which request.
 ///
 /// The two always travel together — an audit record needs both, and splitting
@@ -177,7 +153,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         scope: &AccessScope,
         query: &toolkit_odata::ODataQuery,
     ) -> Result<toolkit_odata::Page<Category>, DomainError> {
-        reject_unsupported_options(query)?;
+        crate::domain::odata::reject_unsupported_options(query, "categories")?;
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-6
         let visible = visibility::domain_visibility(scope);
         // @cpt-end:cpt-cf-settings-service-flow-category-management-list:p1:inst-cat-list-6

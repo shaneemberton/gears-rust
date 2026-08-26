@@ -35,6 +35,13 @@ pub struct SettingsService {
             >,
         >,
     >,
+    declarations: OnceLock<
+        Arc<
+            crate::domain::declaration::DeclarationService<
+                crate::infra::storage::declaration_repo::DeclarationRepo,
+            >,
+        >,
+    >,
 }
 
 impl Default for SettingsService {
@@ -45,6 +52,7 @@ impl Default for SettingsService {
             enforcer: OnceLock::new(),
             types: OnceLock::new(),
             categories: OnceLock::new(),
+            declarations: OnceLock::new(),
         }
     }
 }
@@ -160,6 +168,15 @@ impl Gear for SettingsService {
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
+        self.declarations
+            .set(Arc::new(
+                crate::domain::declaration::DeclarationService::new(
+                    crate::infra::storage::declaration_repo::DeclarationRepo,
+                    self.types()?,
+                ),
+            ))
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-9
         info!("Settings Service gear initialized");
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-9
@@ -180,10 +197,22 @@ impl RestApiCapability for SettingsService {
             .get()
             .ok_or_else(|| anyhow::anyhow!("category service not initialized"))?
             .clone();
-        Ok(crate::api::rest::routes::register_routes(
+        let declarations = self
+            .declarations
+            .get()
+            .ok_or_else(|| anyhow::anyhow!("declaration service not initialized"))?
+            .clone();
+        let router = crate::api::rest::routes::register_routes(
             router,
             openapi,
             service,
+            self.db()?,
+            self.enforcer()?,
+        );
+        Ok(crate::api::rest::declaration_routes::register_routes(
+            router,
+            openapi,
+            declarations,
             self.db()?,
             self.enforcer()?,
         ))

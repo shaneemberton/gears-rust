@@ -60,7 +60,7 @@ Two contracts in this feature are consumed from outside the service and are ther
 |-------|-----------------|
 | `cpt-cf-settings-service-actor-internal-caller` | Consumes the `SettingsReaderClient` trait in process and must handle its degradation contract |
 | `cpt-cf-settings-service-actor-contributing-module` | Consumes the `SettingsContributionClient` trait to register and retire its own declarations |
-| `cpt-cf-settings-service-actor-authn-resolver` | Authenticates the caller and carries the credential step-up assertion |
+| `cpt-cf-settings-service-actor-authn-resolver` | Authenticates the caller. The step-up token a re-authenticated caller presents is verified **locally** in this gear against the identity provider's JWKS; the resolver is not called on the write path (DESIGN §4.2 *Value Writer*) |
 | `cpt-cf-settings-service-actor-authz-resolver` | Supplies the authorization decision and the `AccessScope` constraints the PEP enforces |
 | `cpt-cf-settings-service-actor-platform-admin` | The operator whose session is re-authenticated when a behavior-affecting action demands step-up |
 
@@ -103,18 +103,18 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 
 **Input**: Candidate setting key string
 
-**Output**: A parsed key value object carrying its value-type segment, instance segment, category, and leaf name, or a validation problem
+**Output**: A parsed key value object carrying the fixed base type, the derived type, the category token, and the leaf name, or a validation problem
 
-GTS grammar is **not** re-implemented here. The platform GTS identifier library is the single source of truth for the prefix, the lowercase rule, the permitted character set, and the four-name-token-per-segment shape. This algorithm adds only what that library cannot know: that a setting key is exactly a type followed by an instance, and where the category and leaf name sit inside the instance segment.
+GTS grammar is **not** re-implemented here. The platform GTS identifier library is the single source of truth for the prefix, the lowercase rule, the permitted character set, and the four-name-token-per-segment shape. This algorithm adds only what that library cannot know: that a setting key is exactly the Settings gear's abstract `setting_type` base followed by **one derived type**, and where the category and leaf name sit inside that derived half ([ADR-002](../ADR/ADR-002-setting-key-gts-type-id.md)).
 
 **Steps**:
-1. [x] - `p1` - Validate the whole candidate as a GTS identifier through the platform GTS validator, disallowing wildcards, since a concrete setting key never carries one - `inst-gf-key-1`
+1. [x] - `p1` - Validate the whole candidate as a GTS identifier through the platform GTS validator, disallowing wildcards, since a concrete setting key never carries one; refuse surrounding whitespace rather than trimming it, so the stored form is byte-identical to the supplied one - `inst-gf-key-1`
 2. [x] - `p1` - **IF** validation fails → **RETURN** its problem unchanged in substance, preserving whether the fault was identifier-level or segment-level and, for a segment fault, the segment number and byte offset it reported - `inst-gf-key-2`
-3. [x] - `p1` - **IF** the identifier does not consist of exactly two segments → **RETURN** a validation problem stating that a setting key is a value type followed by an instance id, naming how many segments were found - `inst-gf-key-3`
-4. [x] - `p1` - **IF** the first segment is not a GTS type → **RETURN** a validation problem, because the value-type half must be a registered type - `inst-gf-key-4`
-5. [x] - `p1` - **IF** the second segment is a GTS type → **RETURN** a validation problem, because the setting is an instance and a trailing terminator would make it a type - `inst-gf-key-5`
-6. [x] - `p1` - Read the owning category from the instance segment's namespace token and the leaf name from its type token; both authoring parties place them in those positions - `inst-gf-key-6`
-7. [x] - `p1` - **RETURN** the parsed key value object exposing both segments without re-normalizing the input, so a stored key and a supplied key compare identically - `inst-gf-key-7`
+3. [x] - `p1` - **IF** the identifier does not consist of exactly two segments → **RETURN** a validation problem stating that a setting key is the setting base type followed by one derived type, naming how many segments were found - `inst-gf-key-3`
+4. [x] - `p1` - **IF** the first segment is not the Settings gear's abstract base `gts.cf.core.settings.setting_type.v1~`, compared byte-for-byte on the candidate → **RETURN** a validation problem naming the base that was found, because a key rooted anywhere else is not a setting whatever else it may be - `inst-gf-key-4`
+5. [x] - `p1` - **IF** the second segment is not itself a GTS type, having no trailing terminator → **RETURN** a validation problem, because a setting is a registered type and the terminator is the entire difference between a type and an instance - `inst-gf-key-5`
+6. [x] - `p1` - Read the owning category from the derived half's namespace token and the leaf name from its type token; both authoring parties place them in those positions, and a derived half yielding an empty category or leaf is refused - `inst-gf-key-6`
+7. [x] - `p1` - **RETURN** the parsed key value object exposing the base and the derived half without re-normalizing the input, so a stored key and a supplied key compare identically - `inst-gf-key-7`
 
 ### Optimistic Concurrency Precondition Evaluation
 
@@ -151,7 +151,7 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 
 - [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-gear-foundation-authz-stepup`
 
-**Input**: Authenticated request context, the target GTS resource type, the required action, and whether the action is behavior-affecting
+**Input**: Authenticated request context, the target GTS resource type, the required action, and whether the action demands step-up — a behavior-affecting declaration action, or an interactive value write to a declaration that requires elevated confirmation
 
 **Output**: An `AccessScope` for the caller, or a denial
 
@@ -161,8 +161,8 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 3. [x] - `p1` - Ask the Policy Decision client for a decision on the action against the target GTS resource type - `inst-gf-authz-3`
 4. [x] - `p1` - **IF** the decision cannot be obtained → **RETURN** denial, failing closed rather than proceeding on an unknown verdict - `inst-gf-authz-4`
 5. [x] - `p1` - **IF** the decision is deny → **RETURN** denial - `inst-gf-authz-5`
-6. [ ] - `p1` - **IF** the action is behavior-affecting → require a valid credential step-up assertion established at the identity provider - `inst-gf-authz-6`
-7. [ ] - `p1` - **IF** the step-up assertion is absent, expired, or not bound to this principal → **RETURN** denial - `inst-gf-authz-7`
+6. [ ] - `p1` - **IF** the action demands step-up → require a fresh step-up token established at the identity provider, verified locally through the gear's `StepUpVerifier` port: signature against the provider's JWKS, `sub` bound to this principal, `auth_time` within the freshness window of at most five minutes, and the required `acr`/`amr` - `inst-gf-authz-6`
+7. [ ] - `p1` - **IF** the token is absent, outside the window, or not bound to this principal → **RETURN** denial carrying the RFC 9470 challenge, `401` with `insufficient_user_authentication`, so the client learns what to ask the provider for; a service principal writing to such a declaration is refused outright, since no ceremony a machine performs proves a person is present - `inst-gf-authz-7`
 8. [x] - `p1` - Build the `AccessScope` from the decision's constraints - `inst-gf-authz-8`
 9. [x] - `p1` - **RETURN** the `AccessScope` for the handler to apply as a query and visibility predicate - `inst-gf-authz-9`
 
@@ -180,11 +180,11 @@ Not applicable. This feature introduces no domain entity and therefore no lifecy
 | Gear Scaffold and ClientHub Registration | registering the client traits into `ClientHub` | 2.5 |
 | REST and OData Infrastructure | rejecting an expression on an unmapped field or unsupported operator | 2.2 |
 | Policy Enforcement Point and Step-Up Gate | enforcing against a target resource type; applying `AccessScope` as a query predicate | 2.2 |
-| Audit Emitter | publishing domain events alongside audit records | the Apply-side wave |
+| Audit Emitter | the transactional `AuditSink` port with its gear-local `audit_records` binding, and publishing domain events alongside the records | 2.6 |
 
 `SettingsReaderClient` is the reason two of these wait until 2.5 rather than 2.2: it is the effective-**value** read path, so nothing implements it until value resolution exists, and there is nothing to register before then.
 
-The step-up half of *Policy Enforcement Point and Step-Up Gate* waits on a contract this service does not own at all — DESIGN.md §4.2 assigns it to `authn-resolver`. See the DECOMPOSITION note on the Apply-side wave.
+The step-up half of *Policy Enforcement Point and Step-Up Gate* is this gear's own to build, not a contract to wait on: DESIGN.md §4.2 *Value Writer* specifies the default OIDC/JWKS `StepUpVerifier` binding — a port declared in the domain and adapted in infra, verifying the presented token's claims locally. It lands with the first path that needs it, the value write path (entry 2.8), which is also where the behavior-affecting declaration actions of 2.3 pick it up; `MockStepUpVerifier` in the test harness is the only sanctioned non-verifying binding.
 
 ### SDK Crate, Models and Value Objects
 
@@ -312,7 +312,7 @@ The system **MUST** provide shared `OperationBuilder` wiring, OData `$filter`, `
 
 - [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-authz-stepup`
 
-The system **MUST** enforce authorization through the `PolicyEnforcer` PEP against the target GTS resource type, **MUST** derive an `AccessScope` from the decision's constraints for handlers to apply as a query and visibility predicate, and **MUST** verify a credential step-up assertion established at the identity provider before any behavior-affecting action. An authorization or entitlement decision that cannot be obtained **MUST** deny.
+The system **MUST** enforce authorization through the `PolicyEnforcer` PEP against the target GTS resource type, **MUST** derive an `AccessScope` from the decision's constraints for handlers to apply as a query and visibility predicate, and **MUST** verify a fresh step-up token established at the identity provider before any behavior-affecting declaration action and before an interactive value write to a declaration that requires elevated confirmation. Verification **MUST** go through the gear's own `StepUpVerifier` port, whose default binding is the local OIDC/JWKS claims check of DESIGN.md §4.2 *Value Writer*; a binding that cannot fail is not a binding. Authorization **MUST** be decided before step-up is consulted, and an authorization or entitlement decision that cannot be obtained **MUST** deny.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-gear-foundation-authz-stepup`
@@ -320,13 +320,13 @@ The system **MUST** enforce authorization through the `PolicyEnforcer` PEP again
 **Constraints**: `cpt-cf-settings-service-constraint-rbac-policy-enforcer`, `cpt-cf-settings-service-constraint-step-up-at-idp`
 
 **Touches**:
-- Entities: `PolicyEnforcer`, `AccessScope`, step-up assertion
+- Entities: `PolicyEnforcer`, `AccessScope`, `StepUpVerifier`
 
 ### Audit Emitter
 
 - [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-audit-emitter`
 
-The system **MUST** provide the shared Audit Emitter through which every mutating feature publishes its audit records and domain events, supporting pre-image and post-image capture so later features can audit a mutation's before and after state.
+The system **MUST** provide the shared Audit Emitter through which every mutating feature publishes its audit records and domain events, supporting pre-image and post-image capture so later features can audit a mutation's before and after state. Its sink **MUST** be a port taking the mutation's own transaction and `AccessScope` — `AuditSink::append(txn, scope, record)` — so that the gear-local `audit_records` binding delivered in entry 2.6 commits the record with the change it audits or rolls back with it. The tracing stand-in the tree carries until then exercises the emitter's callers and satisfies none of this.
 
 **Touches**:
 - Entities: Audit Emitter
@@ -348,10 +348,10 @@ The system **MUST** provide the shared Audit Emitter through which every mutatin
 - [x] A round-trip Problem test asserts every wire-string constant appears at its expected JSON path
 - [x] The projection carries no `instance` or `trace_id` field
 - [x] A reader failure never returns a substituted Schema Default in place of an error
-- [x] A well-formed setting key parses into its value-type segment and instance segment, and the parsed key round-trips to a byte-identical string
-- [x] The category and leaf name are recoverable from the instance segment's namespace and type tokens, for a module-supplied key as well as an admin-composed one
-- [x] A bare value type, or a key with three or more segments, is rejected as not being a value type followed by an instance id
-- [x] A trailing `~` on the instance segment is rejected, because that would make it a type
+- [x] A well-formed setting key parses into its base type and its derived type, and the parsed key round-trips to a byte-identical string
+- [x] The category and leaf name are recoverable from the derived half's namespace and type tokens, for a module-supplied key as well as an admin-composed one
+- [x] A bare base type, a key with three or more segments, or a key rooted under any base other than `gts.cf.core.settings.setting_type.v1~` is rejected, the last naming the base that was found
+- [x] A derived half without the trailing `~` is rejected, because a setting is a type and without the terminator it would be an instance
 - [x] An identifier-level fault — missing `gts.` prefix, uppercase — is reported as identifier-level, and a segment-level fault such as `/` in a token is reported with its segment number
 - [x] A segment carrying five name tokens before the version is rejected, since the GTS grammar admits exactly four
 - [ ] Every 4xx and 5xx response carries `Content-Type: application/problem+json` with `type`, `title`, `status`, and `trace_id` populated

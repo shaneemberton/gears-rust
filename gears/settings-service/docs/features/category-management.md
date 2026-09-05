@@ -47,7 +47,7 @@ Category Management provides the flat taxonomy every setting declaration is file
 
 Categories are the first domain entity in the Settings Service and the only one with no upstream domain dependency, which is why they come immediately after the gear foundation. A setting declaration carries a non-null `category_id`, so categories must exist before any declaration can.
 
-The category `key` is load-bearing well beyond grouping. It becomes the `<category>` segment of an admin-authored setting's instance id, so it is validated against the reserved path separator at create time rather than treated as free text. That coupling has a consequence worth stating up front: renaming or moving a category re-keys every setting inside it, and the stale key then resolves as not-found with no alias and no key history. The `key` is therefore immutable after creation, and only the display `name` may change.
+The category `key` is load-bearing well beyond grouping. It becomes the `<category>` token of every setting key declared under it — the third segment of the key's derived half, for admin-authored and module-contributed settings alike ([ADR-002](../ADR/ADR-002-setting-key-gts-type-id.md)) — so it is validated against the reserved path separator at create time rather than treated as free text. That coupling has a consequence worth stating up front: renaming or moving a category re-keys every setting inside it, and the stale key then resolves as not-found with no alias and no key history. The `key` is therefore immutable after creation, and only the display `name` may change.
 
 The no-orphan rule protects the invariant that no declaration is ever left pointing at a missing category. It is enforced twice deliberately: an explicit pre-check that returns a meaningful conflict, and the declaration-to-category foreign key `ON DELETE RESTRICT`, which is the authoritative guard and holds even when the only referencing declaration is `retired`.
 
@@ -69,7 +69,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - **Design**: [DESIGN.md](../DESIGN.md) — §4.1 (Entity `Category`), §4.2 (Component: Category Management), §4.3 (REST API — Categories, Error Response Format), §4.7 (Table `categories`), §4.8 (Security and Authorization)
 - **DECOMPOSITION**: [DECOMPOSITION.md](../DECOMPOSITION.md) entry 2.2
 - **Dependencies**: entry 2.1 gear foundation, which supplies the persistence adapter, the RFC-9457 Problem mapping, the shared `If-Match` precondition helper returning `428` and `412`, the `PolicyEnforcer` PEP and `AccessScope` derivation, and the Audit Emitter. This feature consumes those rather than restating them.
-- **Not applicable**: No PRD use case maps directly to category administration; the four defined use cases concern setting configuration, value resolution, staging, and audit review. Feature and licence entitlement gating is not part of this wave and lands with the licensing feature, so the entitlement consultation named in the DESIGN component's dependency list is wired through the foundation's authorization path here without its own fail-closed licence policy. Frontend presentation is owned by a future frontend DESIGN. Performance targets are set at the system level in the PRD NFR section.
+- **Not applicable**: No PRD use case maps directly to category administration; the four defined use cases concern setting configuration, value resolution, validate-and-set, and audit review. Feature and licence entitlement gating is R2 — the `license-resolver` gear is documentation only, and the platform gates at base-licence level — so the entitlement consultation named in the DESIGN component's dependency list is wired through the foundation's authorization path here without its own fail-closed licence policy. Frontend presentation is owned by a future frontend DESIGN. Performance targets are set at the system level in the PRD NFR section.
 
 ## 2. Actor Flows (CDSL)
 
@@ -91,7 +91,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 **Steps**:
 1. [x] - `p1` - Actor sends POST /v1/categories with `key`, `name`, optional `description`, optional `domain_affinity`, `sort_order`, optional `icon` - `inst-cat-create-1`
-2. [x] - `p1` - Authorize `create` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-create-2`
+2. [x] - `p1` - Authorize `create` on `gts.cf.core.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-create-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-create-3`
 4. [x] - `p1` - Invoke category key validation on the supplied `key` - `inst-cat-create-4`
 5. [x] - `p1` - **IF** key validation fails → **RETURN** `400` with a field-level error naming `key` - `inst-cat-create-5`
@@ -121,7 +121,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 **Steps**:
 1. [x] - `p1` - Actor sends PATCH /v1/categories/{id} with `If-Match` and any of `name`, `description`, `domain_affinity`, `sort_order`, `icon` - `inst-cat-update-1`
-2. [x] - `p1` - Authorize `update` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-update-2`
+2. [x] - `p1` - Authorize `update` on `gts.cf.core.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-update-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-update-3`
 4. [x] - `p1` - **IF** the request body carries `key` → **RETURN** `400`, because `key` is immutable once settings are keyed through it - `inst-cat-update-4`
 5. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-update-5`
@@ -153,7 +153,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 **Steps**:
 1. [x] - `p1` - Actor sends DELETE /v1/categories/{id} with `If-Match` - `inst-cat-delete-1`
-2. [x] - `p1` - Authorize `delete` on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-delete-2`
+2. [x] - `p1` - Authorize `delete` on `gts.cf.core.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-delete-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-delete-3`
 4. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-delete-4`
 5. [x] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-delete-5`
@@ -180,7 +180,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 **Steps**:
 1. [x] - `p1` - Actor sends GET /v1/categories/{id} - `inst-cat-get-1`
-2. [x] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-get-2`
+2. [x] - `p1` - Authorize `read` on `gts.cf.core.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-get-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-get-3`
 4. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-get-4`
 5. [x] - `p1` - **IF** category not found → **RETURN** `404` - `inst-cat-get-5`
@@ -203,7 +203,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 
 **Steps**:
 1. [x] - `p1` - Actor sends GET /v1/categories with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-cat-list-1`
-2. [x] - `p1` - Authorize `read` on `gts.cf.toolkit.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-list-2`
+2. [x] - `p1` - Authorize `read` on `gts.cf.core.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-list-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-list-3`
 4. [x] - `p1` - Parse the OData expressions against the category field mapping - `inst-cat-list-4`
 5. [x] - `p1` - **IF** an expression references an unmapped field or an unsupported operator → **RETURN** `400` - `inst-cat-list-5`
@@ -329,7 +329,7 @@ The system **MUST** reject a category `key` that is empty, exceeds 128 character
 
 - [x] `p1` - **ID**: `cpt-cf-settings-service-dod-category-management-authorization`
 
-The system **MUST** authorize every category operation as per-resource-type CRUD on `gts.cf.toolkit.settings.category.v1~` through the `PolicyEnforcer` PEP, **MUST** apply the caller's `AccessScope` domain constraints inside the query rather than as a post-filter, and **MUST** deny when a decision cannot be obtained. A category filtered out by the visibility gate **MUST** be reported as absent rather than as forbidden.
+The system **MUST** authorize every category operation as per-resource-type CRUD on `gts.cf.core.settings.category.v1~` through the `PolicyEnforcer` PEP, **MUST** apply the caller's `AccessScope` domain constraints inside the query rather than as a post-filter, and **MUST** deny when a decision cannot be obtained. A category filtered out by the visibility gate **MUST** be reported as absent rather than as forbidden.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-category-management-visibility-filter`

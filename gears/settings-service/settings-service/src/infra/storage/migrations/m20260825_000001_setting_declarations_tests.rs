@@ -229,6 +229,26 @@ async fn a_leaf_name_may_not_repeat_within_one_category() {
 }
 
 #[tokio::test]
+async fn a_retired_predecessor_does_not_hold_its_leaf_name() {
+    // The slug index is partial on `status = 'active'`: the name is what a live
+    // declaration occupies, and a retired one has left it. Without this, the
+    // evolve path (`…v1~` retired, `…v2~` created) could never take the name
+    // back for the successor.
+    let db = migrated().await;
+    run(
+        &db,
+        &insert("d1", CATEGORY_ID, "timeout", "status='retired'"),
+    )
+    .await
+    .expect("retired predecessor");
+    let mut successor = insert("d2", CATEGORY_ID, "timeout", "");
+    successor = successor.replace(".network.timeout.v1~'", ".network.timeout.v2~'");
+    run(&db, &successor)
+        .await
+        .expect("the successor takes the name the retired row no longer holds");
+}
+
+#[tokio::test]
 async fn a_category_holding_a_declaration_cannot_be_deleted() {
     // The no-orphan rule as the database enforces it. The service checks first
     // so the common case reports a conflict rather than a constraint error, but

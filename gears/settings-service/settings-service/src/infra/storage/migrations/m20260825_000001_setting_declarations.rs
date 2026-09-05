@@ -77,9 +77,12 @@ impl MigrationTrait for Migration {
                      ON setting_declarations (key);",
                 // Per category, not globally: two categories may each hold a
                 // setting named `timeout`, and their keys differ by the category
-                // segment they embed.
+                // segment they embed. Partial on the active rows: a retired
+                // predecessor must not hold its name against its own successor
+                // (DESIGN.md §4.3 *Re-declare to revive*, §4.7).
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_declaration_category_slug
-                     ON setting_declarations (category_id, leaf_slug);",
+                     ON setting_declarations (category_id, leaf_slug)
+                     WHERE status = 'active';",
                 "CREATE INDEX IF NOT EXISTS idx_declarations_category
                      ON setting_declarations (category_id);",
                 "CREATE INDEX IF NOT EXISTS idx_declarations_owner_module
@@ -152,7 +155,8 @@ impl MigrationTrait for Migration {
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_declaration_key
                      ON setting_declarations (key);",
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_declaration_category_slug
-                     ON setting_declarations (category_id, leaf_slug);",
+                     ON setting_declarations (category_id, leaf_slug)
+                     WHERE status = 'active';",
                 "CREATE INDEX IF NOT EXISTS idx_declarations_category
                      ON setting_declarations (category_id);",
                 "CREATE INDEX IF NOT EXISTS idx_declarations_owner_module

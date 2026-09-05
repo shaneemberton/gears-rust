@@ -13,7 +13,7 @@
 //! the same.
 
 use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+use sea_orm_migration::sea_orm::{ConnectionTrait, DatabaseBackend};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -45,7 +45,7 @@ impl MigrationTrait for Migration {
             // conflicting with every other feature that needs it.
             "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
         ] {
-            conn.execute(Statement::from_string(backend, sql)).await?;
+            conn.execute_unprepared(sql).await?;
         }
 
         Ok(())

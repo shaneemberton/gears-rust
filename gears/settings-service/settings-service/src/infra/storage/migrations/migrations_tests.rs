@@ -10,7 +10,7 @@
 //! reachable. What is testable in-crate is that the harness hands over a list
 //! that actually applies.
 
-use sea_orm::{ConnectionTrait, Database, DatabaseBackend, DbBackend};
+use sea_orm::{Database, DatabaseBackend, DbBackend};
 use sea_orm_migration::MigratorTrait;
 
 use super::Migrator;

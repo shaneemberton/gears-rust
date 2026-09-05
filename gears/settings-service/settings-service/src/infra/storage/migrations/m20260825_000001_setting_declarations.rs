@@ -23,7 +23,7 @@
 //! the test backend.
 
 use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+use sea_orm_migration::sea_orm::{ConnectionTrait, DatabaseBackend};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -167,19 +167,15 @@ impl MigrationTrait for Migration {
         };
 
         for sql in statements {
-            conn.execute(Statement::from_string(backend, sql)).await?;
+            conn.execute_unprepared(sql).await?;
         }
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let backend = manager.get_database_backend();
         manager
             .get_connection()
-            .execute(Statement::from_string(
-                backend,
-                "DROP TABLE IF EXISTS setting_declarations;",
-            ))
+            .execute_unprepared("DROP TABLE IF EXISTS setting_declarations;")
             .await?;
         Ok(())
     }

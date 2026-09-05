@@ -128,14 +128,6 @@ gears:
     config:
       vendor: "constructorfabric"
 
-  # Required by settings-service: a declaration's value type is a registry
-  # entry, so the gear resolves TypesRegistryClient at init and refuses to
-  # start without it. No seeded entities are needed here -- the settings value
-  # type catalogue is authored per deployment.
-  types-registry:
-    config:
-      vendor: "constructorfabric"
-
   static-authn-plugin:
     config:
       vendor: "constructorfabric"

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use toolkit_db::secure::DBRunner;
 use toolkit_security::SecurityContext;
 
-use crate::audit::{AuditEmitter, AuditRecord, AuditScope, AuditValue};
+use crate::audit::{AuditEmitter, AuditRecord, AuditTenant, AuditValue};
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
@@ -54,6 +54,9 @@ fn snapshot(category: &Category) -> serde_json::Value {
 pub struct CategoryService<R> {
     repo: R,
     audit: Arc<dyn AuditEmitter>,
+    /// The root tenant's id. Categories are platform-scoped, and platform scope
+    /// is that id rather than an absent tenant (DESIGN.md §4.1).
+    root_tenant: AuditTenant,
 }
 
 impl<R: CategoryRepository> CategoryService<R> {
@@ -63,8 +66,12 @@ impl<R: CategoryRepository> CategoryService<R> {
     /// "no audit configured" a supported state, and a mutation could then
     /// succeed leaving no trail — which is precisely what DESIGN.md §4.2's
     /// fail-closed rule forbids.
-    pub fn new(repo: R, audit: Arc<dyn AuditEmitter>) -> Self {
-        Self { repo, audit }
+    pub fn new(repo: R, audit: Arc<dyn AuditEmitter>, root_tenant: AuditTenant) -> Self {
+        Self {
+            repo,
+            audit,
+            root_tenant,
+        }
     }
 
     /// Record a mutation, failing the operation if the trail cannot be written.
@@ -80,7 +87,7 @@ impl<R: CategoryRepository> CategoryService<R> {
         // so their audit scope is the platform row rather than a tenant's.
         let mut rec = AuditRecord::new(
             key.as_str(),
-            AuditScope::Platform,
+            self.root_tenant,
             actor.ctx.subject_id().to_string(),
             action,
             actor.request_id,

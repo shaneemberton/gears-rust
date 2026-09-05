@@ -19,8 +19,8 @@ use uuid::Uuid;
 /// # Invariants the database owns
 ///
 /// Three cross-field rules are `CHECK` constraints rather than application
-/// guards, so no path can write a contradiction: a `global` declaration is never
-/// `tenant_overridable`, `data_classification = 'secret'` holds exactly when
+/// guards, so no path can write a contradiction: an anonymous-exposable
+/// declaration is never `secret` or `pii`, `data_classification = 'secret'` holds exactly when
 /// `has_secret_trait` does, and `owner_module` is present exactly when `source`
 /// is `module_contributed`. The mapping here is deliberately plain `String` and
 /// `bool` -- the vocabulary is enforced where it cannot be bypassed.
@@ -63,12 +63,14 @@ pub struct Model {
     /// `standard` or `advanced`.
     pub mode: String,
 
-    /// Whether a tenant may read the setting. Read-only exposure, independent of
-    /// whether they may override it.
-    pub tenant_visible: bool,
+    /// Whether changing this setting's value requires elevated confirmation.
+    /// Defaults to `true`: a declaration that says nothing is protected, and
+    /// clearing the flag is itself step-up-gated.
+    pub requires_step_up: bool,
 
-    /// Whether a tenant may override the value. Never true for `global`.
-    pub tenant_overridable: bool,
+    /// Whether the effective value may be served on the unauthenticated read
+    /// surface. Never true for a `secret` or `pii` declaration — a `CHECK`.
+    pub anonymous_exposable: bool,
 
     /// Optional administrative domain, used to filter listings.
     pub domain_affinity: Option<String>,

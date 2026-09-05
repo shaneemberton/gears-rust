@@ -18,16 +18,18 @@
 //! Fields that carry a value fixed by the design, rather than by the deployment,
 //! may default — [`SettingsServiceConfig::cache_ttl_seconds`] is the only one.
 //!
-//! # Step-up configuration is not here
+//! # Step-up configuration is not here yet
 //!
-//! An earlier draft required a JWKS endpoint and a step-up freshness window.
-//! Neither traces to a PRD requirement, and the freshness window was actively
-//! harmful: `cpt-cf-settings-service-fr-apply-preview-stepup` requires
-//! credential re-verification before **every** Apply, unconditionally, so a
-//! deployment-tunable staleness allowance is a knob for weakening a requirement
-//! that has no carve-out. DESIGN.md §4.2 also assigns the step-up contract to
-//! the `authn-resolver` gear, which this service resolves rather than defines —
-//! so whatever configuration verification needs arrives with that contract.
+//! Step-up is gated per declaration (`requires_step_up`, default required —
+//! `cpt-cf-settings-service-fr-service-writes`) and enforced on interactive writes
+//! and behavior-affecting declaration actions (`cpt-cf-settings-service-fr-authn-role-gating`).
+//! DESIGN.md §4.2 *Value Writer* fixes the R1 check: the presented token's
+//! signature against the identity provider's JWKS, `sub` matching the session, and `auth_time`
+//! within a **≤ 5 min** freshness window — a binding behind a ClientHub-resolved
+//! `StepUpVerifier` port owned by this gear. The window is a design constant, not
+//! a deployment knob, and the JWKS endpoint is the identity provider's, so the binding carries
+//! its own configuration when it lands with the write path; nothing here
+//! precedes it.
 
 use serde::Deserialize;
 

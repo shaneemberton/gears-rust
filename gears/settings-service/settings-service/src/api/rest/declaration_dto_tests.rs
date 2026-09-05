@@ -12,9 +12,9 @@ fn rendered(traits: serde_json::Value) -> RenderedDeclaration {
     RenderedDeclaration {
         declaration: Declaration {
             id: Uuid::nil(),
-            key: "gts.cf.settings.types.bool_flag.v1~acme.settings.network.proxy.v1".to_owned(),
+            key: "gts.cf.core.settings.setting_type.v1~acme.settings.network.proxy.v1~".to_owned(),
             leaf_slug: "proxy".to_owned(),
-            value_type_id: "gts.cf.settings.types.bool_flag.v1~".to_owned(),
+            value_type_id: "gts.cf.toolkit.settings.type_bool_flag.v1~".to_owned(),
             category_id: Uuid::nil(),
             scope_class: "local".to_owned(),
             mode: "standard".to_owned(),
@@ -41,11 +41,15 @@ fn the_wire_shape_is_snake_case() {
 
 #[test]
 fn the_value_type_travels_beside_the_key() {
-    // A client must not have to split the key to learn its value type: the
-    // split is grammar the server already performed.
+    // The key is a GTS type id under the settings base (ADR-002); the value type
+    // is a separate fact of the declaration. A client learns it from this field,
+    // not by splitting the key -- there is nothing in the key to split off.
     let dto = DeclarationDto::from(rendered(json!({})));
-    assert_eq!(dto.value_type_id, "gts.cf.settings.types.bool_flag.v1~");
-    assert!(dto.key.starts_with(&dto.value_type_id));
+    assert_eq!(
+        dto.value_type_id,
+        "gts.cf.toolkit.settings.type_bool_flag.v1~"
+    );
+    assert!(!dto.key.contains(&dto.value_type_id));
 }
 
 #[test]

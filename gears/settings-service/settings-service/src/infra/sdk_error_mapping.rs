@@ -15,15 +15,15 @@ use crate::domain::error::DomainError;
 use crate::precondition;
 
 /// The resource this gear attributes its errors to.
-#[resource_error("gts.cf.toolkit.settings.declaration.v1~")]
+#[resource_error("gts.cf.core.settings.declaration.v1~")]
 struct SettingsResource;
 
 /// Errors attributed to a category.
-#[resource_error("gts.cf.toolkit.settings.category.v1~")]
+#[resource_error("gts.cf.core.settings.category.v1~")]
 struct CategoryResource;
 
 /// Errors attributed to a stored setting value.
-#[resource_error("gts.cf.toolkit.settings.value.v1~")]
+#[resource_error("gts.cf.core.settings.value.v1~")]
 struct ValueResource;
 
 /// Build a denial attributed to the resource actually enforced.

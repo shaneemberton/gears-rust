@@ -21,8 +21,10 @@ toolkit-canonical-errors = { workspace = true }
 settings-service-sdk = { workspace = true }
 authz-resolver-sdk = { workspace = true }
 types-registry-sdk = { workspace = true }
+tenant-resolver-sdk = { workspace = true }
 authz-resolver = { workspace = true }
 types-registry = { workspace = true }
+tenant-resolver = { workspace = true }
 uuid = { workspace = true }
 
 anyhow = { workspace = true }

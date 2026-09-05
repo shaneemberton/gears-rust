@@ -10,9 +10,9 @@ use crate::domain::declaration::service::RenderedDeclaration;
 ///
 /// Carries `key`, `value_type_id` and the resolved trait set, which is what the
 /// read surface is specified to render. The value type travels beside the key
-/// rather than being left for the client to split off the key's left half: the
-/// split is grammar the server already performed, and re-deriving it in every
-/// client is how two parsers drift apart.
+/// because the key no longer carries it: a setting key is a GTS *type* id
+/// (ADR-002), and which value type its default and overrides validate against
+/// is a separate fact of the declaration, not a half of its name.
 // `Eq` is absent because `traits` is a `serde_json::Value`, which is only
 // `PartialEq` -- JSON numbers have no total equality.
 #[derive(Debug, Clone, PartialEq)]

@@ -10,9 +10,9 @@
 //! instead of a constraint error; a declaration inserted between that check and
 //! the delete is caught here.
 //!
-//! The cross-field checks live in the schema for the same reason. A `global`
-//! declaration that were also tenant-overridable, or a `secret` classification
-//! that disagreed with `has_secret_trait`, would be a contradiction no
+//! The cross-field checks live in the schema for the same reason. A `secret`
+//! classification that disagreed with `has_secret_trait`, or an anonymous-exposable
+//! flag on a `secret` or `pii` declaration, would be a contradiction no
 //! application path is allowed to write — and stating it once in the column
 //! definition is stronger than restating it at every call site.
 //!
@@ -49,10 +49,10 @@ impl MigrationTrait for Migration {
                                          CHECK (scope_class IN ('global', 'cascading', 'local')),
                     mode                 text          NOT NULL DEFAULT 'standard'
                                          CHECK (mode IN ('standard', 'advanced')),
-                    tenant_visible       boolean       NOT NULL DEFAULT false,
-                    tenant_overridable   boolean       NOT NULL DEFAULT false,
                     domain_affinity      text,
                     has_secret_trait     boolean       NOT NULL DEFAULT false,
+                    requires_step_up     boolean       NOT NULL DEFAULT true,
+                    anonymous_exposable  boolean       NOT NULL DEFAULT false,
                     data_classification  text          NOT NULL DEFAULT 'public'
                                          CHECK (data_classification IN ('public', 'pii', 'secret')),
                     source               text          NOT NULL DEFAULT 'admin_authored'
@@ -66,8 +66,8 @@ impl MigrationTrait for Migration {
                     created_at           timestamptz   NOT NULL DEFAULT now(),
                     updated_at           timestamptz   NOT NULL DEFAULT now(),
                     created_by           text          NOT NULL,
-                    CONSTRAINT ck_declaration_global_not_overridable
-                        CHECK (NOT (scope_class = 'global' AND tenant_overridable)),
+                    CONSTRAINT ck_declaration_exposable_not_sensitive
+                        CHECK (NOT (anonymous_exposable AND data_classification IN ('secret', 'pii'))),
                     CONSTRAINT ck_declaration_secret_matches_trait
                         CHECK ((data_classification = 'secret') = has_secret_trait),
                     CONSTRAINT ck_declaration_owner_module_iff_contributed
@@ -125,10 +125,10 @@ impl MigrationTrait for Migration {
                                          CHECK (scope_class IN ('global', 'cascading', 'local')),
                     mode                 text     NOT NULL DEFAULT 'standard'
                                          CHECK (mode IN ('standard', 'advanced')),
-                    tenant_visible       integer  NOT NULL DEFAULT 0,
-                    tenant_overridable   integer  NOT NULL DEFAULT 0,
                     domain_affinity      text,
                     has_secret_trait     integer  NOT NULL DEFAULT 0,
+                    requires_step_up     integer  NOT NULL DEFAULT 1,
+                    anonymous_exposable  integer  NOT NULL DEFAULT 0,
                     data_classification  text     NOT NULL DEFAULT 'public'
                                          CHECK (data_classification IN ('public', 'pii', 'secret')),
                     source               text     NOT NULL DEFAULT 'admin_authored'
@@ -142,8 +142,8 @@ impl MigrationTrait for Migration {
                     created_at           text     NOT NULL,
                     updated_at           text     NOT NULL,
                     created_by           text     NOT NULL,
-                    CONSTRAINT ck_declaration_global_not_overridable
-                        CHECK (NOT (scope_class = 'global' AND tenant_overridable = 1)),
+                    CONSTRAINT ck_declaration_exposable_not_sensitive
+                        CHECK (NOT (anonymous_exposable = 1 AND data_classification IN ('secret', 'pii'))),
                     CONSTRAINT ck_declaration_secret_matches_trait
                         CHECK ((data_classification = 'secret') = has_secret_trait),
                     CONSTRAINT ck_declaration_owner_module_iff_contributed

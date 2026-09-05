@@ -67,6 +67,14 @@ fn an_uninitialized_gear_refuses_to_hand_out_the_types_registry() {
 }
 
 #[test]
+fn an_uninitialized_gear_refuses_to_hand_out_the_root_tenant() {
+    // Platform scope is this id; an audit record written against a guessed one
+    // would be filed under a tenant that does not exist.
+    let gear = SettingsService::default();
+    assert!(gear.root_tenant().is_err());
+}
+
+#[test]
 fn an_uninitialized_gear_refuses_to_hand_out_the_enforcer() {
     // Handing back a permissive default here would turn every unenforced
     // handler into an allow. There is no default to hand back.

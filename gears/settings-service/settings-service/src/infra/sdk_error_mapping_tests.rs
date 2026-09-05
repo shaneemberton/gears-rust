@@ -34,7 +34,7 @@ fn every_variant_carries_the_required_members() {
             detail: "already there".to_owned(),
         },
         DomainError::Unauthorized {
-            resource: "gts.cf.toolkit.settings.category.v1~",
+            resource: "gts.cf.core.settings.category.v1~",
         },
         DomainError::NotFound {
             resource: "declaration",
@@ -112,10 +112,10 @@ fn a_denial_does_not_disclose_whether_the_target_exists() {
     // Two denials for different settings must be byte-identical, or a caller
     // without entitlement can enumerate the settings tree by diffing responses.
     let first = problem(DomainError::Unauthorized {
-        resource: "gts.cf.toolkit.settings.category.v1~",
+        resource: "gts.cf.core.settings.category.v1~",
     });
     let second = problem(DomainError::Unauthorized {
-        resource: "gts.cf.toolkit.settings.category.v1~",
+        resource: "gts.cf.core.settings.category.v1~",
     });
     assert_eq!(first, second);
 
@@ -145,7 +145,7 @@ fn the_conversion_is_total() {
     for case in [
         DomainError::validation("x"),
         DomainError::Unauthorized {
-            resource: "gts.cf.toolkit.settings.category.v1~",
+            resource: "gts.cf.core.settings.category.v1~",
         },
         DomainError::Internal {
             diagnostic: String::new(),

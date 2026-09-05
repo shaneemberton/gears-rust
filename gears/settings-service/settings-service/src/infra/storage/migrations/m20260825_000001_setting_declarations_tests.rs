@@ -54,14 +54,14 @@ async fn migrated() -> DatabaseConnection {
 /// statement that fails for that reason would pass a test expecting a
 /// constraint violation while proving nothing about the constraint.
 fn insert(id: &str, category: &str, leaf: &str, overrides: &str) -> String {
-    let key = format!("gts.cf.settings.types.bool_flag.v1~acme.settings.network.{leaf}.v1");
+    let key = format!("gts.cf.core.settings.setting_type.v1~acme.settings.network.{leaf}.v1~");
     let mut fields: Vec<(&str, String)> = vec![
         ("id", format!("'{id}'")),
         ("key", format!("'{key}'")),
         ("leaf_slug", format!("'{leaf}'")),
         (
             "value_type_id",
-            "'gts.cf.settings.types.bool_flag.v1~'".to_owned(),
+            "'gts.cf.toolkit.settings.type_bool_flag.v1~'".to_owned(),
         ),
         ("category_id", format!("'{category}'")),
         ("default_value", "'true'".to_owned()),
@@ -98,31 +98,53 @@ async fn a_well_formed_declaration_inserts() {
 }
 
 #[tokio::test]
-async fn a_global_declaration_may_not_be_tenant_overridable() {
-    // Override behaviour is derived from `scope_class`; a global setting that
-    // were also overridable would express two answers to one question.
+async fn an_exposable_declaration_may_not_be_pii() {
+    // `anonymous_exposable` serves the unauthenticated read surface; the two
+    // classifications that must never leave are excluded in the schema, not
+    // only by the handler that sets the flag.
     let db = migrated().await;
     let sql = insert(
         "d1",
         CATEGORY_ID,
-        "timeout",
-        "scope_class='global',tenant_overridable=1",
+        "banner",
+        "anonymous_exposable=1,data_classification='pii'",
     );
     assert!(run(&db, &sql).await.is_err());
 }
 
 #[tokio::test]
-async fn a_global_declaration_may_still_be_tenant_visible() {
-    // Visibility is read-only exposure and is governed separately, so the check
-    // must not have caught it by accident.
+async fn an_exposable_declaration_may_not_be_secret() {
     let db = migrated().await;
     let sql = insert(
         "d1",
         CATEGORY_ID,
-        "timeout",
-        "scope_class='global',tenant_visible=1",
+        "token",
+        "anonymous_exposable=1,data_classification='secret',has_secret_trait=1",
     );
-    run(&db, &sql).await.expect("visible-but-not-overridable");
+    assert!(run(&db, &sql).await.is_err());
+}
+
+#[tokio::test]
+async fn a_public_declaration_may_be_exposable() {
+    let db = migrated().await;
+    let sql = insert("d1", CATEGORY_ID, "banner", "anonymous_exposable=1");
+    run(&db, &sql)
+        .await
+        .expect("public and exposable is the intended pair");
+}
+
+#[tokio::test]
+async fn step_up_may_be_cleared_explicitly() {
+    // The column defaults to required; a row may still say otherwise, because
+    // machine-managed values exist. Clearing it is a deliberate act the schema
+    // permits and the write path gates.
+    let db = migrated().await;
+    run(
+        &db,
+        &insert("d1", CATEGORY_ID, "timeout", "requires_step_up=0"),
+    )
+    .await
+    .expect("an explicit false is a valid value");
 }
 
 #[tokio::test]
@@ -202,7 +224,7 @@ async fn a_leaf_name_may_not_repeat_within_one_category() {
         .await
         .expect("first insert");
     let mut clash = insert("d2", CATEGORY_ID, "timeout", "");
-    clash = clash.replace(".network.timeout.v1'", ".network.timeout.v2'");
+    clash = clash.replace(".network.timeout.v1~'", ".network.timeout.v2~'");
     assert!(run(&db, &clash).await.is_err());
 }
 

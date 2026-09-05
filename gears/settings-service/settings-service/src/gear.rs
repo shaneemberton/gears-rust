@@ -10,9 +10,11 @@ use std::sync::{Arc, OnceLock};
 use async_trait::async_trait;
 use authz_resolver_sdk::{AuthZResolverApi, PolicyEnforcer};
 use sea_orm_migration::MigrationTrait;
+use tenant_resolver_sdk::TenantResolverClient;
 use toolkit::api::OpenApiRegistry;
 use toolkit::{DatabaseCapability, Gear, GearCtx, RestApiCapability};
 use toolkit_db::{DBProvider, DbError};
+use toolkit_security::SecurityContext;
 use tracing::info;
 use types_registry_sdk::TypesRegistryClient;
 
@@ -22,12 +24,13 @@ use crate::config::SettingsServiceConfig;
 ///
 /// Holds what initialization resolves, so later phases can hang services off it
 /// without changing the startup contract.
-#[toolkit::gear(name = "settings-service", deps = [types_registry, authz_resolver], capabilities = [db, rest])]
+#[toolkit::gear(name = "settings-service", deps = [types_registry, authz_resolver, tenant_resolver], capabilities = [db, rest])]
 pub struct SettingsService {
     config: OnceLock<Arc<SettingsServiceConfig>>,
     db: OnceLock<Arc<DBProvider<DbError>>>,
     enforcer: OnceLock<Arc<PolicyEnforcer>>,
     types: OnceLock<Arc<dyn TypesRegistryClient>>,
+    root_tenant: OnceLock<uuid::Uuid>,
     categories: OnceLock<
         Arc<
             crate::domain::category::CategoryService<
@@ -51,6 +54,7 @@ impl Default for SettingsService {
             db: OnceLock::new(),
             enforcer: OnceLock::new(),
             types: OnceLock::new(),
+            root_tenant: OnceLock::new(),
             categories: OnceLock::new(),
             declarations: OnceLock::new(),
         }
@@ -111,6 +115,21 @@ impl SettingsService {
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
     }
+
+    /// The root tenant's id, once initialization has run.
+    ///
+    /// Platform scope is this id rather than an absent tenant (DESIGN.md §4.1):
+    /// every platform-scoped row and every audit record for one carries it. It
+    /// is install-time and undeletable, so resolving it once at init is exact.
+    ///
+    /// # Errors
+    /// Returns an error when called before [`Gear::init`].
+    pub fn root_tenant(&self) -> anyhow::Result<uuid::Uuid> {
+        self.root_tenant
+            .get()
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
+    }
 }
 
 #[async_trait]
@@ -157,6 +176,22 @@ impl Gear for SettingsService {
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
 
+        // Resolved once, at init: the root tenant is the install-time, undeletable
+        // ancestor of every tenant, and its id *is* platform scope. A gear that
+        // could not learn it would write audit records against a scope it cannot
+        // name, so this fails closed like the two clients above.
+        let tenants = ctx
+            .client_hub()
+            .get::<dyn TenantResolverClient>()
+            .map_err(|e| anyhow::anyhow!("failed to resolve the tenant resolver: {e}"))?;
+        let root = tenants
+            .get_root_tenant(&SecurityContext::anonymous())
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to resolve the root tenant: {e}"))?;
+        self.root_tenant
+            .set(root.id.0)
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+
         self.enforcer
             .set(Arc::new(PolicyEnforcer::new(authz)))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
@@ -165,6 +200,7 @@ impl Gear for SettingsService {
             .set(Arc::new(crate::domain::category::CategoryService::new(
                 crate::infra::storage::category_repo::CategoryRepo,
                 Arc::new(crate::infra::audit_emitter::TracingAuditEmitter),
+                self.root_tenant()?,
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 

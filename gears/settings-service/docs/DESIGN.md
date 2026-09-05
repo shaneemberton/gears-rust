@@ -137,6 +137,12 @@ The service is delivered as a **Constructor Fabric Gear** — the platform's uni
 | `cpt-cf-settings-service-nfr-ops-set-monitoring` | Aggregate change-failure visibility | Metrics | `settings_value_write_failure_ratio` on shared dashboards plus an alert-routing rule | Dashboard and alert-rule review |
 | `cpt-cf-settings-service-nfr-versatility-gts-scope-class` | New types and gear declarations need no core change | Type Validator + Reconciler | Values validated against a curated catalog value type; declarations arrive at runtime | Add a value type and a gear declaration without touching the gear |
 
+#### Architecture Decision Records
+
+| ADR ID | Title |
+| --- | --- |
+| `cpt-cf-settings-service-adr-setting-key-gts-type-id` | [Setting Key Is a GTS Type Identifier](ADR/ADR-002-setting-key-gts-type-id.md) — `gts.cf.core.settings.setting_type.v1~<vendor>.<package>.<category>.<name>.v1~` for both authors; supersedes the retired instance-id decision |
+
 ### 1.3 Architecture Layers
 
 ```
@@ -2360,6 +2366,6 @@ Concurrent writes to the same setting and scope exist. Tests:
 ## 8. Traceability
 
 - **PRD**: [PRD.md](./PRD.md)
-- **ADRs**: [ADR/](./ADR/) — TBD, not yet authored for this gear
+- **ADRs**: [ADR/](./ADR/) — `cpt-cf-settings-service-adr-setting-key-gts-type-id` (§1.2 *Architecture Decision Records*)
 - **Features**: [features/](./features/) — TBD, not yet authored for this gear
 - **Activation design**: [DESIGN-activation.md](./DESIGN-activation.md)

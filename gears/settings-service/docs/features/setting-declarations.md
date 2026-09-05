@@ -340,7 +340,7 @@ The system **MUST** persist declarations in a `setting_declarations` table carry
 **Implements**:
 - `cpt-cf-settings-service-flow-setting-declarations-create`
 
-**Constraints**: `cpt-cf-settings-service-constraint-key-is-gts-instance-id`
+**Constraints**: `cpt-cf-settings-service-constraint-key-is-gts-type-id`
 
 **Touches**:
 - DB Table: `setting_declarations`
@@ -355,7 +355,7 @@ The system **MUST** construct the setting key as the value type followed by the 
 **Implements**:
 - `cpt-cf-settings-service-algo-setting-declarations-key-construction`
 
-**Constraints**: `cpt-cf-settings-service-constraint-key-is-gts-instance-id`
+**Constraints**: `cpt-cf-settings-service-constraint-key-is-gts-type-id`
 
 **Touches**:
 - API: `POST /v1/declarations`

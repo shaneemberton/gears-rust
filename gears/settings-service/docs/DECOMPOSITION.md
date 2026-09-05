@@ -200,7 +200,7 @@ Neither item blocks this wave, and — contrary to an earlier revision of this n
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-cf-settings-service-constraint-key-is-gts-instance-id`
+  - [ ] `p1` - `cpt-cf-settings-service-constraint-key-is-gts-type-id`
 
 - **Domain Model Entities**:
   - SettingDeclaration

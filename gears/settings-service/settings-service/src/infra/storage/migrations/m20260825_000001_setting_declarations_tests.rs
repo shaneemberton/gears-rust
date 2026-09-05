@@ -12,9 +12,7 @@
 //! `ON DELETE RESTRICT` test meaningful here.
 
 use sea_orm_migration::MigratorTrait;
-use sea_orm_migration::sea_orm::{
-    ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement,
-};
+use sea_orm_migration::sea_orm::{ConnectionTrait, Database, DatabaseConnection};
 
 use crate::infra::storage::migrations::Migrator;
 
@@ -22,9 +20,7 @@ const CATEGORY_ID: &str = "11111111-1111-1111-1111-111111111111";
 const OTHER_CATEGORY_ID: &str = "22222222-2222-2222-2222-222222222222";
 
 async fn run(db: &DatabaseConnection, sql: &str) -> Result<(), sea_orm_migration::sea_orm::DbErr> {
-    db.execute(Statement::from_string(DbBackend::Sqlite, sql.to_owned()))
-        .await
-        .map(|_| ())
+    db.execute_unprepared(sql).await.map(|_| ())
 }
 
 /// A migrated database with foreign keys enforced and two categories present.

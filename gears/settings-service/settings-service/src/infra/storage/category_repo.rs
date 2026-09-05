@@ -3,7 +3,7 @@
 //! SeaORM-backed category persistence.
 
 use async_trait::async_trait;
-use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, ExprTrait, QueryFilter};
 use toolkit_db::secure::{DBRunner, SecureDeleteExt, SecureEntityExt, SecureUpdateExt};
 use toolkit_security::AccessScope;
 use uuid::Uuid;
@@ -257,7 +257,11 @@ impl CategoryRepository for CategoryRepo {
         id: Uuid,
     ) -> Result<(), DomainError> {
         // @cpt-begin:cpt-cf-settings-service-flow-category-management-delete:p1:inst-cat-delete-10
-        let outcome = CategoryEntity::delete_by_id(id)
+        // `delete_many` filtered to the id: sea-orm 2 hands back a validated
+        // one-row delete from `delete_by_id`, which the secure extension does not
+        // wrap, and scoping is the point of the call.
+        let outcome = CategoryEntity::delete_many()
+            .filter(category::Column::Id.eq(id))
             .secure()
             .scope_with(scope)
             .exec(conn)

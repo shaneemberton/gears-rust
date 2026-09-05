@@ -8,8 +8,8 @@
 //! `access_scope` itself needs a live policy decision point, so what is pinned
 //! here is the projection every one of its failures passes through.
 
+use authz_resolver_sdk::EnforcerError;
 use authz_resolver_sdk::pep::ConstraintCompileError;
-use authz_resolver_sdk::{AuthZResolverError, EnforcerError};
 use serde_json::Value;
 use toolkit_canonical_errors::{CanonicalError, Problem};
 
@@ -26,10 +26,11 @@ fn problem_of(err: DomainError) -> Value {
 fn every_failure() -> Vec<EnforcerError> {
     vec![
         EnforcerError::Denied { deny_reason: None },
-        EnforcerError::EvaluationFailed(AuthZResolverError::ServiceUnavailable(
-            "policy decision point unreachable".to_owned(),
-        )),
-        EnforcerError::EvaluationFailed(AuthZResolverError::NoPluginAvailable),
+        // `EvaluationFailed` carries the canonical error the resolver surfaced;
+        // which category it was does not matter to the projection, only that it
+        // never becomes an allow.
+        EnforcerError::EvaluationFailed(CanonicalError::service_unavailable().create()),
+        EnforcerError::EvaluationFailed(CanonicalError::service_unavailable().create()),
         EnforcerError::CompileFailed(ConstraintCompileError::ConstraintsRequiredButAbsent),
         EnforcerError::CompileFailed(ConstraintCompileError::AllConstraintsFailed {
             reason: "unsupported constraint operator".to_owned(),
@@ -59,9 +60,7 @@ fn an_unreachable_decision_point_denies_rather_than_defaults() {
     // Step 4 of the enforcement algorithm, stated as its own test because it is
     // the one an implementation is most tempted to get wrong: an outage in the
     // policy service must not become an outage-shaped allow.
-    let err = EnforcerError::EvaluationFailed(AuthZResolverError::ServiceUnavailable(
-        "connection refused".to_owned(),
-    ));
+    let err = EnforcerError::EvaluationFailed(CanonicalError::service_unavailable().create());
     assert!(matches!(
         deny(&resource::CATEGORY, &err),
         DomainError::Unauthorized { .. }

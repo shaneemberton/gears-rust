@@ -2,7 +2,7 @@
 //! Persistence for declarations.
 
 use async_trait::async_trait;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, ExprTrait, QueryFilter};
 use toolkit_db::odata::{LimitCfg, paginate_odata};
 use toolkit_db::secure::{DBRunner, SecureEntityExt};
 use toolkit_odata::{ODataQuery, Page, SortDir};

@@ -8,7 +8,7 @@
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
-use authz_resolver_sdk::{AuthZResolverClient, PolicyEnforcer};
+use authz_resolver_sdk::{AuthZResolverApi, PolicyEnforcer};
 use sea_orm_migration::MigrationTrait;
 use toolkit::api::OpenApiRegistry;
 use toolkit::{DatabaseCapability, Gear, GearCtx, RestApiCapability};
@@ -146,7 +146,7 @@ impl Gear for SettingsService {
         // that has already passed authorization and reached the database.
         let authz = ctx
             .client_hub()
-            .get::<dyn AuthZResolverClient>()
+            .get::<dyn AuthZResolverApi>()
             .map_err(|e| anyhow::anyhow!("failed to resolve the AuthZ resolver: {e}"))?;
         let types = ctx
             .client_hub()

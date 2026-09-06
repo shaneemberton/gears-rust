@@ -20,6 +20,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 gts-id = { workspace = true }
+# The abstract `setting_type` base is declared here with `#[gts_type_schema]`, which
+# submits it to the link-time inventory the types registry drains at its init.
+gts = { workspace = true }
+toolkit-gts = { workspace = true }
+schemars = { workspace = true }
 toolkit-odata-macros = { workspace = true }
 toolkit-odata = { workspace = true }
 async-trait = { workspace = true }

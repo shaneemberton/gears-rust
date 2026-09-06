@@ -3074,10 +3074,13 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "cf-gears-toolkit-canonical-errors",
+ "cf-gears-toolkit-gts",
  "cf-gears-toolkit-odata",
  "cf-gears-toolkit-odata-macros",
  "cf-gears-toolkit-security",
+ "gts",
  "gts-id",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

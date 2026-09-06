@@ -157,7 +157,6 @@ impl Gear for SettingsService {
             .set(db)
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
-        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
         // Both resolved at init, not per request. A decision point that cannot
         // be resolved must stop the gear coming up rather than surface later as
         // a request-time denial indistinguishable from a real policy decision;
@@ -174,7 +173,6 @@ impl Gear for SettingsService {
         self.types
             .set(types)
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
-        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
 
         // Resolved once, at init: the root tenant is the install-time, undeletable
         // ancestor of every tenant, and its id *is* platform scope. A gear that
@@ -213,9 +211,9 @@ impl Gear for SettingsService {
             ))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
-        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-9
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-11
         info!("Settings Service gear initialized");
-        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-9
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-11
 
         Ok(())
     }

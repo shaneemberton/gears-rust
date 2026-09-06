@@ -53,7 +53,7 @@ impl From<DomainError> for CanonicalError {
     fn from(err: DomainError) -> Self {
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-1
         match err {
-            // 422 — the only path that carries field-level detail.
+            // Validation — the only path that carries field-level detail; canonical invalid-argument renders as 400.
             DomainError::Validation {
                 field,
                 code,

@@ -92,10 +92,12 @@ Not applicable. This feature delivers SDK contracts and gear infrastructure with
 3. [x] - `p1` - Establish the PostgreSQL connection pool and construct the `SecureConn` and `DBRunner` handles - `inst-gf-init-3`
 4. [x] - `p1` - Run outstanding schema migrations to completion - `inst-gf-init-4`
 5. [x] - `p1` - **IF** a migration fails → **RETURN** startup failure without serving traffic, so no request observes a partially migrated schema - `inst-gf-init-5`
-6. [x] - `p1` - Resolve the `TypesRegistryClient` and the Policy Decision client through `ClientHub` - `inst-gf-init-6`
+6. [ ] - `p1` - Resolve the `TypesRegistryClient` through `ClientHub` — the one client this gear calls during its own init, and therefore the only entry in `deps`; every consumed client — authorization resolver, tenant resolver, and later the credential store and event broker — is declared with `#[toolkit::consumes]` and fetched at first use on the request path, never eagerly, so a gear that reads settings during its own init can never close a dependency cycle through this one - `inst-gf-init-6`
 7. [ ] - `p1` - Register the gear's own `SettingsReaderClient` and `SettingsContributionClient` implementations into `ClientHub` - `inst-gf-init-7`
-8. [ ] - `p1` - Bind each registered trait according to the active deployment profile: the in-process implementation when co-located, the same trait over REST when out of process - `inst-gf-init-8`
-9. [x] - `p1` - Mark the gear ready and begin serving - `inst-gf-init-9`
+8. [ ] - `p1` - Bind each registered trait according to the active deployment profile — the in-process implementation when co-located, the same trait over REST when out of process — and, while the release is Embedded-only, **RETURN** startup failure when configuration asks for a remote binding, so in-process-only is a check rather than a promise - `inst-gf-init-8`
+9. [ ] - `p1` - Register the gear's GTS control-plane schemas — category, declaration, value, effective value, change set, the event schemas, and the abstract `setting_type` base every setting key derives from — in the types registry, idempotently; no declaration can be created before its base type exists - `inst-gf-init-9`
+10. [ ] - `p1` - Seed the minimal category set by idempotent upsert, so a fresh installation carries the categories the platform's own declarations file under and a restart changes nothing - `inst-gf-init-10`
+11. [x] - `p1` - Mark the gear ready and begin serving - `inst-gf-init-11`
 
 ### Setting Key Parsing and Validation
 
@@ -286,7 +288,7 @@ An earlier wording required *"SeaORM entity scaffolding"* here. That could not b
 
 - [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-gear-scaffold`
 
-The system **MUST** provide a `#[toolkit::gear]` annotated gear that registers its client traits into `ClientHub` and binds them per the active deployment profile, and **MUST** take bootstrap configuration — database and broker endpoints, service identity, TLS, ports — from ToolKit config at gear init, never from a managed setting.
+The system **MUST** provide a `#[toolkit::gear]` annotated gear that declares only the client it calls during its own init — `deps = [types_registry]` — and reaches every consumed client through `#[toolkit::consumes]` at first use; **MUST** register its client traits into `ClientHub` and bind them per the active deployment profile, failing startup on a remote binding while the release is Embedded-only; **MUST** register its GTS control-plane schemas and the abstract `setting_type` base, and seed the minimal category set idempotently, at init; and **MUST** take bootstrap configuration — database and broker endpoints, service identity, TLS, ports, and the step-up JWKS endpoint and freshness window once the verifier binds — from ToolKit config at gear init, never from a managed setting.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-gear-foundation-gear-init`

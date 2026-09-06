@@ -50,7 +50,7 @@ Two guards exist for reasons that are easy to miss and expensive to discover lat
 
 The `setting_values` schema carries two invariants worth reading carefully before writing migrations. Exactly one of `value` and `secret_ref` is set, so a row can be neither doubly-valued nor valueless. And SQL `NULL` in the `value` column means *no inline value here*, which is not the JSON value `null` — a setting whose type admits `null` stores a non-`NULL` column holding JSON `null`, so the exactly-one check reads it as a value like any other.
 
-**Requirements**: `cpt-cf-settings-service-fr-typed-value-validation`
+**Requirements**: `cpt-cf-settings-service-fr-typed-value-validation`, `cpt-cf-settings-service-fr-subject-scoped-values`
 
 **Principles**: `cpt-cf-settings-service-principle-consume-gts`, `cpt-cf-settings-service-principle-fail-closed`
 

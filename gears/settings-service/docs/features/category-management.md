@@ -90,7 +90,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Duplicate `key` or duplicate `name`
 
 **Steps**:
-1. [x] - `p1` - Actor sends POST /v1/categories with `key`, `name`, optional `description`, optional `domain_affinity`, `sort_order`, optional `icon` - `inst-cat-create-1`
+1. [x] - `p1` - Actor sends POST /settings-service/v1/categories with `key`, `name`, optional `description`, optional `domain_affinity`, `sort_order`, optional `icon` - `inst-cat-create-1`
 2. [x] - `p1` - Authorize `create` on `gts.cf.core.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-create-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-create-3`
 4. [x] - `p1` - Invoke category key validation on the supplied `key` - `inst-cat-create-4`
@@ -120,7 +120,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Updated `name` collides with an existing category
 
 **Steps**:
-1. [x] - `p1` - Actor sends PATCH /v1/categories/{id} with `If-Match` and any of `name`, `description`, `domain_affinity`, `sort_order`, `icon` - `inst-cat-update-1`
+1. [x] - `p1` - Actor sends PATCH /settings-service/v1/categories/{id} with `If-Match` and any of `name`, `description`, `domain_affinity`, `sort_order`, `icon` - `inst-cat-update-1`
 2. [x] - `p1` - Authorize `update` on `gts.cf.core.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-update-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-update-3`
 4. [x] - `p1` - **IF** the request body carries `key` → **RETURN** `400`, because `key` is immutable once settings are keyed through it - `inst-cat-update-4`
@@ -152,7 +152,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Category still contains one or more declarations, active or retired
 
 **Steps**:
-1. [x] - `p1` - Actor sends DELETE /v1/categories/{id} with `If-Match` - `inst-cat-delete-1`
+1. [x] - `p1` - Actor sends DELETE /settings-service/v1/categories/{id} with `If-Match` - `inst-cat-delete-1`
 2. [x] - `p1` - Authorize `delete` on `gts.cf.core.settings.category.v1~` through the `PolicyEnforcer` PEP - `inst-cat-delete-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-delete-3`
 4. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-delete-4`
@@ -179,7 +179,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Category does not exist, or exists but falls outside the caller's domain or visibility scope
 
 **Steps**:
-1. [x] - `p1` - Actor sends GET /v1/categories/{id} - `inst-cat-get-1`
+1. [x] - `p1` - Actor sends GET /settings-service/v1/categories/{id} - `inst-cat-get-1`
 2. [x] - `p1` - Authorize `read` on `gts.cf.core.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-get-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-get-3`
 4. [x] - `p1` - DB: SELECT the category row WHERE id = {id} - `inst-cat-get-4`
@@ -202,7 +202,7 @@ The no-orphan rule protects the invariant that no declaration is ever left point
 - Malformed or expired pagination cursor
 
 **Steps**:
-1. [x] - `p1` - Actor sends GET /v1/categories with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-cat-list-1`
+1. [x] - `p1` - Actor sends GET /settings-service/v1/categories with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-cat-list-1`
 2. [x] - `p1` - Authorize `read` on `gts.cf.core.settings.category.v1~` and obtain the `AccessScope` constraints - `inst-cat-list-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-cat-list-3`
 4. [x] - `p1` - Parse the OData expressions against the category field mapping - `inst-cat-list-4`
@@ -290,11 +290,11 @@ The system **MUST** expose create, get, list, update, and delete over categories
 - `cpt-cf-settings-service-flow-category-management-delete`
 
 **Touches**:
-- API: `POST /v1/categories`
-- API: `GET /v1/categories`
-- API: `GET /v1/categories/{id}`
-- API: `PATCH /v1/categories/{id}`
-- API: `DELETE /v1/categories/{id}`
+- API: `POST /settings-service/v1/categories`
+- API: `GET /settings-service/v1/categories`
+- API: `GET /settings-service/v1/categories/{id}`
+- API: `PATCH /settings-service/v1/categories/{id}`
+- API: `DELETE /settings-service/v1/categories/{id}`
 - Entities: `Category`
 
 ### No-Orphan Deletion Rule
@@ -308,7 +308,7 @@ The system **MUST** refuse to delete a category while any setting declaration re
 - `cpt-cf-settings-service-algo-category-management-no-orphan-guard`
 
 **Touches**:
-- API: `DELETE /v1/categories/{id}`
+- API: `DELETE /settings-service/v1/categories/{id}`
 - DB Table: `categories`, `setting_declarations`
 - Entities: `Category`
 
@@ -322,7 +322,7 @@ The system **MUST** reject a category `key` that is empty, exceeds 128 character
 - `cpt-cf-settings-service-algo-category-management-key-validation`
 
 **Touches**:
-- API: `POST /v1/categories`
+- API: `POST /settings-service/v1/categories`
 - Entities: `Category`
 
 ### Authorization on Category Operations
@@ -338,8 +338,8 @@ The system **MUST** authorize every category operation as per-resource-type CRUD
 **Constraints**: `cpt-cf-settings-service-constraint-rbac-policy-enforcer`
 
 **Touches**:
-- API: `GET /v1/categories`
-- API: `GET /v1/categories/{id}`
+- API: `GET /settings-service/v1/categories`
+- API: `GET /settings-service/v1/categories/{id}`
 - Entities: `Category`
 
 ### Optimistic Concurrency on Mutations
@@ -355,8 +355,8 @@ The system **MUST** require `If-Match` on `PATCH` and `DELETE`, returning `428` 
 **Constraints**: `cpt-cf-settings-service-constraint-optimistic-concurrency`
 
 **Touches**:
-- API: `PATCH /v1/categories/{id}`
-- API: `DELETE /v1/categories/{id}`
+- API: `PATCH /settings-service/v1/categories/{id}`
+- API: `DELETE /settings-service/v1/categories/{id}`
 - Entities: `Category`
 
 ### Category Mutation Audit
@@ -373,9 +373,9 @@ The system **MUST** emit an audit record through the Audit Emitter for every suc
 **Constraints**: `cpt-cf-settings-service-constraint-audit-and-events`
 
 **Touches**:
-- API: `POST /v1/categories`
-- API: `PATCH /v1/categories/{id}`
-- API: `DELETE /v1/categories/{id}`
+- API: `POST /settings-service/v1/categories`
+- API: `PATCH /settings-service/v1/categories/{id}`
+- API: `DELETE /settings-service/v1/categories/{id}`
 - Entities: `Category`
 
 ## 6. Acceptance Criteria

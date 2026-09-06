@@ -101,7 +101,7 @@ The hardest constraint here is not any single field but the rule connecting them
 - Duplicate `key`, or a leaf slug already held by an active declaration in the category
 
 **Steps**:
-1. [ ] - `p1` - Actor sends POST /v1/declarations with `value_type_id`, `vendor`, leaf `name`, `category_id`, `default_value`, `scope_class`, and optional `description`, `mode`, `requires_step_up`, `anonymous_exposable`, `domain_affinity`, `licence_feature`, `data_classification` - `inst-decl-create-1`
+1. [ ] - `p1` - Actor sends POST /settings-service/v1/declarations with `value_type_id`, `vendor`, leaf `name`, `category_id`, `default_value`, `scope_class`, and optional `description`, `mode`, `requires_step_up`, `anonymous_exposable`, `domain_affinity`, `licence_feature`, `data_classification` - `inst-decl-create-1`
 2. [ ] - `p1` - Authorize `create` on `gts.cf.core.settings.declaration.v1~` through the `PolicyEnforcer` PEP - `inst-decl-create-2`
 3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-create-3`
 4. [ ] - `p1` - DB: SELECT the target category WHERE id = {category_id} - `inst-decl-create-4`
@@ -139,7 +139,7 @@ The hardest constraint here is not any single field but the rule connecting them
 - `If-Match` absent or stale
 
 **Steps**:
-1. [ ] - `p1` - Actor sends PATCH /v1/declarations/{id} with `If-Match` and any of `description`, `mode`, `domain_affinity`, `licence_feature`, `requires_step_up`, `anonymous_exposable`, `data_classification` - `inst-decl-update-1`
+1. [ ] - `p1` - Actor sends PATCH /settings-service/v1/declarations/{id} with `If-Match` and any of `description`, `mode`, `domain_affinity`, `licence_feature`, `requires_step_up`, `anonymous_exposable`, `data_classification` - `inst-decl-update-1`
 2. [ ] - `p1` - Authorize `update` on `gts.cf.core.settings.declaration.v1~` - `inst-decl-update-2`
 3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-update-3`
 4. [ ] - `p1` - DB: SELECT the declaration WHERE id = {id} - `inst-decl-update-4`
@@ -170,7 +170,7 @@ The hardest constraint here is not any single field but the rule connecting them
 - `If-Match` absent or stale
 
 **Steps**:
-1. [ ] - `p1` - Actor sends DELETE /v1/declarations/{id} with `If-Match` - `inst-decl-retire-1`
+1. [ ] - `p1` - Actor sends DELETE /settings-service/v1/declarations/{id} with `If-Match` - `inst-decl-retire-1`
 2. [ ] - `p1` - Authorize `delete` on `gts.cf.core.settings.declaration.v1~` - `inst-decl-retire-2`
 3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-retire-3`
 4. [ ] - `p1` - Require a valid credential step-up assertion, because retire drops a live setting out of resolution at once - `inst-decl-retire-4`
@@ -199,7 +199,7 @@ The hardest constraint here is not any single field but the rule connecting them
 - The re-declared key does not match an existing retired row, in which case the request is an ordinary create
 
 **Steps**:
-1. [ ] - `p1` - Actor sends POST /v1/declarations at a key that matches an existing `retired` declaration - `inst-decl-react-1`
+1. [ ] - `p1` - Actor sends POST /settings-service/v1/declarations at a key that matches an existing `retired` declaration - `inst-decl-react-1`
 2. [ ] - `p1` - Authorize `create` on `gts.cf.core.settings.declaration.v1~` - `inst-decl-react-2`
 3. [ ] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-react-3`
 4. [ ] - `p1` - Construct the key and look up an existing declaration at that key - `inst-decl-react-4`
@@ -251,7 +251,7 @@ The hardest constraint here is not any single field but the rule connecting them
 - Unsupported OData filter or ordering expression
 
 **Steps**:
-1. [x] - `p1` - Actor sends GET /v1/declarations/{id} or GET /v1/declarations with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-decl-read-1`
+1. [x] - `p1` - Actor sends GET /settings-service/v1/declarations/{id} or GET /settings-service/v1/declarations with optional OData `$filter`, `$orderby`, `$select`, and a pagination cursor - `inst-decl-read-1`
 2. [x] - `p1` - Authorize `read` on `gts.cf.core.settings.declaration.v1~` and obtain the `AccessScope` constraints - `inst-decl-read-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-decl-read-3`
 4. [ ] - `p1` - Derive the combined visibility and domain-affinity predicate from the `AccessScope` constraints; the licence predicate joins it in R2, when the License Resolver exists to answer it - `inst-decl-read-4`
@@ -360,7 +360,7 @@ The system **MUST** construct the setting key as the Settings gear's abstract ba
 **Constraints**: `cpt-cf-settings-service-constraint-key-is-gts-type-id`
 
 **Touches**:
-- API: `POST /v1/declarations`
+- API: `POST /settings-service/v1/declarations`
 - Entities: `SettingDeclaration`
 
 ### Schema Default Semantics
@@ -373,7 +373,7 @@ The Schema Default **MUST** live solely in the `default_value` column, be non-nu
 - `cpt-cf-settings-service-flow-setting-declarations-create`
 
 **Touches**:
-- API: `POST /v1/declarations`
+- API: `POST /settings-service/v1/declarations`
 - DB Table: `setting_declarations`
 - Entities: `SettingDeclaration`
 
@@ -400,7 +400,7 @@ The system **MUST** derive `has_secret_trait` from the value type's resolved tra
 - `cpt-cf-settings-service-algo-setting-declarations-classification`
 
 **Touches**:
-- API: `POST /v1/declarations`
+- API: `POST /settings-service/v1/declarations`
 - Entities: `SettingDeclaration`
 
 ### Mutation Class Discipline
@@ -416,7 +416,7 @@ The system **MUST** partition declaration changes into descriptive metadata appl
 **Constraints**: `cpt-cf-settings-service-constraint-optimistic-concurrency`, `cpt-cf-settings-service-constraint-step-up-at-idp`
 
 **Touches**:
-- API: `PATCH /v1/declarations/{id}`
+- API: `PATCH /settings-service/v1/declarations/{id}`
 - Entities: `SettingDeclaration`
 
 ### Retire and Reactivate Lifecycle
@@ -433,8 +433,8 @@ Retire **MUST** be an immediate soft delete setting `status` to `retired` in one
 **Constraints**: `cpt-cf-settings-service-constraint-step-up-at-idp`
 
 **Touches**:
-- API: `DELETE /v1/declarations/{id}`
-- API: `POST /v1/declarations`
+- API: `DELETE /settings-service/v1/declarations/{id}`
+- API: `POST /settings-service/v1/declarations`
 - DB Table: `setting_declarations`
 - Entities: `DeclarationStatus`
 
@@ -449,8 +449,8 @@ A declaration whose `source` is `module_contributed` **MUST** be rejected for ad
 - `cpt-cf-settings-service-flow-setting-declarations-retire`
 
 **Touches**:
-- API: `PATCH /v1/declarations/{id}`
-- API: `DELETE /v1/declarations/{id}`
+- API: `PATCH /settings-service/v1/declarations/{id}`
+- API: `DELETE /settings-service/v1/declarations/{id}`
 - Entities: `DeclarationSource`
 
 ### Dependency Group Declaration
@@ -477,8 +477,8 @@ Declaration reads **MUST** be visibility- and domain-gated with the predicate ap
 **Constraints**: `cpt-cf-settings-service-constraint-rbac-policy-enforcer`
 
 **Touches**:
-- API: `GET /v1/declarations`
-- API: `GET /v1/declarations/{id}`
+- API: `GET /settings-service/v1/declarations`
+- API: `GET /settings-service/v1/declarations/{id}`
 - Entities: `SettingDeclaration`
 
 ### Declaration Mutation Audit
@@ -495,9 +495,9 @@ The system **MUST** emit an audit record through the Audit Emitter for every dec
 **Constraints**: `cpt-cf-settings-service-constraint-audit-and-events`
 
 **Touches**:
-- API: `POST /v1/declarations`
-- API: `PATCH /v1/declarations/{id}`
-- API: `DELETE /v1/declarations/{id}`
+- API: `POST /settings-service/v1/declarations`
+- API: `PATCH /settings-service/v1/declarations/{id}`
+- API: `DELETE /settings-service/v1/declarations/{id}`
 - Entities: `SettingDeclaration`
 
 ## 6. Acceptance Criteria

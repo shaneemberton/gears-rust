@@ -24,12 +24,15 @@
 //! `cpt-cf-settings-service-fr-service-writes`) and enforced on interactive writes
 //! and behavior-affecting declaration actions (`cpt-cf-settings-service-fr-authn-role-gating`).
 //! DESIGN.md §4.2 *Value Writer* fixes the R1 check: the presented token's
-//! signature against the identity provider's JWKS, `sub` matching the session, and `auth_time`
-//! within a **≤ 5 min** freshness window — a binding behind a ClientHub-resolved
-//! `StepUpVerifier` port owned by this gear. The window is a design constant, not
-//! a deployment knob, and the JWKS endpoint is the identity provider's, so the binding carries
-//! its own configuration when it lands with the write path; nothing here
-//! precedes it.
+//! signature against the identity provider's JWKS, `sub` matching the session, and
+//! `auth_time` within the step-up freshness window — a binding behind a
+//! ClientHub-resolved `StepUpVerifier` port owned by this gear. Two values are
+//! deployment configuration and, per DESIGN.md §4.9, load at gear init: the
+//! provider's **JWKS endpoint**, and the **freshness window**, which
+//! `cpt-cf-settings-service-fr-validate-before-set` makes deployment-configured
+//! and DESIGN caps at five minutes. Both arrive with the verifier binding in
+//! DECOMPOSITION entry 2.8; declaring them before anything reads them would be
+//! configuration nobody can validate.
 
 use serde::Deserialize;
 

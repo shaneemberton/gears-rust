@@ -5,3 +5,4 @@ pub mod category;
 pub mod declaration;
 pub mod error;
 pub mod odata;
+pub mod platform_scope;

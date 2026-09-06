@@ -59,19 +59,11 @@ fn the_gear_hands_its_migrations_to_the_capability() {
 
 #[test]
 fn an_uninitialized_gear_refuses_to_hand_out_the_types_registry() {
-    // The registry is resolved at init for the same reason as the enforcer: a
-    // read that reached the database before discovering the registry is missing
-    // has already spent the authorization and the query.
+    // The registry is the one client resolved at init -- the one `deps` entry
+    // -- because a read that reached the database before discovering the
+    // registry is missing has already spent the authorization and the query.
     let gear = SettingsService::default();
     assert!(gear.types().is_err());
-}
-
-#[test]
-fn an_uninitialized_gear_refuses_to_hand_out_the_root_tenant() {
-    // Platform scope is this id; an audit record written against a guessed one
-    // would be filed under a tenant that does not exist.
-    let gear = SettingsService::default();
-    assert!(gear.root_tenant().is_err());
 }
 
 #[test]

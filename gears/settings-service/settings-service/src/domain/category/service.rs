@@ -12,7 +12,7 @@ use std::sync::Arc;
 use toolkit_db::secure::DBRunner;
 use toolkit_security::SecurityContext;
 
-use crate::audit::{AuditEmitter, AuditRecord, AuditTenant, AuditValue};
+use crate::audit::{AuditEmitter, AuditRecord, AuditValue};
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
@@ -20,6 +20,7 @@ use super::visibility::{self, DomainVisibility};
 use super::{Category, CategoryDraft, CategoryPatch, CategoryRepository};
 use crate::api::precondition::{self, ETag};
 use crate::domain::error::DomainError;
+use crate::domain::platform_scope::PlatformScope;
 
 /// Who performed a mutation and under which request.
 ///
@@ -54,9 +55,11 @@ fn snapshot(category: &Category) -> serde_json::Value {
 pub struct CategoryService<R> {
     repo: R,
     audit: Arc<dyn AuditEmitter>,
-    /// The root tenant's id. Categories are platform-scoped, and platform scope
-    /// is that id rather than an absent tenant (DESIGN.md §4.1).
-    root_tenant: AuditTenant,
+    /// Where the root tenant's id comes from. Categories are platform-scoped,
+    /// and platform scope is that id rather than an absent tenant (DESIGN.md
+    /// §4.1) — asked for at the first mutation, since the Tenant Resolver is
+    /// fetched at first use and never during init (DESIGN.md §4.9).
+    scope: Arc<dyn PlatformScope>,
 }
 
 impl<R: CategoryRepository> CategoryService<R> {
@@ -66,12 +69,8 @@ impl<R: CategoryRepository> CategoryService<R> {
     /// "no audit configured" a supported state, and a mutation could then
     /// succeed leaving no trail — which is precisely what DESIGN.md §4.2's
     /// fail-closed rule forbids.
-    pub fn new(repo: R, audit: Arc<dyn AuditEmitter>, root_tenant: AuditTenant) -> Self {
-        Self {
-            repo,
-            audit,
-            root_tenant,
-        }
+    pub fn new(repo: R, audit: Arc<dyn AuditEmitter>, scope: Arc<dyn PlatformScope>) -> Self {
+        Self { repo, audit, scope }
     }
 
     /// Record a mutation, failing the operation if the trail cannot be written.
@@ -84,10 +83,12 @@ impl<R: CategoryRepository> CategoryService<R> {
         actor: Actor<'_>,
     ) -> Result<(), DomainError> {
         // Categories are platform-global -- the table has no tenant column --
-        // so their audit scope is the platform row rather than a tenant's.
+        // so their audit scope is the root tenant's, which is platform scope.
+        // A mutation that cannot name its scope does not proceed.
+        let tenant = self.scope.root_tenant().await?;
         let mut rec = AuditRecord::new(
             key.as_str(),
-            self.root_tenant,
+            tenant,
             actor.ctx.subject_id().to_string(),
             action,
             actor.request_id,

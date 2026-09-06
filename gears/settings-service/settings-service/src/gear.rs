@@ -8,13 +8,11 @@
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
-use authz_resolver_sdk::{AuthZResolverApi, PolicyEnforcer};
+use authz_resolver_sdk::PolicyEnforcer;
 use sea_orm_migration::MigrationTrait;
-use tenant_resolver_sdk::TenantResolverClient;
 use toolkit::api::OpenApiRegistry;
 use toolkit::{DatabaseCapability, Gear, GearCtx, RestApiCapability};
 use toolkit_db::{DBProvider, DbError};
-use toolkit_security::SecurityContext;
 use tracing::info;
 use types_registry_sdk::TypesRegistryClient;
 
@@ -24,13 +22,23 @@ use crate::config::SettingsServiceConfig;
 ///
 /// Holds what initialization resolves, so later phases can hang services off it
 /// without changing the startup contract.
-#[toolkit::gear(name = "settings-service", deps = [types_registry, authz_resolver, tenant_resolver], capabilities = [db, rest])]
+///
+/// `deps` names the one gear this service calls during its **own** init — the
+/// types registry — because a `deps` entry is an ordering claim that a gear
+/// reading settings during *its* init could turn into an unsortable cycle
+/// (DESIGN.md §4.9). Everything else is consumed: the authorization resolver is
+/// declared below and wired by the runtime's proxy-wiring phase after init, so
+/// the enforcer fetches it from the hub on first use; the tenant resolver is
+/// fetched the same way (see [`crate::infra::platform_scope`]) — its SDK has no
+/// REST projection yet, so it cannot carry a `consumes` declaration until it
+/// does, and in the Embedded profile R1 is limited to the two paths coincide.
+#[toolkit::consumes(contract = authz_resolver_sdk::AuthZResolverApi, from = "authz-resolver")]
+#[toolkit::gear(name = "settings-service", deps = [types_registry], capabilities = [db, rest])]
 pub struct SettingsService {
     config: OnceLock<Arc<SettingsServiceConfig>>,
     db: OnceLock<Arc<DBProvider<DbError>>>,
     enforcer: OnceLock<Arc<PolicyEnforcer>>,
     types: OnceLock<Arc<dyn TypesRegistryClient>>,
-    root_tenant: OnceLock<uuid::Uuid>,
     categories: OnceLock<
         Arc<
             crate::domain::category::CategoryService<
@@ -54,7 +62,6 @@ impl Default for SettingsService {
             db: OnceLock::new(),
             enforcer: OnceLock::new(),
             types: OnceLock::new(),
-            root_tenant: OnceLock::new(),
             categories: OnceLock::new(),
             declarations: OnceLock::new(),
         }
@@ -89,6 +96,9 @@ impl SettingsService {
     /// Every handler obtains its `AccessScope` through this rather than
     /// consulting the decision point directly, so the fail-closed projection in
     /// [`crate::api::authz`] cannot be bypassed by a handler that forgets it.
+    /// The enforcer itself resolves the decision point lazily from the hub: the
+    /// resolver is a consumed client, wired after init (DESIGN.md §4.9), and a
+    /// decision it cannot obtain is a denial, not an allow.
     ///
     /// # Errors
     /// Returns an error when called before [`Gear::init`].
@@ -113,21 +123,6 @@ impl SettingsService {
         self.types
             .get()
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
-    }
-
-    /// The root tenant's id, once initialization has run.
-    ///
-    /// Platform scope is this id rather than an absent tenant (DESIGN.md §4.1):
-    /// every platform-scoped row and every audit record for one carries it. It
-    /// is install-time and undeletable, so resolving it once at init is exact.
-    ///
-    /// # Errors
-    /// Returns an error when called before [`Gear::init`].
-    pub fn root_tenant(&self) -> anyhow::Result<uuid::Uuid> {
-        self.root_tenant
-            .get()
-            .copied()
             .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
     }
 }
@@ -157,15 +152,12 @@ impl Gear for SettingsService {
             .set(db)
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
-        // Both resolved at init, not per request. A decision point that cannot
-        // be resolved must stop the gear coming up rather than surface later as
-        // a request-time denial indistinguishable from a real policy decision;
-        // and a registry that is absent must not first be discovered by a read
-        // that has already passed authorization and reached the database.
-        let authz = ctx
-            .client_hub()
-            .get::<dyn AuthZResolverApi>()
-            .map_err(|e| anyhow::anyhow!("failed to resolve the AuthZ resolver: {e}"))?;
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
+        // The one client called during our own init, and therefore the one
+        // `deps` entry: registering the settings GTS schemas is a real call into
+        // the registry, so it must already be up. A registry that is absent must
+        // not first be discovered by a read that has already passed
+        // authorization and reached the database.
         let types = ctx
             .client_hub()
             .get::<dyn TypesRegistryClient>()
@@ -174,31 +166,25 @@ impl Gear for SettingsService {
             .set(types)
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
-        // Resolved once, at init: the root tenant is the install-time, undeletable
-        // ancestor of every tenant, and its id *is* platform scope. A gear that
-        // could not learn it would write audit records against a scope it cannot
-        // name, so this fails closed like the two clients above.
-        let tenants = ctx
-            .client_hub()
-            .get::<dyn TenantResolverClient>()
-            .map_err(|e| anyhow::anyhow!("failed to resolve the tenant resolver: {e}"))?;
-        let root = tenants
-            .get_root_tenant(&SecurityContext::anonymous())
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to resolve the root tenant: {e}"))?;
-        self.root_tenant
-            .set(root.id.0)
-            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
-
+        // Consumed, not depended on. The authorization resolver is declared with
+        // `#[toolkit::consumes]` on the struct and wired by the proxy-wiring
+        // phase *after* init, so resolving it here would fail by construction;
+        // the enforcer fetches it from the hub per call and denies when it
+        // cannot. The tenant resolver is fetched the same way, on the first
+        // platform-scoped mutation that needs the root tenant's id. Neither is
+        // an ordering claim on the rest of the platform (DESIGN.md §4.9).
+        let hub = ctx.client_hub();
         self.enforcer
-            .set(Arc::new(PolicyEnforcer::new(authz)))
+            .set(Arc::new(PolicyEnforcer::from_hub(Arc::clone(&hub))))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+        let platform_scope = Arc::new(crate::infra::platform_scope::HubPlatformScope::new(hub));
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
 
         self.categories
             .set(Arc::new(crate::domain::category::CategoryService::new(
                 crate::infra::storage::category_repo::CategoryRepo,
                 Arc::new(crate::infra::audit_emitter::TracingAuditEmitter),
-                self.root_tenant()?,
+                platform_scope,
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 

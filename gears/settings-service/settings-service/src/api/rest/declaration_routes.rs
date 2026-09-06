@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use axum::Router;
+use toolkit::api::operation_builder::OperationBuilderODataExt;
 use toolkit::api::{OpenApiRegistry, OperationBuilder};
 use toolkit_db::{DBProvider, DbError};
 
@@ -17,6 +18,7 @@ use crate::api::rest::declaration_dto::DeclarationDto;
 use crate::api::rest::declaration_handlers as handlers;
 use crate::domain::declaration::DeclarationService;
 use crate::infra::storage::declaration_repo::DeclarationRepo;
+use settings_service_sdk::odata::DeclarationFilterField;
 
 /// `OpenAPI` grouping for these operations.
 const TAG: &str = "settings-declarations";
@@ -35,8 +37,8 @@ pub fn register_routes(
         .summary("List setting declarations")
         .description(
             "List declarations visible to the caller. Supports OData `$filter` and \
-             `$orderby` over `key`, `categoryId`, `domainAffinity`, `mode`, `status` \
-             and `ownerModule`, with cursor pagination. `$select` is not supported and \
+             `$orderby` over `key`, `category_id`, `domain_affinity`, `mode`, `status` \
+             and `owner_module`, with cursor pagination. `$select` is not supported and \
              is rejected rather than ignored. Each declaration carries its \
              `value_type_id` and the value type's resolved traits.",
         )
@@ -47,12 +49,16 @@ pub fn register_routes(
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
         .no_license_required()
+        .query_param_typed("limit", false, "Page size", "integer")
+        .query_param("cursor", false, "Cursor for pagination")
         .handler(handlers::list_declarations::<DeclarationRepo>)
         .json_response_with_schema::<toolkit_odata::Page<DeclarationDto>>(
             openapi,
             StatusCode::OK,
             "A page of declarations with its pagination cursors",
         )
+        .with_odata_filter::<DeclarationFilterField>()
+        .with_odata_orderby::<DeclarationFilterField>()
         .error_400(openapi)
         .error_401(openapi)
         .error_403(openapi)
@@ -76,6 +82,7 @@ pub fn register_routes(
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-2
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-1
         .no_license_required()
+        .path_param("id", "Declaration UUID")
         .handler(handlers::get_declaration::<DeclarationRepo>)
         .json_response_with_schema::<DeclarationDto>(
             openapi,

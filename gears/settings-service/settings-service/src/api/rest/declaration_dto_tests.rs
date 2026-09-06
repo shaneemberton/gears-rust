@@ -29,6 +29,8 @@ fn rendered(traits: serde_json::Value) -> RenderedDeclaration {
             requires_step_up: true,
             anonymous_exposable: false,
             source: "admin_authored".to_owned(),
+            last_change_at: time::OffsetDateTime::UNIX_EPOCH,
+            updated_at: time::OffsetDateTime::UNIX_EPOCH,
         },
         traits,
     }

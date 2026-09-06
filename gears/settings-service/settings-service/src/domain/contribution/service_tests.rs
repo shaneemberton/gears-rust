@@ -79,7 +79,13 @@ impl Harness {
             Arc::clone(&audit) as Arc<dyn crate::audit::AuditEmitter>,
             Arc::new(FixedScope(Uuid::nil())),
         ));
-        let client = ContributionClient::new(Arc::clone(&db), service);
+        let client = ContributionClient::new(
+            Arc::clone(&db),
+            service,
+            Arc::new(crate::domain::resolution::EffectiveCache::new(
+                std::time::Duration::from_secs(30),
+            )),
+        );
         Self {
             db,
             client,

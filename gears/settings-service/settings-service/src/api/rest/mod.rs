@@ -7,3 +7,6 @@ pub mod declaration_routes;
 pub mod dto;
 pub mod handlers;
 pub mod routes;
+pub mod setting_dto;
+pub mod setting_handlers;
+pub mod setting_routes;

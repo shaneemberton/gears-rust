@@ -92,6 +92,18 @@ impl From<DomainError> for CanonicalError {
                 .create(),
 
             // 409 — the request conflicts with current state.
+            // No canonical category means "retired", so it rides a failed
+            // precondition whose violation type the SDK projects to `Retired`.
+            // 410: the declaration is a positive fact that will not come back
+            // at this key, which is neither a missing resource nor a conflict.
+            DomainError::Retired { key } => SettingsResource::failed_precondition()
+                .with_precondition_violation(
+                    "setting",
+                    format!("setting `{key}` is retired"),
+                    settings_service_sdk::precondition::SETTING_RETIRED,
+                )
+                .with_override(Http::status_code(410))
+                .create(),
             DomainError::Conflict { detail } => SettingsResource::already_exists(detail)
                 .with_resource("setting")
                 .create(),

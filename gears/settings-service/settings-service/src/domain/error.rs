@@ -82,6 +82,15 @@ pub enum DomainError {
     },
 
     /// No such resource. Renders as `404`.
+    /// The declaration exists and is retired: a positive fact, distinct from
+    /// not-found, so a consumer still reading the key during its own upgrade
+    /// window can drop the dependency rather than retry a transient miss.
+    #[error("setting `{key}` is retired")]
+    Retired {
+        /// The retired setting's key.
+        key: String,
+    },
+
     #[error("{resource} not found")]
     NotFound {
         /// The kind of thing that was not found — never the caller's identifier

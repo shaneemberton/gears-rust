@@ -22,18 +22,25 @@ use crate::domain::category::CategoryRepository;
 use crate::domain::contribution::{ContributionService, ItemError, Outcome};
 use crate::domain::declaration::DeclarationRepository;
 use crate::domain::error::DomainError;
+use crate::domain::resolution::EffectiveCache;
 use crate::domain::value::ValueRepository;
 
 /// The SDK trait over the reconciler and the database.
 pub struct ContributionClient<D, Cat, V> {
     db: Arc<DBProvider<DbError>>,
     service: Arc<ContributionService<D, Cat, V>>,
+    cache: Arc<EffectiveCache>,
 }
 
 impl<D, Cat, V> ContributionClient<D, Cat, V> {
-    /// Serve the contract over this database and reconciler.
-    pub fn new(db: Arc<DBProvider<DbError>>, service: Arc<ContributionService<D, Cat, V>>) -> Self {
-        Self { db, service }
+    /// Serve the contract over this database and reconciler, evicting the
+    /// effective-value cache for every declaration it changes.
+    pub fn new(
+        db: Arc<DBProvider<DbError>>,
+        service: Arc<ContributionService<D, Cat, V>>,
+        cache: Arc<EffectiveCache>,
+    ) -> Self {
+        Self { db, service, cache }
     }
 }
 
@@ -88,6 +95,12 @@ where
                     })
                 })
                 .await;
+            // A changed declaration changes what every scope resolves to —
+            // its default, its traits, its very existence — so the key is
+            // evicted whole and re-resolves lazily.
+            if matches!(outcome, Ok(Ok(o)) if o != Outcome::Unchanged) {
+                self.cache.invalidate_key(key.as_str());
+            }
             match outcome {
                 Ok(Ok(Outcome::Registered)) => result.registered += 1,
                 Ok(Ok(Outcome::Updated)) => result.updated += 1,
@@ -130,6 +143,9 @@ where
                     })
                 })
                 .await;
+            if matches!(outcome, Ok(Ok(true))) {
+                self.cache.invalidate_key(key.as_str());
+            }
             match outcome {
                 Ok(Ok(true)) => result.retired += 1,
                 Ok(Ok(false)) => {}

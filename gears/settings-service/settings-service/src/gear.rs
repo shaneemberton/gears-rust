@@ -18,7 +18,7 @@ use types_registry_sdk::TypesRegistryClient;
 
 use crate::domain::platform_scope::PlatformScope;
 use crate::domain::validation::TypeValidator;
-use settings_service_sdk::api::SettingsContributionClient;
+use settings_service_sdk::api::{SettingsContributionClient, SettingsReaderClient};
 
 use crate::config::SettingsServiceConfig;
 
@@ -36,6 +36,13 @@ use crate::config::SettingsServiceConfig;
 /// fetched the same way (see [`crate::infra::platform_scope`]) — its SDK has no
 /// REST projection yet, so it cannot carry a `consumes` declaration until it
 /// does, and in the Embedded profile R1 is limited to the two paths coincide.
+/// The resolver over the concrete repositories, as the gear and its REST
+/// surface share it.
+pub type ConcreteResolver = crate::domain::resolution::ValueResolver<
+    crate::infra::storage::declaration_repo::DeclarationRepo,
+    crate::infra::storage::value_repo::ValueRepo,
+>;
+
 #[toolkit::consumes(contract = authz_resolver_sdk::AuthZResolverApi, from = "authz-resolver")]
 #[toolkit::gear(name = "settings-service", deps = [types_registry], capabilities = [db, rest])]
 pub struct SettingsService {
@@ -51,6 +58,8 @@ pub struct SettingsService {
             >,
         >,
     >,
+    resolver: OnceLock<Arc<ConcreteResolver>>,
+    hierarchy: OnceLock<Arc<dyn crate::domain::resolution::TenantHierarchy>>,
     declarations: OnceLock<
         Arc<
             crate::domain::declaration::DeclarationService<
@@ -69,6 +78,8 @@ impl Default for SettingsService {
             types: OnceLock::new(),
             validator: OnceLock::new(),
             categories: OnceLock::new(),
+            resolver: OnceLock::new(),
+            hierarchy: OnceLock::new(),
             declarations: OnceLock::new(),
         }
     }
@@ -144,6 +155,28 @@ impl SettingsService {
             .get()
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("{} gear not initialized", Self::MODULE_NAME))
+    }
+
+    /// The Value Resolver, once initialized.
+    ///
+    /// # Errors
+    /// If called before `init` completed.
+    pub fn resolver(&self) -> anyhow::Result<Arc<ConcreteResolver>> {
+        self.resolver
+            .get()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("{} resolver not initialized", Self::MODULE_NAME))
+    }
+
+    /// The tenant hierarchy port, once initialized.
+    ///
+    /// # Errors
+    /// If called before `init` completed.
+    pub fn hierarchy(&self) -> anyhow::Result<Arc<dyn crate::domain::resolution::TenantHierarchy>> {
+        self.hierarchy
+            .get()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("{} hierarchy not initialized", Self::MODULE_NAME))
     }
 }
 
@@ -222,6 +255,37 @@ impl Gear for SettingsService {
         // The contribution door: gears register their declarations through this
         // trait from their own init, so it is bound into the hub here and each
         // caller names `settings-service` in its `deps` to initialize after us.
+        // The read path: the local effective-value cache — this gear's
+        // `cache_ttl_seconds` is its knob — the tenant hierarchy port over the
+        // tenant resolver, the resolver over both repositories, and the
+        // in-process reader bound into the hub for every consuming gear.
+        let cache = Arc::new(crate::domain::resolution::EffectiveCache::new(
+            std::time::Duration::from_secs(self.config()?.cache_ttl_seconds),
+        ));
+        let hierarchy: Arc<dyn crate::domain::resolution::TenantHierarchy> = Arc::new(
+            crate::infra::tenant_hierarchy::HubTenantHierarchy::new(ctx.client_hub()),
+        );
+        self.hierarchy
+            .set(Arc::clone(&hierarchy))
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+        let resolver = Arc::new(crate::domain::resolution::ValueResolver::new(
+            crate::infra::storage::declaration_repo::DeclarationRepo,
+            crate::infra::storage::value_repo::ValueRepo,
+            hierarchy,
+            Arc::clone(&platform_scope),
+            self.validator()?,
+            Arc::clone(&cache),
+        ));
+        self.resolver
+            .set(Arc::clone(&resolver))
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+        // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-7
+        let reader: Arc<dyn SettingsReaderClient> = Arc::new(
+            crate::infra::reader_client::ReaderClient::new(self.db()?, Arc::clone(&resolver)),
+        );
+        ctx.client_hub()
+            .register::<dyn SettingsReaderClient>(reader);
+
         let contributions = Arc::new(crate::domain::contribution::ContributionService::new(
             crate::infra::storage::declaration_repo::DeclarationRepo,
             crate::infra::storage::category_repo::CategoryRepo,
@@ -233,11 +297,15 @@ impl Gear for SettingsService {
             audit,
             platform_scope,
         ));
-        let contribution_client: Arc<dyn SettingsContributionClient> = Arc::new(
-            crate::infra::contribution_client::ContributionClient::new(self.db()?, contributions),
-        );
+        let contribution_client: Arc<dyn SettingsContributionClient> =
+            Arc::new(crate::infra::contribution_client::ContributionClient::new(
+                self.db()?,
+                contributions,
+                cache,
+            ));
         ctx.client_hub()
             .register::<dyn SettingsContributionClient>(contribution_client);
+        // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-7
 
         self.declarations
             .set(Arc::new(
@@ -280,10 +348,17 @@ impl RestApiCapability for SettingsService {
             self.db()?,
             self.enforcer()?,
         );
-        Ok(crate::api::rest::declaration_routes::register_routes(
+        let router = crate::api::rest::declaration_routes::register_routes(
             router,
             openapi,
             declarations,
+            self.db()?,
+            self.enforcer()?,
+        );
+        Ok(crate::api::rest::setting_routes::register_routes(
+            router,
+            openapi,
+            self.resolver()?,
             self.db()?,
             self.enforcer()?,
         ))

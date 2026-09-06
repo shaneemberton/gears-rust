@@ -59,12 +59,16 @@ One requirement is counted as covered while being split across releases: `cpt-cf
 
 **Accepted narrowing — notification filtering is by subscription, not by entitlement.** `cpt-cf-settings-service-fr-consumer-activation` requires that a notification carry *"never a setting it is not entitled to read"*. [DESIGN-activation](./DESIGN-activation.md) §4.1 filters each notification to the subscriber's **own subscribed keys** and states that, under the platform trusted-caller model, subscriber identity is taken on trust — making this least-privilege by blast radius rather than an identity-enforced entitlement check. **This narrowing is intended and accepted.** It is recorded here rather than left in passing prose because it qualifies a PRD `MUST`: a consumer that subscribes to a key it could not read on the read path is still notified of that key's change. Revisit if consumers ever cease to be trusted.
 
-**Four things to settle with the DESIGN owners**, none of which blocks a wave:
+**Things to settle with the DESIGN owners**, none of which blocks a wave:
 
 - `audit_records.declaration_key` is `NOT NULL`, and the canonical resource id is built from a setting key. Category mutations have no setting key, yet 2.2 audits them through the same emitter. Either the column becomes nullable or category audit gets its own resource form; until that is decided, 2.6 keeps the emitter's interface value-centric and records category mutations with the category key in the resource field.
 - DESIGN §4.3 still carries `422` in several rule tables outside the Error Response Format section, which itself states that a validation rejection is the canonical invalid-argument category rendering as `400` with no `422` category. The FEATUREs and code follow the canonical-error ADRs and use `400`; the reason codes (`DefaultRequired`, `ValueTooLarge`, `SecretNotCloneable`, …) are kept.
 - DESIGN §4.8 *Bootstrap* has the gear seed "a minimal category set" at startup, but no section names the set. The init step is specified without its contents until it does.
 - DESIGN §4.9 has every consumed client declared with `#[toolkit::consumes]`, which requires the provider SDK's REST projection to exist. `tenant-resolver-sdk` has none, so the tenant resolver is fetched from the hub at first use instead — the same thing in the Embedded profile R1 is limited to, but the declaration has to land in that SDK before the out-of-process profiles of R2.
+- The default for an omitted `tenant` is stated twice in §4.3 and differently: "platform scope" on the read and write path notes, "the caller's own tenant" in the set rules. The FEATUREs assume the caller's own tenant, which for a platform administrator is the root tenant and therefore platform scope — the one reading that satisfies both sentences.
+- §4.3 says the read's `last_change_at` is the ETag a write submits, but that field is the leak-safe maximum over the declaration and the resolved row, which may be an ancestor's. The FEATUREs guard a write on the target scope's **own** row — its `last_change_at`, or an absent-state tag when no row exists — and return that tag in `ETag`, distinct from the recency in the body.
+- `audit_records.operation` is checked to the value operations only; restriction changes (2.7) and declaration and category mutations need entries too, or a second vocabulary. The §4.3 history row still spells its parameter `scope={path}` although scopes are tenant ids everywhere else.
+- The administrative read carries no effective tenant access for the caller, so a console cannot tell from the response whether to offer an editor; the FEATUREs keep the design's shape and leave the field to the DESIGN owners.
 
 **Not decomposed yet — R2 and R3, by owning component:**
 
@@ -94,7 +98,7 @@ One requirement is counted as covered while being split across releases: `cpt-cf
 - **Depends On**: None
 
 - **Scope**:
-  - SDK crate (`settings-service-sdk`): domain models, the `SettingKey` value object — a GTS type id under the Settings gear's abstract base `gts.cf.core.settings.setting_type.v1~` ([ADR-002](./ADR/ADR-002-setting-key-gts-type-id.md)), parsed once and never re-normalized — the `SettingsReaderClient` trait (DESIGN §4.5), the Contribution client trait, the `TypeValidator` trait whose implementation arrives in 2.4, the change-notification and outcome types the Settings Activation consumes, and the error taxonomy
+  - SDK crate (`settings-service-sdk`): domain models, the `SettingKey` value object — a GTS type id under the Settings gear's abstract base `gts.cf.core.settings.setting_type.v1~` ([ADR-002](./ADR/ADR-002-setting-key-gts-type-id.md)), parsed once and never re-normalized — the `SettingsReaderClient` trait (DESIGN §4.5), the Contribution client trait,  the change-notification and outcome types the Settings Activation consumes, and the error taxonomy
   - Gear scaffold: `#[toolkit::gear]` annotated gear with `deps = [types_registry]` — the one client it calls during its own init — and every consumed client (authorization resolver, tenant resolver, later the credential store and event broker) fetched at first use and declared with `#[toolkit::consumes]` where its SDK carries a REST projection (DESIGN §4.9; the tenant resolver's does not yet, see §1); ClientHub registration for the SDK client traits; registration of the gear's GTS control-plane schemas and the abstract `setting_type` base, and the idempotent seed of the minimal category set, at init (DESIGN §4.8 *Bootstrap*). The root tenant's id — platform scope (DESIGN §4.1, §4.7) — is learned from the tenant resolver on first use and kept
   - Persistence: SeaORM entity scaffolding, `SecureConn` and `DBRunner` wiring, migration harness
   - Error mapping: `DomainError` to Problem (RFC-9457) across the canonical error categories of DESIGN §4.3 — a validation rejection is invalid-argument and renders as `400`; `428`/`412` are explicit transport overrides on the `If-Match` preconditions
@@ -266,7 +270,7 @@ One requirement is counted as covered while being split across releases: `cpt-cf
 - **Depends On**: `cpt-cf-settings-service-feature-setting-declarations`
 
 - **Scope**:
-  - Type Validator component with `TypesRegistryClient` resolved in-process through ClientHub
+  - The `TypeValidator` port, declared in the gear's domain layer — not in the SDK — and bound over `TypesRegistryClient` resolved in-process through ClientHub
   - `validate_value`: structural validation against JSON Schema 2020-12, plus `format` keyword assertions and trait-driven rules (cron dialect parses, regex compiles, dynamic-enum membership, entity-reference resolves) enforced as hard checks
   - The 64 KiB serialized-JSON size cap, rejected as `ValueTooLarge`, bounding the hot cache, audit pre and post images, and validate-before-set report payloads
   - IEEE-754 binary64 round-trip canonicality, rejecting values that do not survive the round trip unchanged as `ValueNotCanonical`
@@ -322,6 +326,8 @@ One requirement is counted as covered while being split across releases: `cpt-cf
   - Batched resolution sharing one ancestry walk per scope, with independent per-key outcomes so a mixed batch never fails wholesale — the bulk read by category or by key set, a key the caller may not see or that does not exist reported in its own entry
   - Needs-review fallthrough: a flagged override is skipped rather than served, resolution continues to the nearest valid ancestor or the Schema Default, and the flagged override stays visible to administrators
   - Distinct not-found outcomes: a stale key after a category rename resolves as `NotFound` with no tombstone or alias, while a retired declaration resolves as the distinct `Retired`
+  - The administrative read surface over the resolver: `GET …/settings/{key}` with source, trail, leak-safe recency, the scope's own review flag and the value state tag in `ETag`; `GET …/settings` by category or key set with per-key outcomes, and the needs-review listing over the caller's subtree; hidden settings absent, standalone descendants outside the subtree, values masked by classification
+  - The in-process `SettingsReaderClient` over the resolver, registered into `ClientHub` at init, with no REST contract published and startup refused on a remote binding while the release is Embedded-only
   - Revert-to-default resolution semantics, with the Schema Default independent of any override and never destroyed by setting or clearing one
   - Cache `get`, `populate`, and `invalidate` keyed by `(key, scope)`, with key-wide eviction for cascading declarations so descendants re-resolve lazily
   - `cache_ttl_seconds` backstop, default 30 s, owned by this cache

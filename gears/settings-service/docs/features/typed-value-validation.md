@@ -139,9 +139,9 @@ Not applicable. Validation is an internal service invoked by other features rath
 
 **Steps**:
 1. [ ] - `p1` - Copy the declaration's `data_classification` onto every `setting_values` row written for that declaration - `inst-tvv-sync-1`
-2. [ ] - `p1` - **WHEN** a declaration's classification changes → re-sync the denormalized column on every existing value row for that declaration - `inst-tvv-sync-2`
-3. [ ] - `p1` - Perform the re-sync in the same transaction as the declaration change, so no window exists in which the two disagree - `inst-tvv-sync-3`
-4. [ ] - `p1` - **RETURN** having preserved the table check tying a `secret` classification to the presence of `secret_ref` - `inst-tvv-sync-4`
+2. [x] - `p1` - **WHEN** a declaration's classification changes → re-sync the denormalized column on every existing value row for that declaration - `inst-tvv-sync-2`
+3. [x] - `p1` - Perform the re-sync in the same transaction as the declaration change, so no window exists in which the two disagree - `inst-tvv-sync-3`
+4. [x] - `p1` - **RETURN** having preserved the table check tying a `secret` classification to the presence of `secret_ref` - `inst-tvv-sync-4`
 
 ## 4. States (CDSL)
 

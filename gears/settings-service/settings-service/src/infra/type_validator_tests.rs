@@ -1,16 +1,13 @@
 // Created: 2026-09-06 by Constructor Tech
 //! Tests for the registry-backed Type Validator, against a hand-built source.
 
-use std::collections::{HashMap, HashSet};
+use serde_json::json;
 
-use async_trait::async_trait;
-use serde_json::{Value, json};
-use types_registry_sdk::{GtsTypeId, GtsTypeSchema};
-
-use super::{GtsTypeValidator, SchemaSource};
+use super::GtsTypeValidator;
 use crate::domain::error::DomainError;
 use crate::domain::validation::TypeValidator;
 use crate::field;
+use crate::test_support::FakeSource;
 
 const PORT_TYPE: &str = "gts.cf.toolkit.settings.type_port.v1~";
 const IP_TYPE: &str = "gts.cf.toolkit.settings.type_ipv4.v1~";
@@ -18,44 +15,6 @@ const REGEX_TYPE: &str = "gts.cf.toolkit.settings.type_regex.v1~";
 const REF_TYPE: &str = "gts.cf.toolkit.settings.type_tenant_ref.v1~";
 const SECRET_TYPE: &str = "gts.cf.toolkit.settings.type_api_token.v1~";
 const TENANT_TYPE: &str = "gts.cf.core.am.tenant.v1~";
-
-/// A registry standing in for the catalogue that does not exist yet.
-#[derive(Default)]
-struct FakeSource {
-    schemas: HashMap<String, GtsTypeSchema>,
-    instances: HashSet<String>,
-    unavailable: bool,
-}
-
-impl FakeSource {
-    fn with_type(mut self, id: &str, schema: Value) -> Self {
-        let schema = GtsTypeSchema::try_new(GtsTypeId::new(id), schema, None, None)
-            .expect("fixture schema is a valid root type");
-        self.schemas.insert(id.to_owned(), schema);
-        self
-    }
-
-    fn with_instance(mut self, id: &str) -> Self {
-        self.instances.insert(id.to_owned());
-        self
-    }
-}
-
-#[async_trait]
-impl SchemaSource for FakeSource {
-    async fn type_schema(&self, type_id: &str) -> Result<Option<GtsTypeSchema>, DomainError> {
-        if self.unavailable {
-            return Err(DomainError::Unavailable {
-                detail: "registry down".to_owned(),
-            });
-        }
-        Ok(self.schemas.get(type_id).cloned())
-    }
-
-    async fn instance_exists(&self, instance_id: &str) -> Result<bool, DomainError> {
-        Ok(self.instances.contains(instance_id))
-    }
-}
 
 fn catalogue() -> FakeSource {
     FakeSource::default()

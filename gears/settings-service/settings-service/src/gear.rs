@@ -16,7 +16,9 @@ use toolkit_db::{DBProvider, DbError};
 use tracing::info;
 use types_registry_sdk::TypesRegistryClient;
 
+use crate::domain::platform_scope::PlatformScope;
 use crate::domain::validation::TypeValidator;
+use settings_service_sdk::api::SettingsContributionClient;
 
 use crate::config::SettingsServiceConfig;
 
@@ -203,16 +205,39 @@ impl Gear for SettingsService {
         self.enforcer
             .set(Arc::new(PolicyEnforcer::from_hub(Arc::clone(&hub))))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
-        let platform_scope = Arc::new(crate::infra::platform_scope::HubPlatformScope::new(hub));
+        let platform_scope: Arc<dyn PlatformScope> =
+            Arc::new(crate::infra::platform_scope::HubPlatformScope::new(hub));
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
 
+        let audit: Arc<dyn crate::audit::AuditEmitter> =
+            Arc::new(crate::infra::audit_emitter::TracingAuditEmitter);
         self.categories
             .set(Arc::new(crate::domain::category::CategoryService::new(
                 crate::infra::storage::category_repo::CategoryRepo,
-                Arc::new(crate::infra::audit_emitter::TracingAuditEmitter),
-                platform_scope,
+                Arc::clone(&audit),
+                Arc::clone(&platform_scope),
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+
+        // The contribution door: gears register their declarations through this
+        // trait from their own init, so it is bound into the hub here and each
+        // caller names `settings-service` in its `deps` to initialize after us.
+        let contributions = Arc::new(crate::domain::contribution::ContributionService::new(
+            crate::infra::storage::declaration_repo::DeclarationRepo,
+            crate::infra::storage::category_repo::CategoryRepo,
+            crate::infra::storage::value_repo::ValueRepo,
+            self.validator()?,
+            Arc::new(
+                crate::infra::setting_type_registrar::TypesRegistryRegistrar::new(self.types()?),
+            ),
+            audit,
+            platform_scope,
+        ));
+        let contribution_client: Arc<dyn SettingsContributionClient> = Arc::new(
+            crate::infra::contribution_client::ContributionClient::new(self.db()?, contributions),
+        );
+        ctx.client_hub()
+            .register::<dyn SettingsContributionClient>(contribution_client);
 
         self.declarations
             .set(Arc::new(

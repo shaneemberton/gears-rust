@@ -91,12 +91,12 @@ The key is the module's own: `gts.cf.core.settings.setting_type.v1~<vendor>.<pac
 - The types registry, the validator, or the database unavailable
 
 **Steps**:
-1. [ ] - `p1` - Actor resolves `SettingsContributionClient` from `ClientHub` in its own init — having named `settings-service` in its `deps` so this gear initialized first — and calls `register_declarations` with its `owner_module` and the full set of declarations it ships - `inst-mc-reg-1`
-2. [ ] - `p1` - **FOR EACH** contributed declaration → invoke contributed key admission; **IF** it refuses → record the item's error and continue with the rest, since one malformed setting must not take the gear's whole set down - `inst-mc-reg-2`
-3. [ ] - `p1` - **FOR EACH** admitted declaration → reuse the category whose slug is the key's category segment, or create it with that slug as both key and display name, in one transaction with the declaration it is created for - `inst-mc-reg-3`
-4. [ ] - `p1` - **FOR EACH** admitted declaration → invoke reconcile one declaration, matched by its version-stripped path - `inst-mc-reg-4`
+1. [ ] - `p1` - Actor resolves `SettingsContributionClient` from `ClientHub` in its own init — having named `settings-service` in its `deps` so this gear initialized first — and calls `register_declarations` with its `owner_module` and the full set of declarations it ships from its `post_init` hook, since the types registry admits the schemas registered during the init phase, the value-type catalogue among them, into its readable store only when it switches to ready mode after every gear's `init`; a call made from `init` finds its value types unknown - `inst-mc-reg-1`
+2. [x] - `p1` - **FOR EACH** contributed declaration → invoke contributed key admission; **IF** it refuses → record the item's error and continue with the rest, since one malformed setting must not take the gear's whole set down - `inst-mc-reg-2`
+3. [x] - `p1` - **FOR EACH** admitted declaration → reuse the category whose slug is the key's category segment, or create it with that slug as both key and display name, in one transaction with the declaration it is created for - `inst-mc-reg-3`
+4. [x] - `p1` - **FOR EACH** admitted declaration → invoke reconcile one declaration, matched by its version-stripped path - `inst-mc-reg-4`
 5. [ ] - `p1` - Publish `event_declaration_registered` for every inserted or upgraded declaration and `event_declaration_reactivated` for every revived one, and write one audit record per changed row through the Audit Emitter - `inst-mc-reg-5`
-6. [ ] - `p1` - **RETURN** the `ReconcileResult` with the counts of registered, updated, retired and reactivated declarations and the per-item errors; a set that changed nothing returns all zeros and no error - `inst-mc-reg-6`
+6. [x] - `p1` - **RETURN** the `ReconcileResult` with the counts of registered, updated, retired and reactivated declarations and the per-item errors; a set that changed nothing returns all zeros and no error - `inst-mc-reg-6`
 
 ### Retire Declarations
 
@@ -112,28 +112,28 @@ The key is the module's own: `gts.cf.core.settings.setting_type.v1~<vendor>.<pac
 - A key that is already retired, which is a no-op rather than an error
 
 **Steps**:
-1. [ ] - `p1` - Actor calls `retire_declarations` with its `owner_module` and the keys it no longer ships - `inst-mc-ret-1`
-2. [ ] - `p1` - **FOR EACH** key → DB: SELECT the declaration; **IF** none, **OR** its `owner_module` differs → record the item's error and continue - `inst-mc-ret-2`
-3. [ ] - `p1` - **IF** already retired → count nothing and continue - `inst-mc-ret-3`
-4. [ ] - `p1` - DB: UPDATE setting_declarations SET status = 'retired' in one transaction with the audit record; retain every row in `setting_values`; do not unregister the type, so a later re-registration is a lookup rather than a re-mint - `inst-mc-ret-4`
+1. [x] - `p1` - Actor calls `retire_declarations` with its `owner_module` and the keys it no longer ships - `inst-mc-ret-1`
+2. [x] - `p1` - **FOR EACH** key → DB: SELECT the declaration; **IF** none, **OR** its `owner_module` differs → record the item's error and continue - `inst-mc-ret-2`
+3. [x] - `p1` - **IF** already retired → count nothing and continue - `inst-mc-ret-3`
+4. [x] - `p1` - DB: UPDATE setting_declarations SET status = 'retired' in one transaction with the audit record; retain every row in `setting_values`; do not unregister the type, so a later re-registration is a lookup rather than a re-mint - `inst-mc-ret-4`
 5. [ ] - `p1` - Evict the local cache for the key at every scope and publish `event_declaration_retired` - `inst-mc-ret-5`
-6. [ ] - `p1` - **RETURN** the `ReconcileResult` with the retired count and the per-item errors; a read of a retired key now resolves as the distinct retired outcome - `inst-mc-ret-6`
+6. [x] - `p1` - **RETURN** the `ReconcileResult` with the retired count and the per-item errors; a read of a retired key now resolves as the distinct retired outcome - `inst-mc-ret-6`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Contributed Key Admission
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-module-contributions-key`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-module-contributions-key`
 
 **Input**: A contributed declaration's key
 
 **Output**: The key's category slug, leaf name, major and version-stripped path, or the refusal
 
 **Steps**:
-1. [ ] - `p1` - Parse the key through the shared setting-key parser, which requires the fixed base and one derived type; **IF** it fails → **RETURN** refused with the parser's problem - `inst-mc-key-1`
-2. [ ] - `p1` - **IF** the derived half's category segment is absent or not a well-formed slug → **RETURN** refused as `KeyNotNamespaced`; a contributed key is namespaced to its gear by construction and files under the category its third segment names - `inst-mc-key-2`
-3. [ ] - `p1` - Take the leaf name from the type token and the major from the version suffix, and form the version-stripped path — the derived half without its `.vN` — which is what "the same setting across versions" means - `inst-mc-key-3`
-4. [ ] - `p1` - **RETURN** the category slug, leaf name, major and stripped path - `inst-mc-key-4`
+1. [x] - `p1` - Parse the key through the shared setting-key parser, which requires the fixed base and one derived type; **IF** it fails → **RETURN** refused with the parser's problem - `inst-mc-key-1`
+2. [x] - `p1` - **IF** the derived half's category segment is absent or not a well-formed slug → **RETURN** refused as `KeyNotNamespaced`; a contributed key is namespaced to its gear by construction and files under the category its third segment names - `inst-mc-key-2`
+3. [x] - `p1` - Take the leaf name from the type token and the major from the version suffix, and form the version-stripped path — the derived half without its `.vN` — which is what "the same setting across versions" means - `inst-mc-key-3`
+4. [x] - `p1` - **RETURN** the category slug, leaf name, major and stripped path - `inst-mc-key-4`
 
 ### Reconcile One Declaration
 
@@ -144,14 +144,14 @@ The key is the module's own: `gts.cf.core.settings.setting_type.v1~<vendor>.<pac
 **Output**: The row inserted, updated, upgraded or reactivated, or the refusal
 
 **Steps**:
-1. [ ] - `p1` - Resolve the value type's trait set; derive `has_secret_trait` and the classification — `secret` from the trait and never from the caller, otherwise the caller's `pii` or `public`; **IF** the caller supplied `secret` on a non-secret type, or a non-empty default on a secret-trait type → **RETURN** refused - `inst-mc-rec-1`
-2. [ ] - `p1` - Validate the Schema Default against `value_type_id` through the Type Validator; **IF** it fails → **RETURN** refused with field-level detail, since a declaration must have a valid default - `inst-mc-rec-2`
-3. [ ] - `p1` - **IF** no declaration exists on the stripped path → invoke setting type registration, then DB: INSERT the row with `source = module_contributed`, the `owner_module`, `status = active`, the classification, `requires_step_up` as supplied or `true`, and `anonymous_exposable` as supplied or `false`, refusing the latter on `secret` or `pii`; **RETURN** registered - `inst-mc-rec-3`
-4. [ ] - `p1` - **IF** a declaration exists at the same major **AND** its `value_type_id` differs → **RETURN** refused as `ValueTypeChanged`, whatever its status: a retype is a new major, and this path runs with nobody watching - `inst-mc-rec-4`
-5. [ ] - `p1` - **IF** a declaration exists at the same major **AND** is active → DB: UPDATE its descriptive metadata and classification in place, preserving every administrator-set value; **IF** the classification changed → re-sync the denormalized copy on the setting's value rows in the same transaction; **RETURN** updated - `inst-mc-rec-5`
-6. [ ] - `p1` - **IF** a declaration exists at the same major **AND** is retired → DB: UPDATE status = 'active' and its metadata, re-validate every retained value against the type and flag what fails with `needs_review` and its detail, evict the cache, and **RETURN** reactivated - `inst-mc-rec-6`
+1. [x] - `p1` - Resolve the value type's trait set; derive `has_secret_trait` and the classification — `secret` from the trait and never from the caller, otherwise the caller's `pii` or `public`; **IF** the caller supplied `secret` on a non-secret type, or a non-empty default on a secret-trait type → **RETURN** refused - `inst-mc-rec-1`
+2. [x] - `p1` - Validate the Schema Default against `value_type_id` through the Type Validator; **IF** it fails → **RETURN** refused with field-level detail, since a declaration must have a valid default - `inst-mc-rec-2`
+3. [x] - `p1` - **IF** no declaration exists on the stripped path → invoke setting type registration, then DB: INSERT the row with `source = module_contributed`, the `owner_module`, `status = active`, the classification, `requires_step_up` as supplied or `true`, and `anonymous_exposable` as supplied or `false`, refusing the latter on `secret` or `pii`; **RETURN** registered - `inst-mc-rec-3`
+4. [x] - `p1` - **IF** a declaration exists at the same major **AND** its `value_type_id` differs → **RETURN** refused as `ValueTypeChanged`, whatever its status: a retype is a new major, and this path runs with nobody watching - `inst-mc-rec-4`
+5. [x] - `p1` - **IF** a declaration exists at the same major **AND** is active → DB: UPDATE its descriptive metadata and classification in place, preserving every administrator-set value; **IF** the classification changed → re-sync the denormalized copy on the setting's value rows in the same transaction; **RETURN** updated - `inst-mc-rec-5`
+6. [x] - `p1` - **IF** a declaration exists at the same major **AND** is retired → DB: UPDATE status = 'active' and its metadata, re-validate every retained value against the type and flag what fails with `needs_review` and its detail, evict the cache, and **RETURN** reactivated - `inst-mc-rec-6`
 7. [ ] - `p1` - **IF** the contributed major is higher than the highest stored → invoke the upgrade migration and **RETURN** registered - `inst-mc-rec-7`
-8. [ ] - `p1` - **IF** the contributed major is lower than the active one → **RETURN** refused; a gear does not roll a setting back by re-registering an older major - `inst-mc-rec-8`
+8. [x] - `p1` - **IF** the contributed major is lower than the active one → **RETURN** refused; a gear does not roll a setting back by re-registering an older major - `inst-mc-rec-8`
 
 ### Upgrade Migration to a New Major
 
@@ -171,17 +171,17 @@ The key is the module's own: `gts.cf.core.settings.setting_type.v1~<vendor>.<pac
 
 ### Setting Type Registration
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-module-contributions-type`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-module-contributions-type`
 
 **Input**: A setting key and the `value_type_id` its values validate against
 
 **Output**: The setting's own type registered in the types registry, derived from the base
 
 **Steps**:
-1. [ ] - `p1` - Compose the setting's type schema: identified by the key, deriving from the abstract `gts.cf.core.settings.setting_type.v1~` base this gear registered at init, and composed with the value type the declaration names — carrying **no** `default`, since the Schema Default lives in `default_value` alone - `inst-mc-type-1`
-2. [ ] - `p1` - Call the types registry's type-schema registration before the row is inserted; **IF** the registry reports the base absent → **RETURN** unavailable, since the base is registered at this gear's init and its absence means the gear is not the one that started - `inst-mc-type-2`
-3. [ ] - `p1` - **IF** the type is already registered → treat it as success: registration is idempotent, so a retry after a failed insert reuses the type rather than minting a second one, and a type with no declaration resolves but names nothing - `inst-mc-type-3`
-4. [ ] - `p1` - **RETURN** registered; a later retirement of the declaration leaves the type in place - `inst-mc-type-4`
+1. [x] - `p1` - Compose the setting's type schema: identified by the key, deriving from the abstract `gts.cf.core.settings.setting_type.v1~` base this gear registered at init, and composed with the value type the declaration names — carrying **no** `default`, since the Schema Default lives in `default_value` alone - `inst-mc-type-1`
+2. [x] - `p1` - Call the types registry's type-schema registration before the row is inserted; **IF** the registry reports the base absent → **RETURN** unavailable, since the base is registered at this gear's init and its absence means the gear is not the one that started - `inst-mc-type-2`
+3. [x] - `p1` - **IF** the type is already registered → treat it as success: registration is idempotent, so a retry after a failed insert reuses the type rather than minting a second one, and a type with no declaration resolves but names nothing - `inst-mc-type-3`
+4. [x] - `p1` - **RETURN** registered; a later retirement of the declaration leaves the type in place - `inst-mc-type-4`
 
 ## 4. States (CDSL)
 
@@ -191,7 +191,7 @@ Not applicable. The declaration lifecycle — active, retired, reactivated — i
 
 ### Contribution Contract in the SDK
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-sdk`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-sdk`
 
 The SDK **MUST** carry a `ContributedDeclaration` that names the full setting key, the `value_type_id`, the Schema Default, the scope class, and the optional `mode`, `description`, `domain_affinity`, `licence_feature`, `data_classification` (`public` or `pii` only), `requires_step_up` and `anonymous_exposable`; a `SettingKey` constructor composing a contributed key from vendor, package, category, name and major; and a `ReconcileResult` counting registered, updated, retired and reactivated declarations and carrying per-item errors. `SettingsContributionClient` **MUST** expose `register_declarations` and `retire_declarations`.
 
@@ -206,7 +206,7 @@ The SDK **MUST** carry a `ContributedDeclaration` that names the full setting ke
 
 ### Reconciler Operations
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-operations`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-operations`
 
 The system **MUST** implement `SettingsContributionClient` in process and register it into `ClientHub` at init, **MUST** make `register_declarations` idempotent so a repeated call converges the gear's set and changes nothing, **MUST** continue past a refused item and report it per item, and **MUST** publish the registered, retired and reactivated events and write one audit record per changed row.
 
@@ -221,7 +221,7 @@ The system **MUST** implement `SettingsContributionClient` in process and regist
 
 ### Namespaced Keys and Auto-Vivified Categories
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-key`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-key`
 
 A contributed key **MUST** parse through the shared setting-key parser as the fixed base followed by one derived type, **MUST** be refused as `KeyNotNamespaced` when its category segment is absent or malformed, and **MUST** file under the category its third segment names, which the reconciler **MUST** reuse by slug or create with that slug as both key and name.
 
@@ -264,7 +264,7 @@ A higher major on the same path **MUST** insert the successor, copy every predec
 
 ### Type Registered Before the Row
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-type`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-type`
 
 Before a contributed declaration's row is inserted, its own type **MUST** be registered in the types registry, derived from the abstract `setting_type` base and composed with its value type, carrying no `default`. Registration **MUST** be idempotent, an absent base **MUST** surface as unavailable, and retiring the declaration **MUST NOT** unregister the type.
 
@@ -304,17 +304,17 @@ While the release is Embedded-only, the contribution trait **MUST** be bound in 
 
 ## 6. Acceptance Criteria
 
-- [ ] A gear registering three declarations on a fresh database gets `registered = 3`, three active rows with `source = module_contributed`, three registered types, and its category created by slug; the same call again returns all zeros and changes nothing
+- [x] A gear registering three declarations on a fresh database gets `registered = 3`, three active rows with `source = module_contributed`, three registered types, and its category created by slug; the same call again returns all zeros and changes nothing
 - [ ] A key whose derived half lacks a category segment is refused as `KeyNotNamespaced`, and the other declarations in the same call are still reconciled
-- [ ] A Schema Default failing its value type is refused with field-level detail and inserts no row and no type
-- [ ] A `secret` classification supplied by the caller on a non-secret type is refused; a secret-trait type derives `secret` and refuses a non-empty default
-- [ ] Re-registering a setting at the same major with a new description updates the row in place and leaves every stored value intact
-- [ ] Re-registering a setting at the same major with a different `value_type_id` is refused as `ValueTypeChanged`, and the stored declaration and its values are untouched
+- [x] A Schema Default failing its value type is refused with field-level detail and inserts no row and no type
+- [x] A `secret` classification supplied by the caller on a non-secret type is refused; a secret-trait type derives `secret` and refuses a non-empty default
+- [x] Re-registering a setting at the same major with a new description updates the row in place and leaves every stored value intact
+- [x] Re-registering a setting at the same major with a different `value_type_id` is refused as `ValueTypeChanged`, and the stored declaration and its values are untouched
 - [ ] Re-registering a retired setting at the same major reactivates it, and a retained value that no longer validates is flagged `needs_review` with a detail and falls through on read
 - [ ] Registering `…sett1.v2~` with a different value type while `…sett1.v1~` is active with two values creates `v2` active, copies both values with the failing one flagged, retires `v1`, and leaves all of it or none of it when the transaction fails
-- [ ] Registering a major lower than the active one is refused
+- [x] Registering a major lower than the active one is refused
 - [ ] The setting's type exists in the types registry before its row, a retry after a failed insert reuses it, and retiring the declaration leaves it registered
-- [ ] Retiring a key the module does not own is refused per item; retiring an already retired key changes nothing
+- [x] Retiring a key the module does not own is refused per item; retiring an already retired key changes nothing
 - [ ] After a retire, a read of the key resolves as the distinct retired outcome and every value row remains
 - [ ] Every registration, upgrade, reactivation and retirement writes an audit record and publishes its event
 - [ ] `PATCH` and `DELETE` on a contributed declaration return `409 ContributedDeclarationImmutable`, while a value write to it succeeds under the ordinary rules

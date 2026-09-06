@@ -5,3 +5,4 @@ pub mod audit_emitter;
 pub mod platform_scope;
 pub mod sdk_error_mapping;
 pub mod storage;
+pub mod type_validator;

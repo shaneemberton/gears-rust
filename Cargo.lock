@@ -3056,6 +3056,8 @@ dependencies = [
  "cf-gears-types-registry-sdk",
  "http",
  "inventory",
+ "jsonschema",
+ "regex",
  "sea-orm",
  "sea-orm-migration",
  "serde",

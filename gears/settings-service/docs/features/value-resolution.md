@@ -204,7 +204,7 @@ Three properties matter more than the walk itself.
 3. [x] - `p1` - **ELSE** assemble the page under the narrowed grant: fetch a candidate batch wider than the page, evaluate the candidates in one batch decision, keep what is allowed, and refill until the page is full or the candidates run out; a setting the caller may not read is absent from the page and the count, never marked - `inst-vr-browse-3`
 4. [x] - `p1` - Confirm the target is within the caller's subtree and not standalone; **IF** not → **RETURN** `403` - `inst-vr-browse-4`
 5. [x] - `p1` - **IF** the OData expression references an unmapped field or an unsupported operator → **RETURN** `400` rather than ignoring it - `inst-vr-browse-5`
-6. [x] - `p1` - Exclude every setting whose effective tenant access for the target is `hidden`, silently and from the count - `inst-vr-browse-6`
+6. [x] - `p1` - Exclude every setting whose effective tenant access for the caller is `hidden`, silently and from the count; an administrator above the target still sees what it restricted - `inst-vr-browse-6`
 7. [x] - `p1` - **IF** the filter asks for `needs_review` → DB: SELECT the flagged override rows for declarations in the page whose tenant lies in the caller's subtree, excluding standalone descendants, through `idx_values_needs_review`, and return them with their detail; this lists rows, not resolved values - `inst-vr-browse-7`
 8. [x] - `p1` - **ELSE** obtain the ancestor chain once and resolve every item in the page against it, masking each value by classification - `inst-vr-browse-8`
 9. [x] - `p1` - **IF** the filter named a key set → report a key the caller may not see or that does not exist in its own entry with its own outcome, never as a failure of the request - `inst-vr-browse-9`

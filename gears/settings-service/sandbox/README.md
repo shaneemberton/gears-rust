@@ -126,6 +126,24 @@ Every error is an RFC 9457 problem document: `type`, `title`, `status`,
 `detail`, `instance`, and for a validation failure `violations[]` with
 `field`, `code` and `message`.
 
+Tenant access restriction of one setting at one tenant:
+`GET /settings-service/v1/settings/{key}/permissions?tenant=<uuid>` — returns
+`effective` (`access`: `overridable`, `read_only` or `hidden`, plus
+`supplied_by`, the tenant whose row wins), `stored` (the row at that tenant,
+absent when none) and `etag`; the `ETag` header repeats it, `absent` when no
+row exists. `PUT` with `{"access": "read_only" | "hidden"}` and `If-Match`
+creates or changes the row; `DELETE` with `If-Match` removes it; both answer
+with the new readout. `overridable` is not a stored state, so `PUT` refuses
+it with 400: clear the row instead. The caller must be an administrator above
+the target: a tenant cannot restrict itself, a sibling or an ancestor (403).
+A row set on a tenant applies to its whole subtree; the strictest row on the
+chain wins. `GET …/permissions/all` lists every row in the caller's subtree.
+`hidden` makes the setting answer 404 to that tenant on every read and browse.
+
+Declarations carry `default_value`, `data_classification`, `has_secret_trait`,
+`requires_step_up`, `anonymous_exposable`, `source`, `last_change_at` and
+`etag`; `GET /settings-service/v1/declarations/{id}` sets the `ETag` header.
+
 | Status | When |
 |---|---|
 | 400 | malformed key or `tenant`, invalid value (with `violations`), unsupported OData, over 500 batch changes |
@@ -140,8 +158,6 @@ Every error is an RFC 9457 problem document: `type`, `title`, `status`,
 
 ## What is not there yet
 
-- Tenant access restriction endpoints (`…/{key}/permissions`): reads and
-  writes already honour restrictions, but nothing can create one.
 - Administrative creation of declarations: they come from gears through the
   SDK. The demo gear is the only contributor.
 - Secret values cannot be set (503) until the Secret Manager lands; render
@@ -152,6 +168,3 @@ Every error is an RFC 9457 problem document: `type`, `title`, `status`,
 - CORS is off on the example server. Serve the frontend from the same origin
   or proxy `/settings-service/*` in the dev server, as this sandbox does.
 - No "who am I" endpoint: the client knows its tenant from how it logged in.
-- `DeclarationDto` does not yet carry `default_value`, `data_classification`,
-  `requires_step_up` or `anonymous_exposable`; the browse endpoint's
-  `effective` carries the classification.

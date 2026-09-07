@@ -162,8 +162,12 @@ pub async fn get_setting(
     // target tenant is `hidden`, both answer 404 so existence is not disclosed.
     // For a `global` setting this is the visibility rule that gates whether a
     // tenant is served the platform value at all.
+    // Whose access decides is the caller's: an administrator above a tenant it
+    // restricted still sees the setting; the restricted tenant does not.
+    let caller =
+        ScopeTarget::Tenant(ctx.subject_tenant_id()).normalize(resolver.root_tenant().await?);
     let hidden = resolver
-        .effective_access(&conn, effective.declaration_id, target)
+        .effective_access(&conn, effective.declaration_id, caller)
         .await?
         .is_hidden();
     if hidden
@@ -340,7 +344,8 @@ pub async fn browse_settings(
     // A setting hidden from the target tenant leaves the page silently — and
     // the count with it, since the page is what is counted — never marked.
     let ids: Vec<Uuid> = page.items.iter().map(|d| d.id).collect();
-    let access = resolver.effective_access_for(&conn, &ids, target).await?;
+    let caller = ScopeTarget::Tenant(ctx.subject_tenant_id()).normalize(root);
+    let access = resolver.effective_access_for(&conn, &ids, caller).await?;
     page.items
         .retain(|d| !access.get(&d.id).is_some_and(|a| a.is_hidden()));
     // @cpt-end:cpt-cf-settings-service-flow-value-resolution-admin-browse:p1:inst-vr-browse-6
@@ -470,8 +475,9 @@ pub async fn get_history(
     // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-6
     // Hidden from the target tenant: 404 rather than 403, so a hidden setting's
     // existence is not disclosed through its history either.
+    let caller = ScopeTarget::Tenant(ctx.subject_tenant_id()).normalize(root);
     if resolver
-        .effective_access(&conn, declaration.id, target)
+        .effective_access(&conn, declaration.id, caller)
         .await?
         .is_hidden()
     {

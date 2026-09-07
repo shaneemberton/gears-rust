@@ -168,7 +168,11 @@ function renderRows() {
       const impact = document.createElement("button");
       impact.textContent = "Impact";
       impact.onclick = () => showPanel(api("GET", `${BASE}/settings/${encodeKey(key)}/impact?value=${encodeURIComponent(JSON.stringify(effective.value))}${tenantQuery("&")}`));
-      actions.append(edit, revert, remove, history, impact);
+      const access = document.createElement("button");
+      access.textContent = "Access";
+      access.title = "GET/PUT/DELETE .../permissions?tenant= for the selected tenant";
+      access.onclick = () => openAccess(key, tr);
+      actions.append(edit, revert, remove, history, impact, access);
     }
     tr.append(name, type, value, source, actions);
     body.appendChild(tr);
@@ -192,6 +196,42 @@ function openEditor(row, tr) {
   editor.append(widget, validate, save);
   tr.querySelector("td.value").appendChild(editor);
   function read(w) { try { return w.read(); } catch (e) { log("err", `not JSON: ${e.message}`); throw e; } }
+}
+
+async function openAccess(key, tr) {
+  const existing = tr.querySelector(".access");
+  if (existing) { existing.remove(); return; }
+  const path = `${BASE}/settings/${encodeKey(key)}/permissions${tenantQuery()}`;
+  const current = await api("GET", path);
+  if (!current.ok) return showResult(current);
+  const readout = current.json;
+  const box = document.createElement("div");
+  box.className = "access";
+  const info = document.createElement("span");
+  info.className = "muted";
+  info.textContent = `effective ${readout.effective.access}` +
+    (readout.effective.supplied_by ? ` (set at ${readout.effective.supplied_by})` : "") +
+    ` · stored ${readout.stored ? readout.stored.access : "none"} · etag ${readout.etag} `;
+  const pick = document.createElement("select");
+  fill(pick, [["read_only", "read_only"], ["hidden", "hidden"]], readout.stored ? readout.stored.access : "read_only");
+  const set = document.createElement("button");
+  set.textContent = `Set (If-Match ${readout.etag})`;
+  set.onclick = () => plainWrite("PUT", path, readout.etag, { access: pick.value });
+  const clear = document.createElement("button");
+  clear.textContent = "Clear";
+  clear.title = "DELETE with If-Match; a no-op when no row is stored";
+  clear.onclick = () => plainWrite("DELETE", path, readout.etag);
+  const all = document.createElement("button");
+  all.textContent = "All rows";
+  all.title = "GET .../permissions/all: every restriction row in the caller's subtree";
+  all.onclick = () => showPanel(api("GET", `${BASE}/settings/${encodeKey(key)}/permissions/all`));
+  box.append(info, pick, set, clear, all);
+  tr.querySelector("td.actions").appendChild(box);
+}
+
+async function plainWrite(method, path, etag, body) {
+  showResult(await api(method, path, { body, headers: { "If-Match": etag } }));
+  await loadCategory();
 }
 
 async function write(method, path, etag, body) {

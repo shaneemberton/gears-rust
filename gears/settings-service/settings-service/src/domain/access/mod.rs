@@ -10,6 +10,7 @@
 //! and the in-process reader is not gated at all.
 
 pub mod repo;
+pub mod service;
 
 use std::sync::Arc;
 
@@ -22,6 +23,7 @@ use crate::domain::error::DomainError;
 use crate::domain::resolution::{EffectiveCache, TenantHierarchy};
 
 pub use repo::AccessRepository;
+pub use service::{AccessActor, AccessReadout, AccessService};
 
 /// What a tenant may do with a setting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -62,6 +62,7 @@ pub struct SettingsService {
     >,
     resolver: OnceLock<Arc<ConcreteResolver>>,
     writes: OnceLock<Arc<crate::infra::value_writes::WriteCoordinator>>,
+    access: OnceLock<Arc<crate::api::rest::access_handlers::ConcreteAccessService>>,
     hierarchy: OnceLock<Arc<dyn crate::domain::resolution::TenantHierarchy>>,
     declarations: OnceLock<
         Arc<
@@ -83,6 +84,7 @@ impl Default for SettingsService {
             categories: OnceLock::new(),
             resolver: OnceLock::new(),
             writes: OnceLock::new(),
+            access: OnceLock::new(),
             hierarchy: OnceLock::new(),
             declarations: OnceLock::new(),
         }
@@ -181,6 +183,19 @@ impl SettingsService {
             .get()
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("{} writes not initialized", Self::MODULE_NAME))
+    }
+
+    /// The tenant access service, once initialized.
+    ///
+    /// # Errors
+    /// If called before `init` completed.
+    pub fn access(
+        &self,
+    ) -> anyhow::Result<Arc<crate::api::rest::access_handlers::ConcreteAccessService>> {
+        self.access
+            .get()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("{} access not initialized", Self::MODULE_NAME))
     }
 
     /// The tenant hierarchy port, once initialized.
@@ -294,6 +309,7 @@ impl Gear for SettingsService {
         self.hierarchy
             .set(Arc::clone(&hierarchy))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+        let hierarchy_for_access = Arc::clone(&hierarchy);
         let resolver = Arc::new(crate::domain::resolution::ValueResolver::new(
             crate::infra::storage::declaration_repo::DeclarationRepo,
             crate::infra::storage::value_repo::ValueRepo,
@@ -306,6 +322,19 @@ impl Gear for SettingsService {
         self.resolver
             .set(Arc::clone(&resolver))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+        // Tenant access restrictions: set, clear, read and list, each mutation in
+        // its own transaction with its record, evicting the restricted subtree.
+        self.access
+            .set(Arc::new(crate::domain::access::AccessService::new(
+                crate::infra::storage::declaration_repo::DeclarationRepo,
+                crate::infra::storage::access_repo::AccessRepo,
+                crate::infra::storage::audit_store::AuditStore,
+                Arc::clone(&hierarchy_for_access),
+                Arc::clone(&platform_scope),
+                Arc::clone(&cache),
+            )))
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+
         // The write path: the step-up verifier from configuration — the OIDC/JWKS
         // binding when a section is present, otherwise the binding that refuses
         // every write needing step-up while reads keep serving — over the same
@@ -416,10 +445,17 @@ impl RestApiCapability for SettingsService {
             self.db()?,
             self.enforcer()?,
         );
-        Ok(crate::api::rest::value_routes::register_routes(
+        let router = crate::api::rest::value_routes::register_routes(
             router,
             openapi,
             self.writes()?,
+            self.enforcer()?,
+        );
+        Ok(crate::api::rest::access_routes::register_routes(
+            router,
+            openapi,
+            self.access()?,
+            self.db()?,
             self.enforcer()?,
         ))
     }

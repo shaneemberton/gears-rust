@@ -61,6 +61,17 @@ fn the_value_type_travels_beside_the_key() {
 }
 
 #[test]
+fn the_flags_default_and_classification_travel_with_the_declaration() {
+    let dto = DeclarationDto::from(rendered(json!({})));
+    assert_eq!(dto.default_value, json!(true));
+    assert_eq!(dto.data_classification, "public");
+    assert!(dto.requires_step_up && !dto.anonymous_exposable && !dto.has_secret_trait);
+    assert_eq!(dto.source, "admin_authored");
+    assert_eq!(dto.last_change_at, "1970-01-01T00:00:00Z");
+    assert_eq!(dto.etag, "0", "the epoch's tag");
+}
+
+#[test]
 fn traits_are_carried_through_verbatim() {
     let dto = DeclarationDto::from(rendered(json!({ "secret": true, "unit": "ms" })));
     assert_eq!(dto.traits, json!({ "secret": true, "unit": "ms" }));

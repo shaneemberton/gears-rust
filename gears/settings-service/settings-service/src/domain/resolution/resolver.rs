@@ -14,6 +14,7 @@ use super::{
     EffectiveCache, EffectiveValue, OwnRow, ScopeTarget, TenantHierarchy, TrailEntry, scope_class,
     scope_path,
 };
+use crate::domain::access::{AccessRepository, EffectiveAccess, strictest};
 use crate::domain::declaration::{Declaration, DeclarationRepository};
 use crate::domain::error::DomainError;
 use crate::domain::platform_scope::PlatformScope;
@@ -81,15 +82,17 @@ struct Walk {
 }
 
 /// The resolver.
+// @cpt-dod:cpt-cf-settings-service-dod-tenant-access-effective:p1
 // @cpt-dod:cpt-cf-settings-service-dod-value-resolution-operations:p1
 // @cpt-dod:cpt-cf-settings-service-dod-value-resolution-scope-class:p1
 // @cpt-dod:cpt-cf-settings-service-dod-value-resolution-ancestry:p1
 // @cpt-dod:cpt-cf-settings-service-dod-value-resolution-defaults:p1
 // @cpt-dod:cpt-cf-settings-service-dod-value-resolution-fallthrough:p1
 // @cpt-dod:cpt-cf-settings-service-dod-value-resolution-outcomes:p1
-pub struct ValueResolver<D, V> {
+pub struct ValueResolver<D, V, A> {
     declarations: D,
     values: V,
+    access: A,
     hierarchy: Arc<dyn TenantHierarchy>,
     platform: Arc<dyn PlatformScope>,
     validator: Arc<dyn TypeValidator>,
@@ -240,15 +243,17 @@ fn same_detail(err: &DomainError) -> DomainError {
     }
 }
 
-impl<D, V> ValueResolver<D, V>
+impl<D, V, A> ValueResolver<D, V, A>
 where
     D: DeclarationRepository,
     V: ValueRepository,
+    A: AccessRepository,
 {
     /// Build the resolver over its repositories, ports and cache.
     pub fn new(
         declarations: D,
         values: V,
+        access: A,
         hierarchy: Arc<dyn TenantHierarchy>,
         platform: Arc<dyn PlatformScope>,
         validator: Arc<dyn TypeValidator>,
@@ -257,11 +262,70 @@ where
         Self {
             declarations,
             values,
+            access,
             hierarchy,
             platform,
             validator,
             cache,
         }
+    }
+
+    /// A tenant's effective access for one declaration: the strictest row on
+    /// its root-to-self chain, `overridable` when there is none.
+    ///
+    /// The chain is the same lookup the cascading walk uses, and it is walked
+    /// for `local` and `global` settings too: they do not inherit their value,
+    /// but their administrative access still narrows down the tree.
+    ///
+    /// # Errors
+    /// [`DomainError`] when the chain or the rows cannot be read.
+    pub async fn effective_access<C: DBRunner>(
+        &self,
+        conn: &C,
+        declaration_id: Uuid,
+        target: ScopeTarget,
+    ) -> Result<EffectiveAccess, DomainError> {
+        let mut by_declaration = self
+            .effective_access_for(conn, &[declaration_id], target)
+            .await?;
+        Ok(by_declaration
+            .remove(&declaration_id)
+            .unwrap_or(EffectiveAccess::OVERRIDABLE))
+    }
+
+    /// Effective access of one tenant for several declarations, over one chain
+    /// lookup and one set query.
+    ///
+    /// # Errors
+    /// [`DomainError`] when the chain or the rows cannot be read.
+    pub async fn effective_access_for<C: DBRunner>(
+        &self,
+        conn: &C,
+        declaration_ids: &[Uuid],
+        target: ScopeTarget,
+    ) -> Result<HashMap<Uuid, EffectiveAccess>, DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-algo-tenant-access-resolve:p1:inst-ta-resolve-1
+        let root = self.platform.root_tenant().await?;
+        let mut ancestry = Ancestry::new(root, target);
+        let chain = ancestry.chain(self.hierarchy.as_ref()).await?.to_vec();
+        // @cpt-end:cpt-cf-settings-service-algo-tenant-access-resolve:p1:inst-ta-resolve-1
+        let rows = self
+            .access
+            .find_for_declarations(conn, &AccessScope::allow_all(), declaration_ids, &chain)
+            .await?;
+        let mut grouped: HashMap<Uuid, Vec<crate::domain::access::Restriction>> = HashMap::new();
+        for row in rows {
+            grouped.entry(row.declaration_id).or_default().push(row);
+        }
+        Ok(declaration_ids
+            .iter()
+            .map(|id| {
+                let effective = grouped
+                    .get(id)
+                    .map_or(EffectiveAccess::OVERRIDABLE, |rows| strictest(rows));
+                (*id, effective)
+            })
+            .collect())
     }
 
     /// The cache this resolver reads through.

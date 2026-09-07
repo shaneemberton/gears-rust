@@ -18,6 +18,7 @@ fn reader(
 ) -> ReaderClient<
     crate::infra::storage::declaration_repo::DeclarationRepo,
     crate::infra::storage::value_repo::ValueRepo,
+    crate::infra::storage::access_repo::AccessRepo,
 > {
     ReaderClient::new(Arc::clone(&h.db), Arc::clone(&h.resolver))
 }

@@ -24,14 +24,14 @@ use crate::domain::resolution::{EffectiveValue, ScopeTarget, ValueResolver};
 use crate::domain::value::ValueRepository;
 
 /// The SDK trait over the resolver and the database.
-pub struct ReaderClient<D, V> {
+pub struct ReaderClient<D, V, A> {
     db: Arc<DBProvider<DbError>>,
-    resolver: Arc<ValueResolver<D, V>>,
+    resolver: Arc<ValueResolver<D, V, A>>,
 }
 
-impl<D, V> ReaderClient<D, V> {
+impl<D, V, A> ReaderClient<D, V, A> {
     /// Serve the contract over this database and resolver.
-    pub fn new(db: Arc<DBProvider<DbError>>, resolver: Arc<ValueResolver<D, V>>) -> Self {
+    pub fn new(db: Arc<DBProvider<DbError>>, resolver: Arc<ValueResolver<D, V, A>>) -> Self {
         Self { db, resolver }
     }
 }
@@ -76,10 +76,11 @@ fn conn_error(err: &DbError) -> CanonicalError {
 }
 
 #[async_trait]
-impl<D, V> SettingsReaderClient for ReaderClient<D, V>
+impl<D, V, A> SettingsReaderClient for ReaderClient<D, V, A>
 where
     D: DeclarationRepository + 'static,
     V: ValueRepository + 'static,
+    A: crate::domain::access::AccessRepository + 'static,
 {
     async fn get_effective(
         &self,
@@ -159,10 +160,11 @@ where
     }
 }
 
-impl<D, V> ReaderClient<D, V>
+impl<D, V, A> ReaderClient<D, V, A>
 where
     D: DeclarationRepository,
     V: ValueRepository,
+    A: crate::domain::access::AccessRepository,
 {
     async fn keys_in_category(&self, category: &str) -> Result<Vec<SettingKey>, CanonicalError> {
         let category_id = Uuid::parse_str(category).map_err(|_| {

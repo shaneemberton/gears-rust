@@ -1,6 +1,7 @@
 // Created: 2026-08-12 by Constructor Tech
 //! Domain layer.
 
+pub mod access;
 pub mod category;
 pub mod contribution;
 pub mod declaration;

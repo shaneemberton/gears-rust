@@ -118,6 +118,7 @@ async fn may_read_pii(
         .is_ok()
 }
 
+// @cpt-dod:cpt-cf-settings-service-dod-value-resolution-rest-read-surface:p1
 /// `GET /settings-service/v1/settings/{key}?tenant={tenant_id}`
 ///
 /// # Errors
@@ -154,18 +155,30 @@ pub async fn get_setting(
     let effective = resolver.resolve(&conn, &key, target).await?;
     // @cpt-end:cpt-cf-settings-service-flow-value-resolution-admin-read:p1:inst-vr-aread-7
     // @cpt-end:cpt-cf-settings-service-flow-value-resolution-admin-read:p1:inst-vr-aread-6
-    // A declaration outside the caller's administrative domain is absent, not
-    // forbidden, so its existence is not disclosed. The tenant-access `hidden`
-    // clause of the same rule arrives with tenant access restrictions.
-    if !visibility::is_visible(
-        &visibility::domain_visibility(&scope),
-        effective.domain_affinity.as_deref(),
-    ) {
+    // @cpt-begin:cpt-cf-settings-service-flow-value-resolution-admin-read:p1:inst-vr-aread-5
+    // @cpt-begin:cpt-cf-settings-service-algo-value-resolution-dispatch:p1:inst-vr-disp-3
+    // Absent, never forbidden: a declaration outside the caller's
+    // administrative domain, and a setting whose effective access for the
+    // target tenant is `hidden`, both answer 404 so existence is not disclosed.
+    // For a `global` setting this is the visibility rule that gates whether a
+    // tenant is served the platform value at all.
+    let hidden = resolver
+        .effective_access(&conn, effective.declaration_id, target)
+        .await?
+        .is_hidden();
+    if hidden
+        || !visibility::is_visible(
+            &visibility::domain_visibility(&scope),
+            effective.domain_affinity.as_deref(),
+        )
+    {
         return Err(DomainError::NotFound {
             resource: "declaration",
         }
         .into());
     }
+    // @cpt-end:cpt-cf-settings-service-algo-value-resolution-dispatch:p1:inst-vr-disp-3
+    // @cpt-end:cpt-cf-settings-service-flow-value-resolution-admin-read:p1:inst-vr-aread-5
     let pii = effective.data_classification == "pii" && may_read_pii(&enforcer, &ctx).await;
     let dto: EffectiveValueDto = render(&effective, pii);
     let etag = dto.etag.clone();
@@ -320,9 +333,17 @@ pub async fn browse_settings(
         filter_hash: query.filter_hash.clone(),
         select: None,
     };
-    let page = resolver
+    let mut page = resolver
         .list_declarations(&conn, &scope, &declarations_query)
         .await?;
+    // @cpt-begin:cpt-cf-settings-service-flow-value-resolution-admin-browse:p1:inst-vr-browse-6
+    // A setting hidden from the target tenant leaves the page silently — and
+    // the count with it, since the page is what is counted — never marked.
+    let ids: Vec<Uuid> = page.items.iter().map(|d| d.id).collect();
+    let access = resolver.effective_access_for(&conn, &ids, target).await?;
+    page.items
+        .retain(|d| !access.get(&d.id).is_some_and(|a| a.is_hidden()));
+    // @cpt-end:cpt-cf-settings-service-flow-value-resolution-admin-browse:p1:inst-vr-browse-6
     let has_pii = page.items.iter().any(|d| d.data_classification == "pii");
     let pii = has_pii && may_read_pii(&enforcer, &ctx).await;
 
@@ -389,6 +410,7 @@ pub async fn browse_settings(
 #[path = "setting_handlers_tests.rs"]
 mod setting_handlers_tests;
 
+// @cpt-dod:cpt-cf-settings-service-dod-audit-store-history-read:p1
 /// `GET /settings-service/v1/settings/{key}/history?tenant={tenant_id}` with
 /// `limit` and `cursor`.
 ///
@@ -431,7 +453,7 @@ pub async fn get_history(
     // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-5
     // A retired declaration keeps its history and is read like an active one;
     // absence, and a declaration outside the caller's administrative domain,
-    // are 404. The tenant-access `hidden` clause arrives with tenant access.
+    // are 404.
     let declaration = resolver
         .find_declaration(&conn, &key)
         .await?
@@ -445,6 +467,20 @@ pub async fn get_history(
             resource: "declaration",
         })?;
     // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-5
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-6
+    // Hidden from the target tenant: 404 rather than 403, so a hidden setting's
+    // existence is not disclosed through its history either.
+    if resolver
+        .effective_access(&conn, declaration.id, target)
+        .await?
+        .is_hidden()
+    {
+        return Err(DomainError::NotFound {
+            resource: "declaration",
+        }
+        .into());
+    }
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-6
     let page = crate::infra::storage::audit_store::AuditStore
         .history(&conn, &scope, key.as_str(), target.tenant_id(root), &query)
         .await?;

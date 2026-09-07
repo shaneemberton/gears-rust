@@ -158,7 +158,7 @@ Three properties matter more than the walk itself.
 
 ### Read an Effective Value Administratively
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-flow-value-resolution-admin-read`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-flow-value-resolution-admin-read`
 
 **Actor**: `cpt-cf-settings-service-actor-tenant-admin`
 
@@ -175,7 +175,7 @@ Three properties matter more than the walk itself.
 2. [x] - `p1` - Authorize `read` on the setting's key through the `PolicyEnforcer` PEP and obtain the `AccessScope` constraints - `inst-vr-aread-2`
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-vr-aread-3`
 4. [x] - `p1` - Confirm through the tenant resolver that the target is the caller's own tenant or a descendant that is not standalone; **IF** not → **RETURN** `403` - `inst-vr-aread-4`
-5. [ ] - `p1` - DB: SELECT the declaration by key; **IF** none, **OR** the caller's effective tenant access for it is `hidden` → **RETURN** `404`, never `403`, so existence is not disclosed - `inst-vr-aread-5`
+5. [x] - `p1` - DB: SELECT the declaration by key; **IF** none, **OR** the caller's effective tenant access for it is `hidden` → **RETURN** `404`, never `403`, so existence is not disclosed - `inst-vr-aread-5`
 6. [x] - `p1` - **IF** the declaration is retired → **RETURN** the distinct retired outcome without its retained values - `inst-vr-aread-6`
 7. [x] - `p1` - Resolve the effective value at the target through the resolver, cache first, recording the trail - `inst-vr-aread-7`
 8. [x] - `p1` - Compute `last_change_at` as the greater of the declaration's own `last_change_at` and the **resolved** row's — never a maximum over sibling or descendant scopes, so the timestamp reveals nothing the caller could not already read - `inst-vr-aread-8`
@@ -186,7 +186,7 @@ Three properties matter more than the walk itself.
 
 ### Browse Effective Values
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-flow-value-resolution-admin-browse`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-flow-value-resolution-admin-browse`
 
 **Actor**: `cpt-cf-settings-service-actor-tenant-admin`
 
@@ -204,7 +204,7 @@ Three properties matter more than the walk itself.
 3. [x] - `p1` - **ELSE** assemble the page under the narrowed grant: fetch a candidate batch wider than the page, evaluate the candidates in one batch decision, keep what is allowed, and refill until the page is full or the candidates run out; a setting the caller may not read is absent from the page and the count, never marked - `inst-vr-browse-3`
 4. [x] - `p1` - Confirm the target is within the caller's subtree and not standalone; **IF** not → **RETURN** `403` - `inst-vr-browse-4`
 5. [x] - `p1` - **IF** the OData expression references an unmapped field or an unsupported operator → **RETURN** `400` rather than ignoring it - `inst-vr-browse-5`
-6. [ ] - `p1` - Exclude every setting whose effective tenant access for the target is `hidden`, silently and from the count - `inst-vr-browse-6`
+6. [x] - `p1` - Exclude every setting whose effective tenant access for the target is `hidden`, silently and from the count - `inst-vr-browse-6`
 7. [x] - `p1` - **IF** the filter asks for `needs_review` → DB: SELECT the flagged override rows for declarations in the page whose tenant lies in the caller's subtree, excluding standalone descendants, through `idx_values_needs_review`, and return them with their detail; this lists rows, not resolved values - `inst-vr-browse-7`
 8. [x] - `p1` - **ELSE** obtain the ancestor chain once and resolve every item in the page against it, masking each value by classification - `inst-vr-browse-8`
 9. [x] - `p1` - **IF** the filter named a key set → report a key the caller may not see or that does not exist in its own entry with its own outcome, never as a failure of the request - `inst-vr-browse-9`
@@ -214,7 +214,7 @@ Three properties matter more than the walk itself.
 
 ### Scope Class Resolution Dispatch
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-value-resolution-dispatch`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-value-resolution-dispatch`
 
 **Input**: A declaration and a requested scope
 
@@ -223,7 +223,7 @@ Three properties matter more than the walk itself.
 **Steps**:
 1. [x] - `p1` - **IF** the declaration's scope class is `global` - `inst-vr-disp-1`
    1. [x] - `p1` - DB: SELECT the platform-scope row for the declaration, identified by the root tenant's id - `inst-vr-disp-2`
-   2. [ ] - `p1` - **IF** the request comes from a tenant scope → serve the platform value read-only, and only when the setting is visible to that tenant, its effective access being other than `hidden` - `inst-vr-disp-3`
+   2. [x] - `p1` - **IF** the request comes from a tenant scope → serve the platform value read-only, and only when the setting is visible to that tenant, its effective access being other than `hidden` - `inst-vr-disp-3`
    3. [x] - `p1` - **IF** no platform row exists → **RETURN** the Schema Default with the default source - `inst-vr-disp-4`
 2. [x] - `p1` - **IF** the declaration's scope class is `cascading` - `inst-vr-disp-5`
    1. [x] - `p1` - Ask the tenant resolver for the requested tenant's ancestor ids, ordered root to self - `inst-vr-disp-6`
@@ -418,7 +418,7 @@ The cache **MUST** evict the affected subtree's cascading entries on a tenant hi
 
 ### Administrative Read Surface
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-value-resolution-rest-read-surface`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-value-resolution-rest-read-surface`
 
 The system **MUST** serve `GET /settings-service/v1/settings/{key}` and `GET /settings-service/v1/settings` on the resolver, authorized by `read` on the setting's key — one decision on the base type where the grant covers everything, batch evaluation of candidates under a narrowed grant — confined to the caller's own tenant or a non-standalone descendant, with a hidden setting reported as absent and excluded from listings and counts. The single read **MUST** carry `value`, `source`, `source_scope`, `traits`, the inheritance trail with setter identity, a leak-safe `last_change_at`, the scope's own review flag, and the value state tag in `ETag`; values **MUST** be masked by classification. The browse **MUST** support selection by category and by key set with per-key outcomes, and the needs-review listing over the caller's subtree.
 
@@ -452,7 +452,7 @@ The system **MUST** implement `SettingsReaderClient` over the resolver — `get_
 
 - [x] A `global` setting with a root-tenant row resolves to that row's value with the root tenant as its source scope
 - [x] A `global` setting with no root-tenant row resolves to its Schema Default
-- [ ] A `global` setting is served to a tenant read-only when the setting is visible to it, and is not served when its effective access is `hidden`
+- [x] A `global` setting is served to a tenant read-only when the setting is visible to it, and is not served when its effective access is `hidden`
 - [x] A `cascading` setting with an override at the requested tenant resolves as an own override
 - [x] A `cascading` setting with no own override but an ancestor override resolves as inherited and names the ancestor scope
 - [x] A `cascading` setting with overrides at two ancestors resolves to the deeper of the two
@@ -481,7 +481,7 @@ The system **MUST** implement `SettingsReaderClient` over the resolver — `get_
 - [x] `GET /settings-service/v1/settings/{key}` returns `value`, `source`, `source_scope`, `traits`, the trail with setter identity, `last_change_at`, and an `ETag` equal to the scope's own value state tag
 - [x] The read's `last_change_at` never exceeds the greater of the declaration's and the resolved row's timestamps, and a sibling's later write leaves it unchanged
 - [x] A read whose own override is flagged returns the fallthrough value together with `needs_review` and its detail
-- [ ] A read of a hidden setting returns `404`; a read for a tenant outside the subtree or a standalone descendant returns `403`
+- [x] A read of a hidden setting returns `404`; a read for a tenant outside the subtree or a standalone descendant returns `403`
 - [x] A read of a secret setting returns the mask token; a `pii` value is masked without the entitlement and unmasked with it
 - [x] `GET /settings-service/v1/settings?$filter=key in (…)` returns one entry per key, a hidden or non-existent key carrying its own outcome
 - [ ] `GET /settings-service/v1/settings?$filter=needs_review eq true` lists the flagged overrides in the caller's subtree with their detail and none from a standalone descendant

@@ -41,6 +41,7 @@ use crate::config::SettingsServiceConfig;
 pub type ConcreteResolver = crate::domain::resolution::ValueResolver<
     crate::infra::storage::declaration_repo::DeclarationRepo,
     crate::infra::storage::value_repo::ValueRepo,
+    crate::infra::storage::access_repo::AccessRepo,
 >;
 
 #[toolkit::consumes(contract = authz_resolver_sdk::AuthZResolverApi, from = "authz-resolver")]
@@ -283,6 +284,7 @@ impl Gear for SettingsService {
         let resolver = Arc::new(crate::domain::resolution::ValueResolver::new(
             crate::infra::storage::declaration_repo::DeclarationRepo,
             crate::infra::storage::value_repo::ValueRepo,
+            crate::infra::storage::access_repo::AccessRepo,
             hierarchy,
             Arc::clone(&platform_scope),
             self.validator()?,

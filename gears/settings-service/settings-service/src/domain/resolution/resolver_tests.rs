@@ -417,3 +417,99 @@ async fn the_trail_carries_setter_identity_for_the_administrative_projection() {
         .expect("b is on the trail");
     assert_eq!(at_b.set_by, None);
 }
+
+mod access {
+    //! Effective access over the harness: the strictest row on the chain.
+
+    use serde_json::json;
+    use toolkit_security::AccessScope;
+
+    use crate::domain::access::{AccessRepository, RestrictionDraft, TenantAccess};
+    use crate::domain::resolution::{ScopeTarget, scope_class};
+    use crate::infra::storage::access_repo::AccessRepo;
+    use crate::test_support::ResolutionHarness;
+
+    #[tokio::test]
+    async fn a_fresh_setting_is_overridable_everywhere_and_creates_no_row() {
+        let h = ResolutionHarness::new().await;
+        let d = h.declare("strict", scope_class::GLOBAL, json!(false)).await;
+        let conn = h.db.conn().expect("connection");
+        for target in [ScopeTarget::Platform, ScopeTarget::Tenant(h.tree.b)] {
+            let access = h
+                .resolver
+                .effective_access(&conn, d, target)
+                .await
+                .expect("resolves");
+            assert_eq!(access.access, TenantAccess::Overridable);
+            assert_eq!(access.supplied_by, None);
+        }
+        assert!(
+            AccessRepo
+                .find_one(&conn, &AccessScope::allow_all(), d, h.tree.b)
+                .await
+                .expect("lookup")
+                .is_none(),
+            "reading creates nothing"
+        );
+        assert!(
+            h.hierarchy.chain_calls() >= 1,
+            "access walks the chain even for a global setting"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_strictest_ancestor_row_wins_and_siblings_are_unaffected() {
+        let h = ResolutionHarness::new().await;
+        let d = h
+            .declare("strict", scope_class::CASCADING, json!(false))
+            .await;
+        let conn = h.db.conn().expect("connection");
+        let all = AccessScope::allow_all();
+        let t = &h.tree;
+        for (tenant, access) in [(t.a, TenantAccess::Hidden), (t.b, TenantAccess::ReadOnly)] {
+            AccessRepo
+                .upsert(
+                    &conn,
+                    &all,
+                    RestrictionDraft {
+                        declaration_id: d,
+                        tenant_id: tenant,
+                        access,
+                        set_by: "root-admin".to_owned(),
+                    },
+                )
+                .await
+                .expect("row");
+        }
+        let at_b = h
+            .resolver
+            .effective_access(&conn, d, ScopeTarget::Tenant(t.b))
+            .await
+            .expect("resolves");
+        assert_eq!(
+            at_b.access,
+            TenantAccess::Hidden,
+            "the ancestor's hidden dominates"
+        );
+        assert_eq!(at_b.supplied_by, Some(t.a));
+        let at_c = h
+            .resolver
+            .effective_access(&conn, d, ScopeTarget::Tenant(t.c))
+            .await
+            .expect("resolves");
+        assert_eq!(
+            at_c.access,
+            TenantAccess::Overridable,
+            "a sibling branch is untouched"
+        );
+
+        // The value still resolves for the hidden tenant: access gates the
+        // caller, never the value, and the in-process reader is not gated.
+        h.set(d, t.a, json!(true)).await;
+        let value = h
+            .resolve("strict", ScopeTarget::Tenant(t.b))
+            .await
+            .expect("resolves");
+        assert_eq!(value.value, json!(true));
+    }
+}

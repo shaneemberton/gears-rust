@@ -116,6 +116,18 @@ impl EffectiveCache {
         // @cpt-end:cpt-cf-settings-service-algo-value-resolution-cache-invalidate:p1:inst-vr-inv-5
     }
 
+    /// Evict a key's entries for the given tenants only: an access change on a
+    /// tenant and its descendants, whatever the scope class.
+    pub fn invalidate_tenants(&self, key: &str, tenants: &[Uuid]) {
+        let mut entries = self
+            .entries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for tenant in tenants {
+            entries.remove(&(key.to_owned(), *tenant));
+        }
+    }
+
     /// Evict every scope of a key: for a declaration change, whose default or
     /// traits alter every scope's effective value at once.
     pub fn invalidate_key(&self, key: &str) {
@@ -150,3 +162,26 @@ impl EffectiveCache {
 #[cfg(test)]
 #[path = "cache_tests.rs"]
 mod cache_tests;
+
+/// A minimal entry for tests elsewhere in the crate.
+#[cfg(test)]
+#[must_use]
+pub fn tests_entry(key: &str, tenant: Uuid) -> EffectiveValue {
+    EffectiveValue {
+        key: key.to_owned(),
+        declaration_id: Uuid::nil(),
+        scope: format!("/tenants/{tenant}"),
+        tenant_id: tenant,
+        value: serde_json::json!(1),
+        source: settings_service_sdk::EffectiveSource::SchemaDefault,
+        source_scope: None,
+        traits: serde_json::json!({}),
+        trail: Vec::new(),
+        data_classification: "public".to_owned(),
+        domain_affinity: None,
+        secret_backed: false,
+        declaration_last_change_at: time::OffsetDateTime::UNIX_EPOCH,
+        resolved_row_last_change_at: None,
+        own_row: None,
+    }
+}

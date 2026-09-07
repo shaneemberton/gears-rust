@@ -176,58 +176,58 @@ The standalone seam lives here too, because it is the same boundary drawn from t
 
 ### Effective Access Resolution
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-resolve`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-resolve`
 
 **Input**: A declaration and a tenant
 
 **Output**: The tenant's effective access for the setting, and the tenant whose row supplies it
 
 **Steps**:
-1. [ ] - `p1` - Obtain the tenant's ancestor ids from the tenant resolver, root to self — the same lookup the cascading walk uses, and the same one for `local` and `global` settings, which do not walk ancestors for their value but do for their access - `inst-ta-resolve-1`
-2. [ ] - `p1` - DB: SELECT tenant_permissions WHERE declaration_id = {declaration} AND tenant_id IN ({chain}) as one exact-match set query - `inst-ta-resolve-2`
-3. [ ] - `p1` - **IF** no row → **RETURN** `overridable` with no supplying tenant, and create nothing: absence is the default, not a state to materialize - `inst-ta-resolve-3`
-4. [ ] - `p1` - Take the strictest access on the chain, `hidden` over `read_only`, and the tenant of the row that supplied it - `inst-ta-resolve-4`
-5. [ ] - `p1` - **RETURN** the effective access and its source; resolution never uses access to choose a value row - `inst-ta-resolve-5`
+1. [x] - `p1` - Obtain the tenant's ancestor ids from the tenant resolver, root to self — the same lookup the cascading walk uses, and the same one for `local` and `global` settings, which do not walk ancestors for their value but do for their access - `inst-ta-resolve-1`
+2. [x] - `p1` - DB: SELECT tenant_permissions WHERE declaration_id = {declaration} AND tenant_id IN ({chain}) as one exact-match set query - `inst-ta-resolve-2`
+3. [x] - `p1` - **IF** no row → **RETURN** `overridable` with no supplying tenant, and create nothing: absence is the default, not a state to materialize - `inst-ta-resolve-3`
+4. [x] - `p1` - Take the strictest access on the chain, `hidden` over `read_only`, and the tenant of the row that supplied it - `inst-ta-resolve-4`
+5. [x] - `p1` - **RETURN** the effective access and its source; resolution never uses access to choose a value row - `inst-ta-resolve-5`
 
 ### Strict-Descendant Target Check
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-target`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-target`
 
 **Input**: The caller's tenant and a target tenant
 
 **Output**: Whether the caller may restrict the target
 
 **Steps**:
-1. [ ] - `p1` - **IF** the target is the caller's own tenant → **RETURN** refused; a tenant cannot change its own row - `inst-ta-target-1`
-2. [ ] - `p1` - Ask the tenant resolver whether the caller is an ancestor of the target; **IF** not → **RETURN** refused, covering ancestors, siblings and tenants outside the subtree alike - `inst-ta-target-2`
-3. [ ] - `p1` - **IF** the target is a standalone tenant, or lies below one, as the tenant resolver marks it → **RETURN** refused; nothing traverses downward into a standalone tenant from an administrator above it - `inst-ta-target-3`
-4. [ ] - `p1` - **RETURN** permitted - `inst-ta-target-4`
+1. [x] - `p1` - **IF** the target is the caller's own tenant → **RETURN** refused; a tenant cannot change its own row - `inst-ta-target-1`
+2. [x] - `p1` - Ask the tenant resolver whether the caller is an ancestor of the target; **IF** not → **RETURN** refused, covering ancestors, siblings and tenants outside the subtree alike - `inst-ta-target-2`
+3. [x] - `p1` - **IF** the target is a standalone tenant, or lies below one, as the tenant resolver marks it → **RETURN** refused; nothing traverses downward into a standalone tenant from an administrator above it - `inst-ta-target-3`
+4. [x] - `p1` - **RETURN** permitted - `inst-ta-target-4`
 
 ### Restriction State Tag
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-etag`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-etag`
 
 **Input**: The stored row for a `(setting, tenant)` pair, or its absence
 
 **Output**: The ETag a mutation of that pair must present
 
 **Steps**:
-1. [ ] - `p1` - **IF** a row exists → derive the tag from its normalized UTC `updated_at`, as every other ETag in this service is derived - `inst-ta-etag-1`
-2. [ ] - `p1` - **ELSE** derive an absent-state tag that is stable for the pair and distinct from every stored-row tag, so a PUT may create a row only against the caller's knowledge that none existed - `inst-ta-etag-2`
-3. [ ] - `p1` - **RETURN** the tag; comparison and mutation happen in one transaction, so a row changed in between fails the comparison rather than being overwritten - `inst-ta-etag-3`
+1. [x] - `p1` - **IF** a row exists → derive the tag from its normalized UTC `updated_at`, as every other ETag in this service is derived - `inst-ta-etag-1`
+2. [x] - `p1` - **ELSE** derive an absent-state tag that is stable for the pair and distinct from every stored-row tag, so a PUT may create a row only against the caller's knowledge that none existed - `inst-ta-etag-2`
+3. [x] - `p1` - **RETURN** the tag; comparison and mutation happen in one transaction, so a row changed in between fails the comparison rather than being overwritten - `inst-ta-etag-3`
 
 ### Eviction on an Access Change
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-evict`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-tenant-access-evict`
 
 **Input**: A declaration and the tenant whose row changed
 
 **Output**: Evicted cache entries
 
 **Steps**:
-1. [ ] - `p1` - Obtain the tenant's descendants from the tenant resolver - `inst-ta-evict-1`
-2. [ ] - `p1` - Evict the cached entries of the setting for the tenant and every descendant on this instance, regardless of scope class, because their effective access may have changed even where their effective value has not - `inst-ta-evict-2`
-3. [ ] - `p1` - **RETURN** having evicted locally only; peer replicas converge through the R2 `cache_invalidate` broadcast - `inst-ta-evict-3`
+1. [x] - `p1` - Obtain the tenant's descendants from the tenant resolver - `inst-ta-evict-1`
+2. [x] - `p1` - Evict the cached entries of the setting for the tenant and every descendant on this instance, regardless of scope class, because their effective access may have changed even where their effective value has not - `inst-ta-evict-2`
+3. [x] - `p1` - **RETURN** having evicted locally only; peer replicas converge through the R2 `cache_invalidate` broadcast - `inst-ta-evict-3`
 
 ## 4. States (CDSL)
 
@@ -237,7 +237,7 @@ Not applicable. A restriction is a row that exists with one of two values or doe
 
 ### Tenant Permissions Table
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-tenant-access-table`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-tenant-access-table`
 
 The system **MUST** persist restrictions in a `tenant_permissions` table carrying `declaration_id` as a foreign key to `setting_declarations` declared `ON DELETE CASCADE`, a non-null `tenant_id` that is the restricted tenant, `access` checked to `read_only` or `hidden`, `set_by`, and timestamps, with `uq_tenant_permission` on `(declaration_id, tenant_id)` and `idx_tenant_permission_tenant`. `overridable` **MUST** be represented by no row, and the root tenant **MUST** never have one. Rows **MUST** survive a declaration's soft-retire and be deleted only by a hard delete of the declaration or a tenant's deletion.
 
@@ -274,7 +274,7 @@ The system **MUST** expose set, clear, read and list over restrictions, authoriz
 
 ### Effective Access Rule
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-tenant-access-effective`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-tenant-access-effective`
 
 Effective access **MUST** be the strictest row on the tenant's root-to-self chain, `overridable < read_only < hidden`, obtained from the tenant resolver's ancestry and one exact-match set query, with absence meaning `overridable` and creating no row. A row **MUST** be stored even when a stricter ancestor already dominates it.
 
@@ -338,19 +338,19 @@ An access change **MUST** evict the setting's cached entries for the target tena
 
 ## 6. Acceptance Criteria
 
-- [ ] A freshly declared setting has `overridable` effective access for every tenant, and reading it creates no row
-- [ ] An ancestor with `hidden` and a descendant with `read_only` yield `hidden` for the descendant, and siblings outside the restricted branch are unaffected
+- [x] A freshly declared setting has `overridable` effective access for every tenant, and reading it creates no row
+- [x] An ancestor with `hidden` and a descendant with `read_only` yield `hidden` for the descendant, and siblings outside the restricted branch are unaffected
 - [ ] A tenant administrator targeting its own tenant receives `403` and no row is written
 - [ ] Targeting an ancestor, a sibling, a tenant outside the subtree, or a standalone descendant receives `403`
 - [ ] A row set below an already `hidden` tenant is stored and becomes effective when the ancestor restriction is cleared
 - [ ] A value set before its tenant became `read_only` still resolves and is inherited, and a write by that tenant is refused
 - [ ] An `overridable` ancestor writes at a `read_only` descendant successfully, while the descendant's own write remains refused
-- [ ] A gear reading through `SettingsReaderClient` receives the effective value of a `hidden` tenant unchanged
+- [x] A gear reading through `SettingsReaderClient` receives the effective value of a `hidden` tenant unchanged
 - [ ] `PUT` with `access=overridable` returns `400`
 - [ ] `PUT` or `DELETE` without `If-Match` returns `428`; with a tag made stale by another delegate returns `412`, and the newer restriction remains stored
 - [ ] `GET` for a pair with no row returns `overridable` and an absent-state ETag that a subsequent `PUT` can present
 - [ ] `DELETE` clears one row, and the effective access afterwards reflects any ancestor row that remains
 - [ ] Setting or clearing a restriction evicts the cached entries of the target tenant and its descendants
-- [ ] Restriction rows survive a retire and revive of their declaration unchanged
+- [x] Restriction rows survive a retire and revive of their declaration unchanged
 - [ ] Every restriction change leaves an audit record with the previous and the new row
 - [ ] The root tenant never holds a restriction row

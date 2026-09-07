@@ -72,7 +72,7 @@ Two things about the record itself are fixed before it is written. Masking happe
 
 ### Read Setting History
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-flow-audit-store-history`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-flow-audit-store-history`
 
 **Actor**: `cpt-cf-settings-service-actor-tenant-admin`
 
@@ -91,7 +91,7 @@ Two things about the record itself are fixed before it is written. Masking happe
 3. [x] - `p1` - **IF** the decision is deny or cannot be obtained → **RETURN** `403` - `inst-as-hist-3`
 4. [x] - `p1` - Confirm through the tenant resolver that the target tenant is the caller's own or a descendant, and not a standalone descendant; **IF** it is neither → **RETURN** `403`, since a caller that cannot read a tenant's values cannot read their history either - `inst-as-hist-4`
 5. [x] - `p1` - DB: SELECT the declaration by key; **IF** none → **RETURN** `404`; a retired declaration keeps its history and is read like an active one - `inst-as-hist-5`
-6. [ ] - `p1` - Evaluate the caller's effective tenant access for the setting; **IF** `hidden` → **RETURN** `404` rather than `403`, so a hidden setting's existence is not disclosed through its history - `inst-as-hist-6`
+6. [x] - `p1` - Evaluate the caller's effective tenant access for the setting; **IF** `hidden` → **RETURN** `404` rather than `403`, so a hidden setting's existence is not disclosed through its history - `inst-as-hist-6`
 7. [x] - `p1` - Compose the canonical audit resource id for the key and the target tenant with the shared formatter, and DB: SELECT audit_records WHERE declaration_key = {key} AND tenant_id = {tenant} ORDER BY occurred_at DESC through `idx_audit_scoped`, cursor-paginated, on the caller's `AccessScope` - `inst-as-hist-7`
 8. [x] - `p1` - **FOR EACH** record → **IF** its actor classification is `pii` **AND** the caller is not authorized for unmasked PII → mask the actor; **IF** a recorded value is `pii`-classified under the same condition → mask it; a `secret` value needs no decision here, since it was never recorded in plaintext - `inst-as-hist-8`
 9. [x] - `p1` - **RETURN** `200` with the page of records — `operation`, `actor`, `pre_value`, `post_value`, `outcome`, `request_id`, `change_set_id`, `occurred_at` — and its pagination cursors; an empty page is `200` with no items, never an error - `inst-as-hist-9`
@@ -208,7 +208,7 @@ A `secret`-classified value **MUST** be masked before the record is built and **
 
 ### History Read
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-audit-store-history-read`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-audit-store-history-read`
 
 The system **MUST** serve `GET /settings-service/v1/settings/{key}/history` from the gear's own `audit_records` table, newest first and cursor-paginated, authorized by `read` on the setting's key, confined to the caller's own tenant or a descendant that is not standalone, and reporting a hidden setting as absent rather than forbidden. The query **MUST** be an index lookup on `(declaration_key, tenant_id)`, and an empty history **MUST** be an empty page rather than an error.
 
@@ -243,7 +243,7 @@ Every record **MUST** carry `retain_until` or fall under the store's configured 
 - [x] The platform-scope record of a category or a platform-level value carries the root tenant's id, never a sentinel
 - [x] History for one setting at one scope returns only that pair's records, newest first, and a second page follows the cursor without duplicates
 - [x] A `pii`-classified actor is masked for a caller without the PII entitlement and unmasked for one with it
-- [ ] History of a hidden setting returns `404`, and history of a setting for a tenant outside the caller's subtree, or for a standalone descendant, returns `403`
+- [x] History of a hidden setting returns `404`, and history of a setting for a tenant outside the caller's subtree, or for a standalone descendant, returns `403`
 - [ ] History of a retired declaration is readable
 - [x] A setting with no history returns `200` with an empty page
 - [x] A record inserted with no `retain_until` is pruned only after the configured default horizon, and one with an explicit `retain_until` only after that instant

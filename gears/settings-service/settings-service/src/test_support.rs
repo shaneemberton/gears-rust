@@ -35,6 +35,7 @@ use crate::domain::category::{CategoryDraft, CategoryKey, CategoryRepository};
 use crate::domain::declaration::{DeclarationDraft, DeclarationRepository};
 use crate::domain::resolution::{EffectiveCache, ScopeTarget, ValueResolver};
 use crate::domain::value::{ValueDraft, ValueRepository};
+use crate::infra::storage::access_repo::AccessRepo;
 use crate::infra::storage::category_repo::CategoryRepo;
 use crate::infra::storage::declaration_repo::DeclarationRepo;
 use crate::infra::storage::value_repo::ValueRepo;
@@ -348,7 +349,7 @@ pub struct ResolutionHarness {
     pub tree: Tree,
     pub hierarchy: Arc<FakeHierarchy>,
     pub cache: Arc<EffectiveCache>,
-    pub resolver: Arc<ValueResolver<DeclarationRepo, ValueRepo>>,
+    pub resolver: Arc<ValueResolver<DeclarationRepo, ValueRepo, AccessRepo>>,
     category_id: Uuid,
 }
 
@@ -365,6 +366,7 @@ impl ResolutionHarness {
         let resolver = Arc::new(ValueResolver::new(
             DeclarationRepo,
             ValueRepo,
+            AccessRepo,
             Arc::clone(&hierarchy) as Arc<dyn crate::domain::resolution::TenantHierarchy>,
             Arc::new(FixedScope(tree.root)),
             Arc::new(GtsTypeValidator::new(resolution_catalogue())),

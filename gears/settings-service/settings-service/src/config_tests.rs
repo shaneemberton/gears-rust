@@ -62,3 +62,11 @@ fn a_wrong_typed_value_is_refused_rather_than_coerced() {
     // start the service with a staleness bound nobody chose.
     assert!(parse(serde_json::json!({ "cache_ttl_seconds": "thirty" })).is_err());
 }
+
+#[test]
+fn the_audit_retention_defaults_to_twelve_months() {
+    let cfg = parse(serde_json::json!({})).expect("parses");
+    assert_eq!(cfg.audit_retention_days, 365);
+    let cfg = parse(serde_json::json!({ "audit_retention_days": 730 })).expect("parses");
+    assert_eq!(cfg.audit_retention_days, 730);
+}

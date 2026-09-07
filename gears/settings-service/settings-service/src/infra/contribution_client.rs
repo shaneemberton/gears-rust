@@ -18,6 +18,7 @@ use toolkit_db::{DBProvider, DbError};
 use toolkit_security::SecurityContext;
 use uuid::Uuid;
 
+use crate::audit::AuditSink;
 use crate::domain::category::CategoryRepository;
 use crate::domain::contribution::{ContributionService, ItemError, Outcome};
 use crate::domain::declaration::DeclarationRepository;
@@ -26,18 +27,18 @@ use crate::domain::resolution::EffectiveCache;
 use crate::domain::value::ValueRepository;
 
 /// The SDK trait over the reconciler and the database.
-pub struct ContributionClient<D, Cat, V> {
+pub struct ContributionClient<D, Cat, V, S> {
     db: Arc<DBProvider<DbError>>,
-    service: Arc<ContributionService<D, Cat, V>>,
+    service: Arc<ContributionService<D, Cat, V, S>>,
     cache: Arc<EffectiveCache>,
 }
 
-impl<D, Cat, V> ContributionClient<D, Cat, V> {
+impl<D, Cat, V, S> ContributionClient<D, Cat, V, S> {
     /// Serve the contract over this database and reconciler, evicting the
     /// effective-value cache for every declaration it changes.
     pub fn new(
         db: Arc<DBProvider<DbError>>,
-        service: Arc<ContributionService<D, Cat, V>>,
+        service: Arc<ContributionService<D, Cat, V, S>>,
         cache: Arc<EffectiveCache>,
     ) -> Self {
         Self { db, service, cache }
@@ -56,11 +57,12 @@ fn refusal_of(key: &SettingKey, (code, message): Refusal) -> ContributionError {
 }
 
 #[async_trait]
-impl<D, Cat, V> SettingsContributionClient for ContributionClient<D, Cat, V>
+impl<D, Cat, V, S> SettingsContributionClient for ContributionClient<D, Cat, V, S>
 where
     D: DeclarationRepository + 'static,
     Cat: CategoryRepository + 'static,
     V: ValueRepository + 'static,
+    S: AuditSink + 'static,
 {
     async fn register_declarations(
         &self,

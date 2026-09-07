@@ -55,6 +55,7 @@ pub struct SettingsService {
         Arc<
             crate::domain::category::CategoryService<
                 crate::infra::storage::category_repo::CategoryRepo,
+                crate::infra::storage::audit_store::AuditStore,
             >,
         >,
     >,
@@ -242,12 +243,23 @@ impl Gear for SettingsService {
             Arc::new(crate::infra::platform_scope::HubPlatformScope::new(hub));
         // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-6
 
-        let audit: Arc<dyn crate::audit::AuditEmitter> =
-            Arc::new(crate::infra::audit_emitter::TracingAuditEmitter);
+        // The audit sink: the gear's own table, written in each mutation's
+        // transaction. The retention default is validated here because a store
+        // configured below twelve months would prune what the platform must keep.
+        let config = self.config()?;
+        if config.audit_retention_days < crate::audit::MIN_RETENTION_DAYS {
+            anyhow::bail!(
+                "{}: audit_retention_days is {} but must not be below {}",
+                Self::MODULE_NAME,
+                config.audit_retention_days,
+                crate::audit::MIN_RETENTION_DAYS
+            );
+        }
+        let audit = crate::infra::storage::audit_store::AuditStore;
         self.categories
             .set(Arc::new(crate::domain::category::CategoryService::new(
                 crate::infra::storage::category_repo::CategoryRepo,
-                Arc::clone(&audit),
+                audit,
                 Arc::clone(&platform_scope),
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;

@@ -18,7 +18,9 @@ use toolkit_security::{AccessScope, SecurityContext};
 use uuid::Uuid;
 
 use crate::api::authz::{self, resource};
-use crate::api::rest::setting_dto::{EffectiveValueDto, SettingItemDto, render, render_flagged};
+use crate::api::rest::setting_dto::{
+    AuditRecordDto, EffectiveValueDto, SettingItemDto, render, render_flagged, render_record,
+};
 use crate::domain::category::visibility;
 use crate::domain::error::DomainError;
 use crate::domain::resolution::ScopeTarget;
@@ -386,3 +388,82 @@ pub async fn browse_settings(
 #[cfg(test)]
 #[path = "setting_handlers_tests.rs"]
 mod setting_handlers_tests;
+
+/// `GET /settings-service/v1/settings/{key}/history?tenant={tenant_id}` with
+/// `limit` and `cursor`.
+///
+/// # Errors
+/// 400 on a malformed key or `tenant`, or on `$filter`, `$orderby` or `$select`,
+/// which the history does not take; 403 when the caller may not read values or
+/// the target is outside its subtree or standalone; 404 when no declaration
+/// exists at the key or it is outside the caller's administrative domain; 503
+/// when the store cannot answer.
+pub async fn get_history(
+    Extension(ctx): Extension<SecurityContext>,
+    Extension(resolver): Extension<Arc<ConcreteResolver>>,
+    Extension(db): Extension<Arc<toolkit_db::DBProvider<toolkit_db::DbError>>>,
+    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Path(key): Path<String>,
+    Query(params): Query<TenantParam>,
+    OData(query): OData,
+) -> ApiResult<impl IntoResponse> {
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-1
+    let key = parse_key(&key)?;
+    let requested = parse_tenant(params.tenant.as_deref())?;
+    if query.filter.is_some() || !query.order.0.is_empty() || query.select.is_some() {
+        return Err(unsupported(
+            "history takes `limit` and `cursor` only; it is always newest first",
+        )
+        .into());
+    }
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-1
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-2
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-3
+    let scope = authz::access_scope(&enforcer, &ctx, &resource::VALUE, READ, None).await?;
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-3
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-2
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-4
+    // A caller that cannot read a tenant's values cannot read their history.
+    let target = gate_target(&resolver, &ctx, requested).await?;
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-4
+    let root = resolver.root_tenant().await?;
+    let conn = db.conn().map_err(|e| conn_error(&e))?;
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-5
+    // A retired declaration keeps its history and is read like an active one;
+    // absence, and a declaration outside the caller's administrative domain,
+    // are 404. The tenant-access `hidden` clause arrives with tenant access.
+    let declaration = resolver
+        .find_declaration(&conn, &key)
+        .await?
+        .filter(|d| {
+            visibility::is_visible(
+                &visibility::domain_visibility(&scope),
+                d.domain_affinity.as_deref(),
+            )
+        })
+        .ok_or(DomainError::NotFound {
+            resource: "declaration",
+        })?;
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-5
+    let page = crate::infra::storage::audit_store::AuditStore
+        .history(&conn, &scope, key.as_str(), target.tenant_id(root), &query)
+        .await?;
+    let values_are_pii = declaration.data_classification == "pii";
+    let needs_entitlement = values_are_pii
+        || page
+            .items
+            .iter()
+            .any(|r| r.actor_classification == crate::audit::ActorClassification::Pii);
+    let pii = needs_entitlement && may_read_pii(&enforcer, &ctx).await;
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-9
+    let items: Vec<AuditRecordDto> = page
+        .items
+        .iter()
+        .map(|r| render_record(r, values_are_pii, pii))
+        .collect();
+    Ok(Json(toolkit_odata::Page {
+        items,
+        page_info: page.page_info,
+    }))
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-9
+}

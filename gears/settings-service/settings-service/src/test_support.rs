@@ -18,7 +18,7 @@ use toolkit_db::{ConnectOpts, DBProvider, DbError, connect_db};
 use types_registry_sdk::{GtsTypeId, GtsTypeSchema};
 use uuid::Uuid;
 
-use crate::audit::{AuditEmitter, AuditRecord};
+use crate::audit::{AuditRecord, AuditSink};
 use crate::domain::contribution::SettingTypeRegistrar;
 use crate::domain::error::DomainError;
 use crate::domain::platform_scope::PlatformScope;
@@ -85,21 +85,44 @@ pub struct RecordingAudit {
 }
 
 impl RecordingAudit {
-    pub fn actions(&self) -> Vec<String> {
+    pub fn operations(&self) -> Vec<&'static str> {
         self.records
             .lock()
             .expect("audit lock")
             .iter()
-            .map(|r| r.action.clone())
+            .map(|r| r.operation.as_str())
             .collect()
     }
 }
 
 #[async_trait]
-impl AuditEmitter for RecordingAudit {
-    async fn audit(&self, record: AuditRecord) -> Result<(), DomainError> {
+impl AuditSink for Arc<RecordingAudit> {
+    async fn append<C: toolkit_db::secure::DBRunner>(
+        &self,
+        _conn: &C,
+        _scope: &AccessScope,
+        record: AuditRecord,
+    ) -> Result<(), DomainError> {
         self.records.lock().expect("audit lock").push(record);
         Ok(())
+    }
+}
+
+/// A sink that refuses every record, standing in for a database that cannot
+/// take the row: the mutation must roll back with it.
+pub struct FailingSink;
+
+#[async_trait]
+impl AuditSink for FailingSink {
+    async fn append<C: toolkit_db::secure::DBRunner>(
+        &self,
+        _conn: &C,
+        _scope: &AccessScope,
+        _record: AuditRecord,
+    ) -> Result<(), DomainError> {
+        Err(DomainError::Unavailable {
+            detail: "audit store down".to_owned(),
+        })
     }
 }
 

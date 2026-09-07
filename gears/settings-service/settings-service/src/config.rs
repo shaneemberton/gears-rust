@@ -39,6 +39,7 @@ use serde::Deserialize;
 /// The cache backstop that bounds staleness when an invalidation broadcast is
 /// missed. Fixed by DESIGN.md §4.2 *Cache & Invalidation*, not by the operator.
 const DEFAULT_CACHE_TTL_SECONDS: u64 = 30;
+const DEFAULT_AUDIT_RETENTION_DAYS: u32 = 365;
 
 /// Bootstrap configuration, read once at gear init.
 ///
@@ -56,10 +57,20 @@ pub struct SettingsServiceConfig {
     /// of a guess.
     #[serde(default = "default_cache_ttl_seconds")]
     pub cache_ttl_seconds: u64,
+
+    /// How long an audit record without an explicit `retain_until` stays in the
+    /// online window. Twelve months by default, and never configurable below
+    /// that: init refuses a shorter value.
+    #[serde(default = "default_audit_retention_days")]
+    pub audit_retention_days: u32,
 }
 
 const fn default_cache_ttl_seconds() -> u64 {
     DEFAULT_CACHE_TTL_SECONDS
+}
+
+const fn default_audit_retention_days() -> u32 {
+    DEFAULT_AUDIT_RETENTION_DAYS
 }
 
 #[cfg(test)]

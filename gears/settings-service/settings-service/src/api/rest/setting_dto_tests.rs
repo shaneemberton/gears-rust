@@ -115,3 +115,67 @@ fn the_administrative_trail_keeps_setter_identity_and_time() {
     );
     assert_eq!(dto.source, "inherited");
 }
+
+mod history {
+    use serde_json::json;
+    use time::OffsetDateTime;
+    use uuid::Uuid;
+
+    use crate::api::rest::setting_dto::render_record;
+    use crate::audit::{
+        ActorClassification, AuditOperation, AuditOutcome, AuditValue, StoredAuditRecord,
+    };
+    use crate::domain::resolution::MASK_TOKEN;
+
+    fn record(actor: ActorClassification) -> StoredAuditRecord {
+        StoredAuditRecord {
+            id: Uuid::nil(),
+            declaration_key: "k".to_owned(),
+            tenant_id: Uuid::nil(),
+            operation: AuditOperation::Change,
+            actor: "admin@acme".to_owned(),
+            actor_classification: actor,
+            pre_image: Some(AuditValue::Clear(json!("old"))),
+            post_image: Some(AuditValue::Masked),
+            outcome: AuditOutcome::Success,
+            request_id: "r".to_owned(),
+            change_set_id: None,
+            occurred_at: OffsetDateTime::UNIX_EPOCH,
+            retain_until: None,
+        }
+    }
+
+    #[test]
+    fn a_pii_actor_is_masked_without_the_entitlement_and_shown_with_it() {
+        let hidden = render_record(&record(ActorClassification::Pii), false, false);
+        assert_eq!(
+            (hidden.actor.as_str(), hidden.actor_masked),
+            (MASK_TOKEN, true)
+        );
+        let shown = render_record(&record(ActorClassification::Pii), false, true);
+        assert_eq!(
+            (shown.actor.as_str(), shown.actor_masked),
+            ("admin@acme", false)
+        );
+        let module = render_record(&record(ActorClassification::Public), false, false);
+        assert_eq!(module.actor, "admin@acme");
+    }
+
+    #[test]
+    fn recorded_values_follow_the_setting_classification_and_secrets_stay_masked() {
+        let public = render_record(&record(ActorClassification::Public), false, false);
+        assert_eq!(public.pre_value, Some(json!("old")));
+        assert_eq!(
+            public.post_value,
+            Some(json!(MASK_TOKEN)),
+            "recorded masked, shown masked"
+        );
+        assert!(!public.values_masked);
+
+        let pii = render_record(&record(ActorClassification::Public), true, false);
+        assert_eq!(pii.pre_value, Some(json!(MASK_TOKEN)));
+        assert!(pii.values_masked);
+        let entitled = render_record(&record(ActorClassification::Public), true, true);
+        assert_eq!(entitled.pre_value, Some(json!("old")));
+    }
+}

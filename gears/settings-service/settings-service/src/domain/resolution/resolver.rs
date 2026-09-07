@@ -369,6 +369,20 @@ where
         out
     }
 
+    /// The declaration at a key, whatever its status, or nothing.
+    ///
+    /// # Errors
+    /// [`DomainError`] when the read fails.
+    pub async fn find_declaration<C: DBRunner>(
+        &self,
+        conn: &C,
+        key: &SettingKey,
+    ) -> Result<Option<Declaration>, DomainError> {
+        self.declarations
+            .find_by_key(conn, &AccessScope::allow_all(), key.as_str())
+            .await
+    }
+
     /// The declarations filed under a category — the bulk read's other selector.
     ///
     /// # Errors

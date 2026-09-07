@@ -312,3 +312,79 @@ impl SettingItemDto {
 #[cfg(test)]
 #[path = "setting_dto_tests.rs"]
 mod setting_dto_tests;
+
+/// One audit record, as `GET /settings-service/v1/settings/{key}/history`
+/// returns it.
+#[derive(Debug, Clone, PartialEq)]
+#[toolkit_macros::api_dto(response)]
+pub struct AuditRecordDto {
+    /// Record identity.
+    pub id: Uuid,
+    /// `create`, `change`, `revert`, `remove`, `clone` or `secret_use`.
+    pub operation: String,
+    /// Who did it, masked when the identity is PII the caller may not see.
+    pub actor: String,
+    /// Whether `actor` carries the mask token.
+    pub actor_masked: bool,
+    /// The value before, as recorded; a secret was recorded masked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pre_value: Option<Value>,
+    /// The value after, as recorded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post_value: Option<Value>,
+    /// Whether the recorded values were masked for this caller.
+    pub values_masked: bool,
+    /// `success` or `failure`.
+    pub outcome: String,
+    /// The request that produced the record.
+    pub request_id: String,
+    /// The change set the mutation was produced under.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub change_set_id: Option<Uuid>,
+    /// When it happened.
+    pub occurred_at: String,
+}
+
+fn recorded(image: Option<&crate::audit::AuditValue>, mask_pii: bool) -> Option<Value> {
+    image.map(|v| match v {
+        crate::audit::AuditValue::Masked => Value::String(MASK_TOKEN.to_owned()),
+        crate::audit::AuditValue::Clear(_) if mask_pii => Value::String(MASK_TOKEN.to_owned()),
+        crate::audit::AuditValue::Clear(value) => value.clone(),
+    })
+}
+
+// @cpt-dod:cpt-cf-settings-service-dod-audit-store-masking-classification:p1
+/// Render a stored record for the history read.
+///
+/// `values_are_pii` says whether the setting's values are `pii`-classified;
+/// `may_read_pii` whether the caller holds the entitlement. A secret needs no
+/// decision here: it was never recorded in plaintext.
+#[must_use]
+pub fn render_record(
+    record: &crate::audit::StoredAuditRecord,
+    values_are_pii: bool,
+    may_read_pii: bool,
+) -> AuditRecordDto {
+    // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-8
+    let actor_masked =
+        record.actor_classification == crate::audit::ActorClassification::Pii && !may_read_pii;
+    let values_masked = values_are_pii && !may_read_pii;
+    AuditRecordDto {
+        id: record.id,
+        operation: record.operation.as_str().to_owned(),
+        actor: if actor_masked {
+            MASK_TOKEN.to_owned()
+        } else {
+            record.actor.clone()
+        },
+        actor_masked,
+        pre_value: recorded(record.pre_image.as_ref(), values_masked),
+        post_value: recorded(record.post_image.as_ref(), values_masked),
+        values_masked,
+        outcome: record.outcome.as_str().to_owned(),
+        request_id: record.request_id.clone(),
+        change_set_id: record.change_set_id,
+        occurred_at: rfc3339(record.occurred_at),
+    }
+    // @cpt-end:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-8
+}

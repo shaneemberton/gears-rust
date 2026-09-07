@@ -12,7 +12,7 @@ use toolkit::api::operation_builder::{
 use toolkit::api::{OpenApiRegistry, OperationBuilder};
 use toolkit_db::{DBProvider, DbError};
 
-use crate::api::rest::setting_dto::{EffectiveValueDto, SettingItemDto};
+use crate::api::rest::setting_dto::{AuditRecordDto, EffectiveValueDto, SettingItemDto};
 use crate::api::rest::setting_handlers as handlers;
 use crate::gear::ConcreteResolver;
 
@@ -113,6 +113,43 @@ pub fn register_routes(
             http::StatusCode::GONE,
             "Gone: the declaration is retired",
         )
+        .error_500(openapi)
+        .error_503(openapi)
+        .register(router, openapi);
+
+    let router = OperationBuilder::get("/settings-service/v1/settings/{key}/history")
+        .operation_id("settings_service.get_setting_history")
+        .summary("Read a setting's history at a scope")
+        .description(
+            "The mutation history of one setting at one scope, newest first and \
+             cursor-paginated, served from the gear's own audit store. `tenant` follows the \
+             read surface: omitted, the caller's own tenant; a tenant outside the caller's \
+             subtree or a standalone descendant answers 403. A `pii` actor, and `pii` values, \
+             are masked for a caller without the PII entitlement; a secret was never recorded \
+             in plaintext. A retired declaration keeps its history. An empty history is an \
+             empty page. `$filter`, `$orderby` and `$select` are refused.",
+        )
+        .tag(TAG)
+        .authenticated()
+        .no_license_required()
+        .path_param("key", "The setting key, a URL-encoded GTS type id")
+        .query_param(
+            "tenant",
+            false,
+            "Target tenant id; omitted, the caller's own tenant",
+        )
+        .query_param_typed("limit", false, "Page size", "integer")
+        .query_param("cursor", false, "Cursor for pagination")
+        .handler(handlers::get_history)
+        .json_response_with_schema::<toolkit_odata::Page<AuditRecordDto>>(
+            openapi,
+            StatusCode::OK,
+            "A page of audit records, newest first, with its pagination cursors",
+        )
+        .error_400(openapi)
+        .error_401(openapi)
+        .error_403(openapi)
+        .error_404(openapi)
         .error_500(openapi)
         .error_503(openapi)
         .register(router, openapi);

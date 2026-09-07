@@ -327,7 +327,7 @@ The system **MUST** enforce authorization through the `PolicyEnforcer` PEP again
 
 ### Audit Emitter
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-audit-emitter`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-audit-emitter`
 
 The system **MUST** provide the shared Audit Emitter through which every mutating feature publishes its audit records and domain events, supporting pre-image and post-image capture so later features can audit a mutation's before and after state. Its sink **MUST** be a port taking the mutation's own transaction and `AccessScope` — `AuditSink::append(txn, scope, record)` — so that the gear-local `audit_records` binding delivered in entry 2.6 commits the record with the change it audits or rolls back with it. The tracing stand-in the tree carries until then exercises the emitter's callers and satisfies none of this.
 

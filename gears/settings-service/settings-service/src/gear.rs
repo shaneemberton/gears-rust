@@ -61,6 +61,7 @@ pub struct SettingsService {
         >,
     >,
     resolver: OnceLock<Arc<ConcreteResolver>>,
+    writes: OnceLock<Arc<crate::infra::value_writes::WriteCoordinator>>,
     hierarchy: OnceLock<Arc<dyn crate::domain::resolution::TenantHierarchy>>,
     declarations: OnceLock<
         Arc<
@@ -81,6 +82,7 @@ impl Default for SettingsService {
             validator: OnceLock::new(),
             categories: OnceLock::new(),
             resolver: OnceLock::new(),
+            writes: OnceLock::new(),
             hierarchy: OnceLock::new(),
             declarations: OnceLock::new(),
         }
@@ -168,6 +170,17 @@ impl SettingsService {
             .get()
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("{} resolver not initialized", Self::MODULE_NAME))
+    }
+
+    /// The write coordinator, once initialized.
+    ///
+    /// # Errors
+    /// If called before `init` completed.
+    pub fn writes(&self) -> anyhow::Result<Arc<crate::infra::value_writes::WriteCoordinator>> {
+        self.writes
+            .get()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("{} writes not initialized", Self::MODULE_NAME))
     }
 
     /// The tenant hierarchy port, once initialized.
@@ -293,6 +306,33 @@ impl Gear for SettingsService {
         self.resolver
             .set(Arc::clone(&resolver))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+        // The write path: the step-up verifier from configuration — the OIDC/JWKS
+        // binding when a section is present, otherwise the binding that refuses
+        // every write needing step-up while reads keep serving — over the same
+        // resolver, audit store, and the ports whose real bindings come later.
+        let step_up: Arc<dyn crate::domain::stepup::StepUpVerifier> = match &config.step_up {
+            Some(section) => Arc::new(crate::infra::step_up::OidcStepUpVerifier::from_config(
+                section,
+            )?),
+            None => Arc::new(crate::domain::stepup::NoStepUpVerifier::default()),
+        };
+        let writer = Arc::new(crate::domain::writes::ValueWriter::new(
+            crate::infra::storage::value_repo::ValueRepo,
+            Arc::clone(&resolver),
+            self.validator()?,
+            crate::infra::storage::audit_store::AuditStore,
+            step_up,
+            Arc::new(crate::domain::ports::NoSecretManager),
+            Arc::new(crate::infra::write_metrics::LoggingPublisher),
+            Arc::new(crate::infra::write_metrics::OtelWriteMetrics::new()),
+        ));
+        self.writes
+            .set(Arc::new(crate::infra::value_writes::WriteCoordinator::new(
+                self.db()?,
+                writer,
+            )))
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-7
         let reader: Arc<dyn SettingsReaderClient> = Arc::new(
             crate::infra::reader_client::ReaderClient::new(self.db()?, Arc::clone(&resolver)),
@@ -369,11 +409,17 @@ impl RestApiCapability for SettingsService {
             self.db()?,
             self.enforcer()?,
         );
-        Ok(crate::api::rest::setting_routes::register_routes(
+        let router = crate::api::rest::setting_routes::register_routes(
             router,
             openapi,
             self.resolver()?,
             self.db()?,
+            self.enforcer()?,
+        );
+        Ok(crate::api::rest::value_routes::register_routes(
+            router,
+            openapi,
+            self.writes()?,
             self.enforcer()?,
         ))
     }

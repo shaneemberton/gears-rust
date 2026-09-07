@@ -10,3 +10,6 @@ pub mod routes;
 pub mod setting_dto;
 pub mod setting_handlers;
 pub mod setting_routes;
+pub mod value_dto;
+pub mod value_handlers;
+pub mod value_routes;

@@ -10,11 +10,9 @@ use crate::domain::error::DomainError;
 use crate::domain::resolution::{EffectiveValue, MASK_TOKEN, scope_path};
 use crate::domain::value::StoredValue;
 
-/// The value state tag of a scope that holds no row yet.
-///
-/// A write that creates the row presents this tag; a row created in between
-/// changes the tag and the write is refused as stale.
-pub const ABSENT_STATE_TAG: &str = "absent";
+/// The value state tag of a scope that holds no row yet — the write path's
+/// absent-state tag, which the read returns for the same state.
+pub const ABSENT_STATE_TAG: &str = crate::domain::writes::ABSENT_VALUE_TAG;
 
 fn rfc3339(at: OffsetDateTime) -> String {
     at.format(&Rfc3339).unwrap_or_else(|_| at.to_string())
@@ -152,7 +150,7 @@ pub fn render(effective: &EffectiveValue, may_read_pii: bool) -> EffectiveValueD
     // is distinct from the recency above, which describes the effective value.
     let etag = effective.own_row.as_ref().map_or_else(
         || ABSENT_STATE_TAG.to_owned(),
-        |own| own.updated_at.unix_timestamp_nanos().to_string(),
+        |own| own.last_change_at.unix_timestamp_nanos().to_string(),
     );
     EffectiveValueDto {
         key: effective.key.clone(),

@@ -63,3 +63,7 @@ pub const SCOPE_PATH: &str = "scope_path";
 
 /// A `tenant` query parameter that is not a UUID.
 pub const TENANT_PARAM: &str = "tenant_param";
+
+/// A clone of a secret-classified setting, which would couple the target to
+/// the source credential's lifecycle.
+pub const SECRET_NOT_CLONEABLE: &str = "secret_not_cloneable";

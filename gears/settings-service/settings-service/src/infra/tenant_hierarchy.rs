@@ -115,4 +115,49 @@ impl TenantHierarchy for HubTenantHierarchy {
             .map_err(map)?;
         Ok(response.descendants.iter().map(|r| r.id.0).collect())
     }
+
+    async fn descendants_bfs(
+        &self,
+        tenant: Uuid,
+        budget: usize,
+    ) -> Result<(Vec<Uuid>, bool), DomainError> {
+        let client = self.client()?;
+        let response = client
+            .get_descendants(
+                &SecurityContext::anonymous(),
+                TenantId(tenant),
+                &GetDescendantsOptions {
+                    barrier_mode: BarrierMode::Respect,
+                    ..GetDescendantsOptions::default()
+                },
+            )
+            .await
+            .map_err(map)?;
+        // The resolver answers a flat set; breadth-first order is rebuilt from
+        // the parent links it carries.
+        let mut children: std::collections::HashMap<Uuid, Vec<Uuid>> =
+            std::collections::HashMap::new();
+        for r in &response.descendants {
+            if let Some(parent) = r.parent_id {
+                children.entry(parent.0).or_default().push(r.id.0);
+            }
+        }
+        let mut order = Vec::new();
+        let mut queue = std::collections::VecDeque::from([tenant]);
+        let mut truncated = false;
+        while let Some(next) = queue.pop_front() {
+            for child in children.get(&next).into_iter().flatten() {
+                if order.len() >= budget {
+                    truncated = true;
+                    break;
+                }
+                order.push(*child);
+                queue.push_back(*child);
+            }
+            if truncated {
+                break;
+            }
+        }
+        Ok((order, truncated))
+    }
 }

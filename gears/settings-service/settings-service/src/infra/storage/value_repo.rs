@@ -4,7 +4,7 @@
 use async_trait::async_trait;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
-use toolkit_db::secure::{DBRunner, SecureEntityExt, SecureUpdateExt};
+use toolkit_db::secure::{DBRunner, SecureDeleteExt, SecureEntityExt, SecureUpdateExt};
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
@@ -178,5 +178,65 @@ impl ValueRepository for ValueRepo {
             .await
             .map_err(|err| map_write_error(&err))?;
         Ok(to_domain(model))
+    }
+
+    async fn update<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        id: Uuid,
+        value: Option<serde_json::Value>,
+        secret_ref: Option<String>,
+        set_by: &str,
+    ) -> Result<StoredValue, DomainError> {
+        let at = time::OffsetDateTime::now_utc();
+        let outcome = ValueEntity::update_many()
+            .col_expr(setting_value::Column::Value, Expr::value(value))
+            .col_expr(setting_value::Column::SecretRef, Expr::value(secret_ref))
+            .col_expr(setting_value::Column::NeedsReview, Expr::value(false))
+            .col_expr(
+                setting_value::Column::NeedsReviewDetail,
+                Expr::value(Option::<String>::None),
+            )
+            .col_expr(setting_value::Column::LastChangeAt, Expr::value(at))
+            .col_expr(setting_value::Column::UpdatedAt, Expr::value(at))
+            .col_expr(setting_value::Column::SetBy, Expr::value(set_by.to_owned()))
+            .filter(setting_value::Column::Id.eq(id))
+            .secure()
+            .scope_with(scope)
+            .exec(conn)
+            .await
+            .map_err(db_error)?;
+        if outcome.rows_affected == 0 {
+            return Err(DomainError::NotFound { resource: "value" });
+        }
+        let row = ValueEntity::find()
+            .filter(setting_value::Column::Id.eq(id))
+            .secure()
+            .scope_with(scope)
+            .one(conn)
+            .await
+            .map_err(db_error)?
+            .ok_or(DomainError::NotFound { resource: "value" })?;
+        Ok(to_domain(row))
+    }
+
+    async fn delete<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        declaration_id: Uuid,
+        tenant_id: Uuid,
+    ) -> Result<bool, DomainError> {
+        let outcome = ValueEntity::delete_many()
+            .filter(setting_value::Column::DeclarationId.eq(declaration_id))
+            .filter(setting_value::Column::TenantId.eq(tenant_id))
+            .filter(subjectless())
+            .secure()
+            .scope_with(scope)
+            .exec(conn)
+            .await
+            .map_err(db_error)?;
+        Ok(outcome.rows_affected > 0)
     }
 }

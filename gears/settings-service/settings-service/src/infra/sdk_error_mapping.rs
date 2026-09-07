@@ -113,6 +113,11 @@ impl From<DomainError> for CanonicalError {
             // that exists is byte-identical to one for a setting that does not.
             // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-5
             DomainError::Unauthorized { resource } => permission_denied_for(resource),
+            // The reason code rides the RFC 9470 challenge the handler adds as a
+            // header; the body's reason is the stable one clients key on.
+            DomainError::StepUpRequired { .. } => CanonicalError::unauthenticated()
+                .with_reason("INSUFFICIENT_USER_AUTHENTICATION")
+                .create(),
             // @cpt-end:cpt-cf-settings-service-algo-gear-foundation-problem-mapping:p1:inst-gf-problem-5
 
             // 404 — names the kind of resource, never the caller's identifier.

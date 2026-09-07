@@ -235,7 +235,7 @@ Every record **MUST** carry `retain_until` or fall under the store's configured 
 
 ## 6. Acceptance Criteria
 
-- [ ] A category mutation, a declaration mutation, and a value write each leave exactly one audit record, committed in the same transaction as the change
+- [x] A category mutation, a declaration mutation, and a value write each leave exactly one audit record, committed in the same transaction as the change
 - [x] A fault injected between the mutation's write and the record's insert leaves neither behind: no changed row, no record
 - [x] When the record cannot be inserted, the mutation is rejected as unavailable and the caller sees no change
 - [x] A `secret`-classified value appears in no record; its pre-image and post-image carry the mask token

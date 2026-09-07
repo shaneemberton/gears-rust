@@ -86,6 +86,7 @@ fn the_review_pair_appears_only_when_the_own_row_is_flagged_and_the_tag_follows_
     flagged.own_row = Some(OwnRow {
         needs_review: true,
         needs_review_detail: Some("no longer a boolean".to_owned()),
+        last_change_at: at(300),
         updated_at: at(300),
     });
     let dto = render(&flagged, false);

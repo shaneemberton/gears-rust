@@ -127,6 +127,18 @@ pub trait TenantHierarchy: Send + Sync {
     /// # Errors
     /// As [`Self::chain`].
     async fn descendants(&self, tenant: Uuid) -> Result<Vec<Uuid>, DomainError>;
+
+    /// The descendants of `tenant` in breadth-first order, at most `budget` of
+    /// them, standalone subtrees left out; the flag says whether the budget
+    /// cut the walk short.
+    ///
+    /// # Errors
+    /// As [`Self::chain`].
+    async fn descendants_bfs(
+        &self,
+        tenant: Uuid,
+        budget: usize,
+    ) -> Result<(Vec<Uuid>, bool), DomainError>;
 }
 
 /// One scope the resolver inspected, in full.
@@ -160,7 +172,9 @@ pub struct OwnRow {
     pub needs_review: bool,
     /// Why.
     pub needs_review_detail: Option<String>,
-    /// The row version the value state tag derives from.
+    /// When the row last changed — what the value state tag derives from.
+    pub last_change_at: OffsetDateTime,
+    /// The row version.
     pub updated_at: OffsetDateTime,
 }
 

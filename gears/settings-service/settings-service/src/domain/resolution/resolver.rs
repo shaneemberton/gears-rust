@@ -170,6 +170,7 @@ fn select(
     let own_row = rows.get(&tenant).map(|r| OwnRow {
         needs_review: r.needs_review,
         needs_review_detail: r.needs_review_detail.clone(),
+        last_change_at: r.last_change_at,
         updated_at: r.updated_at,
     });
     // @cpt-end:cpt-cf-settings-service-algo-value-resolution-needs-review-fallthrough:p1:inst-vr-nrf-5

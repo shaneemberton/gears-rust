@@ -78,4 +78,33 @@ pub trait ValueRepository: Send + Sync {
         scope: &AccessScope,
         draft: ValueDraft,
     ) -> Result<StoredValue, DomainError>;
+
+    /// Replace a row's value or secret reference, stamping `last_change_at`
+    /// and `updated_at` and clearing `needs_review`: a valid re-set is what
+    /// clears the flag.
+    ///
+    /// # Errors
+    /// [`DomainError::NotFound`] when the row is gone; [`DomainError`] when the
+    /// write fails.
+    async fn update<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        id: Uuid,
+        value: Option<serde_json::Value>,
+        secret_ref: Option<String>,
+        set_by: &str,
+    ) -> Result<StoredValue, DomainError>;
+
+    /// Delete the row of one pair, reporting whether one existed.
+    ///
+    /// # Errors
+    /// [`DomainError`] when the delete fails.
+    async fn delete<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        declaration_id: Uuid,
+        tenant_id: Uuid,
+    ) -> Result<bool, DomainError>;
 }

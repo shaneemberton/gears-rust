@@ -287,7 +287,7 @@ Effective access **MUST** be the strictest row on the tenant's root-to-self chai
 
 ### Access Gates the Caller, Not the Value
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-tenant-access-consumption`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-tenant-access-consumption`
 
 Every administrative read path **MUST** report a `hidden` setting as absent, and a `read_only` or `hidden` tenant **MUST** be refused as a writer, while its existing override **MUST** keep resolving and being inherited. The check on a write **MUST** use the **caller's** effective access, never the target's, so an `overridable` ancestor may manage a restricted descendant. The in-process reader **MUST NOT** be gated by tenant access.
 
@@ -343,8 +343,8 @@ An access change **MUST** evict the setting's cached entries for the target tena
 - [ ] A tenant administrator targeting its own tenant receives `403` and no row is written
 - [ ] Targeting an ancestor, a sibling, a tenant outside the subtree, or a standalone descendant receives `403`
 - [ ] A row set below an already `hidden` tenant is stored and becomes effective when the ancestor restriction is cleared
-- [ ] A value set before its tenant became `read_only` still resolves and is inherited, and a write by that tenant is refused
-- [ ] An `overridable` ancestor writes at a `read_only` descendant successfully, while the descendant's own write remains refused
+- [x] A value set before its tenant became `read_only` still resolves and is inherited, and a write by that tenant is refused
+- [x] An `overridable` ancestor writes at a `read_only` descendant successfully, while the descendant's own write remains refused
 - [x] A gear reading through `SettingsReaderClient` receives the effective value of a `hidden` tenant unchanged
 - [ ] `PUT` with `access=overridable` returns `400`
 - [ ] `PUT` or `DELETE` without `If-Match` returns `428`; with a tag made stale by another delegate returns `412`, and the newer restriction remains stored

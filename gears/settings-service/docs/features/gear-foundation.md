@@ -152,7 +152,7 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 
 ### Authorization Enforcement and Credential Step-Up
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-algo-gear-foundation-authz-stepup`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-algo-gear-foundation-authz-stepup`
 
 **Input**: Authenticated request context, the target GTS resource type, the required action, and whether the action demands step-up — a behavior-affecting declaration action, or an interactive value write to a declaration that requires elevated confirmation
 
@@ -164,8 +164,8 @@ GTS grammar is **not** re-implemented here. The platform GTS identifier library 
 3. [x] - `p1` - Ask the Policy Decision client for a decision on the action against the target GTS resource type - `inst-gf-authz-3`
 4. [x] - `p1` - **IF** the decision cannot be obtained → **RETURN** denial, failing closed rather than proceeding on an unknown verdict - `inst-gf-authz-4`
 5. [x] - `p1` - **IF** the decision is deny → **RETURN** denial - `inst-gf-authz-5`
-6. [ ] - `p1` - **IF** the action demands step-up → require a fresh step-up token established at the identity provider, verified locally through the gear's `StepUpVerifier` port: signature against the provider's JWKS, `sub` bound to this principal, `auth_time` within the freshness window of at most five minutes, and the required `acr`/`amr` - `inst-gf-authz-6`
-7. [ ] - `p1` - **IF** the token is absent, outside the window, or not bound to this principal → **RETURN** denial carrying the RFC 9470 challenge, `401` with `insufficient_user_authentication`, so the client learns what to ask the provider for; a service principal writing to such a declaration is refused outright, since no ceremony a machine performs proves a person is present - `inst-gf-authz-7`
+6. [x] - `p1` - **IF** the action demands step-up → require a fresh step-up token established at the identity provider, verified locally through the gear's `StepUpVerifier` port: signature against the provider's JWKS, `sub` bound to this principal, `auth_time` within the freshness window of at most five minutes, and the required `acr`/`amr` - `inst-gf-authz-6`
+7. [x] - `p1` - **IF** the token is absent, outside the window, or not bound to this principal → **RETURN** denial carrying the RFC 9470 challenge, `401` with `insufficient_user_authentication`, so the client learns what to ask the provider for; a service principal writing to such a declaration is refused outright, since no ceremony a machine performs proves a person is present - `inst-gf-authz-7`
 8. [x] - `p1` - Build the `AccessScope` from the decision's constraints - `inst-gf-authz-8`
 9. [x] - `p1` - **RETURN** the `AccessScope` for the handler to apply as a query and visibility predicate - `inst-gf-authz-9`
 
@@ -313,7 +313,7 @@ The system **MUST** provide shared `OperationBuilder` wiring, OData `$filter`, `
 
 ### Policy Enforcement Point and Step-Up Gate
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-authz-stepup`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-gear-foundation-authz-stepup`
 
 The system **MUST** enforce authorization through the `PolicyEnforcer` PEP against the target GTS resource type, **MUST** derive an `AccessScope` from the decision's constraints for handlers to apply as a query and visibility predicate, and **MUST** verify a fresh step-up token established at the identity provider before any behavior-affecting declaration action and before an interactive value write to a declaration that requires elevated confirmation. Verification **MUST** go through the gear's own `StepUpVerifier` port, whose default binding is the local OIDC/JWKS claims check of DESIGN.md §4.2 *Value Writer*; a binding that cannot fail is not a binding. Authorization **MUST** be decided before step-up is consulted, and an authorization or entitlement decision that cannot be obtained **MUST** deny.
 

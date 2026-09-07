@@ -289,6 +289,38 @@ impl TenantHierarchy for FakeHierarchy {
         }
         Ok(out)
     }
+
+    async fn descendants_bfs(
+        &self,
+        tenant: Uuid,
+        budget: usize,
+    ) -> Result<(Vec<Uuid>, bool), DomainError> {
+        let reachable = self.descendants(tenant).await?;
+        let parents = self.parents.lock().expect("lock").clone();
+        let mut order = Vec::new();
+        let mut queue = std::collections::VecDeque::from([tenant]);
+        let mut truncated = false;
+        while let Some(next) = queue.pop_front() {
+            let mut kids: Vec<Uuid> = reachable
+                .iter()
+                .copied()
+                .filter(|c| parents.get(c) == Some(&Some(next)))
+                .collect();
+            kids.sort();
+            for kid in kids {
+                if order.len() >= budget {
+                    truncated = true;
+                    break;
+                }
+                order.push(kid);
+                queue.push_back(kid);
+            }
+            if truncated {
+                break;
+            }
+        }
+        Ok((order, truncated))
+    }
 }
 
 // ---- The resolution harness: tree `root → a → b`, `c` a sibling of `a`, `s` a
@@ -523,5 +555,59 @@ impl ResolutionHarness {
     ) -> Result<Arc<crate::domain::resolution::EffectiveValue>, DomainError> {
         let conn = self.db.conn().expect("connection");
         self.resolver.resolve(&conn, &self.key(name), target).await
+    }
+}
+
+/// A Change Publisher that keeps what it was given.
+#[derive(Default)]
+pub struct RecordingPublisher {
+    pub events: Mutex<Vec<crate::domain::ports::ValueEvent>>,
+}
+
+#[async_trait]
+impl crate::domain::ports::ChangePublisher for RecordingPublisher {
+    async fn publish(&self, event: crate::domain::ports::ValueEvent) {
+        self.events.lock().expect("lock").push(event);
+    }
+}
+
+/// A step-up verifier whose verdict the test fixes.
+pub struct FixedStepUp {
+    pub verdict: Result<(), crate::domain::stepup::StepUpRefusal>,
+    pub requirement: crate::domain::stepup::StepUpRequirement,
+}
+
+impl FixedStepUp {
+    pub fn verified() -> Self {
+        Self {
+            verdict: Ok(()),
+            requirement: crate::domain::stepup::StepUpRequirement {
+                max_age: Duration::from_mins(5),
+                acr_values: Vec::new(),
+                amr_values: Vec::new(),
+            },
+        }
+    }
+
+    pub fn refusing(refusal: crate::domain::stepup::StepUpRefusal) -> Self {
+        Self {
+            verdict: Err(refusal),
+            ..Self::verified()
+        }
+    }
+}
+
+#[async_trait]
+impl crate::domain::stepup::StepUpVerifier for FixedStepUp {
+    async fn verify(
+        &self,
+        _token: Option<&str>,
+        _subject: &crate::domain::stepup::StepUpSubject,
+    ) -> Result<(), crate::domain::stepup::StepUpRefusal> {
+        self.verdict.clone()
+    }
+
+    fn requirement(&self) -> &crate::domain::stepup::StepUpRequirement {
+        &self.requirement
     }
 }

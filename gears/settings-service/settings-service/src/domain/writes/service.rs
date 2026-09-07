@@ -41,7 +41,9 @@ pub struct WriteActor {
 }
 
 impl WriteActor {
-    fn subject(&self) -> String {
+    /// The subject id as recorded and audited.
+    #[must_use]
+    pub fn subject(&self) -> String {
         self.ctx.subject_id().to_string()
     }
 
@@ -51,7 +53,9 @@ impl WriteActor {
         self.ctx.subject_type() == Some(USER_SUBJECT_TYPE)
     }
 
-    fn step_up_subject(&self) -> StepUpSubject {
+    /// Who a step-up assertion must be bound to.
+    #[must_use]
+    pub fn step_up_subject(&self) -> StepUpSubject {
         StepUpSubject {
             subject_id: self.ctx.subject_id(),
             session_sub: self

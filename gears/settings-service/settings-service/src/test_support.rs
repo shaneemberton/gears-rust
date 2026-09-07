@@ -382,6 +382,7 @@ pub struct ResolutionHarness {
     pub hierarchy: Arc<FakeHierarchy>,
     pub cache: Arc<EffectiveCache>,
     pub resolver: Arc<ValueResolver<DeclarationRepo, ValueRepo, AccessRepo>>,
+    pub platform: Arc<dyn PlatformScope>,
     category_id: Uuid,
 }
 
@@ -395,12 +396,13 @@ impl ResolutionHarness {
         let tree = Tree::new();
         let hierarchy = Arc::new(tree.hierarchy());
         let cache = Arc::new(EffectiveCache::new(ttl));
+        let platform: Arc<dyn PlatformScope> = Arc::new(FixedScope(tree.root));
         let resolver = Arc::new(ValueResolver::new(
             DeclarationRepo,
             ValueRepo,
             AccessRepo,
             Arc::clone(&hierarchy) as Arc<dyn crate::domain::resolution::TenantHierarchy>,
-            Arc::new(FixedScope(tree.root)),
+            Arc::clone(&platform),
             Arc::new(GtsTypeValidator::new(resolution_catalogue())),
             Arc::clone(&cache),
         ));
@@ -426,6 +428,7 @@ impl ResolutionHarness {
             hierarchy,
             cache,
             resolver,
+            platform,
             category_id: category.id,
         }
     }

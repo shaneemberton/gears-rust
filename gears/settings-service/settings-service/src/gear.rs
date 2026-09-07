@@ -71,6 +71,8 @@ pub struct SettingsService {
             >,
         >,
     >,
+    declaration_admin:
+        OnceLock<Arc<crate::api::rest::declaration_handlers::ConcreteDeclarationAdmin>>,
 }
 
 impl Default for SettingsService {
@@ -87,6 +89,7 @@ impl Default for SettingsService {
             access: OnceLock::new(),
             hierarchy: OnceLock::new(),
             declarations: OnceLock::new(),
+            declaration_admin: OnceLock::new(),
         }
     }
 }
@@ -354,6 +357,7 @@ impl Gear for SettingsService {
         let secrets: Arc<dyn crate::domain::ports::SecretManager> = Arc::new(
             crate::infra::secret_manager::CredStoreSecretManager::new(credstore),
         );
+        let step_up_for_admin = Arc::clone(&step_up);
         let writer = Arc::new(crate::domain::writes::ValueWriter::new(
             crate::infra::storage::value_repo::ValueRepo,
             Arc::clone(&resolver),
@@ -400,13 +404,13 @@ impl Gear for SettingsService {
                 crate::infra::setting_type_registrar::TypesRegistryRegistrar::new(self.types()?),
             ),
             audit,
-            platform_scope,
+            Arc::clone(&platform_scope),
         ));
         let contribution_client: Arc<dyn SettingsContributionClient> =
             Arc::new(crate::infra::contribution_client::ContributionClient::new(
                 self.db()?,
                 contributions,
-                cache,
+                Arc::clone(&cache),
             ));
         ctx.client_hub()
             .register::<dyn SettingsContributionClient>(contribution_client);
@@ -419,6 +423,27 @@ impl Gear for SettingsService {
                     self.types()?,
                 ),
             ))
+            .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
+
+        // Administrative authoring: create, revive, edit metadata, retire. It
+        // shares the step-up verifier and the audit store with the value write
+        // path, so one gate and one trail cover both.
+        self.declaration_admin
+            .set(Arc::new(crate::domain::declaration::DeclarationAdmin::new(
+                crate::infra::storage::declaration_repo::DeclarationRepo,
+                crate::infra::storage::category_repo::CategoryRepo,
+                crate::infra::storage::value_repo::ValueRepo,
+                self.validator()?,
+                Arc::new(
+                    crate::infra::setting_type_registrar::TypesRegistryRegistrar::new(
+                        self.types()?,
+                    ),
+                ),
+                Arc::clone(&step_up_for_admin),
+                crate::infra::storage::audit_store::AuditStore,
+                Arc::clone(&platform_scope),
+                Arc::clone(&cache),
+            )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
         // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-gear-init:p1:inst-gf-init-12
@@ -453,10 +478,16 @@ impl RestApiCapability for SettingsService {
             self.db()?,
             self.enforcer()?,
         );
+        let admin = self
+            .declaration_admin
+            .get()
+            .ok_or_else(|| anyhow::anyhow!("declaration admin not initialized"))?
+            .clone();
         let router = crate::api::rest::declaration_routes::register_routes(
             router,
             openapi,
             declarations,
+            admin,
             self.db()?,
             self.enforcer()?,
         );

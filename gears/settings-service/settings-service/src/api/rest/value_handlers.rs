@@ -46,11 +46,11 @@ fn request_id(headers: &HeaderMap) -> String {
         .unwrap_or_else(|| Uuid::new_v4().to_string())
 }
 
-fn if_match(headers: &HeaderMap) -> Option<&str> {
+pub(crate) fn if_match(headers: &HeaderMap) -> Option<&str> {
     header_str(headers, "if-match").map(|v| v.trim().trim_matches('"'))
 }
 
-fn actor(ctx: &SecurityContext, headers: &HeaderMap) -> WriteActor {
+pub(crate) fn actor(ctx: &SecurityContext, headers: &HeaderMap) -> WriteActor {
     // @cpt-begin:cpt-cf-settings-service-flow-value-writes-set:p1:inst-vw-set-1
     let step_up_token = header_str(headers, STEP_UP_HEADER)
         .map(str::to_owned)
@@ -90,7 +90,7 @@ fn parse_tenant(raw: Option<&str>) -> Result<Option<Uuid>, DomainError> {
 /// The RFC 9470 challenge: `401` telling the client what to ask the
 /// provider for.
 // @cpt-begin:cpt-cf-settings-service-algo-gear-foundation-authz-stepup:p1:inst-gf-authz-7
-fn step_up_challenge(err: DomainError) -> Response {
+pub(crate) fn step_up_challenge(err: DomainError) -> Response {
     let (reason, max_age, acr) = match &err {
         DomainError::StepUpRequired {
             reason,

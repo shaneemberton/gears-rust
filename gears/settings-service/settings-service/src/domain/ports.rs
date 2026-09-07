@@ -124,6 +124,20 @@ pub enum ValueEvent {
         /// The change set the write belonged to.
         change_set_id: Uuid,
     },
+    /// `event_declaration_retired`: a declaration left resolution.
+    DeclarationRetired {
+        /// The setting key.
+        key: String,
+        /// Who retired it.
+        actor: String,
+    },
+    /// `event_declaration_reactivated`: a retired declaration is live again.
+    DeclarationReactivated {
+        /// The setting key.
+        key: String,
+        /// Who revived it.
+        actor: String,
+    },
     /// `event_value_change_failed`: a change was rejected, as a durable
     /// notification rather than only a response.
     ChangeFailed {

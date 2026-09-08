@@ -60,6 +60,15 @@ fn if_match_param() -> ParamSpec {
     }
 }
 
+/// The `Location` of the declaration a create or revive answers with.
+fn location_header() -> ResponseHeaderSpec {
+    ResponseHeaderSpec::new(
+        "Location",
+        "URL of the declaration",
+        ResponseHeaderType::String,
+    )
+}
+
 /// The `ETag` every declaration representation carries.
 fn etag_header() -> ResponseHeaderSpec {
     ResponseHeaderSpec::new(
@@ -136,6 +145,7 @@ pub fn register_routes(
             StatusCode::OK,
             "The declaration and its resolved traits",
         )
+        .response_header(etag_header())
         .error_401(openapi)
         .error_403(openapi)
         .error_404(openapi)
@@ -173,16 +183,16 @@ pub fn register_routes(
             StatusCode::CREATED,
             "The created declaration, with its ETag and Location",
         )
+        // `response_header` binds to the response declared last, so each success
+        // status names its own headers: both a create and a revive carry them.
+        .response_header(location_header())
+        .response_header(etag_header())
         .json_response_with_schema::<CreatedDeclarationDto>(
             openapi,
             StatusCode::OK,
             "The revived declaration, `reactivated` true",
         )
-        .response_header(ResponseHeaderSpec::new(
-            "Location",
-            "URL of the declaration",
-            ResponseHeaderType::String,
-        ))
+        .response_header(location_header())
         .response_header(etag_header())
         .error_400(openapi)
         .error_401(openapi)

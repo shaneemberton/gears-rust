@@ -593,8 +593,12 @@ where
                 let secret_ref = secret_ref.clone();
                 // @cpt-end:cpt-cf-settings-service-flow-secret-values-set:p1:inst-sv-set-6
                 // @cpt-begin:cpt-cf-settings-service-algo-value-writes-commit:p1:inst-vw-commit-5
+                // @cpt-begin:cpt-cf-settings-service-algo-typed-value-validation-classification-sync:p1:inst-tvv-sync-1
+                // @cpt-begin:cpt-cf-settings-service-state-typed-value-validation-review:p1:inst-tvv-state-2
                 // A valid re-set clears `needs_review`; the unique index guards
-                // the first insert so two first writers cannot both land.
+                // the first insert so two first writers cannot both land. The
+                // row takes the declaration's classification as it is written,
+                // so masking reads one column and the two never disagree.
                 match &current {
                     Some(row) => (
                         Some(
@@ -628,6 +632,8 @@ where
                         AuditOperation::Create,
                     ),
                 }
+                // @cpt-end:cpt-cf-settings-service-state-typed-value-validation-review:p1:inst-tvv-state-2
+                // @cpt-end:cpt-cf-settings-service-algo-typed-value-validation-classification-sync:p1:inst-tvv-sync-1
                 // @cpt-end:cpt-cf-settings-service-algo-value-writes-commit:p1:inst-vw-commit-5
             }
             Staged::Revert | Staged::Remove => {

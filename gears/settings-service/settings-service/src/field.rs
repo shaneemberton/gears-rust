@@ -94,3 +94,15 @@ pub const DECLARATION_FIELD_IMMUTABLE: &str = "declaration_field_immutable";
 
 /// `default_value` omitted from a declaration.
 pub const DEFAULT_REQUIRED: &str = "default_required";
+
+/// A cron expression that does not parse under its declared dialect.
+pub const VALUE_CRON_INVALID: &str = "value_cron_invalid";
+
+/// A cron dialect this gear cannot check.
+pub const VALUE_CRON_DIALECT_UNKNOWN: &str = "value_cron_dialect_unknown";
+
+/// A value outside the membership of its declared dynamic enumeration.
+pub const VALUE_NOT_IN_ENUM: &str = "value_not_in_enum";
+
+/// A dynamic enumeration source that does not resolve.
+pub const VALUE_ENUM_SOURCE_UNKNOWN: &str = "value_enum_source_unknown";

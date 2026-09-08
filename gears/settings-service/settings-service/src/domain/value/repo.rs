@@ -63,6 +63,10 @@ pub trait ValueRepository: Send + Sync {
     /// Flag one row for review with the detail that explains it, or clear the
     /// flag when `detail` is `None`.
     ///
+    /// The detail travels with the flag in both directions: a flagged row says
+    /// why, and clearing the flag clears the reason with it.
+    // @cpt-dod:cpt-cf-settings-service-dod-typed-value-validation-needs-review:p1
+    ///
     /// # Errors
     /// [`DomainError`] when the database cannot answer.
     async fn flag<C: DBRunner>(

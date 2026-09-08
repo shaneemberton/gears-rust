@@ -718,6 +718,7 @@ where
         let successor = self.reload(conn, scope, &contributed.key).await?;
         // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-2
         // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-3
+        // @cpt-begin:cpt-cf-settings-service-state-typed-value-validation-review:p1:inst-tvv-state-1
         // Every value the predecessor holds moves to the successor at the same
         // scope. A copy that no longer validates is stored flagged, never
         // coerced and never dropped: an administrator sees it and the resolver
@@ -742,6 +743,7 @@ where
                 )
                 .await?;
         }
+        // @cpt-end:cpt-cf-settings-service-state-typed-value-validation-review:p1:inst-tvv-state-1
         // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-3
         self.record(
             conn,

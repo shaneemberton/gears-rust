@@ -56,6 +56,7 @@ fn subjectless() -> sea_orm::Condition {
 
 #[async_trait]
 impl ValueRepository for ValueRepo {
+    // @cpt-dod:cpt-cf-settings-service-dod-typed-value-validation-classification:p1
     async fn resync_classification<C: DBRunner>(
         &self,
         conn: &C,

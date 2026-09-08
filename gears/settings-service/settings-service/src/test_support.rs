@@ -46,10 +46,20 @@ use crate::infra::type_validator::GtsTypeValidator;
 pub struct FakeSource {
     pub schemas: HashMap<String, GtsTypeSchema>,
     pub instances: HashSet<String>,
+    pub enums: HashMap<String, Vec<String>>,
     pub unavailable: bool,
 }
 
 impl FakeSource {
+    /// A dynamic enumeration this source knows, and its members.
+    pub fn with_enum(mut self, source: &str, members: &[&str]) -> Self {
+        self.enums.insert(
+            source.to_owned(),
+            members.iter().map(|m| (*m).to_owned()).collect(),
+        );
+        self
+    }
+
     pub fn with_type(mut self, id: &str, schema: Value) -> Self {
         let schema = GtsTypeSchema::try_new(GtsTypeId::new(id), schema, None, None)
             .expect("fixture schema is a valid root type");
@@ -76,6 +86,10 @@ impl SchemaSource for FakeSource {
 
     async fn instance_exists(&self, instance_id: &str) -> Result<bool, DomainError> {
         Ok(self.instances.contains(instance_id))
+    }
+
+    async fn enum_members(&self, source: &str) -> Result<Option<Vec<String>>, DomainError> {
+        Ok(self.enums.get(source).cloned())
     }
 }
 

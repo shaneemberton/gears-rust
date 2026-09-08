@@ -279,6 +279,12 @@ impl Gear for SettingsService {
         // transaction. The retention default is validated here because a store
         // configured below twelve months would prune what the platform must keep.
         let config = self.config()?;
+        // The two SDK traits are bound in process and have no remote contract
+        // to reach, so a deployment that wires one remotely is refused here
+        // rather than left with a binding that resolves to nothing.
+        if let Err(reason) = config.check_in_process_bindings() {
+            anyhow::bail!("{}: {reason}", Self::MODULE_NAME);
+        }
         if config.audit_retention_days < crate::audit::MIN_RETENTION_DAYS {
             anyhow::bail!(
                 "{}: audit_retention_days is {} but must not be below {}",

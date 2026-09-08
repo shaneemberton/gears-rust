@@ -503,16 +503,16 @@ Every committed change **MUST** publish `event_value_changed` and every rejected
 - [x] A valid set stores the value, and a subsequent read returns it with the `etag` the write returned
 - [x] An invalid value is refused `400` with field-level detail and nothing is stored
 - [x] A set whose `If-Match` is stale is refused `412`, nothing is stored, and the stored value is the other writer's
-- [ ] Of N concurrent sets presenting the same tag exactly one commits, the rest return `412`, and exactly one audit record exists for the stored change
-- [ ] Two concurrent first writes at a scope with no row leave exactly one row
+- [x] Of N concurrent sets presenting the same tag exactly one commits, the rest return `412`, and exactly one audit record exists for the stored change
+- [x] Two concurrent first writes at a scope with no row leave exactly one row
 - [x] A fault injected between the value write and the audit append leaves neither behind
 - [x] After a set, the local cache no longer holds the key at the target, and for a `cascading` setting holds it at no scope
 - [x] A batch of mixed changes stores the valid ones, reports the invalid one with its error, and answers with one entry per change; a batch of more than five hundred changes is refused `400`
-- [ ] A batch verifies step-up once, and a failed verification stores nothing
+- [x] A batch verifies step-up once, and a failed verification stores nothing
 - [x] A revert at a tenant scope returns the nearest-ancestor fallback and at the root tenant the Schema Default, which is unchanged
-- [ ] A clone stores the source's effective value at the target with no continuing link, is refused `403` when the caller may not read the source, and is refused `SecretNotCloneable` on a secret setting
+- [x] A clone stores the source's effective value at the target with no continuing link, is refused `403` when the caller may not read the source, and is refused `SecretNotCloneable` on a secret setting
 - [x] A write to a secret-trait declaration with no Secret Manager bound is refused as unavailable, and no plaintext appears in `setting_values`
 - [x] A valid set clears `needs_review` on the row
-- [ ] The impact report omits standalone descendants from its list and its total, honours `limit` between one and five hundred, stops at the node budget with `truncated` set, and never blocks the write
+- [x] The impact report omits standalone descendants from its list and its total, honours `limit` between one and five hundred, stops at the node budget with `truncated` set, and never blocks the write
 - [x] A committed change publishes `event_value_changed` and a rejected one `event_value_change_failed`; `settings_value_writes_total` and `settings_step_up_total` count both outcomes
 - [x] With no `StepUpVerifier` bound, reads keep serving and every write to a declaration that requires step-up refuses

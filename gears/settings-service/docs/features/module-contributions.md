@@ -290,7 +290,7 @@ A `module_contributed` declaration **MUST** be refused `409 ContributedDeclarati
 
 ### In-Process Only
 
-- [ ] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-trust`
+- [x] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-trust`
 
 While the release is Embedded-only, the contribution trait **MUST** be bound in process, the gear **MUST** publish no REST contract for it and **MUST** fail startup when configuration asks for a remote binding, and `owner_module` **MUST** be recorded as an attribute and never used as an authorization input.
 
@@ -318,4 +318,4 @@ While the release is Embedded-only, the contribution trait **MUST** be bound in 
 - [x] After a retire, a read of the key resolves as the distinct retired outcome and every value row remains
 - [x] Every registration, upgrade, reactivation and retirement writes an audit record and publishes its event
 - [x] `PATCH` and `DELETE` on a contributed declaration return `409 ContributedDeclarationImmutable`, while a value write to it succeeds under the ordinary rules
-- [ ] `SettingsContributionClient` is resolvable from `ClientHub` after init, and a configuration naming a remote binding for it fails startup
+- [x] `SettingsContributionClient` is resolvable from `ClientHub` after init, and a configuration naming a remote binding for it fails startup

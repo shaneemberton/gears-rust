@@ -399,3 +399,8 @@ impl WriteCoordinator {
         self.writer.resolver().resolve(&conn, key, target).await
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[path = "value_writes_tests.rs"]
+mod value_writes_tests;

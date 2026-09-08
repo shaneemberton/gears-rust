@@ -244,7 +244,7 @@ Every record **MUST** carry `retain_until` or fall under the store's configured 
 - [x] History for one setting at one scope returns only that pair's records, newest first, and a second page follows the cursor without duplicates
 - [x] A `pii`-classified actor is masked for a caller without the PII entitlement and unmasked for one with it
 - [x] History of a hidden setting returns `404`, and history of a setting for a tenant outside the caller's subtree, or for a standalone descendant, returns `403`
-- [ ] History of a retired declaration is readable
+- [x] History of a retired declaration is readable
 - [x] A setting with no history returns `200` with an empty page
 - [x] A record inserted with no `retain_until` is pruned only after the configured default horizon, and one with an explicit `retain_until` only after that instant
 - [x] No code path issues an `UPDATE` against `audit_records`, and the only `DELETE` is pruning

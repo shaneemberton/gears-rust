@@ -46,6 +46,33 @@ pub trait ValueRepository: Send + Sync {
     ///
     /// # Errors
     /// [`DomainError`] when the read fails.
+    /// Every stored row of one declaration, at any scope.
+    ///
+    /// What an upgrade migration carries across and what a reactivation
+    /// re-validates: both have to see the rows without knowing the tenants.
+    ///
+    /// # Errors
+    /// [`DomainError`] when the database cannot answer.
+    async fn find_all<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        declaration_id: Uuid,
+    ) -> Result<Vec<StoredValue>, DomainError>;
+
+    /// Flag one row for review with the detail that explains it, or clear the
+    /// flag when `detail` is `None`.
+    ///
+    /// # Errors
+    /// [`DomainError`] when the database cannot answer.
+    async fn flag<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        id: Uuid,
+        detail: Option<String>,
+    ) -> Result<(), DomainError>;
+
     async fn find_one<C: DBRunner>(
         &self,
         conn: &C,

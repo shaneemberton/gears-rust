@@ -411,6 +411,7 @@ impl Gear for SettingsService {
                 self.db()?,
                 contributions,
                 Arc::clone(&cache),
+                Arc::new(crate::infra::write_metrics::LoggingPublisher),
             ));
         ctx.client_hub()
             .register::<dyn SettingsContributionClient>(contribution_client);

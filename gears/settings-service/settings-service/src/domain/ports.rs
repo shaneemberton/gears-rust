@@ -124,6 +124,13 @@ pub enum ValueEvent {
         /// The change set the write belonged to.
         change_set_id: Uuid,
     },
+    /// `event_declaration_registered`: a gear's declaration was stored.
+    DeclarationRegistered {
+        /// The setting key.
+        key: String,
+        /// The module that contributed it.
+        actor: String,
+    },
     /// `event_declaration_retired`: a declaration left resolution.
     DeclarationRetired {
         /// The setting key.

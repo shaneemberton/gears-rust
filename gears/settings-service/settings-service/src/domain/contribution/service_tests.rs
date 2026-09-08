@@ -21,18 +21,20 @@ use uuid::Uuid;
 use crate::domain::category::{CategoryKey, CategoryRepository};
 use crate::domain::contribution::{ContributionService, reason};
 use crate::domain::declaration::{Declaration, DeclarationRepository};
+use crate::domain::value::ValueRepository;
 use crate::infra::contribution_client::ContributionClient;
 use crate::infra::storage::category_repo::CategoryRepo;
 use crate::infra::storage::declaration_repo::DeclarationRepo;
 use crate::infra::storage::value_repo::ValueRepo;
 use crate::infra::type_validator::GtsTypeValidator;
 use crate::test_support::{
-    FakeSource, FixedScope, RecordingAudit, RecordingRegistrar, sqlite_provider,
+    FakeSource, FixedScope, RecordingAudit, RecordingPublisher, RecordingRegistrar, sqlite_provider,
 };
 
 const BOOL: &str = "gts.cf.toolkit.settings.type_bool_flag.v1~";
 const PORT: &str = "gts.cf.toolkit.settings.type_port.v1~";
 const SECRET: &str = "gts.cf.toolkit.settings.type_secret_string.v1~";
+const NARROW_PORT: &str = "gts.cf.toolkit.settings.type_narrow_port.v1~";
 const STRING: &str = "gts.cf.toolkit.settings.type_string.v1~";
 const MODULE: &str = "settings-demo";
 
@@ -52,6 +54,22 @@ fn catalogue() -> FakeSource {
             }),
         )
         .with_type(STRING, json!({ "$id": format!("gts://{STRING}"), "type": "string" }))
+        .with_type(
+            NARROW_PORT,
+            json!({ "$id": format!("gts://{NARROW_PORT}"), "type": "integer", "minimum": 1, "maximum": 10000 }),
+        )
+}
+
+/// The same catalogue after the port type gained a narrower revision: the
+/// upper bound moved, so a value stored under the old one may no longer pass.
+fn narrowed_catalogue() -> FakeSource {
+    FakeSource::default()
+        .with_type(BOOL, json!({ "$id": format!("gts://{BOOL}"), "type": "boolean" }))
+        .with_type(
+            PORT,
+            json!({ "$id": format!("gts://{PORT}"), "type": "integer", "minimum": 1, "maximum": 10000 }),
+        )
+        .with_type(STRING, json!({ "$id": format!("gts://{STRING}"), "type": "string" }))
 }
 
 struct Harness {
@@ -59,6 +77,7 @@ struct Harness {
     client: ContributionClient<DeclarationRepo, CategoryRepo, ValueRepo, Arc<RecordingAudit>>,
     audit: Arc<RecordingAudit>,
     registrar: Arc<RecordingRegistrar>,
+    published: Arc<RecordingPublisher>,
 }
 
 impl Harness {
@@ -66,31 +85,48 @@ impl Harness {
         Self::with_registrar(RecordingRegistrar::default()).await
     }
 
+    /// A second client over the same database and a different catalogue: what
+    /// a restart looks like once the types registry has moved on.
+    fn with_catalogue(db: Arc<DBProvider<DbError>>, source: FakeSource) -> Self {
+        Self::build(db, RecordingRegistrar::default(), source)
+    }
+
     async fn with_registrar(registrar: RecordingRegistrar) -> Self {
         let db = sqlite_provider().await;
+        Self::build(db, registrar, catalogue())
+    }
+
+    fn build(
+        db: Arc<DBProvider<DbError>>,
+        registrar: RecordingRegistrar,
+        source: FakeSource,
+    ) -> Self {
         let audit = Arc::new(RecordingAudit::default());
         let registrar = Arc::new(registrar);
         let service = Arc::new(ContributionService::new(
             DeclarationRepo,
             CategoryRepo,
             ValueRepo,
-            Arc::new(GtsTypeValidator::new(catalogue())),
+            Arc::new(GtsTypeValidator::new(source)),
             Arc::clone(&registrar) as Arc<dyn crate::domain::contribution::SettingTypeRegistrar>,
             Arc::clone(&audit),
             Arc::new(FixedScope(Uuid::nil())),
         ));
+        let published = Arc::new(RecordingPublisher::default());
         let client = ContributionClient::new(
             Arc::clone(&db),
             service,
             Arc::new(crate::domain::resolution::EffectiveCache::new(
                 std::time::Duration::from_secs(30),
             )),
+            Arc::clone(&published) as Arc<dyn crate::domain::ports::ChangePublisher>,
         );
         Self {
             db,
             client,
             audit,
             registrar,
+            published,
         }
     }
 
@@ -131,6 +167,37 @@ impl Harness {
         let conn = self.db.conn().expect("connection");
         DeclarationRepo
             .find_by_key(&conn, &AccessScope::allow_all(), key.as_str())
+            .await
+            .expect("lookup")
+    }
+
+    /// Store a value the way an administrator's write leaves it.
+    async fn set_value(&self, declaration_id: Uuid, tenant_id: Uuid, value: Value) {
+        let conn = self.db.conn().expect("connection");
+        ValueRepo
+            .insert(
+                &conn,
+                &AccessScope::allow_all(),
+                crate::domain::value::ValueDraft {
+                    declaration_id,
+                    tenant_id,
+                    value: Some(value),
+                    secret_ref: None,
+                    data_classification: "public".to_owned(),
+                    needs_review: false,
+                    needs_review_detail: None,
+                    set_by: "an-admin".to_owned(),
+                },
+            )
+            .await
+            .expect("value row");
+    }
+
+    /// Every stored row of one declaration.
+    async fn values_of(&self, declaration_id: Uuid) -> Vec<crate::domain::value::StoredValue> {
+        let conn = self.db.conn().expect("connection");
+        ValueRepo
+            .find_all(&conn, &AccessScope::allow_all(), declaration_id)
             .await
             .expect("lookup")
     }
@@ -545,24 +612,8 @@ async fn another_module_cannot_take_over_a_key() {
 }
 
 #[tokio::test]
-async fn a_higher_major_is_refused_until_the_upgrade_exists_and_a_lower_one_always() {
+async fn a_lower_major_than_the_active_one_is_always_refused() {
     let h = Harness::new().await;
-    h.register(vec![flag("network", "proxy_enabled")]).await;
-
-    let v2 = ContributedDeclaration::new(
-        key("network", "proxy_enabled", 2),
-        STRING.to_owned(),
-        json!("off"),
-        ScopeClass::Cascading,
-    );
-    let result = h.register(vec![v2]).await;
-    assert_eq!(codes(&result), vec![reason::UPGRADE_UNSUPPORTED]);
-    assert!(
-        h.stored(&key("network", "proxy_enabled", 2))
-            .await
-            .is_none()
-    );
-
     let v3 = ContributedDeclaration::new(
         key("limits", "quota", 3),
         PORT.to_owned(),
@@ -578,6 +629,171 @@ async fn a_higher_major_is_refused_until_the_upgrade_exists_and_a_lower_one_alwa
     );
     let result = h.register(vec![v1]).await;
     assert_eq!(codes(&result), vec![reason::MAJOR_REGRESSION]);
+}
+
+#[tokio::test]
+async fn a_higher_major_carries_every_value_across_and_retires_the_predecessor() {
+    let h = Harness::new().await;
+    h.register(vec![port("listen_port", json!(8080))]).await;
+    let v1 = key("network", "listen_port", 1);
+    let predecessor = h.stored(&v1).await.expect("v1");
+
+    // Two administrator-set values, one of which the successor's type refuses.
+    let tenant_ok = Uuid::new_v4();
+    let tenant_bad = Uuid::new_v4();
+    h.set_value(predecessor.id, tenant_ok, json!(9090)).await;
+    h.set_value(predecessor.id, tenant_bad, json!(70000)).await;
+
+    // v2 narrows the type: a port becomes a bounded one the second value fails.
+    let v2 = ContributedDeclaration::new(
+        key("network", "listen_port", 2),
+        NARROW_PORT.to_owned(),
+        json!(8080),
+        ScopeClass::Global,
+    );
+    let result = h.register(vec![v2]).await;
+    assert_eq!(result.errors, Vec::new());
+    assert_eq!(result.registered, 1);
+
+    // Exactly one major on the path is active.
+    let successor = h
+        .stored(&key("network", "listen_port", 2))
+        .await
+        .expect("v2");
+    assert_eq!(successor.status, "active");
+    assert_eq!(h.stored(&v1).await.expect("v1").status, "retired");
+
+    // Every value carried across at the same scope; the failing one flagged
+    // with its detail rather than coerced or dropped.
+    let carried = h.values_of(successor.id).await;
+    assert_eq!(carried.len(), 2);
+    let ok = carried
+        .iter()
+        .find(|r| r.tenant_id == tenant_ok)
+        .expect("the valid one");
+    assert_eq!(ok.value, Some(json!(9090)));
+    assert!(!ok.needs_review);
+    let bad = carried
+        .iter()
+        .find(|r| r.tenant_id == tenant_bad)
+        .expect("the failing one");
+    assert_eq!(bad.value, Some(json!(70000)), "never coerced");
+    assert!(bad.needs_review);
+    assert!(bad.needs_review_detail.is_some());
+
+    // The predecessor keeps its own rows; nothing was moved out from under it.
+    assert_eq!(h.values_of(predecessor.id).await.len(), 2);
+
+    // Both keys evicted, both events published, and the audit trail carries the
+    // successor's creation and the predecessor's retirement.
+    assert!(h.audit.operations().contains(&"remove"));
+    let events = h.published.events.lock().expect("lock");
+    let registered = events.iter().any(|e| {
+        matches!(e, crate::domain::ports::ValueEvent::DeclarationRegistered { key, .. }
+            if key == successor.key.as_str())
+    });
+    let retired = events.iter().any(|e| {
+        matches!(e, crate::domain::ports::ValueEvent::DeclarationRetired { key, .. }
+            if key == v1.as_str())
+    });
+    assert!(registered && retired, "{events:?}");
+}
+
+#[tokio::test]
+async fn a_higher_major_over_an_all_retired_path_is_an_ordinary_registration() {
+    let h = Harness::new().await;
+    h.register(vec![port("listen_port", json!(8080))]).await;
+    let v1 = key("network", "listen_port", 1);
+    h.retire_as(MODULE, vec![v1.clone()]).await;
+
+    let v2 = ContributedDeclaration::new(
+        key("network", "listen_port", 2),
+        PORT.to_owned(),
+        json!(8080),
+        ScopeClass::Global,
+    );
+    let result = h.register(vec![v2]).await;
+    assert_eq!(result.errors, Vec::new());
+    assert_eq!(result.registered, 1);
+    assert_eq!(h.stored(&v1).await.expect("v1").status, "retired");
+    assert_eq!(
+        h.stored(&key("network", "listen_port", 2))
+            .await
+            .expect("v2")
+            .status,
+        "active"
+    );
+}
+
+#[tokio::test]
+async fn reactivating_re_validates_the_retained_values_against_the_type() {
+    // The type gains a narrower revision while the setting sits retired: what
+    // no longer validates comes back flagged, not served and not discarded.
+    let h = Harness::with_registrar(RecordingRegistrar::default()).await;
+    h.register(vec![port("listen_port", json!(8080))]).await;
+    let key_v1 = key("network", "listen_port", 1);
+    let stored = h.stored(&key_v1).await.expect("v1");
+    let tenant_ok = Uuid::new_v4();
+    let tenant_bad = Uuid::new_v4();
+    h.set_value(stored.id, tenant_ok, json!(9090)).await;
+    h.set_value(stored.id, tenant_bad, json!(70000)).await;
+    h.retire_as(MODULE, vec![key_v1.clone()]).await;
+
+    // Re-registered at the same major, but the catalogue now refuses the second
+    // value. A fresh harness carries the narrowed catalogue and the same rows.
+    let narrowed = Harness::with_catalogue(Arc::clone(&h.db), narrowed_catalogue());
+    let result = narrowed
+        .register(vec![ContributedDeclaration::new(
+            key_v1.clone(),
+            PORT.to_owned(),
+            json!(8080),
+            ScopeClass::Global,
+        )])
+        .await;
+    assert_eq!(result.errors, Vec::new());
+    assert_eq!(result.reactivated, 1);
+    assert_eq!(narrowed.stored(&key_v1).await.expect("v1").status, "active");
+
+    let rows = narrowed.values_of(stored.id).await;
+    let ok = rows
+        .iter()
+        .find(|r| r.tenant_id == tenant_ok)
+        .expect("the valid one");
+    assert!(!ok.needs_review);
+    let bad = rows
+        .iter()
+        .find(|r| r.tenant_id == tenant_bad)
+        .expect("the failing one");
+    assert!(bad.needs_review);
+    assert!(bad.needs_review_detail.is_some());
+    assert_eq!(bad.value, Some(json!(70000)), "never coerced");
+
+    let events = narrowed.published.events.lock().expect("lock");
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            crate::domain::ports::ValueEvent::DeclarationReactivated { .. }
+        )),
+        "{events:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_registration_and_a_retirement_publish_their_events() {
+    let h = Harness::new().await;
+    h.register(vec![flag("network", "proxy_enabled")]).await;
+    let k = key("network", "proxy_enabled", 1);
+    h.retire_as(MODULE, vec![k.clone()]).await;
+    let events = h.published.events.lock().expect("lock");
+    let registered = events.iter().any(|e| {
+        matches!(e, crate::domain::ports::ValueEvent::DeclarationRegistered { key, .. }
+            if key == k.as_str())
+    });
+    let retired = events.iter().any(|e| {
+        matches!(e, crate::domain::ports::ValueEvent::DeclarationRetired { key, .. }
+            if key == k.as_str())
+    });
+    assert!(registered && retired, "{events:?}");
 }
 
 #[tokio::test]

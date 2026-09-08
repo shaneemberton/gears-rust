@@ -22,11 +22,18 @@ use crate::domain::declaration::{
 use crate::domain::error::DomainError;
 use crate::domain::platform_scope::PlatformScope;
 use crate::domain::validation::TypeValidator;
-use crate::domain::value::ValueRepository;
+use crate::domain::value::{ValueDraft, ValueRepository};
 
 /// What one declaration's reconcile did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
+    /// A higher major inserted, the predecessor's values carried across and
+    /// the predecessor retired. Carries the retired key, which the caller
+    /// evicts alongside the successor's.
+    Upgraded {
+        /// The predecessor's key, now retired.
+        retired: String,
+    },
     /// Inserted as new.
     Registered,
     /// Metadata updated in place.
@@ -220,6 +227,7 @@ where
     /// # Errors
     /// [`ItemError::Refused`] with a stable reason, or [`ItemError::Failed`]
     /// when a repository, the validator or the registry failed.
+    // @cpt-dod:cpt-cf-settings-service-dod-module-contributions-reconcile:p1
     pub async fn reconcile_one<C: DBRunner>(
         &self,
         conn: &C,
@@ -274,19 +282,44 @@ where
                 )
                 .await
             }
+            // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-reconcile:p1:inst-mc-rec-7
             (None, Some(highest)) if admitted.major > highest => {
-                // The upgrade migration — successor inserted, values copied and
-                // re-validated, predecessor retired — needs the value listing
-                // the read path brings; until then a higher major is refused
-                // rather than half-applied.
-                Err(refused(
-                    reason::UPGRADE_UNSUPPORTED,
-                    format!(
-                        "`{key}` is a higher major than the stored v{highest}; the upgrade \
-                         migration is not available yet"
-                    ),
-                ))
+                let predecessor = on_path
+                    .iter()
+                    .find(|d| major_of(d) == Some(highest) && d.status == "active")
+                    .cloned();
+                match predecessor {
+                    Some(predecessor) => {
+                        self.upgrade(
+                            conn,
+                            &scope,
+                            owner_module,
+                            request_id,
+                            contributed,
+                            &admitted,
+                            &derived,
+                            predecessor,
+                        )
+                        .await
+                    }
+                    // Every major on the path is retired: nothing to carry
+                    // across and nothing to retire, so the successor is an
+                    // ordinary first registration at its own major.
+                    None => {
+                        self.register_new(
+                            conn,
+                            &scope,
+                            owner_module,
+                            request_id,
+                            contributed,
+                            &admitted,
+                            &derived,
+                        )
+                        .await
+                    }
+                }
             }
+            // @cpt-end:cpt-cf-settings-service-algo-module-contributions-reconcile:p1:inst-mc-rec-7
             // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-reconcile:p1:inst-mc-rec-8
             (None, Some(highest)) => Err(refused(
                 reason::MAJOR_REGRESSION,
@@ -559,8 +592,7 @@ where
         if existing.status == "retired" {
             // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-reconcile:p1:inst-mc-rec-6
             // Revive in place: the row keeps its id and its values stay where
-            // they are. Re-validation of retained values against the type
-            // follows the value listing, which arrives with the read path.
+            // they are.
             self.declarations
                 .update_metadata(conn, scope, existing.id, metadata)
                 .await?;
@@ -571,6 +603,17 @@ where
                 self.values
                     .resync_classification(conn, scope, existing.id, derived.data_classification)
                     .await?;
+            }
+            // The value type cannot have changed at this major, but the type
+            // itself may have gained a compatible revision while the setting
+            // sat retired. Every retained value is re-validated before it goes
+            // live again; what fails is flagged with its detail and falls
+            // through on read rather than being served or discarded.
+            for row in self.values.find_all(conn, scope, existing.id).await? {
+                let detail = self.revalidate(&contributed.value_type_id, &row).await?;
+                if detail.is_some() != row.needs_review {
+                    self.values.flag(conn, scope, row.id, detail).await?;
+                }
             }
             let revived = self.reload(conn, scope, key).await?;
             self.record(
@@ -619,6 +662,130 @@ where
     }
 
     /// The category a key's third segment names, created on first use.
+    /// Carry a setting to a new major: the successor inserted, every value
+    /// copied and re-validated, the predecessor retired, all in the caller's
+    /// transaction.
+    // @cpt-dod:cpt-cf-settings-service-dod-module-contributions-upgrade:p1
+    #[allow(clippy::too_many_arguments)]
+    async fn upgrade<C: DBRunner>(
+        &self,
+        conn: &C,
+        scope: &AccessScope,
+        owner_module: &str,
+        request_id: &str,
+        contributed: &ContributedDeclaration,
+        admitted: &Admitted<'_>,
+        derived: &Derived,
+        predecessor: Declaration,
+    ) -> Result<Outcome, ItemError> {
+        // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-4
+        // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-1
+        // The predecessor retires first, and only because it must: the two
+        // majors share a leaf name in one category, and `uq_declaration_category_slug`
+        // admits one active row for that pair. Everything here is one
+        // transaction, so nothing outside it ever sees the moment where the
+        // path has no active major, and a failure anywhere leaves the
+        // predecessor active and untouched. Its values stay where they are.
+        let predecessor_key = SettingKey::parse(&predecessor.key).map_err(|err| {
+            ItemError::Failed(DomainError::Internal {
+                diagnostic: format!("stored key `{}` does not parse: {err}", predecessor.key),
+            })
+        })?;
+        self.declarations
+            .set_status(conn, scope, predecessor.id, "retired")
+            .await?;
+        let retired = self.reload(conn, scope, &predecessor_key).await?;
+        // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-1
+        // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-2
+        // The successor, its own default already validated against its own
+        // value type by the caller.
+        let registered = self
+            .register_new(
+                conn,
+                scope,
+                owner_module,
+                request_id,
+                contributed,
+                admitted,
+                derived,
+            )
+            .await?;
+        if registered != Outcome::Registered {
+            return Err(ItemError::Failed(DomainError::Internal {
+                diagnostic: format!("registering a successor yielded {registered:?}"),
+            }));
+        }
+        let successor = self.reload(conn, scope, &contributed.key).await?;
+        // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-2
+        // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-3
+        // Every value the predecessor holds moves to the successor at the same
+        // scope. A copy that no longer validates is stored flagged, never
+        // coerced and never dropped: an administrator sees it and the resolver
+        // falls through it.
+        let carried = self.values.find_all(conn, scope, predecessor.id).await?;
+        for row in carried {
+            let detail = self.revalidate(&contributed.value_type_id, &row).await?;
+            self.values
+                .insert(
+                    conn,
+                    scope,
+                    ValueDraft {
+                        declaration_id: successor.id,
+                        tenant_id: row.tenant_id,
+                        value: row.value.clone(),
+                        secret_ref: row.secret_ref.clone(),
+                        data_classification: derived.data_classification.to_owned(),
+                        needs_review: detail.is_some(),
+                        needs_review_detail: detail,
+                        set_by: row.set_by.clone(),
+                    },
+                )
+                .await?;
+        }
+        // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-3
+        self.record(
+            conn,
+            &predecessor_key,
+            owner_module,
+            request_id,
+            AuditOperation::Remove,
+            Some(snapshot(&predecessor)),
+            Some(snapshot(&retired)),
+        )
+        .await?;
+        // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-4
+        // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-5
+        // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-6
+        // The caller evicts both keys once this commits; which major succeeds
+        // which is derivable from the keys themselves — the same stripped path,
+        // the highest major below — so no pointer is stored.
+        Ok(Outcome::Upgraded {
+            retired: predecessor.key.clone(),
+        })
+        // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-6
+        // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-5
+    }
+
+    /// Re-validate a retained value against a value type, returning the detail
+    /// of what refused it, or `None` when it still validates.
+    ///
+    /// A secret row carries a reference rather than a value, and a reference is
+    /// not the credential's shape: there is nothing here to validate.
+    async fn revalidate(
+        &self,
+        value_type_id: &str,
+        row: &crate::domain::value::StoredValue,
+    ) -> Result<Option<String>, ItemError> {
+        let Some(value) = &row.value else {
+            return Ok(None);
+        };
+        let result = self.validator.validate_value(value_type_id, value).await?;
+        Ok(result
+            .violations
+            .first()
+            .map(|first| format!("{} — {}", first.field, first.message)))
+    }
+
     async fn category_for<C: DBRunner>(
         &self,
         conn: &C,

@@ -79,6 +79,12 @@ impl ChangePublisher for LoggingPublisher {
                 %change_set_id,
                 "setting value changed"
             ),
+            ValueEvent::DeclarationRegistered { key, actor } => info!(
+                event = "event_declaration_registered",
+                %key,
+                %actor,
+                "declaration registered"
+            ),
             ValueEvent::DeclarationRetired { key, actor } => info!(
                 event = "event_declaration_retired",
                 %key,

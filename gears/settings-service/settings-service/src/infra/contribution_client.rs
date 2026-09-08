@@ -23,6 +23,7 @@ use crate::domain::category::CategoryRepository;
 use crate::domain::contribution::{ContributionService, ItemError, Outcome};
 use crate::domain::declaration::DeclarationRepository;
 use crate::domain::error::DomainError;
+use crate::domain::ports::{ChangePublisher, ValueEvent};
 use crate::domain::resolution::EffectiveCache;
 use crate::domain::value::ValueRepository;
 
@@ -31,6 +32,7 @@ pub struct ContributionClient<D, Cat, V, S> {
     db: Arc<DBProvider<DbError>>,
     service: Arc<ContributionService<D, Cat, V, S>>,
     cache: Arc<EffectiveCache>,
+    publisher: Arc<dyn ChangePublisher>,
 }
 
 impl<D, Cat, V, S> ContributionClient<D, Cat, V, S> {
@@ -40,8 +42,23 @@ impl<D, Cat, V, S> ContributionClient<D, Cat, V, S> {
         db: Arc<DBProvider<DbError>>,
         service: Arc<ContributionService<D, Cat, V, S>>,
         cache: Arc<EffectiveCache>,
+        publisher: Arc<dyn ChangePublisher>,
     ) -> Self {
-        Self { db, service, cache }
+        Self {
+            db,
+            service,
+            cache,
+            publisher,
+        }
+    }
+
+    async fn publish_registered(&self, key: &str, owner_module: &str) {
+        self.publisher
+            .publish(ValueEvent::DeclarationRegistered {
+                key: key.to_owned(),
+                actor: owner_module.to_owned(),
+            })
+            .await;
     }
 }
 
@@ -100,11 +117,49 @@ where
             // A changed declaration changes what every scope resolves to —
             // its default, its traits, its very existence — so the key is
             // evicted whole and re-resolves lazily.
-            if matches!(outcome, Ok(Ok(o)) if o != Outcome::Unchanged) {
+            if matches!(&outcome, Ok(Ok(o)) if *o != Outcome::Unchanged) {
                 self.cache.invalidate_key(key.as_str());
             }
+            // @cpt-begin:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-5
+            // An upgrade changes two keys: the successor, evicted above, and the
+            // predecessor it retired, which must stop resolving as active.
+            if let Ok(Ok(Outcome::Upgraded { retired })) = &outcome {
+                self.cache.invalidate_key(retired);
+            }
+            // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-5
+            // @cpt-begin:cpt-cf-settings-service-flow-module-contributions-register:p1:inst-mc-reg-5
+            // The declaration events, published once the reconcile is durable:
+            // a consumer learns a setting appeared, moved to a new major, or
+            // came back, and the audit records were written inside.
+            match &outcome {
+                Ok(Ok(Outcome::Registered)) => {
+                    self.publish_registered(key.as_str(), &owner_module).await;
+                }
+                Ok(Ok(Outcome::Upgraded { retired })) => {
+                    self.publish_registered(key.as_str(), &owner_module).await;
+                    self.publisher
+                        .publish(ValueEvent::DeclarationRetired {
+                            key: retired.clone(),
+                            actor: owner_module.clone(),
+                        })
+                        .await;
+                }
+                Ok(Ok(Outcome::Reactivated)) => {
+                    self.publisher
+                        .publish(ValueEvent::DeclarationReactivated {
+                            key: key.to_string(),
+                            actor: owner_module.clone(),
+                        })
+                        .await;
+                }
+                _ => {}
+            }
+            // @cpt-end:cpt-cf-settings-service-flow-module-contributions-register:p1:inst-mc-reg-5
             match outcome {
-                Ok(Ok(Outcome::Registered)) => result.registered += 1,
+                // An upgrade is a registration of the successor as far as the
+                // counts go; what it retired is the predecessor, not one of the
+                // keys the caller asked to retire.
+                Ok(Ok(Outcome::Registered | Outcome::Upgraded { .. })) => result.registered += 1,
                 Ok(Ok(Outcome::Updated)) => result.updated += 1,
                 Ok(Ok(Outcome::Reactivated)) => result.reactivated += 1,
                 Ok(Ok(Outcome::Unchanged)) => {}
@@ -145,9 +200,17 @@ where
                     })
                 })
                 .await;
+            // @cpt-begin:cpt-cf-settings-service-flow-module-contributions-retire:p1:inst-mc-ret-5
             if matches!(outcome, Ok(Ok(true))) {
                 self.cache.invalidate_key(key.as_str());
+                self.publisher
+                    .publish(ValueEvent::DeclarationRetired {
+                        key: key.to_string(),
+                        actor: owner_module.clone(),
+                    })
+                    .await;
             }
+            // @cpt-end:cpt-cf-settings-service-flow-module-contributions-retire:p1:inst-mc-ret-5
             match outcome {
                 Ok(Ok(true)) => result.retired += 1,
                 Ok(Ok(false)) => {}

@@ -911,6 +911,7 @@ where
             })
     }
 
+    // @cpt-dod:cpt-cf-settings-service-dod-module-contributions-immutable:p1
     fn refuse_contributed(declaration: &Declaration) -> Result<(), DomainError> {
         if declaration.source == "module_contributed" {
             return Err(conflict(

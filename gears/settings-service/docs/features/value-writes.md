@@ -1,5 +1,5 @@
 <!-- Created: 2026-09-06 by Constructor Tech -->
-<!-- Updated: 2026-09-06 by Constructor Tech -->
+<!-- Updated: 2026-09-09 by Constructor Tech -->
 
 # Feature: Validate and Set Values
 
@@ -237,11 +237,11 @@ Throughout, `tenant` omitted means the caller's own tenant, which for a platform
 - The caller may not read the setting, or the target is outside its subtree
 
 **Steps**:
-1. [x] - `p1` - Actor sends GET /settings-service/v1/settings/{key}/impact?tenant={tenant_id}&limit={n} with the candidate value - `inst-vw-imp-1`
+1. [x] - `p1` - Actor sends POST /settings-service/v1/settings/{key}/impact?tenant={tenant_id} with the candidate value and `limit` in the body, as `validate` carries them, since a value may run to 64 KiB and no query string carries that - `inst-vw-imp-1`
 2. [x] - `p1` - Authorize `read` on the setting's key and confirm the target is within the caller's subtree; **IF** not → **RETURN** `403` - `inst-vw-imp-2`
 3. [x] - `p1` - DB: SELECT the declaration; **IF** none or hidden → **RETURN** `404`; **IF** the scope class is not `cascading` → **RETURN** `200` with an empty report, since nothing below inherits - `inst-vw-imp-3`
 4. [x] - `p1` - Invoke the bounded impact walk - `inst-vw-imp-4`
-5. [x] - `p1` - **RETURN** `200` with `changed`, `total_changed`, `scanned` and `truncated` - `inst-vw-imp-5`
+5. [x] - `p1` - **RETURN** `200` with `changed`, `total_changed`, `scanned` and `truncated`, each listed descendant's current value masked by the declaration's classification as a read of it would be - `inst-vw-imp-5`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -358,7 +358,7 @@ The system **MUST** expose validate, set, batch, revert, clone, remove and impac
 - API: `POST /settings-service/v1/settings/{key}/value/revert`
 - API: `POST /settings-service/v1/settings/{key}/value/clone`
 - API: `DELETE /settings-service/v1/settings/{key}/value`
-- API: `GET /settings-service/v1/settings/{key}/impact`
+- API: `POST /settings-service/v1/settings/{key}/impact`
 - Entities: `SetResult`, `ValidationReport`, `ImpactReport`
 
 ### Two Gates, in Order
@@ -455,7 +455,7 @@ The impact report **MUST** walk the target's descendants breadth-first under a n
 - `cpt-cf-settings-service-algo-value-writes-impact`
 
 **Touches**:
-- API: `GET /settings-service/v1/settings/{key}/impact`
+- API: `POST /settings-service/v1/settings/{key}/impact`
 - Entities: `ImpactReport`
 
 ### Secret Values Route Through the Secret Manager

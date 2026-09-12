@@ -25,7 +25,6 @@ use crate::domain::declaration::{
     Declaration, DeclarationDraft, DeclarationMetadata, DeclarationRepository,
 };
 use crate::domain::error::DomainError;
-use crate::domain::platform_scope::PlatformScope;
 use crate::domain::resolution::EffectiveCache;
 use crate::domain::stepup::StepUpVerifier;
 use crate::domain::validation::{TraitSet, TypeValidator};
@@ -309,7 +308,6 @@ pub struct DeclarationAdmin<R, Cat, Val, S> {
     registrar: Arc<dyn SettingTypeRegistrar>,
     step_up: Arc<dyn StepUpVerifier>,
     sink: S,
-    platform: Arc<dyn PlatformScope>,
     cache: Arc<EffectiveCache>,
 }
 
@@ -330,7 +328,6 @@ where
         registrar: Arc<dyn SettingTypeRegistrar>,
         step_up: Arc<dyn StepUpVerifier>,
         sink: S,
-        platform: Arc<dyn PlatformScope>,
         cache: Arc<EffectiveCache>,
     ) -> Self {
         Self {
@@ -341,7 +338,6 @@ where
             registrar,
             step_up,
             sink,
-            platform,
             cache,
         }
     }
@@ -962,10 +958,13 @@ where
         pre: Option<Value>,
         post: Option<Value>,
     ) -> Result<(), DomainError> {
-        let tenant = self.platform.root_tenant().await?;
+        // A declaration is a platform-wide definition and sits at no scope, so
+        // its record carries none. It used to borrow the root tenant, which
+        // meant asking the Tenant Resolver for an id no reader of this record
+        // ever matches on.
         let mut record = AuditRecord::new(
             declaration.key.as_str(),
-            tenant,
+            None,
             actor.subject(),
             operation,
             actor.request_id.clone(),

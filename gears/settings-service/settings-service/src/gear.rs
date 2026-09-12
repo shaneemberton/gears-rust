@@ -298,7 +298,6 @@ impl Gear for SettingsService {
             .set(Arc::new(crate::domain::category::CategoryService::new(
                 crate::infra::storage::category_repo::CategoryRepo,
                 audit,
-                Arc::clone(&platform_scope),
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
@@ -410,7 +409,6 @@ impl Gear for SettingsService {
                 crate::infra::setting_type_registrar::TypesRegistryRegistrar::new(self.types()?),
             ),
             audit,
-            Arc::clone(&platform_scope),
         ));
         let contribution_client: Arc<dyn SettingsContributionClient> =
             Arc::new(crate::infra::contribution_client::ContributionClient::new(
@@ -448,7 +446,6 @@ impl Gear for SettingsService {
                 ),
                 Arc::clone(&step_up_for_admin),
                 crate::infra::storage::audit_store::AuditStore,
-                Arc::clone(&platform_scope),
                 Arc::clone(&cache),
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;

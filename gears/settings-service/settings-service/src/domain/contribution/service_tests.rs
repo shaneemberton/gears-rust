@@ -18,6 +18,7 @@ use toolkit_db::{DBProvider, DbError};
 use toolkit_security::{AccessScope, SecurityContext};
 use uuid::Uuid;
 
+use crate::audit::AuditOperation;
 use crate::domain::category::{CategoryKey, CategoryRepository};
 use crate::domain::contribution::{ContributionService, reason};
 use crate::domain::declaration::{Declaration, DeclarationRepository};
@@ -28,7 +29,7 @@ use crate::infra::storage::declaration_repo::DeclarationRepo;
 use crate::infra::storage::value_repo::ValueRepo;
 use crate::infra::type_validator::GtsTypeValidator;
 use crate::test_support::{
-    FakeSource, FixedScope, RecordingAudit, RecordingPublisher, RecordingRegistrar, sqlite_provider,
+    FakeSource, RecordingAudit, RecordingPublisher, RecordingRegistrar, sqlite_provider,
 };
 
 const BOOL: &str = "gts.cf.toolkit.settings.type_bool_flag.v1~";
@@ -110,7 +111,6 @@ impl Harness {
             Arc::new(GtsTypeValidator::new(source)),
             Arc::clone(&registrar) as Arc<dyn crate::domain::contribution::SettingTypeRegistrar>,
             Arc::clone(&audit),
-            Arc::new(FixedScope(Uuid::nil())),
         ));
         let published = Arc::new(RecordingPublisher::default());
         let client = ContributionClient::new(
@@ -128,6 +128,54 @@ impl Harness {
             registrar,
             published,
         }
+    }
+
+    /// The keys announced as newly registered.
+    fn registered_events(&self) -> Vec<String> {
+        self.published
+            .events
+            .lock()
+            .expect("lock")
+            .iter()
+            .filter_map(|e| match e {
+                crate::domain::ports::ValueEvent::DeclarationRegistered { key, .. } => {
+                    Some(key.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The keys announced as changed in place.
+    fn updated_events(&self) -> Vec<String> {
+        self.published
+            .events
+            .lock()
+            .expect("lock")
+            .iter()
+            .filter_map(|e| match e {
+                crate::domain::ports::ValueEvent::DeclarationUpdated { key, .. } => {
+                    Some(key.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The keys announced as revived.
+    fn reactivated_events(&self) -> Vec<String> {
+        self.published
+            .events
+            .lock()
+            .expect("lock")
+            .iter()
+            .filter_map(|e| match e {
+                crate::domain::ports::ValueEvent::DeclarationReactivated { key, .. } => {
+                    Some(key.clone())
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     async fn register(&self, declarations: Vec<ContributedDeclaration>) -> ReconcileResult {
@@ -281,8 +329,9 @@ async fn a_fresh_set_registers_every_declaration_and_its_categories() {
             .iter()
             .any(|(k, t)| k == key("network", "listen_port", 1).as_str() && t == PORT)
     );
-    // One record per changed row, with the module as the actor.
-    assert_eq!(h.audit.operations(), vec!["create"; 3]);
+    // One event per registered row. A contribution writes no audit record —
+    // it has no scope to write it against (see `ContributionService`).
+    assert_eq!(h.registered_events().len(), 3);
     let stored = h
         .stored(&key("network", "proxy_enabled", 1))
         .await
@@ -308,6 +357,7 @@ async fn a_second_boot_with_the_same_set_changes_nothing() {
     ];
     h.register(set.clone()).await;
     let before = h.stored(&key("network", "listen_port", 1)).await;
+    let announced = h.registered_events().len();
 
     let result = h.register(set).await;
 
@@ -323,9 +373,9 @@ async fn a_second_boot_with_the_same_set_changes_nothing() {
     assert!(result.errors.is_empty());
     assert_eq!(h.stored(&key("network", "listen_port", 1)).await, before);
     assert_eq!(
-        h.audit.operations().len(),
-        2,
-        "no record for a boot that changed nothing"
+        h.registered_events().len(),
+        announced,
+        "no event for a boot that changed nothing"
     );
 }
 
@@ -351,7 +401,15 @@ async fn changed_metadata_is_updated_in_place() {
     );
     assert_eq!(stored.mode, "advanced");
     assert!(!stored.requires_step_up);
-    assert_eq!(h.audit.operations().last().copied(), Some("change"));
+    // The reconcile is the only path that can move these gates — the
+    // administrative edit refuses a contributed row — and it runs unattended,
+    // so the event is the whole of the trail. Losing it would make the change
+    // observable nowhere.
+    assert!(
+        h.updated_events()
+            .contains(&key("network", "proxy_enabled", 1).to_string()),
+        "an in-place metadata change announces itself"
+    );
 }
 
 #[tokio::test]
@@ -561,7 +619,11 @@ async fn retire_then_re_register_revives_the_same_row() {
         .expect("row");
     assert_eq!(revived.id, original.id, "revived in place, not re-minted");
     assert_eq!(revived.status, "active");
-    assert_eq!(h.audit.operations(), vec!["create", "remove", "change"]);
+    assert!(
+        h.reactivated_events()
+            .contains(&key("network", "proxy_enabled", 1).to_string()),
+        "the revival is announced as an event"
+    );
     // Type registration happened once: the retirement left the type in place.
     assert_eq!(h.registrar.registered.lock().expect("lock").len(), 1);
 }
@@ -684,9 +746,8 @@ async fn a_higher_major_carries_every_value_across_and_retires_the_predecessor()
     // The predecessor keeps its own rows; nothing was moved out from under it.
     assert_eq!(h.values_of(predecessor.id).await.len(), 2);
 
-    // Both keys evicted, both events published, and the audit trail carries the
-    // successor's creation and the predecessor's retirement.
-    assert!(h.audit.operations().contains(&"remove"));
+    // Both keys evicted and both events published; the contribution path
+    // writes no audit record, having no scope to write one against.
     let events = h.published.events.lock().expect("lock");
     let registered = events.iter().any(|e| {
         matches!(e, crate::domain::ports::ValueEvent::DeclarationRegistered { key, .. }
@@ -828,5 +889,74 @@ async fn a_registry_failure_rolls_the_item_back() {
     );
     // The category was vivified in the same transaction, so it is gone too.
     assert!(!h.category_exists("network").await);
-    assert!(h.audit.operations().is_empty());
+    assert!(h.registered_events().is_empty());
+}
+
+#[tokio::test]
+async fn a_contribution_records_every_changed_row_and_no_unchanged_one() {
+    // The trail is what makes an unattended reconcile accountable: a gear that
+    // rewrites a platform's declarations on upgrade must leave a mark. A boot
+    // that changes nothing must not, or the trail becomes one entry per restart
+    // and stops being readable.
+    let h = Harness::new().await;
+    let set = vec![
+        flag("network", "proxy_enabled"),
+        port("listen_port", json!(8080)),
+    ];
+
+    h.register(set.clone()).await;
+    assert_eq!(
+        h.audit.operations(),
+        vec!["create"; 2],
+        "one record per registered row"
+    );
+
+    h.register(set).await;
+    assert_eq!(
+        h.audit.operations(),
+        vec!["create"; 2],
+        "a boot that converges writes nothing"
+    );
+}
+
+#[tokio::test]
+async fn contribution_records_carry_no_tenant() {
+    // The whole point of the scopeless record: a declaration sits at no scope,
+    // so the reconcile never asks the Tenant Resolver for one. That lookup,
+    // made from inside this transaction, is what stopped hosts from booting.
+    let h = Harness::new().await;
+    h.register(vec![flag("network", "proxy_enabled")]).await;
+
+    let records = h.audit.records();
+    assert!(!records.is_empty(), "the registration was recorded");
+    assert!(
+        records.iter().all(|r| r.tenant_id.is_none()),
+        "a declaration record borrows no scope"
+    );
+}
+
+#[tokio::test]
+async fn a_loosened_gate_leaves_a_record_naming_both_sides() {
+    // PRD 5.7: clearing `requires_step_up` must be audited. The reconcile is
+    // the only path that can move it on a contributed declaration, so this
+    // record is the only trace the change has.
+    let h = Harness::new().await;
+    h.register(vec![flag("network", "proxy_enabled")]).await;
+
+    let mut loosened = flag("network", "proxy_enabled");
+    loosened.requires_step_up = Some(false);
+    h.register(vec![loosened]).await;
+
+    let records = h.audit.records();
+    let change = records
+        .iter()
+        .rfind(|r| r.operation == AuditOperation::Change)
+        .expect("the loosening was recorded");
+    let pre = format!("{:?}", change.pre_image);
+    let post = format!("{:?}", change.post_image);
+    assert!(
+        pre.contains("requires_step_up") && post.contains("requires_step_up"),
+        "both images name the gate that moved"
+    );
+    assert!(change.tenant_id.is_none(), "still no borrowed scope");
 }

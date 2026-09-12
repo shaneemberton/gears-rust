@@ -69,7 +69,7 @@ The key is the module's own: `gts.cf.core.settings.setting_type.v1~<vendor>.<pac
 - **PRD**: [PRD.md](../PRD.md) — §5.8 Module-Contributed Settings; §5.2 (type-versioning policy)
 - **Design**: [DESIGN.md](../DESIGN.md) — §4.2 (Component: Module Contribution Reconciler, including *Upgrade migration* and the worked example; Component: Declaration Management — *Declaration mutation classes*), §4.4 (Events Emitted), §4.5 (`SettingsContributionClient` trait), §4.7 (GTS Type & Schema Identifiers — *When the type is registered*, *Retiring a declaration does not unregister its type*; Compatibility mode for value types), §4.8 (Trusted-Caller Boundary), §4.9 (Gear init)
 - **DECOMPOSITION**: [DECOMPOSITION.md](../DECOMPOSITION.md) entry 2.10
-- **Dependencies**: entry 2.4 for the Type Validator that checks every default and every copied value, and for the `setting_values` table an upgrade copies rows into; entry 2.3 for the declaration entity, its classification derivation and the administrative immutability of contributed rows; entry 2.2 for the category the reconciler reuses or creates; entry 2.1 for the abstract `setting_type` base registered at init and the Audit Emitter every registration writes through.
+- **Dependencies**: entry 2.4 for the Type Validator that checks every default and every copied value, and for the `setting_values` table an upgrade copies rows into; entry 2.3 for the declaration entity, its classification derivation and the administrative immutability of contributed rows; entry 2.2 for the category the reconciler reuses or creates; entry 2.1 for the abstract `setting_type` base registered at init and the Audit Emitter every changed row is recorded through.
 - **Not applicable**: The administrative `POST /settings-service/v1/declarations` and its evolve-by-re-declaring are entry 2.3. Values of contributed settings are set through the value write path of entry 2.8, and a gear that must write a value does so as a service principal there, never through this contract. Verified module identity is R2: `owner_module` is caller-supplied and never an authorization input, and the trait is bound in-process only. Disposition of retained values on full gear removal is an open question in the design. Dependency Groups over contributed settings are R3.
 
 ## 2. Actor Flows (CDSL)
@@ -95,7 +95,7 @@ The key is the module's own: `gts.cf.core.settings.setting_type.v1~<vendor>.<pac
 2. [x] - `p1` - **FOR EACH** contributed declaration → invoke contributed key admission; **IF** it refuses → record the item's error and continue with the rest, since one malformed setting must not take the gear's whole set down - `inst-mc-reg-2`
 3. [x] - `p1` - **FOR EACH** admitted declaration → reuse the category whose slug is the key's category segment, or create it with that slug as both key and display name, in one transaction with the declaration it is created for - `inst-mc-reg-3`
 4. [x] - `p1` - **FOR EACH** admitted declaration → invoke reconcile one declaration, matched by its version-stripped path - `inst-mc-reg-4`
-5. [x] - `p1` - Publish `event_declaration_registered` for every inserted or upgraded declaration and `event_declaration_reactivated` for every revived one, and write one audit record per changed row through the Audit Emitter - `inst-mc-reg-5`
+5. [x] - `p1` - Publish `event_declaration_registered` for every inserted or upgraded declaration, `event_declaration_reactivated` for every revived one, and `event_declaration_updated` for every in-place metadata change, and write one audit record per **changed** row — carrying no tenant, since a declaration sits at no scope, so the write asks the Tenant Resolver for nothing; a boot that converges writes neither - `inst-mc-reg-5`
 6. [x] - `p1` - **RETURN** the `ReconcileResult` with the counts of registered, updated, retired and reactivated declarations and the per-item errors; a set that changed nothing returns all zeros and no error - `inst-mc-reg-6`
 
 ### Retire Declarations
@@ -115,7 +115,7 @@ The key is the module's own: `gts.cf.core.settings.setting_type.v1~<vendor>.<pac
 1. [x] - `p1` - Actor calls `retire_declarations` with its `owner_module` and the keys it no longer ships - `inst-mc-ret-1`
 2. [x] - `p1` - **FOR EACH** key → DB: SELECT the declaration; **IF** none, **OR** its `owner_module` differs → record the item's error and continue - `inst-mc-ret-2`
 3. [x] - `p1` - **IF** already retired → count nothing and continue - `inst-mc-ret-3`
-4. [x] - `p1` - DB: UPDATE setting_declarations SET status = 'retired' in one transaction with the audit record; retain every row in `setting_values`; do not unregister the type, so a later re-registration is a lookup rather than a re-mint - `inst-mc-ret-4`
+4. [x] - `p1` - DB: UPDATE setting_declarations SET status = 'retired' in one transaction with its audit record; retain every row in `setting_values`; do not unregister the type, so a later re-registration is a lookup rather than a re-mint - `inst-mc-ret-4`
 5. [x] - `p1` - Evict the local cache for the key at every scope and publish `event_declaration_retired` - `inst-mc-ret-5`
 6. [x] - `p1` - **RETURN** the `ReconcileResult` with the retired count and the per-item errors; a read of a retired key now resolves as the distinct retired outcome - `inst-mc-ret-6`
 
@@ -208,7 +208,7 @@ The SDK **MUST** carry a `ContributedDeclaration` that names the full setting ke
 
 - [x] `p1` - **ID**: `cpt-cf-settings-service-dod-module-contributions-operations`
 
-The system **MUST** implement `SettingsContributionClient` in process and register it into `ClientHub` at init, **MUST** make `register_declarations` idempotent so a repeated call converges the gear's set and changes nothing, **MUST** continue past a refused item and report it per item, and **MUST** publish the registered, retired and reactivated events and write one audit record per changed row.
+The system **MUST** implement `SettingsContributionClient` in process and register it into `ClientHub` at init, **MUST** make `register_declarations` idempotent so a repeated call converges the gear's set and changes nothing, **MUST** continue past a refused item and report it per item, **MUST** publish the registered, updated, retired and reactivated events, and **MUST** write one audit record per changed row — with **no tenant**, a declaration having no scope to be at, so that the reconcile resolves nothing through the Tenant Resolver and cannot be stopped by its absence while the contributing gear is still starting. It **MUST NOT** write an audit record for a contribution, and therefore **MUST NOT** resolve the root tenant on this path: a declaration is platform-wide and has no scope, so a record could only be written against a borrowed one, and borrowing it means asking the Tenant Resolver while the contributing gear is still starting.
 
 **Implements**:
 - `cpt-cf-settings-service-flow-module-contributions-register`
@@ -316,6 +316,6 @@ While the release is Embedded-only, the contribution trait **MUST** be bound in 
 - [x] The setting's type exists in the types registry before its row, a retry after a failed insert reuses it, and retiring the declaration leaves it registered
 - [x] Retiring a key the module does not own is refused per item; retiring an already retired key changes nothing
 - [x] After a retire, a read of the key resolves as the distinct retired outcome and every value row remains
-- [x] Every registration, upgrade, reactivation and retirement writes an audit record and publishes its event
+- [x] Every registration, upgrade, reactivation, retirement and in-place metadata update publishes its event and writes one audit record whose tenant is absent; a boot that changes nothing writes neither, and no path resolves the root tenant, so a contribution never depends on the Tenant Resolver being serviceable at gear start
 - [x] `PATCH` and `DELETE` on a contributed declaration return `409 ContributedDeclarationImmutable`, while a value write to it succeeds under the ordinary rules
 - [x] `SettingsContributionClient` is resolvable from `ClientHub` after init, and a configuration naming a remote binding for it fails startup

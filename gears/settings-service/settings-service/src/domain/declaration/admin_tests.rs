@@ -55,7 +55,6 @@ impl Harness {
             Arc::clone(&registrar) as Arc<dyn crate::domain::contribution::SettingTypeRegistrar>,
             step_up,
             Arc::clone(&audit),
-            Arc::clone(&base.platform),
             Arc::clone(&base.cache),
         );
         Self {

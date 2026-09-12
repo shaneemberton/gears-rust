@@ -100,6 +100,12 @@ pub struct RecordingAudit {
 }
 
 impl RecordingAudit {
+    /// A copy of every record the sink was handed, for assertions about the
+    /// record itself rather than the shape of the sequence.
+    pub fn records(&self) -> Vec<AuditRecord> {
+        self.records.lock().expect("audit lock").clone()
+    }
+
     pub fn operations(&self) -> Vec<&'static str> {
         self.records
             .lock()
@@ -396,7 +402,6 @@ pub struct ResolutionHarness {
     pub hierarchy: Arc<FakeHierarchy>,
     pub cache: Arc<EffectiveCache>,
     pub resolver: Arc<ValueResolver<DeclarationRepo, ValueRepo, AccessRepo>>,
-    pub platform: Arc<dyn PlatformScope>,
     category_id: Uuid,
 }
 
@@ -442,7 +447,6 @@ impl ResolutionHarness {
             hierarchy,
             cache,
             resolver,
-            platform,
             category_id: category.id,
         }
     }

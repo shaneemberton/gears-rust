@@ -138,6 +138,22 @@ pub enum ValueEvent {
         /// Who retired it.
         actor: String,
     },
+    /// `event_declaration_updated`: a contributed declaration's descriptive
+    /// metadata changed in place on its owner's reconcile.
+    ///
+    /// The reconcile is the **only** path that can change these fields on a
+    /// contributed declaration — the administrative edit refuses one outright
+    /// (`409 ContributedDeclarationImmutable`) — and it runs unattended on
+    /// every boot of the owning gear. Without this event the change would be
+    /// observable nowhere: the contribution path writes no audit record
+    /// (§4.2 *Module Contribution Reconciler*), so the event is the whole of
+    /// the trail.
+    DeclarationUpdated {
+        /// The setting key.
+        key: String,
+        /// The module whose reconcile changed it.
+        actor: String,
+    },
     /// `event_declaration_reactivated`: a retired declaration is live again.
     DeclarationReactivated {
         /// The setting key.

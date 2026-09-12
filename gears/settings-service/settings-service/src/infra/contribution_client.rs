@@ -16,12 +16,13 @@ use settings_service_sdk::models::{ContributedDeclaration, ContributionError, Re
 use toolkit_canonical_errors::CanonicalError;
 use toolkit_db::{DBProvider, DbError};
 use toolkit_security::SecurityContext;
-use uuid::Uuid;
 
-use crate::audit::AuditSink;
 use crate::domain::category::CategoryRepository;
 use crate::domain::contribution::{ContributionService, ItemError, Outcome};
 use crate::domain::declaration::DeclarationRepository;
+use uuid::Uuid;
+
+use crate::audit::AuditSink;
 use crate::domain::error::DomainError;
 use crate::domain::ports::{ChangePublisher, ValueEvent};
 use crate::domain::resolution::EffectiveCache;
@@ -128,9 +129,13 @@ where
             }
             // @cpt-end:cpt-cf-settings-service-algo-module-contributions-upgrade:p1:inst-mc-up-5
             // @cpt-begin:cpt-cf-settings-service-flow-module-contributions-register:p1:inst-mc-reg-5
-            // The declaration events, published once the reconcile is durable:
-            // a consumer learns a setting appeared, moved to a new major, or
-            // came back, and the audit records were written inside.
+            // The declaration events, published once the reconcile is
+            // durable: a consumer learns a setting appeared, moved to a new
+            // major, came back, or had its metadata rewritten. No audit record
+            // is written on this path — a declaration has no scope to write one
+            // against — so these events are the whole of the trail, and the
+            // metadata one matters most: it is the only way a contributed
+            // declaration's gates can change at all.
             match &outcome {
                 Ok(Ok(Outcome::Registered)) => {
                     self.publish_registered(key.as_str(), &owner_module).await;
@@ -147,6 +152,14 @@ where
                 Ok(Ok(Outcome::Reactivated)) => {
                     self.publisher
                         .publish(ValueEvent::DeclarationReactivated {
+                            key: key.to_string(),
+                            actor: owner_module.clone(),
+                        })
+                        .await;
+                }
+                Ok(Ok(Outcome::Updated)) => {
+                    self.publisher
+                        .publish(ValueEvent::DeclarationUpdated {
                             key: key.to_string(),
                             actor: owner_module.clone(),
                         })
@@ -180,6 +193,7 @@ where
         owner_module: String,
         keys: Vec<SettingKey>,
     ) -> Result<ReconcileResult, CanonicalError> {
+        // One id correlates every record this retire writes.
         let request_id = Uuid::new_v4().to_string();
         let mut result = ReconcileResult::default();
         for key in keys {

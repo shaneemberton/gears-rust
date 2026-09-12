@@ -20,7 +20,6 @@ use crate::domain::declaration::{
     Declaration, DeclarationDraft, DeclarationMetadata, DeclarationRepository,
 };
 use crate::domain::error::DomainError;
-use crate::domain::platform_scope::PlatformScope;
 use crate::domain::validation::TypeValidator;
 use crate::domain::value::{ValueDraft, ValueRepository};
 
@@ -79,7 +78,6 @@ pub struct ContributionService<D, Cat, V, S> {
     validator: Arc<dyn TypeValidator>,
     registrar: Arc<dyn SettingTypeRegistrar>,
     sink: S,
-    scope: Arc<dyn PlatformScope>,
 }
 
 /// What the key admitted: the parts of the contributed key the reconcile
@@ -206,7 +204,6 @@ where
         validator: Arc<dyn TypeValidator>,
         registrar: Arc<dyn SettingTypeRegistrar>,
         sink: S,
-        scope: Arc<dyn PlatformScope>,
     ) -> Self {
         Self {
             declarations,
@@ -215,7 +212,6 @@ where
             validator,
             registrar,
             sink,
-            scope,
         }
     }
 
@@ -845,8 +841,20 @@ where
             })
     }
 
-    /// One audit record per changed row, at platform scope, with the module as
-    /// the actor.
+    /// One audit record per changed row, with the module as the actor.
+    ///
+    /// **The record carries no tenant, and the path therefore resolves none.**
+    /// A declaration is a platform-wide definition and sits at no scope, so
+    /// there is no tenant whose history it belongs to (§4.7). It used to borrow
+    /// the root tenant to fill a column that was `NOT NULL`, and learning the
+    /// root tenant means asking the Tenant Resolver — from inside this
+    /// transaction, which `toolkit-db` refuses outright. That is what stopped
+    /// hosts from booting, and it was paid for a value no reader matches on.
+    ///
+    /// Written only where a row actually changed. A boot that reconciles the
+    /// same set converges to `Outcome::Unchanged` above every call site here
+    /// and records nothing, so the trail carries installs and upgrades rather
+    /// than one entry per restart.
     #[allow(clippy::too_many_arguments)]
     async fn record<C: DBRunner>(
         &self,
@@ -858,17 +866,17 @@ where
         pre: Option<Value>,
         post: Option<Value>,
     ) -> Result<(), DomainError> {
-        let tenant = self.scope.root_tenant().await?;
         let mut rec =
-            AuditRecord::new(key.as_str(), tenant, owner_module, operation, request_id).by_module();
+            AuditRecord::new(key.as_str(), None, owner_module, operation, request_id).by_module();
         if let Some(pre) = pre {
             rec = rec.with_pre_image(AuditValue::record(pre, false));
         }
         if let Some(post) = post {
             rec = rec.with_post_image(AuditValue::record(post, false));
         }
-        // Declarations have no tenant of their own; the record is written on
-        // the same unscoped path as the row it audits, inside its transaction.
+        // Written on the same unscoped path as the row it audits, inside its
+        // transaction: a scopeless row cannot satisfy a tenant predicate, so a
+        // constrained scope here would fail the insert closed.
         self.sink.append(conn, &AccessScope::allow_all(), rec).await
     }
 }

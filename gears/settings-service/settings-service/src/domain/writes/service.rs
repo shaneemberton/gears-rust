@@ -666,7 +666,7 @@ where
         // a sink that cannot write rolls the change back with it.
         let mut record = AuditRecord::new(
             declaration.key.as_str(),
-            gated.tenant_id,
+            Some(gated.tenant_id),
             actor.subject(),
             operation,
             actor.request_id.clone(),

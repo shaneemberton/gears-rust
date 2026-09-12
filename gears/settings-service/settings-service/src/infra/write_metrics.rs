@@ -85,6 +85,12 @@ impl ChangePublisher for LoggingPublisher {
                 %actor,
                 "declaration registered"
             ),
+            ValueEvent::DeclarationUpdated { key, actor } => info!(
+                event = "event_declaration_updated",
+                %key,
+                %actor,
+                "contributed declaration metadata rewritten by its owner"
+            ),
             ValueEvent::DeclarationRetired { key, actor } => info!(
                 event = "event_declaration_retired",
                 %key,

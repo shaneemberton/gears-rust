@@ -25,7 +25,9 @@ use crate::domain::declaration::{Declaration, DeclarationRepository};
 use crate::domain::error::DomainError;
 use crate::domain::ports::{ChangePublisher, SecretManager, ValueEvent, WriteMetrics};
 use crate::domain::resolution::{EffectiveValue, ScopeTarget, ValueResolver, scope_class};
-use crate::domain::stepup::{INTERACTIVE_SUBJECT_TYPES, StepUpSubject, StepUpVerifier};
+use crate::domain::stepup::{
+    INTERACTIVE_SUBJECT_TYPES, StepUpSubject, StepUpVerifier, unverified_payload,
+};
 use crate::domain::validation::{FieldViolation, TypeValidator};
 use crate::domain::value::{ValueDraft, ValueRepository};
 
@@ -74,13 +76,10 @@ impl WriteActor {
 /// bind a step-up token to the session it must confirm; the session token
 /// itself was verified by authentication.
 fn session_sub(bearer: &str) -> Option<String> {
-    use base64::Engine;
-    let payload = bearer.split('.').nth(1)?;
-    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(payload)
-        .ok()?;
-    let claims: Value = serde_json::from_slice(&bytes).ok()?;
-    claims.get("sub")?.as_str().map(str::to_owned)
+    unverified_payload(bearer)?
+        .get("sub")?
+        .as_str()
+        .map(str::to_owned)
 }
 
 /// What a change does to the scope's own row.

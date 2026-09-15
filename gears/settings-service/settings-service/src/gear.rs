@@ -400,16 +400,16 @@ impl Gear for SettingsService {
             )))
             .map_err(|_| anyhow::anyhow!("{} gear already initialized", Self::MODULE_NAME))?;
 
-        // The write path: the step-up verifier from configuration — the OIDC/JWKS
-        // binding when a section is present, otherwise the binding that refuses
-        // every write needing step-up while reads keep serving — over the same
-        // resolver, audit store, and the ports whose real bindings come later.
-        let step_up: Arc<dyn crate::domain::stepup::StepUpVerifier> = match &config.step_up {
-            Some(section) => Arc::new(crate::infra::step_up::OidcStepUpVerifier::from_config(
-                section,
-            )?),
-            None => Arc::new(crate::domain::stepup::NoStepUpVerifier::default()),
-        };
+        // The write path: the step-up verifier over the platform's AuthN
+        // resolver, fetched from the hub at first use — never here, and the
+        // resolver is not in `deps` (DESIGN.md §4.9). Always bound: an absent
+        // `step_up` section is the default policy, not the absence of a
+        // verifier. Init refuses a window above five minutes.
+        let step_up: Arc<dyn crate::domain::stepup::StepUpVerifier> =
+            Arc::new(crate::infra::step_up::AuthnStepUpVerifier::from_config(
+                ctx.client_hub(),
+                &config.step_up,
+            )?);
         // The Secret Manager over the Credential Store: `credstore` is a system
         // gear, so its client is in the hub before this init runs.
         let credstore = ctx

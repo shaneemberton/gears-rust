@@ -12,7 +12,7 @@ use super::{CreateDeclaration, DeclarationAdmin, FieldClass, classify_field, eta
 use crate::audit::AuditOperation;
 use crate::domain::declaration::{Declaration, DeclarationRepository};
 use crate::domain::error::DomainError;
-use crate::domain::stepup::{NoStepUpVerifier, StepUpRefusal, StepUpVerifier, USER_SUBJECT_TYPE};
+use crate::domain::stepup::{StepUpRefusal, StepUpVerifier, USER_SUBJECT_TYPE};
 use crate::domain::value::ValueRepository;
 use crate::domain::writes::WriteActor;
 use crate::infra::storage::category_repo::CategoryRepo;
@@ -35,7 +35,10 @@ struct Harness {
 
 impl Harness {
     async fn new() -> Self {
-        Self::with_step_up(Arc::new(NoStepUpVerifier::default())).await
+        Self::with_step_up(Arc::new(FixedStepUp::refusing(
+            StepUpRefusal::NotConfigured,
+        )))
+        .await
     }
 
     /// A harness whose step-up verifier accepts whatever the caller presents.

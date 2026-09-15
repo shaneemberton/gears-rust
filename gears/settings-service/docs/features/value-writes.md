@@ -48,7 +48,7 @@
 
 ### 1.1 Overview
 
-Delivers the write path: a read-only check of what a value would do, and set, batch, revert, clone and remove operations that validate inline, refuse a stale write, take effect when the caller sets them, and commit each change together with its audit record. It is where the `StepUpVerifier` port acquires its default OIDC/JWKS binding.
+Delivers the write path: a read-only check of what a value would do, and set, batch, revert, clone and remove operations that validate inline, refuse a stale write, take effect when the caller sets them, and commit each change together with its audit record. It is where the `StepUpVerifier` port acquires its default binding over the platform's AuthN resolver.
 
 ### 1.2 Purpose
 
@@ -58,7 +58,7 @@ Two gates are kept apart deliberately. Authorization asks *may this caller write
 
 The commit is per change, in one transaction with its audit record — a value live with no record of who set it is exactly the window that would open if the two were committed apart — and the order after the commit is fixed: commit, then evict the local cache, then publish. No consumer can observe an invalidation for a value that is not yet stored.
 
-Step-up is verified locally. The token the caller presents is checked against the identity provider's published JWKS, its subject against the session, its authentication time against a freshness window, and its assurance claims against what the deployment requires. The provider is never called on the write path, so its availability is not a per-write failure mode. The verifier is a port this gear declares and binds; a binding that cannot fail is not a binding, and the only sanctioned non-verifying one lives in the test harness.
+Step-up is verified through the platform. The token the caller presents is authenticated by the AuthN resolver — the same validation every session token gets, over the platform's own trust store — and then its subject is checked against the session, its authentication time against a freshness window, and its assurance claims against what the deployment requires. The gear never calls the identity provider on the write path and names no key set of its own, so the provider's availability is not a per-write failure mode. The verifier is a port this gear declares and binds; a binding that cannot fail is not a binding, and the only sanctioned non-verifying one lives in the test harness.
 
 **Requirements**: `cpt-cf-settings-service-fr-set-value`, `cpt-cf-settings-service-fr-validate-before-set`, `cpt-cf-settings-service-fr-live-read-activation`, `cpt-cf-settings-service-fr-tenant-overrides`, `cpt-cf-settings-service-nfr-reliability-validated-set`, `cpt-cf-settings-service-nfr-ops-set-monitoring`
 
@@ -71,7 +71,7 @@ Step-up is verified locally. The token the caller presents is checked against th
 | `cpt-cf-settings-service-actor-platform-admin` | Sets, reverts, clones and removes values at platform scope and at any tenant, re-authenticating where the declaration requires it |
 | `cpt-cf-settings-service-actor-tenant-admin` | Does the same within its own subtree, when its own effective access is `overridable` |
 | `cpt-cf-settings-service-actor-service-writer` | Writes without step-up where the declaration permits a machine writer, and is refused before validation where it does not; the SDK path for it is R2 |
-| `cpt-cf-settings-service-actor-authn-resolver` | Issues the session and step-up tokens; the step-up token is verified locally against the provider's JWKS, never by calling the resolver on the write path |
+| `cpt-cf-settings-service-actor-authn-resolver` | Issues the session and step-up tokens; the step-up token is handed to the resolver's `authenticate` on the write path, exactly as a session token is; the identity provider itself is never called by this gear |
 | `cpt-cf-settings-service-actor-authz-resolver` | Decides `write` on the setting's key, and `read` at the source scope of a clone |
 | `cpt-cf-settings-service-actor-tenant-resolver` | Answers whether the target lies within the caller's subtree, and supplies the descendants the impact report walks |
 
@@ -274,7 +274,7 @@ Throughout, `tenant` omitted means the caller's own tenant, which for a platform
 
 **Steps**:
 1. [x] - `p1` - **IF** no token is presented → **RETURN** not verified - `inst-vw-su-1`
-2. [x] - `p1` - Verify the token's signature against the identity provider's published JWKS, fetched and cached in the background; **IF** it does not verify → **RETURN** not verified - `inst-vw-su-2`
+2. [x] - `p1` - Have the platform's AuthN resolver authenticate the token — the client fetched from `ClientHub` at first use, never at init — and read the claims of the token it vouched for; **IF** the resolver cannot be reached or does not authenticate the token → **RETURN** not verified - `inst-vw-su-2`
 3. [x] - `p1` - **IF** the token's `sub` is not the current session's subject → **RETURN** not verified; one person's ceremony does not confirm another's write - `inst-vw-su-3`
 4. [x] - `p1` - **IF** `auth_time` is absent, or older than the freshness window — deployment-configured and never longer than five minutes → **RETURN** not verified; this is the claim that separates a re-authenticated token from the morning's session - `inst-vw-su-4`
 5. [x] - `p1` - **IF** the deployment requires an assurance level or method **AND** `acr` or `amr` does not meet it → **RETURN** not verified - `inst-vw-su-5`
@@ -379,7 +379,7 @@ Authorization **MUST** be decided before step-up is consulted, and an unauthoriz
 
 - [x] `p1` - **ID**: `cpt-cf-settings-service-dod-value-writes-step-up-verifier`
 
-The system **MUST** verify step-up through the gear's `StepUpVerifier` port, whose default binding checks the presented token locally — signature against the identity provider's JWKS, `sub` against the session, `auth_time` within the configured freshness window of at most five minutes, and `acr`/`amr` against the required assurance — without calling the provider on the write path. The JWKS endpoint and the freshness window **MUST** be deployment configuration loaded at gear init. No binding that cannot fail **MUST** be reachable outside the test harness, and with no binding bound every write to a declaration that requires step-up **MUST** refuse while reads keep serving.
+The system **MUST** verify step-up through the gear's `StepUpVerifier` port, whose default binding has the platform's AuthN resolver authenticate the presented token and then checks `sub` against the session, `auth_time` within the configured freshness window of at most five minutes, and `acr`/`amr` against the required assurance — without calling the identity provider itself and without a key-set address of its own. The freshness window and the optional issuer and audience pins **MUST** be deployment configuration loaded at gear init, every one of them defaulted so the section may be omitted. The verifier **MUST** be bound whether or not the section is present, and no binding that cannot fail **MUST** be reachable outside the test harness.
 
 **Implements**:
 - `cpt-cf-settings-service-algo-value-writes-step-up`
@@ -495,7 +495,7 @@ Every committed change **MUST** publish `event_value_changed` and every rejected
 - [x] `validate` reports the current effective value and its source, and for a `cascading` setting a paged list of affected descendants
 - [x] An unauthorized caller holding a valid step-up token is refused `403` without the token being verified
 - [x] An authorized caller without step-up on a declaration that requires it receives `401` with `WWW-Authenticate: Bearer error="insufficient_user_authentication"` and `max_age`, and nothing is stored
-- [x] A token whose `auth_time` is older than the freshness window, whose `sub` is another subject, or whose signature does not verify against the JWKS is refused; a fresh token is accepted, and the provider is not called
+- [x] A token whose `auth_time` is older than the freshness window, whose `sub` is another subject, or that the AuthN resolver does not authenticate is refused; a fresh token is accepted, and the identity provider is not called by this gear
 - [x] A service principal writing a declaration with `requires_step_up = true` is refused `403` before validation; on a declaration with the flag clear the value is committed with its audit record and no step-up is asked for
 - [x] A write to a `global` setting at a tenant scope is refused, at the root tenant it succeeds
 - [x] A `read_only` tenant's write is refused, an `overridable` ancestor's write at that tenant succeeds and the value is stored at the descendant

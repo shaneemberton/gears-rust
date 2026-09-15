@@ -192,9 +192,10 @@ and revive always need step-up, and a gear's contributed declarations answer
   plugin, which keeps entries in memory only. After a server restart a secret
   setting still shows its masked row, but the credential behind it is gone
   and the machine path answers `SecretNotConfigured` until it is set again.
-- Step-up needs an identity provider configured under `step_up` in the gear's
-  config; the sandbox has none, so any declaration with `requires_step_up`
-  answers 401 on write. The demo declarations opt out, except `api_token` and
+- Step-up hands the presented token to the platform's AuthN resolver and then
+  reads `auth_time` from it; the sandbox's static tokens are not JWTs and carry
+  no such claim, so any declaration with `requires_step_up` answers 401
+  (`auth_time_missing`) on write. The demo declarations opt out, except `api_token` and
   `turbo_mode` — the latter an ordinary boolean, so the gate can be exercised
   without the credential store in the way.
 - CORS is off on the example server. Serve the frontend from the same origin

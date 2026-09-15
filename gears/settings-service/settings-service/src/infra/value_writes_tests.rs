@@ -28,7 +28,7 @@ use crate::domain::resolution::{ScopeTarget, scope_class};
 use crate::domain::secrets::pending::{
     PENDING_SECRET_TTL, PendingSecret, PendingSecretDraft, PendingSecretRepository,
 };
-use crate::domain::stepup::{NoStepUpVerifier, StepUpRefusal, StepUpVerifier, USER_SUBJECT_TYPE};
+use crate::domain::stepup::{StepUpRefusal, StepUpVerifier, USER_SUBJECT_TYPE};
 use crate::domain::value::ValueRepository;
 use crate::domain::writes::{Change, ValueWriter, WriteActor};
 use crate::field;
@@ -50,7 +50,10 @@ struct Harness {
 
 impl Harness {
     async fn new() -> Self {
-        Self::with_step_up(Arc::new(NoStepUpVerifier::default())).await
+        Self::with_step_up(Arc::new(FixedStepUp::refusing(
+            StepUpRefusal::NotConfigured,
+        )))
+        .await
     }
 
     async fn with_step_up(step_up: Arc<dyn StepUpVerifier>) -> Self {

@@ -14,7 +14,7 @@ use crate::domain::access::{AccessRepository, RestrictionDraft, TenantAccess};
 use crate::domain::error::DomainError;
 use crate::domain::ports::{NoMetrics, NoSecretManager, SecretManager, ValueEvent};
 use crate::domain::resolution::{ScopeTarget, scope_class};
-use crate::domain::stepup::{NoStepUpVerifier, StepUpRefusal, StepUpVerifier, USER_SUBJECT_TYPE};
+use crate::domain::stepup::{StepUpRefusal, StepUpVerifier, USER_SUBJECT_TYPE};
 use crate::domain::value::ValueRepository;
 use crate::infra::storage::access_repo::AccessRepo;
 use crate::infra::storage::declaration_repo::DeclarationRepo;
@@ -36,7 +36,10 @@ struct WriteHarness {
 
 impl WriteHarness {
     async fn new() -> Self {
-        Self::with_step_up(Arc::new(NoStepUpVerifier::default())).await
+        Self::with_step_up(Arc::new(FixedStepUp::refusing(
+            StepUpRefusal::NotConfigured,
+        )))
+        .await
     }
 
     async fn with_step_up(step_up: Arc<dyn StepUpVerifier>) -> Self {
@@ -48,7 +51,7 @@ impl WriteHarness {
     async fn with_secrets() -> (Self, Arc<RecordingSecrets>) {
         let secrets = Arc::new(RecordingSecrets::default());
         let harness = Self::build(
-            Arc::new(NoStepUpVerifier::default()),
+            Arc::new(FixedStepUp::refusing(StepUpRefusal::NotConfigured)),
             Arc::clone(&secrets) as Arc<dyn SecretManager>,
         )
         .await;

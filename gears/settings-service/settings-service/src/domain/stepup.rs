@@ -3,9 +3,11 @@
 //!
 //! Setting a value on a declaration that requires elevated confirmation needs
 //! proof that a person re-authenticated at the identity provider just now.
-//! The domain states that rule here and nothing more: the OIDC/JWKS claims
-//! check is one binding, a platform-wide elevated session will be another,
-//! and a binding that cannot fail is not a binding at all.
+//! The domain states that rule here and nothing more: how the token's
+//! signature is checked is the binding's business — in this gear the
+//! platform's own `AuthN` resolver validates it exactly as it validates every
+//! session token, and the freshness claims are read from the token it vouched
+//! for. A binding that cannot fail is not a binding at all.
 
 use std::time::Duration;
 
@@ -60,10 +62,11 @@ impl StepUpRequirement {
 pub enum StepUpRefusal {
     /// No token was presented.
     Missing,
-    /// No verifier is bound: every write that needs step-up refuses.
+    /// The platform's `AuthN` resolver could not be reached from the hub, so no
+    /// token can be verified: every write that needs step-up refuses.
     NotConfigured,
-    /// The signature did not verify against the provider's keys, or the token
-    /// is malformed.
+    /// The `AuthN` resolver did not authenticate the token: signature, expiry,
+    /// issuer, or a token that is not one at all.
     Signature(String),
     /// The token's `sub` is not the session's subject.
     SubjectMismatch,
@@ -73,7 +76,7 @@ pub enum StepUpRefusal {
     Stale,
     /// `acr` or `amr` does not meet the required assurance.
     Assurance,
-    /// A standard claim failed: expired, wrong issuer or audience.
+    /// A claim the deployment pinned — issuer or audience — is not carried.
     Claims(String),
 }
 
@@ -108,7 +111,8 @@ pub struct StepUpSubject {
 #[async_trait]
 pub trait StepUpVerifier: Send + Sync {
     /// Whether `token` proves that `subject` re-authenticated within the
-    /// requirement's window. The provider is never called on this path.
+    /// requirement's window. The gear never calls the identity provider on
+    /// this path.
     async fn verify(
         &self,
         token: Option<&str>,
@@ -119,35 +123,19 @@ pub trait StepUpVerifier: Send + Sync {
     fn requirement(&self) -> &StepUpRequirement;
 }
 
-/// The binding when nothing is configured: refuses every write that needs
-/// step-up while reads keep serving. Deliberately not a bypass.
-pub struct NoStepUpVerifier {
-    requirement: StepUpRequirement,
-}
-
-impl Default for NoStepUpVerifier {
-    fn default() -> Self {
-        Self {
-            requirement: StepUpRequirement {
-                max_age: StepUpRequirement::MAX_AGE_CEILING,
-                acr_values: Vec::new(),
-                amr_values: Vec::new(),
-            },
-        }
-    }
-}
-
-#[async_trait]
-impl StepUpVerifier for NoStepUpVerifier {
-    async fn verify(
-        &self,
-        _token: Option<&str>,
-        _subject: &StepUpSubject,
-    ) -> Result<(), StepUpRefusal> {
-        Err(StepUpRefusal::NotConfigured)
-    }
-
-    fn requirement(&self) -> &StepUpRequirement {
-        &self.requirement
-    }
+/// The JSON payload of a compact JWT, decoded **without** verifying it.
+///
+/// Safe in exactly two uses, and no third: reading claims from a token whose
+/// signature the `AuthN` resolver verified a moment earlier over these same
+/// bytes, and binding a step-up token to the session by the `sub` that the
+/// session's own — already authenticated — token carried. Anything else is
+/// trusting input. `None` when the token is not a compact JWT at all.
+#[must_use]
+pub fn unverified_payload(token: &str) -> Option<serde_json::Value> {
+    use base64::Engine as _;
+    let payload = token.split('.').nth(1)?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
+    serde_json::from_slice(&bytes).ok()
 }

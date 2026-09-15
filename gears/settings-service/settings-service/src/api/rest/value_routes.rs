@@ -249,8 +249,8 @@ pub fn register_routes(
              requires it; each change then commits on its own, with no atomicity across \
              changes, and the answer carries one entry per change - committed with its new \
              tag, or rejected with one of a fixed vocabulary of codes: `invalid`, \
-             `if_match_required`, `stale`, `conflict`, `forbidden`, `step_up_required`, \
-             `retired`, `not_found`, `unavailable`, `error`. `if_match` is required in \
+             `if_match_required`, `stale`, `conflict`, `forbidden`, `retired`, \
+             `not_found`, `unavailable`, `error`. `if_match` is required in \
              effect - a change without one is rejected `if_match_required` on its own while \
              the rest proceed; a first write sends the literal `absent`. `retired` covers a \
              declaration retired after the change was assembled, since the check runs again \

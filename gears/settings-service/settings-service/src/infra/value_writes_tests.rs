@@ -434,6 +434,85 @@ async fn a_batch_verifies_step_up_once_and_a_refusal_stores_nothing() {
     assert!(refusing.rows(two).await.is_empty());
 }
 
+/// A caller labelled as the test says — or not labelled at all.
+fn actor_labelled(tenant: Uuid, subject_type: Option<&str>) -> WriteActor {
+    let mut ctx = SecurityContext::builder()
+        .subject_id(Uuid::new_v4())
+        .subject_tenant_id(tenant);
+    if let Some(label) = subject_type {
+        ctx = ctx.subject_type(label);
+    }
+    WriteActor {
+        ctx: ctx.build().expect("context"),
+        request_id: "req".to_owned(),
+        step_up_token: Some("token".to_owned()),
+    }
+}
+
+#[tokio::test]
+async fn a_batch_recognises_a_person_labelled_user_and_refuses_the_unlabelled() {
+    // The batch decides interactivity once for the request, at its own call
+    // site: Keycloak's bare `user` is a person and reaches the verifier; no
+    // label is a service principal and is denied before it.
+    let h = Harness::with_step_up(Arc::new(FixedStepUp::refusing(StepUpRefusal::Missing))).await;
+    h.base
+        .declare_typed(
+            "guarded",
+            scope_class::CASCADING,
+            json!(false),
+            BOOL,
+            "public",
+        )
+        .await;
+    let root = h.base.tree.root;
+    let changes = one_change(h.base.key("guarded"), None, json!(true));
+    let refused = h
+        .coordinator
+        .batch(&actor_labelled(root, Some("user")), changes.clone())
+        .await;
+    assert!(
+        matches!(
+            refused,
+            Err(DomainError::StepUpRequired {
+                reason: "missing",
+                ..
+            })
+        ),
+        "{refused:?}"
+    );
+    let denied = h
+        .coordinator
+        .batch(&actor_labelled(root, None), changes)
+        .await;
+    assert!(
+        matches!(denied, Err(DomainError::Unauthorized { .. })),
+        "{denied:?}"
+    );
+
+    // With a verifier that accepts, the `user`-labelled caller's batch commits.
+    let ok = Harness::with_step_up(Arc::new(FixedStepUp::verified())).await;
+    let d = ok
+        .base
+        .declare_typed(
+            "guarded",
+            scope_class::CASCADING,
+            json!(false),
+            BOOL,
+            "public",
+        )
+        .await;
+    let outcome = ok
+        .coordinator
+        .batch(
+            &actor_labelled(ok.base.tree.root, Some("user")),
+            one_change(ok.base.key("guarded"), None, json!(true)),
+        )
+        .await
+        .expect("the batch runs");
+    assert!(outcome.results[0].is_ok(), "{:?}", outcome.results[0]);
+    assert_eq!(ok.rows(d).await.len(), 1);
+}
+
 #[tokio::test]
 async fn a_batch_of_more_than_the_limit_is_refused_before_anything_is_written() {
     let h = Harness::new().await;

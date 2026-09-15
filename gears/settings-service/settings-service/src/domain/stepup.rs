@@ -12,11 +12,29 @@ use std::time::Duration;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-/// The subject type of an interactive human session, as the platform's
-/// authentication resolver labels it. Every other subject type — and an
-/// unlabelled one — is a service principal for the purposes of step-up: no
-/// ceremony a machine performs proves that a person is present.
+/// The subject type of an interactive human session, as the authorization
+/// design states it (a GTS type identifier). Every subject type outside
+/// [`INTERACTIVE_SUBJECT_TYPES`] — and an unlabelled one — is a service
+/// principal for the purposes of step-up: no ceremony a machine performs
+/// proves that a person is present.
 pub const USER_SUBJECT_TYPE: &str = "gts.cf.core.security.subject_user.v1~";
+
+/// Subject types that denote an interactive human session.
+///
+/// The platform has not settled on one vocabulary for this field. The
+/// authorization design states a GTS type id, and `oidc-authn-plugin`'s s2s
+/// branch defaults to [`USER_SUBJECT_TYPE`] accordingly — but the Keycloak
+/// identity-provider plugin writes the bare word `user` into the `user_type`
+/// attribute when it
+/// provisions a person, and that attribute is what a deployed realm maps into
+/// the claim. A machine is unambiguous either way
+/// (`gts.cf.core.security.subject_service.v1~`), so accepting both widens
+/// nothing: it recognises the human case deployments actually produce.
+///
+/// Both arms stay listed until the platform normalises the field. Dropping
+/// either one silently refuses every interactive write on the stands that use
+/// it, with a `403` that names a service principal and explains nothing.
+pub const INTERACTIVE_SUBJECT_TYPES: &[&str] = &[USER_SUBJECT_TYPE, "user"];
 
 /// What a deployment requires of a step-up token.
 #[derive(Debug, Clone, PartialEq, Eq)]

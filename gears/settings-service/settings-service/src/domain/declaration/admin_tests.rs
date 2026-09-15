@@ -738,6 +738,46 @@ async fn a_revive_needs_step_up_and_a_service_principal_never_gets_it() {
 }
 
 #[tokio::test]
+async fn a_person_labelled_user_reaches_the_step_up_gate_of_a_declaration_action() {
+    // The declaration path has its own step-up gate; it must read the label
+    // the same way the value path does.
+    let refusing =
+        Harness::with_step_up(Arc::new(FixedStepUp::refusing(StepUpRefusal::Missing))).await;
+    let created = refusing
+        .create(refusing.request("retry_policy"), &admin_actor())
+        .await
+        .expect("created");
+    let tag = etag_of(&created.declaration);
+    let labelled = |subject_type: Option<&str>| {
+        let mut ctx = SecurityContext::builder()
+            .subject_id(Uuid::new_v4())
+            .subject_tenant_id(Uuid::new_v4());
+        if let Some(label) = subject_type {
+            ctx = ctx.subject_type(label);
+        }
+        WriteActor {
+            ctx: ctx.build().expect("context"),
+            request_id: "req".to_owned(),
+            step_up_token: Some("token".to_owned()),
+        }
+    };
+    let err = refusing
+        .retire(
+            created.declaration.id,
+            Some(tag.as_str()),
+            &labelled(Some("user")),
+        )
+        .await
+        .expect_err("challenged, not denied");
+    assert!(matches!(err, DomainError::StepUpRequired { .. }), "{err:?}");
+    let err = refusing
+        .retire(created.declaration.id, Some(tag.as_str()), &labelled(None))
+        .await
+        .expect_err("denied");
+    assert!(matches!(err, DomainError::Unauthorized { .. }), "{err:?}");
+}
+
+#[tokio::test]
 async fn retiring_evicts_the_key_so_a_cached_read_cannot_keep_serving_it() {
     let h = Harness::verified().await;
     let created = h

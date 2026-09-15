@@ -25,7 +25,7 @@ use crate::domain::declaration::{Declaration, DeclarationRepository};
 use crate::domain::error::DomainError;
 use crate::domain::ports::{ChangePublisher, SecretManager, ValueEvent, WriteMetrics};
 use crate::domain::resolution::{EffectiveValue, ScopeTarget, ValueResolver, scope_class};
-use crate::domain::stepup::{StepUpSubject, StepUpVerifier, USER_SUBJECT_TYPE};
+use crate::domain::stepup::{INTERACTIVE_SUBJECT_TYPES, StepUpSubject, StepUpVerifier};
 use crate::domain::validation::{FieldViolation, TypeValidator};
 use crate::domain::value::{ValueDraft, ValueRepository};
 
@@ -48,9 +48,13 @@ impl WriteActor {
     }
 
     /// Whether the caller is a human session rather than a service principal.
+    /// An unlabelled subject is not: absence of a label is no evidence of a
+    /// person.
     #[must_use]
     pub fn is_interactive(&self) -> bool {
-        self.ctx.subject_type() == Some(USER_SUBJECT_TYPE)
+        self.ctx
+            .subject_type()
+            .is_some_and(|t| INTERACTIVE_SUBJECT_TYPES.contains(&t))
     }
 
     /// Who a step-up assertion must be bound to.

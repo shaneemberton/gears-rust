@@ -35,6 +35,9 @@ struct MemoryCredStore {
     /// The token scopes each presented context carried, in call order. The
     /// store is a stand-in for one that enforces them before RBAC is asked.
     presented_scopes: Mutex<Vec<Vec<String>>>,
+    /// The subject type each presented context carried, in call order: what
+    /// decides which principal type the grant is looked up for.
+    presented_subject_types: Mutex<Vec<Option<String>>>,
     down: std::sync::atomic::AtomicBool,
 }
 
@@ -44,6 +47,10 @@ impl MemoryCredStore {
             .lock()
             .expect("lock")
             .push(ctx.token_scopes().to_vec());
+        self.presented_subject_types
+            .lock()
+            .expect("lock")
+            .push(ctx.subject_type().map(ToOwned::to_owned));
         Slot {
             tenant: ctx.subject_tenant_id(),
             owner: ctx.subject_id(),
@@ -55,6 +62,11 @@ impl MemoryCredStore {
     /// The token scopes every call so far presented.
     fn presented_scopes(&self) -> Vec<Vec<String>> {
         self.presented_scopes.lock().expect("lock").clone()
+    }
+
+    /// The subject type every call so far presented.
+    fn presented_subject_types(&self) -> Vec<Option<String>> {
+        self.presented_subject_types.lock().expect("lock").clone()
     }
 
     fn check(&self) -> Result<(), CredStoreError> {
@@ -196,6 +208,18 @@ async fn a_secret_is_stored_private_to_the_gear_principal_in_the_target_tenant()
             .all(|scopes| scopes == &["*".to_owned()]),
         "{:?}",
         store.presented_scopes()
+    );
+    // And every call named the principal a machine. Omitting the tag passes the
+    // scope check and is then denied at the policy decision point, because an
+    // unlabelled subject is evaluated as a person and this gear's grant is a
+    // service principal's.
+    assert!(
+        store
+            .presented_subject_types()
+            .iter()
+            .all(|t| t.as_deref() == Some("gts.cf.core.security.subject_service.v1~")),
+        "{:?}",
+        store.presented_subject_types()
     );
 
     let plaintext = manager
@@ -365,7 +389,10 @@ fn the_store_context_names_the_gear_principal_the_value_s_tenant_and_the_first_p
     assert_eq!(ctx.subject_id(), manager.principal());
     assert_eq!(ctx.subject_tenant_id(), tenant);
     assert_eq!(ctx.token_scopes(), ["*".to_owned()]);
-    // No subject type: this principal is no user, and nothing downstream reads
-    // one here.
-    assert_eq!(ctx.subject_type(), None);
+    // Named, not omitted: an omitted type is read as a person, and the grant
+    // this gear holds is a service principal's.
+    assert_eq!(
+        ctx.subject_type(),
+        Some("gts.cf.core.security.subject_service.v1~")
+    );
 }

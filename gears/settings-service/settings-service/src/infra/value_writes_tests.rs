@@ -260,7 +260,8 @@ fn one_change(
     vec![BatchChange {
         key,
         tenant,
-        value,
+        op: None,
+        value: Some(value),
         if_match: Some("absent".to_owned()),
     }]
 }
@@ -379,13 +380,15 @@ async fn a_batch_verifies_step_up_once_and_a_refusal_stores_nothing() {
         BatchChange {
             key: h.base.key("one"),
             tenant: None,
-            value: json!(true),
+            op: None,
+            value: Some(json!(true)),
             if_match: Some("absent".to_owned()),
         },
         BatchChange {
             key: h.base.key("two"),
             tenant: None,
-            value: json!(true),
+            op: None,
+            value: Some(json!(true)),
             if_match: Some("absent".to_owned()),
         },
     ];
@@ -415,13 +418,15 @@ async fn a_batch_verifies_step_up_once_and_a_refusal_stores_nothing() {
         BatchChange {
             key: refusing.base.key("one"),
             tenant: None,
-            value: json!(true),
+            op: None,
+            value: Some(json!(true)),
             if_match: Some("absent".to_owned()),
         },
         BatchChange {
             key: refusing.base.key("two"),
             tenant: None,
-            value: json!(true),
+            op: None,
+            value: Some(json!(true)),
             if_match: Some("absent".to_owned()),
         },
     ];
@@ -524,7 +529,8 @@ async fn a_batch_of_more_than_the_limit_is_refused_before_anything_is_written() 
         .map(|_| BatchChange {
             key: h.base.key("flag"),
             tenant: None,
-            value: json!(true),
+            op: None,
+            value: Some(json!(true)),
             if_match: Some("absent".to_owned()),
         })
         .collect();
@@ -534,6 +540,294 @@ async fn a_batch_of_more_than_the_limit_is_refused_before_anything_is_written() 
         "{refused:?}"
     );
     assert!(h.rows(d).await.is_empty());
+}
+
+/// One batch entry, with the operation and value spelled out.
+fn entry(
+    key: settings_service_sdk::SettingKey,
+    op: Option<&str>,
+    value: Option<serde_json::Value>,
+    if_match: &str,
+) -> BatchChange {
+    BatchChange {
+        key,
+        tenant: None,
+        op: op.map(ToOwned::to_owned),
+        value,
+        if_match: Some(if_match.to_owned()),
+    }
+}
+
+/// A verifier that counts how often the coordinator asked it.
+struct CountingStepUp {
+    inner: FixedStepUp,
+    calls: std::sync::atomic::AtomicUsize,
+}
+
+impl CountingStepUp {
+    fn verified() -> Arc<Self> {
+        Arc::new(Self {
+            inner: FixedStepUp::verified(),
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        })
+    }
+
+    fn calls(&self) -> usize {
+        self.calls.load(Ordering::SeqCst)
+    }
+}
+
+#[async_trait::async_trait]
+impl StepUpVerifier for CountingStepUp {
+    async fn verify(
+        &self,
+        token: Option<&str>,
+        subject: &crate::domain::stepup::StepUpSubject,
+    ) -> Result<(), StepUpRefusal> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.verify(token, subject).await
+    }
+
+    fn requirement(&self) -> &crate::domain::stepup::StepUpRequirement {
+        self.inner.requirement()
+    }
+}
+
+#[tokio::test]
+async fn a_batch_mixing_a_set_and_a_revert_commits_both_under_one_change_set() {
+    // What the settings page presses Apply on: some rows edited, some reverted,
+    // one request. Both reach the store through the same writer, so the change
+    // set covers the whole press and the journal records one entry per row.
+    let h = Harness::new().await;
+    let edited = h.declare("edited", scope_class::CASCADING).await;
+    let reverted = h.declare("reverted", scope_class::CASCADING).await;
+    let root = h.base.tree.root;
+    let actor = actor(root);
+
+    let existing = h
+        .set(&actor, "reverted", None, json!(true), Some("absent"))
+        .await
+        .expect("the row to revert");
+
+    let outcome = h
+        .coordinator
+        .batch(
+            &actor,
+            vec![
+                entry(h.base.key("edited"), None, Some(json!(true)), "absent"),
+                entry(h.base.key("reverted"), Some("revert"), None, &existing.etag),
+            ],
+        )
+        .await
+        .expect("the batch runs");
+
+    let committed: Vec<_> = outcome
+        .results
+        .iter()
+        .map(|r| r.as_ref().expect("committed"))
+        .collect();
+    assert_eq!(committed.len(), 2);
+    assert_eq!(committed[0].operation, AuditOperation::Create);
+    assert_eq!(committed[1].operation, AuditOperation::Revert);
+    // One press, one change set — the whole point of carrying the revert here.
+    assert!(
+        committed
+            .iter()
+            .all(|c| c.change_set_id == outcome.change_set_id),
+        "every entry belongs to the batch's change set"
+    );
+
+    assert_eq!(h.rows(edited).await.len(), 1);
+    assert!(
+        h.rows(reverted).await.is_empty(),
+        "the revert cleared the scope's own row"
+    );
+    assert_eq!(h.history("edited").await, vec!["create"]);
+    assert_eq!(h.history("reverted").await, vec!["revert", "create"]);
+    let records = h.history_records("reverted").await;
+    assert_eq!(records[0].change_set_id, Some(outcome.change_set_id));
+}
+
+#[tokio::test]
+async fn an_absent_op_and_an_explicit_set_are_the_same_change() {
+    // The default exists so that a client written before the field keeps
+    // working; it must not be a second code path.
+    let h = Harness::new().await;
+    let implicit = h.declare("implicit", scope_class::CASCADING).await;
+    let explicit = h.declare("explicit", scope_class::CASCADING).await;
+
+    let outcome = h
+        .coordinator
+        .batch(
+            &actor(h.base.tree.root),
+            vec![
+                entry(h.base.key("implicit"), None, Some(json!(true)), "absent"),
+                entry(
+                    h.base.key("explicit"),
+                    Some("set"),
+                    Some(json!(true)),
+                    "absent",
+                ),
+            ],
+        )
+        .await
+        .expect("the batch runs");
+
+    let one = outcome.results[0].as_ref().expect("committed");
+    let two = outcome.results[1].as_ref().expect("committed");
+    assert_eq!(one.operation, two.operation);
+    assert_eq!(one.new_value, two.new_value);
+    assert_eq!(h.rows(implicit).await.len(), 1);
+    assert_eq!(h.rows(explicit).await.len(), 1);
+}
+
+#[tokio::test]
+async fn an_entry_whose_value_contradicts_its_op_is_invalid_and_the_rest_commits() {
+    // Three ways to name a change that cannot be carried out, each refusing one
+    // entry: a revert that brought a value, a set that brought none, and a word
+    // that is not an operation at all.
+    let h = Harness::new().await;
+    let good = h.declare("good", scope_class::CASCADING).await;
+    let d = h.declare("bad", scope_class::CASCADING).await;
+    let actor = actor(h.base.tree.root);
+    let existing = h
+        .set(&actor, "bad", None, json!(true), Some("absent"))
+        .await
+        .expect("a row to aim at");
+
+    let outcome = h
+        .coordinator
+        .batch(
+            &actor,
+            vec![
+                entry(
+                    h.base.key("bad"),
+                    Some("revert"),
+                    Some(json!(false)),
+                    &existing.etag,
+                ),
+                entry(h.base.key("bad"), Some("set"), None, &existing.etag),
+                entry(h.base.key("bad"), Some("remove"), None, &existing.etag),
+                entry(h.base.key("good"), None, Some(json!(true)), "absent"),
+            ],
+        )
+        .await
+        .expect("the batch runs");
+
+    for (i, result) in outcome.results.iter().take(3).enumerate() {
+        let err = result.as_ref().expect_err("refused");
+        assert_eq!(rejection_code(err), "invalid", "entry {i}: {err:?}");
+    }
+    assert!(outcome.results[3].is_ok(), "{:?}", outcome.results[3]);
+
+    // Nothing the three refusals named was touched, and the good entry stands.
+    assert_eq!(h.rows(d).await.len(), 1);
+    assert_eq!(h.rows(d).await[0].value, Some(json!(true)));
+    assert_eq!(h.rows(good).await.len(), 1);
+}
+
+#[tokio::test]
+async fn a_revert_of_a_scope_with_no_override_is_not_found_alone() {
+    // The single endpoint answers 404 here. Inside a batch that is one entry's
+    // rejection, in a code the vocabulary already carries.
+    let h = Harness::new().await;
+    let bare = h.declare("bare", scope_class::CASCADING).await;
+    let other = h.declare("other", scope_class::CASCADING).await;
+
+    let outcome = h
+        .coordinator
+        .batch(
+            &actor(h.base.tree.root),
+            vec![
+                entry(h.base.key("bare"), Some("revert"), None, "absent"),
+                entry(h.base.key("other"), None, Some(json!(true)), "absent"),
+            ],
+        )
+        .await
+        .expect("the batch runs");
+
+    let err = outcome.results[0].as_ref().expect_err("refused");
+    assert_eq!(rejection_code(err), "not_found", "{err:?}");
+    assert!(outcome.results[1].is_ok(), "{:?}", outcome.results[1]);
+    assert!(h.rows(bare).await.is_empty());
+    assert_eq!(h.rows(other).await.len(), 1);
+}
+
+#[tokio::test]
+async fn a_stale_tag_on_a_revert_entry_rejects_that_entry_and_keeps_its_row() {
+    // A revert presents the tag of the row it clears, and is guarded by it
+    // exactly as a set is.
+    let h = Harness::new().await;
+    let d = h.declare("flag", scope_class::CASCADING).await;
+    let actor = actor(h.base.tree.root);
+    h.set(&actor, "flag", None, json!(true), Some("absent"))
+        .await
+        .expect("the row");
+
+    let outcome = h
+        .coordinator
+        .batch(
+            &actor,
+            vec![entry(h.base.key("flag"), Some("revert"), None, "moved")],
+        )
+        .await
+        .expect("the batch runs");
+
+    let err = outcome.results[0].as_ref().expect_err("refused");
+    assert_eq!(rejection_code(err), "stale", "{err:?}");
+    assert_eq!(
+        h.rows(d).await.len(),
+        1,
+        "the row a stale tag aimed at stays"
+    );
+}
+
+#[tokio::test]
+async fn a_batch_of_step_up_gated_reverts_asks_for_one_assertion() {
+    // Step-up is a property of the request, not of the operation: several
+    // gated reverts cost the administrator one re-authentication, as several
+    // gated sets already do.
+    let verifier = CountingStepUp::verified();
+    let h = Harness::with_step_up(Arc::clone(&verifier) as Arc<dyn StepUpVerifier>).await;
+    let one = h
+        .base
+        .declare_typed("one", scope_class::CASCADING, json!(false), BOOL, "public")
+        .await;
+    let two = h
+        .base
+        .declare_typed("two", scope_class::CASCADING, json!(false), BOOL, "public")
+        .await;
+    let actor = actor(h.base.tree.root);
+    let first = h
+        .set(&actor, "one", None, json!(true), Some("absent"))
+        .await
+        .expect("a row");
+    let second = h
+        .set(&actor, "two", None, json!(true), Some("absent"))
+        .await
+        .expect("a row");
+    let before = verifier.calls();
+
+    let outcome = h
+        .coordinator
+        .batch(
+            &actor,
+            vec![
+                entry(h.base.key("one"), Some("revert"), None, &first.etag),
+                entry(h.base.key("two"), Some("revert"), None, &second.etag),
+            ],
+        )
+        .await
+        .expect("the batch runs");
+
+    assert!(outcome.results.iter().all(Result::is_ok), "{outcome:?}");
+    assert_eq!(
+        verifier.calls() - before,
+        1,
+        "one assertion for the whole batch, not one per revert"
+    );
+    assert!(h.rows(one).await.is_empty());
+    assert!(h.rows(two).await.is_empty());
 }
 
 #[tokio::test]
@@ -866,7 +1160,8 @@ async fn a_batch_change_naming_the_token_adopts_the_staged_entry_without_a_secon
             vec![BatchChange {
                 key: h.base.key("api_token"),
                 tenant: None,
-                value: pending_value(&pending),
+                op: None,
+                value: Some(pending_value(&pending)),
                 if_match: Some(committed.etag.clone()),
             }],
         )
@@ -969,7 +1264,8 @@ async fn a_claimed_token_whose_commit_fails_is_spent_and_its_entry_released() {
             vec![BatchChange {
                 key: h.base.key("api_token"),
                 tenant: None,
-                value: pending_value(&pending),
+                op: None,
+                value: Some(pending_value(&pending)),
                 if_match: Some("moved".to_owned()),
             }],
         )

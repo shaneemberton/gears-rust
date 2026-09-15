@@ -99,16 +99,25 @@ pub struct BatchChangeRequest {
     /// The target tenant; absent, the caller's own.
     #[serde(default)]
     pub tenant: Option<Uuid>,
-    /// The new value. For a `secret`-trait setting this may instead be
-    /// `{ "pending_id": "…" }`, naming a secret staged earlier through
-    /// `/secret-stage`: the staged entry is adopted and nothing is stored a
-    /// second time. Any other shape is a value and validates as one.
-    pub value: Value,
-    /// The value state tag the caller last read for this scope, or the literal
-    /// `absent` for a first write. Required in effect: a change that omits it
-    /// is rejected on its own with `if_match_required` while the rest of the
-    /// batch proceeds. It is optional in the schema only so that one missing
-    /// tag refuses one change instead of the whole request.
+    /// `set` or `revert`; absent is `set`, so a client written before the
+    /// field existed sends exactly what it sent before. An unrecognised word
+    /// refuses this change alone with `invalid`.
+    #[serde(default)]
+    pub op: Option<String>,
+    /// The new value, carried by a `set` and absent from a `revert`; a
+    /// mismatch either way refuses this change alone with `invalid`. For a
+    /// `secret`-trait setting this may instead be `{ "pending_id": "…" }`,
+    /// naming a secret staged earlier through `/secret-stage`: the staged
+    /// entry is adopted and nothing is stored a second time. Any other shape
+    /// is a value and validates as one.
+    #[serde(default)]
+    pub value: Option<Value>,
+    /// The value state tag the caller last read for this scope — for a revert,
+    /// the tag of the row being cleared — or the literal `absent` for a first
+    /// write. Required in effect: a change that omits it is rejected on its
+    /// own with `if_match_required` while the rest of the batch proceeds. It
+    /// is optional in the schema only so that one missing tag refuses one
+    /// change instead of the whole request.
     #[serde(default)]
     pub if_match: Option<String>,
 }

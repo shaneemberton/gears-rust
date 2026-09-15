@@ -327,7 +327,8 @@ pub async fn clone_value(
 /// 400 over five hundred changes or on a malformed key; 401 with the challenge
 /// when step-up is required and not proven; 403 when not authorized or a
 /// service principal targets a step-up declaration. Per-change refusals are
-/// entries, not errors.
+/// entries, not errors — among them an entry whose `op` is unrecognised or
+/// whose `value` contradicts it.
 pub async fn batch_set(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
@@ -344,6 +345,7 @@ pub async fn batch_set(
         changes.push(BatchChange {
             key: parse_key(&change.key)?,
             tenant: change.tenant,
+            op: change.op,
             value: change.value,
             if_match: change.if_match,
         });

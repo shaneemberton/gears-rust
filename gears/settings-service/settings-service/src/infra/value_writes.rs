@@ -44,17 +44,59 @@ pub const BATCH_LIMIT: usize = 500;
 /// How many expired stages one sweep pass releases at most.
 pub const SWEEP_LIMIT: u64 = 200;
 
+/// The batch operation that stores a value — the default, so a client that
+/// never heard of the field keeps working unchanged.
+pub const OP_SET: &str = "set";
+
+/// The batch operation that clears the scope's own override.
+pub const OP_REVERT: &str = "revert";
+
 /// One change of a batch.
+///
+/// The operation stays the word the request used until the entry is evaluated.
+/// A batch entry stands or falls alone, so an unrecognised operation — or a
+/// value that contradicts the one named — has to refuse that entry with
+/// `invalid` and leave the rest of the batch to commit; parsing it here, where
+/// the whole request is still one value, could only refuse all of them.
 #[derive(Debug, Clone)]
 pub struct BatchChange {
     /// The setting.
     pub key: SettingKey,
     /// The target tenant; absent, the caller's own.
     pub tenant: Option<Uuid>,
-    /// The value.
-    pub value: Value,
+    /// [`OP_SET`] or [`OP_REVERT`]; absent is [`OP_SET`].
+    pub op: Option<String>,
+    /// The value. Carried by a set, absent from a revert.
+    pub value: Option<Value>,
     /// The tag the caller last read.
     pub if_match: Option<String>,
+}
+
+/// The change an entry asks for, before a secret's staged entry is resolved.
+///
+/// `set` and `revert` are the whole vocabulary: `remove` is the administrative
+/// deletion of a row and is not offered here, and `AdoptSecret` is not asked
+/// for by name — it is what a set of a `pending_id` becomes.
+fn requested_change(op: Option<&str>, value: Option<Value>) -> Result<Change, DomainError> {
+    let invalid = |field: &str, message: String| DomainError::Validation {
+        field: field.to_owned(),
+        code: field::VALIDATION,
+        message,
+    };
+    match op.unwrap_or(OP_SET) {
+        OP_SET => value
+            .map(Change::Set)
+            .ok_or_else(|| invalid("value", format!("a `{OP_SET}` change carries a value"))),
+        OP_REVERT if value.is_some() => Err(invalid(
+            "value",
+            format!("a `{OP_REVERT}` change carries no value"),
+        )),
+        OP_REVERT => Ok(Change::Revert),
+        other => Err(invalid(
+            "op",
+            format!("unknown operation `{other}`; one of `{OP_SET}` or `{OP_REVERT}`"),
+        )),
+    }
 }
 
 /// One batch's answer: a change set id and one outcome per change.
@@ -257,6 +299,7 @@ impl WriteCoordinator {
             let BatchChange {
                 key,
                 tenant,
+                op,
                 value,
                 if_match,
             } = change;
@@ -272,7 +315,10 @@ impl WriteCoordinator {
                 )
                 .await;
             let outcome = match gated {
-                Ok(gated) => match self.batch_change_for(&conn, &gated, actor, value).await {
+                Ok(gated) => match self
+                    .batch_change_for(&conn, &gated, actor, op.as_deref(), value)
+                    .await
+                {
                     Ok(change) => {
                         self.commit(actor, gated, change, if_match.as_deref(), change_set_id)
                             .await
@@ -303,16 +349,32 @@ impl WriteCoordinator {
         })
     }
 
-    /// The change a batch entry carries: a value, or — for a secret setting —
-    /// a `pending_id` standing in for one, resolved to the entry staged
-    /// earlier. Any other shape is a value and validates as one.
+    /// The change a batch entry carries: the operation it names, and for a set
+    /// the value — or, for a secret setting, a `pending_id` standing in for
+    /// one, resolved to the entry staged earlier. Any other shape is a value
+    /// and validates as one.
+    ///
+    /// Every refusal here is this entry's alone: the caller records it as a
+    /// rejection and goes on to the next change.
     async fn batch_change_for<C: DBRunner>(
         &self,
         conn: &C,
         gated: &Gated,
         actor: &WriteActor,
-        value: Value,
+        op: Option<&str>,
+        value: Option<Value>,
     ) -> Result<Change, DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-value-writes-batch:p1:inst-vw-batch-10
+        // A revert takes the same route a set does — the gate, the `If-Match`
+        // check and the commit are one implementation — and parts from it only
+        // in the change it hands on, which the shared commit already knows how
+        // to apply and which audit records as a revert.
+        let value = match requested_change(op, value)? {
+            Change::Set(value) => value,
+            // `requested_change` yields a set or a revert and nothing else.
+            other => return Ok(other),
+        };
+        // @cpt-end:cpt-cf-settings-service-flow-value-writes-batch:p1:inst-vw-batch-10
         if gated.declaration.has_secret_trait
             && let Some(pending_id) = pending::pending_id_of(&value)
         {

@@ -244,11 +244,16 @@ pub fn register_routes(
         .operation_id("settings_service.batch_set")
         .summary("Set several settings in one call")
         .description(
-            "At most five hundred changes, each with its own key, target tenant, value and \
-             `if_match`. Step-up is verified once for the request when any target declaration \
-             requires it; each change then commits on its own, with no atomicity across \
-             changes, and the answer carries one entry per change - committed with its new \
-             tag, or rejected with one of a fixed vocabulary of codes: `invalid`, \
+            "At most five hundred changes, each with its own key, target tenant, operation, \
+             value and `if_match`. `op` is `set` (the default, so a client that never sends it \
+             is unaffected) or `revert`, which clears the scope's own override and carries no \
+             value; a `set` without a value, a `revert` with one, or an unknown word rejects \
+             that change alone with `invalid`, and a `revert` of a scope holding no override \
+             is rejected `not_found` alone. Step-up is verified once for the request when any \
+             target declaration requires it; each change then commits on its own, with no \
+             atomicity across changes, and the answer carries one entry per change - \
+             committed with its new tag and its `operation`, or rejected with one of a fixed \
+             vocabulary of codes: `invalid`, \
              `if_match_required`, `stale`, `conflict`, `forbidden`, `retired`, \
              `not_found`, `unavailable`, `error`. `if_match` is required in \
              effect - a change without one is rejected `if_match_required` on its own while \

@@ -17,7 +17,7 @@
 - [2. Actor Flows (CDSL)](#2-actor-flows-cdsl)
   - [Validate a Value Without Storing It](#validate-a-value-without-storing-it)
   - [Set a Value](#set-a-value)
-  - [Set Several Values in One Call](#set-several-values-in-one-call)
+  - [Set or Revert Several Values in One Call](#set-or-revert-several-values-in-one-call)
   - [Revert a Value](#revert-a-value)
   - [Clone a Value From Another Scope](#clone-a-value-from-another-scope)
   - [Remove a Value](#remove-a-value)
@@ -139,27 +139,29 @@ Throughout, `tenant` omitted means the caller's own tenant, which for a platform
 5. [x] - `p1` - Mint a change set id for the request and carry it on the audit record, so the change is retrievable with any activation tracking that later refers to it - `inst-vw-set-5`
 6. [x] - `p1` - **RETURN** `200` with `old_value`, `new_value`, `scope` and the new `etag`; the value is effective on the next read - `inst-vw-set-6`
 
-### Set Several Values in One Call
+### Set or Revert Several Values in One Call
 
 - [x] `p1` - **ID**: `cpt-cf-settings-service-flow-value-writes-batch`
 
 **Actor**: `cpt-cf-settings-service-actor-platform-admin`
 
 **Success Scenarios**:
-- One result per change — old value, new value, scope, and success or the error that rejected it — each change standing or falling alone
+- One result per change — old value, new value, scope, the operation recorded, and success or the error that rejected it — each change standing or falling alone
+- A set and a revert in one request commit under one change set id, so one press of Apply is one entry group in the journal
 
 **Error Scenarios**:
 - More than five hundred changes in one request
 - Step-up required by any target declaration and not satisfied, refusing the whole request before any item is evaluated
 
 **Steps**:
-1. [x] - `p1` - Actor sends POST /settings-service/v1/settings/batch with a list of changes, each carrying `key`, optional `tenant`, `value` and `if_match`, and the step-up token - `inst-vw-batch-1`
+1. [x] - `p1` - Actor sends POST /settings-service/v1/settings/batch with a list of changes, each carrying `key`, optional `tenant`, an optional `op` — `set`, the default, or `revert` — a `value` for a set and none for a revert, and `if_match`, with the step-up token - `inst-vw-batch-1`
 2. [x] - `p1` - **IF** the list carries more than five hundred changes → **RETURN** `400` - `inst-vw-batch-2`
 3. [x] - `p1` - Verify step-up **once** for the request when any target declaration requires it; **IF** it fails → **RETURN** the refusal with nothing evaluated - `inst-vw-batch-3`
 4. [x] - `p1` - Mint one change set id for the request - `inst-vw-batch-4`
 5. [x] - `p1` - **FOR EACH** change, in order - `inst-vw-batch-5`
-   1. [x] - `p1` - Invoke the remaining write gates for its key and target, then commit one change; for a `secret`-trait target whose value is `{ "pending_id": … }`, the change adopts the entry staged earlier instead of carrying a value (the stage flow of entry 2.9) - `inst-vw-batch-6`
-   2. [x] - `p1` - Record its outcome: the old and new value and scope on success, or the error that rejected it; a failing change stores nothing and does not stop the others - `inst-vw-batch-7`
+   1. [x] - `p1` - Read the operation the entry names: `set` carries a value and `revert` carries none; **IF** the value contradicts the operation, **OR** the word is not one of the two → reject this change alone as `invalid` and continue; a revert takes the same gates, tag check and commit a set does and parts from it only in the change handed on, which the commit records as `revert` — and a revert of a scope holding no override is rejected `not_found` alone - `inst-vw-batch-10`
+   2. [x] - `p1` - Invoke the remaining write gates for its key and target, then commit one change; for a `secret`-trait target whose value is `{ "pending_id": … }`, the change adopts the entry staged earlier instead of carrying a value (the stage flow of entry 2.9) - `inst-vw-batch-6`
+   3. [x] - `p1` - Record its outcome: the old and new value, scope and operation on success, or the error that rejected it; a failing change stores nothing and does not stop the others - `inst-vw-batch-7`
 6. [x] - `p1` - Evict the local cache for every committed change, then publish the committed keys under the change set id - `inst-vw-batch-8`
 7. [x] - `p1` - **RETURN** `200` with one entry per change; the status reflects that every item was answered, and the caller reads the outcomes - `inst-vw-batch-9`
 
@@ -437,7 +439,7 @@ A change **MUST** count as set only once it is durably committed, and the order 
 
 - [x] `p1` - **ID**: `cpt-cf-settings-service-dod-value-writes-batch`
 
-A batch **MUST** carry at most five hundred changes, **MUST** verify step-up once for the request when any target requires it, **MUST** evaluate and commit each change on its own with no atomicity across changes, and **MUST** answer with one entry per change carrying the old value, the new value, the scope, and success or the error that rejected it.
+A batch **MUST** carry at most five hundred changes, each a `set` (the default, so a client that never sends `op` is unaffected) or a `revert`, **MUST** verify step-up once for the request when any target requires it whatever the operations, **MUST** evaluate and commit each change on its own with no atomicity across changes — a revert taking the same gates, tag check and commit a set does — **MUST** reject alone as `invalid` a set without a value, a revert with one, or an unknown operation, and alone as `not_found` a revert of a scope holding no override, and **MUST** answer with one entry per change carrying the old value, the new value, the scope, the operation recorded, and success or the error that rejected it.
 
 **Implements**:
 - `cpt-cf-settings-service-flow-value-writes-batch`
@@ -509,6 +511,9 @@ Every committed change **MUST** publish `event_value_changed` and every rejected
 - [x] After a set, the local cache no longer holds the key at the target, and for a `cascading` setting holds it at no scope
 - [x] A batch of mixed changes stores the valid ones, reports the invalid one with its error, and answers with one entry per change; a batch of more than five hundred changes is refused `400`
 - [x] A batch verifies step-up once, and a failed verification stores nothing
+- [x] A batch mixing a set and a revert commits both under one change set id, with one audit record each and the operation recorded on each; an absent `op` behaves exactly as `set`
+- [x] A revert entry carrying a value, a set entry carrying none, or an unknown `op` is rejected `invalid` alone; a revert of a scope with no override is rejected `not_found` alone; a stale `if_match` on a revert is rejected `stale` alone — the rest of the batch commits
+- [x] A batch of several step-up-gated reverts asks for one assertion, not one per entry
 - [x] A revert at a tenant scope returns the nearest-ancestor fallback and at the root tenant the Schema Default, which is unchanged
 - [x] A clone stores the source's effective value at the target with no continuing link, is refused `403` when the caller may not read the source, and is refused `SecretNotCloneable` on a secret setting
 - [x] A write to a secret-trait declaration with no Secret Manager bound is refused as unavailable, and no plaintext appears in `setting_values`

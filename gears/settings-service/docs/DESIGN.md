@@ -1324,7 +1324,7 @@ Both are **immediate** — declaration operations do not go through the value wr
 |--------|----------|-------------|-------------|
 | `POST` | `/settings-service/v1/settings/{key}/validate?tenant={tenant_id}` | **Check a value without storing it** — validity, current effective value + source, and (for `cascading`) the affected descendants, paginated. Read-only, needs no step-up, and not required before a write (`cpt-cf-settings-service-fr-validate-before-set`) | Yes |
 | `PUT` | `/settings-service/v1/settings/{key}/value?tenant={tenant_id}` | **Set the value** at the target scope (`If-Match` + step-up required) | Yes (same value + same `If-Match` ⇒ same outcome) |
-| `POST` | `/settings-service/v1/settings/batch` | **Set several settings in one call** — per-item results, no atomicity across items (below) | No |
+| `POST` | `/settings-service/v1/settings/batch` | **Set or revert several settings in one call** — each entry a `set` (default) or a `revert`; per-item results, no atomicity across items (below) | No |
 | `POST` | `/settings-service/v1/settings/{key}/secret-stage?tenant={tenant_id}` | **Stage a secret ahead of the batch** — validate the plaintext as a set would, store it under this gear's principal, and answer with an opaque single-use `pending_id` and its expiry, never the reference and never the plaintext; the following batch names `{ "pending_id": … }` in place of the value. The value write gate without step-up: nothing live changes until the batch (§5 *A secret staged across the step-up redirect*). A non-secret declaration is refused `400 not_a_secret` | No |
 | `POST` | `/settings-service/v1/settings/{key}/value/revert?tenant={tenant_id}` | **Revert** — clear the override at the target scope; the response carries the resulting fallback | Yes |
 | `POST` | `/settings-service/v1/settings/{key}/value/clone?tenant={tenant_id}` | **Clone** — copy an effective value from another scope (`from` in body) as an override here | No |
@@ -1347,7 +1347,9 @@ Both are **immediate** — declaration operations do not go through the value wr
 
 ##### `POST /settings-service/v1/settings/batch` — Bulk Set Rules
 
-The body carries a list of changes, each with its own `key`, optional `tenant`, `value` and `If-Match`. Step-up is verified **once for the request**; the per-change conditions above are then evaluated per item.
+The body carries a list of changes, each with its own `key`, optional `tenant`, an optional `op` — `set`, the default, or `revert` — a `value` for a set and none for a revert, and `if_match`. Step-up is verified **once for the request**, whatever the operations; the per-change conditions above are then evaluated per item.
+
+- **A revert is an entry, not a second call.** The settings page stages edits and reverts alike and applies them in one press, so a revert travels in the same batch: the same gates, the same `If-Match` (the tag of the row being cleared), the same commit, recorded as `revert` in the entry's `operation`. A `set` without a value, a `revert` with one, or an unknown `op` is rejected `invalid` for that entry alone; a `revert` of a scope holding no override is rejected `not_found` alone — the code the single endpoint answers as `404`, and one the vocabulary already carries. `remove` is not offered here: it is the administrative deletion of a row, not something the page stages. A revert entry does not report what the scope fell back to; the client re-reads after Apply.
 
 - **Per-item results, no atomicity across items.** The response lists one entry per change — `old_value`, `new_value`, `scope`, and success or the error that rejected it. A change that fails stores nothing; the others still land (`cpt-cf-settings-service-fr-set-value`). The response status reflects the request, not the items: `200` when every item was answered, and the caller reads the outcomes.
 - **Bounded.** At most 500 changes per request (§6); a larger body is rejected `422`.

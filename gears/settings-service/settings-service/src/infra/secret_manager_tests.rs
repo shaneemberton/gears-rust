@@ -32,17 +32,29 @@ struct Slot {
 #[derive(Default)]
 struct MemoryCredStore {
     entries: Mutex<HashMap<Slot, Vec<u8>>>,
+    /// The token scopes each presented context carried, in call order. The
+    /// store is a stand-in for one that enforces them before RBAC is asked.
+    presented_scopes: Mutex<Vec<Vec<String>>>,
     down: std::sync::atomic::AtomicBool,
 }
 
 impl MemoryCredStore {
-    fn slot(ctx: &SecurityContext, key: &SecretRef, sharing: SharingMode) -> Slot {
+    fn slot(&self, ctx: &SecurityContext, key: &SecretRef, sharing: SharingMode) -> Slot {
+        self.presented_scopes
+            .lock()
+            .expect("lock")
+            .push(ctx.token_scopes().to_vec());
         Slot {
             tenant: ctx.subject_tenant_id(),
             owner: ctx.subject_id(),
             reference: key.as_ref().to_owned(),
             sharing: format!("{sharing:?}"),
         }
+    }
+
+    /// The token scopes every call so far presented.
+    fn presented_scopes(&self) -> Vec<Vec<String>> {
+        self.presented_scopes.lock().expect("lock").clone()
     }
 
     fn check(&self) -> Result<(), CredStoreError> {
@@ -65,7 +77,7 @@ impl CredStoreClientV1 for MemoryCredStore {
         key: &SecretRef,
     ) -> Result<Option<GetSecretResponse>, CredStoreError> {
         self.check()?;
-        let slot = Self::slot(ctx, key, SharingMode::Private);
+        let slot = self.slot(ctx, key, SharingMode::Private);
         Ok(self
             .entries
             .lock()
@@ -93,7 +105,7 @@ impl CredStoreClientV1 for MemoryCredStore {
         _opts: WriteOptions,
     ) -> Result<(), CredStoreError> {
         self.check()?;
-        let slot = Self::slot(ctx, key, sharing);
+        let slot = self.slot(ctx, key, sharing);
         let mut entries = self.entries.lock().expect("lock");
         if !entries.contains_key(&slot) {
             return Err(CredStoreError::NotFound);
@@ -112,7 +124,7 @@ impl CredStoreClientV1 for MemoryCredStore {
         _opts: WriteOptions,
     ) -> Result<(), CredStoreError> {
         self.check()?;
-        let slot = Self::slot(ctx, key, sharing);
+        let slot = self.slot(ctx, key, sharing);
         let mut entries = self.entries.lock().expect("lock");
         if entries.contains_key(&slot) {
             return Err(CredStoreError::Conflict);
@@ -128,7 +140,7 @@ impl CredStoreClientV1 for MemoryCredStore {
         _precondition: WritePrecondition,
     ) -> Result<(), CredStoreError> {
         self.check()?;
-        let slot = Self::slot(ctx, key, SharingMode::Private);
+        let slot = self.slot(ctx, key, SharingMode::Private);
         self.entries
             .lock()
             .expect("lock")
@@ -173,6 +185,18 @@ async fn a_secret_is_stored_private_to_the_gear_principal_in_the_target_tenant()
     assert_eq!(slots[0].owner, manager.principal());
     assert_eq!(slots[0].sharing, "Private");
     assert_ne!(manager.principal(), Uuid::nil());
+
+    // Every call presented the first-party scope. Without it the platform's
+    // enforcer refuses the call before RBAC is consulted, and the store answers
+    // `access denied` while being neither down nor mis-provisioned.
+    assert!(
+        store
+            .presented_scopes()
+            .iter()
+            .all(|scopes| scopes == &["*".to_owned()]),
+        "{:?}",
+        store.presented_scopes()
+    );
 
     let plaintext = manager
         .resolve_plaintext(KEY, tenant, &reference)
@@ -328,4 +352,20 @@ async fn another_principal_in_the_same_tenant_reads_nothing_back() {
         .await
         .expect("asked");
     assert!(found.is_none());
+}
+
+#[test]
+fn the_store_context_names_the_gear_principal_the_value_s_tenant_and_the_first_party_scope() {
+    // What the gear presents, which is the whole of this path's half of the
+    // problem: the store's own answer is not this test's to assert.
+    let (_store, manager) = manager();
+    let tenant = Uuid::new_v4();
+    let ctx = manager.context(tenant).expect("context");
+
+    assert_eq!(ctx.subject_id(), manager.principal());
+    assert_eq!(ctx.subject_tenant_id(), tenant);
+    assert_eq!(ctx.token_scopes(), ["*".to_owned()]);
+    // No subject type: this principal is no user, and nothing downstream reads
+    // one here.
+    assert_eq!(ctx.subject_type(), None);
 }

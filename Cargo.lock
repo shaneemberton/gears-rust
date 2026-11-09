@@ -4289,7 +4289,7 @@ dependencies = [
 
 [[package]]
 name = "cf-gears-settings-service"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4300,6 +4300,7 @@ dependencies = [
  "cf-gears-authz-resolver-sdk",
  "cf-gears-credstore",
  "cf-gears-credstore-sdk",
+ "cf-gears-event-broker-sdk",
  "cf-gears-settings-service-sdk",
  "cf-gears-tenant-resolver-sdk",
  "cf-gears-test-containers",
@@ -4311,8 +4312,10 @@ dependencies = [
  "cf-gears-toolkit-macros",
  "cf-gears-toolkit-odata",
  "cf-gears-toolkit-security",
+ "cf-gears-toolkit-trace-context",
  "cf-gears-types-registry",
  "cf-gears-types-registry-sdk",
+ "chrono",
  "fnv",
  "futures-util",
  "gts",
@@ -4320,6 +4323,7 @@ dependencies = [
  "inventory",
  "jsonschema 0.60.2",
  "opentelemetry",
+ "opentelemetry_sdk",
  "regex",
  "sea-orm",
  "sea-orm-migration",
@@ -4334,6 +4338,8 @@ dependencies = [
  "tokio-util",
  "tower",
  "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
  "tracing-test",
  "utoipa",
  "uuid",
@@ -4341,7 +4347,7 @@ dependencies = [
 
 [[package]]
 name = "cf-gears-settings-service-sdk"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-trait",
  "cf-gears-toolkit-canonical-errors",

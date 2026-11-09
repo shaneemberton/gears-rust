@@ -159,6 +159,7 @@ pub async fn create_declaration(
     );
     let request = crate::domain::declaration::CreateDeclaration::try_from(body)?;
     // @cpt-end:cpt-cf-settings-service-flow-setting-declarations-create:p1:inst-decl-create-1
+    let request_id = actor.request_id.clone();
     let admin_for_tx = Arc::clone(&admin);
     let outcome = db
         .db()
@@ -176,13 +177,8 @@ pub async fn create_declaration(
     // @cpt-begin:cpt-cf-settings-service-flow-setting-declarations-evolve:p1:inst-decl-evolve-7
     // Retained values re-enter resolution on a revive; on an evolution the old
     // key leaves it and the new one enters. Nothing cached may keep answering
-    // for either.
-    if created.reactivated || created.evolved {
-        admin.evict(&created.declaration.key);
-    }
-    if let Some(retired) = &created.retired {
-        admin.evict(retired);
-    }
+    // for either; then the request's end, one broadcast naming what changed.
+    admin.after_create(&created, &request_id).await;
     // @cpt-end:cpt-cf-settings-service-flow-setting-declarations-evolve:p1:inst-decl-evolve-7
     let location = format!(
         "/settings-service/v1/declarations/{}",
@@ -248,20 +244,21 @@ pub async fn update_declaration(
     );
     let if_match = crate::api::rest::if_match(&headers).map(str::to_owned);
     // @cpt-end:cpt-cf-settings-service-flow-setting-declarations-update:p1:inst-decl-update-1
+    let request_id = actor.request_id.clone();
     let admin_for_tx = Arc::clone(&admin);
     let outcome = db
         .db()
-        .transaction_ref_mapped::<_, crate::domain::declaration::Declaration, DomainError>(
+        .transaction_ref_mapped::<_, (crate::domain::declaration::Declaration, bool), DomainError>(
             move |tx| {
                 Box::pin(async move {
                     admin_for_tx
-                        .update(tx, &scope, id, if_match.as_deref(), &body, &actor)
+                        .update_change(tx, &scope, id, if_match.as_deref(), &body, &actor)
                         .await
                 })
             },
         )
         .await;
-    let updated = match outcome {
+    let (updated, reclassified) = match outcome {
         Ok(updated) => updated,
         Err(err @ DomainError::StepUpRequired { .. }) => {
             return Ok(crate::api::rest::value_handlers::step_up_challenge(err));
@@ -271,7 +268,9 @@ pub async fn update_declaration(
     // Evicted again now the change is durable: a reader between the
     // in-transaction eviction and the commit could have re-populated the entry
     // under the old classification.
-    admin.evict(&updated.key);
+    admin
+        .after_update(&updated.key, reclassified, &request_id)
+        .await;
     let dto = DeclarationDto::from(svc.render_one(updated).await);
     let etag = dto.etag.clone();
     Ok((
@@ -312,20 +311,21 @@ pub async fn retire_declaration(
     );
     let if_match = crate::api::rest::if_match(&headers).map(str::to_owned);
     // @cpt-end:cpt-cf-settings-service-flow-setting-declarations-retire:p1:inst-decl-retire-1
+    let request_id = actor.request_id.clone();
     let admin_for_tx = Arc::clone(&admin);
     let outcome = db
         .db()
-        .transaction_ref_mapped::<_, crate::domain::declaration::Declaration, DomainError>(
+        .transaction_ref_mapped::<_, (crate::domain::declaration::Declaration, bool), DomainError>(
             move |tx| {
                 Box::pin(async move {
                     admin_for_tx
-                        .retire(tx, &scope, id, if_match.as_deref(), &actor)
+                        .retire_change(tx, &scope, id, if_match.as_deref(), &actor)
                         .await
                 })
             },
         )
         .await;
-    let retired = match outcome {
+    let (retired, changed) = match outcome {
         Ok(retired) => retired,
         Err(err @ DomainError::StepUpRequired { .. }) => {
             return Ok(crate::api::rest::value_handlers::step_up_challenge(err));
@@ -334,7 +334,7 @@ pub async fn retire_declaration(
     };
     // Evicted again now the status is durable: a reader between the in-transaction
     // eviction and the commit could have re-populated the entry.
-    admin.evict(&retired.key);
+    admin.after_retire(&retired.key, changed, &request_id).await;
     let dto = DeclarationDto::from(svc.render_one(retired).await);
     let etag = dto.etag.clone();
     Ok((

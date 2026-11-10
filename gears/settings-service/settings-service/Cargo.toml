@@ -1,7 +1,7 @@
 # Created: 2026-08-12 by Virtuozzo International GmbH
 [package]
 name = "cf-gears-settings-service"
-version = "0.2.1"
+version = "0.2.2"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -91,6 +91,12 @@ account-management-sdk = { workspace = true }
 # The purge's Credential Store release: a bounded number of deletes at once;
 # the cache consumer takes the broker's delivery stream frame by frame.
 futures-util = { workspace = true }
+# Numbers are written as ECMAScript writes them (RFC 8785): the shortest
+# round-trip digits come from `ryu`.
+hex = { workspace = true }
+ryu = { workspace = true }
+# The buffer a secret's plaintext is encoded into is wiped when it drops.
+zeroize = { workspace = true }
 
 [dev-dependencies]
 # Captures the consumer's `warn` lines in the coherence tests.

@@ -48,6 +48,23 @@ const DEFAULT_PUBLISH_TIMEOUT_SECONDS: u64 = 2;
 /// The longest a deployment may make a request wait on the broker.
 pub const PUBLISH_TIMEOUT_CEILING_SECONDS: u64 = 10;
 
+/// The ceiling of `mutation_lock_wait_seconds`: one hour.
+pub const MUTATION_LOCK_WAIT_CEILING_SECONDS: u64 = 3_600;
+
+/// The ceiling of `redeliver_interval_seconds`: half a day, the largest
+/// interval for which a valid `activation_report_timeout_seconds` — at least
+/// two intervals and at most a day — always exists.
+pub const REDELIVER_INTERVAL_CEILING_SECONDS: u64 = 43_200;
+
+/// The ceiling of `activation_report_timeout_seconds`: one day.
+pub const REPORT_TIMEOUT_CEILING_SECONDS: u64 = 86_400;
+/// How long a mutation waits for its key's mutation lock before it answers
+/// `Unavailable`.
+const DEFAULT_MUTATION_LOCK_WAIT_SECONDS: u64 = 10;
+/// How often the delivery loop ticks, and how long an `awaiting` activation
+/// state waits after its last notification before it is published again.
+const DEFAULT_REDELIVER_INTERVAL_SECONDS: u64 = 30;
+
 /// Bootstrap configuration, read once at gear init.
 ///
 /// `deny_unknown_fields` is deliberate: a mistyped key in a deployment file
@@ -83,6 +100,45 @@ pub struct SettingsServiceConfig {
     #[serde(default = "default_publish_timeout_seconds")]
     pub publish_timeout_seconds: u64,
 
+    /// The longest a mutation of one setting key — a value write, a restriction
+    /// change, a subscription registration or unsubscribe — waits for the key's
+    /// mutation lock, in seconds; a wait that runs out answers `Unavailable`
+    /// with nothing stored. In a batch the wait is further capped by the
+    /// remainder of the gateway's request deadline, which is the fixed 30 s of
+    /// `infra::value_writes::REQUEST_DEADLINE`: the gateway's own setting is
+    /// another gear's configuration and is not visible here.
+    ///
+    /// Defaults to 10; init refuses a zero, which would fail every mutation
+    /// that meets another, and a value above 3600 (an hour). A budget above
+    /// the platform's request deadline is accepted and is a misconfiguration:
+    /// the batch cap enforces the deadline and a single-value request would be
+    /// cut by its caller first.
+    #[serde(default = "default_mutation_lock_wait_seconds")]
+    pub mutation_lock_wait_seconds: u64,
+
+    /// How often the activation delivery loop ticks, in seconds, and how long an
+    /// `awaiting` activation state waits after its last notification before it
+    /// is published again.
+    ///
+    /// Defaults to 30; init refuses a zero, which would republish every state
+    /// on every tick without pause, and a value above 43200 (half a day), under
+    /// which a valid `activation_report_timeout_seconds` always exists. The
+    /// first pass runs at start, then one every interval.
+    #[serde(default = "default_redeliver_interval_seconds")]
+    pub redeliver_interval_seconds: u64,
+
+    /// The report timeout, in seconds: how long, counted in deliveries the
+    /// broker accepted rather than in wall time, the delivery loop keeps
+    /// re-publishing an `awaiting` state before it calls the state's instance
+    /// silent. Converted once to `K = ceil(activation_report_timeout_seconds /
+    /// redeliver_interval_seconds)` accepted deliveries, `20` at the defaults.
+    ///
+    /// Defaults to 600; init refuses a value below two intervals, which would
+    /// give an instance fewer than two deliveries before it is called silent,
+    /// and one above 86400 (a day).
+    #[serde(default = "default_activation_report_timeout_seconds")]
+    pub activation_report_timeout_seconds: u64,
+
     /// How long an audit record without an explicit `retain_until` stays in the
     /// online window. Twelve months by default, and never configurable below
     /// that: init refuses a shorter value.
@@ -114,6 +170,73 @@ impl SettingsServiceConfig {
              the bound on how long a request waits for the broker to accept its cache broadcast",
             self.publish_timeout_seconds
         ))
+    }
+
+    /// Refuse a `mutation_lock_wait_seconds` outside `1..=3600`.
+    ///
+    /// # Errors
+    /// Names the field and the reason.
+    pub fn check_mutation_lock_wait(&self) -> Result<(), String> {
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-2
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-3
+        // A budget above the platform request deadline is accepted: the batch
+        // cap by the remainder of the deadline enforces the deadline.
+        if (1..=MUTATION_LOCK_WAIT_CEILING_SECONDS).contains(&self.mutation_lock_wait_seconds) {
+            return Ok(());
+        }
+        Err(format!(
+            "mutation_lock_wait_seconds is {} but must be between 1 and \
+             {MUTATION_LOCK_WAIT_CEILING_SECONDS}: it is how long a mutation waits for its key's \
+             lock, a zero would fail every mutation that meets another and a value above the \
+             ceiling is no bound at all",
+            self.mutation_lock_wait_seconds
+        ))
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-3
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-2
+    }
+
+    /// Refuse a `redeliver_interval_seconds` outside `1..=43200`.
+    ///
+    /// # Errors
+    /// Names the field and the reason.
+    pub fn check_redeliver_interval(&self) -> Result<(), String> {
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-1
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-3
+        if (1..=REDELIVER_INTERVAL_CEILING_SECONDS).contains(&self.redeliver_interval_seconds) {
+            return Ok(());
+        }
+        Err(format!(
+            "redeliver_interval_seconds is {} but must be between 1 and \
+             {REDELIVER_INTERVAL_CEILING_SECONDS}: it is the delivery loop's tick and the wait \
+             before a state is published again, a zero would republish without pause and a value \
+             above the ceiling leaves no report timeout of at least two intervals within a day",
+            self.redeliver_interval_seconds
+        ))
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-3
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-1
+    }
+
+    /// Refuse an `activation_report_timeout_seconds` below two
+    /// `redeliver_interval_seconds` or above `86400`.
+    ///
+    /// # Errors
+    /// Names the field, the value and the bounds.
+    pub fn check_report_timeout(&self) -> Result<(), String> {
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-20
+        let floor = self.redeliver_interval_seconds.saturating_mul(2);
+        if (floor..=REPORT_TIMEOUT_CEILING_SECONDS)
+            .contains(&self.activation_report_timeout_seconds)
+        {
+            return Ok(());
+        }
+        Err(format!(
+            "activation_report_timeout_seconds is {} but must be between {floor} (twice \
+             redeliver_interval_seconds) and {REPORT_TIMEOUT_CEILING_SECONDS}: it is how long the \
+             delivery loop waits for a report, counted in accepted deliveries, and below two \
+             intervals an instance would be called silent before its second delivery",
+            self.activation_report_timeout_seconds
+        ))
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-lifecycle:p1:inst-ca-lifecycle-20
     }
 }
 
@@ -198,6 +321,18 @@ const fn default_cache_ttl_seconds() -> u64 {
 
 const fn default_publish_timeout_seconds() -> u64 {
     DEFAULT_PUBLISH_TIMEOUT_SECONDS
+}
+
+const fn default_mutation_lock_wait_seconds() -> u64 {
+    DEFAULT_MUTATION_LOCK_WAIT_SECONDS
+}
+
+const fn default_redeliver_interval_seconds() -> u64 {
+    DEFAULT_REDELIVER_INTERVAL_SECONDS
+}
+
+const fn default_activation_report_timeout_seconds() -> u64 {
+    crate::domain::activation::DEFAULT_REPORT_TIMEOUT_SECONDS
 }
 
 const fn default_cache_max_entries() -> usize {

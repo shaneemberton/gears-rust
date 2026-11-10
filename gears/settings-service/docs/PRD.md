@@ -1080,6 +1080,8 @@ Several mandatory acceptance criteria depend on platform capabilities that **do 
 
 Links to related specification artifacts.
 
-- **Design**: [DESIGN.md](./DESIGN.md) — TBD, not yet authored for this gear
-- **ADRs**: [ADR/](./ADR/) — TBD, not yet authored for this gear
-- **Features**: [features/](./features/) — TBD, not yet authored for this gear
+- **Design**: [DESIGN.md](./DESIGN.md) — the gear's architecture and contracts
+- **Activation design**: [DESIGN-activation.md](./DESIGN-activation.md) — consumer activation, replica coherence and the activation read
+- **ADRs**: [ADR/](./ADR/) — [ADR-002](./ADR/ADR-002-setting-key-gts-type-id.md) setting key as a GTS type id, [ADR-003](./ADR/ADR-003-thin-event-pull-report-activation.md) thin event, pull, report activation, [ADR-004](./ADR/ADR-004-per-instance-acknowledgement-bounded-wait.md) per-instance acknowledgement with a bounded wait
+- **Decomposition**: [DECOMPOSITION.md](./DECOMPOSITION.md) — the feature entries and their coverage
+- **Features**: [features/](./features/) — one spec per decomposition entry: `gear-foundation.md`, `category-management.md`, `setting-declarations.md`, `typed-value-validation.md`, `value-resolution.md`, `audit-store.md`, `tenant-access.md`, `value-writes.md`, `secret-values.md`, `module-contributions.md`, `search-discoverability.md`, `replica-coherence.md`, `consumer-activation.md`, `activation-read.md`

@@ -114,6 +114,7 @@ pub type ConcreteDeclarationAdmin = crate::domain::declaration::DeclarationAdmin
     crate::infra::storage::value_repo::ValueRepo,
     crate::infra::storage::audit_store::AuditStore,
     crate::infra::storage::pending_secret_repo::PendingSecretRepo,
+    crate::infra::storage::activation_repo::ActivationRepo,
 >;
 
 /// The action a create is authorized as.

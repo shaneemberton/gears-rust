@@ -1,25 +1,19 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use event_broker_sdk::models::EventType;
 use event_broker_sdk::{
-    Ack, AssignedPartition, ConsumerGroup, ConsumerGroupId, ConsumerGroupKind, ConsumerGroupQuery,
-    ControlCode, CreateConsumerGroupRequest, EventBrokerApi, EventBrokerError, EventV1,
-    FrameStream, GtsInstanceId, GtsTypeId, IngestOutcome, JoinRequest, Page, PartitionRange,
-    Position, ProducerCursors, ProducerId, ProducerMode, ResetScope, SeekPosition, SeekResult,
-    Sequence, StoredPosition, Subscription, SubscriptionAssignment, SubscriptionId, Topic,
-    TopicSegment, WireFrame,
+    ConsumerGroupId, ControlCode, EventBrokerApi, EventV1, GtsTypeId, Position, Sequence,
+    StoredPosition, SubscriptionId, WireFrame,
 };
 use serde_json::{Value, json};
 use settings_service_sdk::gts::{
     ACTIVATION_SUBJECT_TYPE, CACHE_INVALIDATE_EVENT_TYPE, CACHE_TOPIC_ID,
 };
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio_util::sync::CancellationToken;
 use toolkit::ClientHub;
 use toolkit_canonical_errors::CanonicalError;
@@ -28,10 +22,14 @@ use types_registry_sdk::RegisterResult;
 use uuid::Uuid;
 
 use super::CacheInvalidationConsumer;
+use crate::domain::activation::NotifyMetrics;
+use crate::domain::activation::testing::{LogBuf, RecordingNotifyMetrics};
 use crate::domain::platform_scope::PlatformScope;
 use crate::domain::resolution::EffectiveCache;
 use crate::domain::resolution::cache::tests_entry;
+use crate::infra::broker_group::lifecycle_tests as lifecycle;
 use crate::infra::event_broker::{Backoff, CacheSchemaRegistry, EventBrokerClient};
+use crate::test_support::scripted_broker::{ScriptedBroker, refused};
 
 const ROOT: Uuid = Uuid::from_u128(0xa0);
 
@@ -42,261 +40,6 @@ fn tenant(n: u128) -> Uuid {
 // ---------------------------------------------------------------------------
 // Doubles
 // ---------------------------------------------------------------------------
-
-type FrameResult = Result<WireFrame, EventBrokerError>;
-
-/// A broker that records what the consumer does to its groups and hands out one
-/// scripted stream per join.
-#[derive(Default)]
-struct ScriptedBroker {
-    create_refusals: AtomicUsize,
-    join_refusals: AtomicUsize,
-    delete_fails: Mutex<bool>,
-    /// `create_consumer_group` and `join` never answer.
-    create_hangs: AtomicBool,
-    join_hangs: AtomicBool,
-    /// `leave` never answers.
-    leave_hangs: AtomicBool,
-    /// Every stream ends as soon as it is opened.
-    streams_end_at_once: AtomicBool,
-    create_calls: Mutex<Vec<std::time::Instant>>,
-    creates: Mutex<Vec<ConsumerGroupId>>,
-    joins: Mutex<Vec<JoinRequest>>,
-    seeks: Mutex<Vec<Vec<SeekPosition>>>,
-    leaves: Mutex<Vec<SubscriptionId>>,
-    deletes: Mutex<Vec<ConsumerGroupId>>,
-    streams: Mutex<Vec<UnboundedSender<FrameResult>>>,
-    next_stream: Mutex<Option<UnboundedReceiver<FrameResult>>>,
-}
-
-fn refused() -> EventBrokerError {
-    EventBrokerError::Internal("refused by the scripted broker".to_owned())
-}
-
-fn unsupported() -> EventBrokerError {
-    EventBrokerError::Internal("not supported by the scripted broker".to_owned())
-}
-
-fn spend(counter: &AtomicUsize) -> bool {
-    counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
-        .is_ok()
-}
-
-impl ScriptedBroker {
-    fn creates(&self) -> usize {
-        self.creates.lock().unwrap().len()
-    }
-    fn deletes(&self) -> Vec<ConsumerGroupId> {
-        self.deletes.lock().unwrap().clone()
-    }
-    fn opened_streams(&self) -> usize {
-        self.streams.lock().unwrap().len()
-    }
-    /// Deliver a frame on the most recent stream.
-    fn send(&self, frame: FrameResult) {
-        let streams = self.streams.lock().unwrap();
-        streams.last().expect("a stream is open").send(frame).ok();
-    }
-    /// End the most recent stream.
-    fn end_stream(&self) {
-        self.streams.lock().unwrap().pop();
-    }
-}
-
-#[async_trait]
-impl EventBrokerApi for ScriptedBroker {
-    async fn register_producer(
-        &self,
-        _: &SecurityContext,
-        _: ProducerMode,
-        _: &str,
-    ) -> Result<ProducerId, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn publish(
-        &self,
-        _: &SecurityContext,
-        _: &EventV1,
-        _: Ack,
-    ) -> Result<IngestOutcome, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn publish_batch(
-        &self,
-        _: &SecurityContext,
-        _: &[EventV1],
-        _: Ack,
-    ) -> Result<IngestOutcome, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn get_producer_cursors(
-        &self,
-        _: &SecurityContext,
-        _: ProducerId,
-    ) -> Result<ProducerCursors, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn reset_producer_chain(
-        &self,
-        _: &SecurityContext,
-        _: ProducerId,
-        _: ResetScope<'_>,
-    ) -> Result<(), EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn create_consumer_group(
-        &self,
-        _: &SecurityContext,
-        req: CreateConsumerGroupRequest,
-    ) -> Result<ConsumerGroup, EventBrokerError> {
-        assert!(req.client_agent.starts_with("settings-service:"));
-        self.create_calls
-            .lock()
-            .unwrap()
-            .push(std::time::Instant::now());
-        if self.create_hangs.load(Ordering::SeqCst) {
-            std::future::pending::<()>().await;
-        }
-        if spend(&self.create_refusals) {
-            return Err(refused());
-        }
-        let id = ConsumerGroupId::new(Uuid::new_v4());
-        self.creates.lock().unwrap().push(id);
-        Ok(ConsumerGroup {
-            id,
-            tenant_id: ROOT,
-            owner_principal_id: Uuid::nil(),
-            kind: ConsumerGroupKind::Anonymous,
-            description: None,
-            created_at: Utc::now(),
-        })
-    }
-    async fn get_consumer_group(
-        &self,
-        _: &SecurityContext,
-        _: &ConsumerGroupId,
-    ) -> Result<ConsumerGroup, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_consumer_groups(
-        &self,
-        _: &SecurityContext,
-        _: ConsumerGroupQuery,
-    ) -> Result<Page<ConsumerGroup>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn delete_consumer_group(
-        &self,
-        _: &SecurityContext,
-        id: &ConsumerGroupId,
-    ) -> Result<(), EventBrokerError> {
-        self.deletes.lock().unwrap().push(*id);
-        if *self.delete_fails.lock().unwrap() {
-            return Err(refused());
-        }
-        Ok(())
-    }
-    async fn join(
-        &self,
-        _: &SecurityContext,
-        req: JoinRequest,
-    ) -> Result<SubscriptionAssignment, EventBrokerError> {
-        self.joins.lock().unwrap().push(req);
-        if self.join_hangs.load(Ordering::SeqCst) {
-            std::future::pending::<()>().await;
-        }
-        if spend(&self.join_refusals) {
-            return Err(refused());
-        }
-        let (tx, rx) = unbounded_channel();
-        self.streams.lock().unwrap().push(tx);
-        *self.next_stream.lock().unwrap() = Some(rx);
-        Ok(SubscriptionAssignment {
-            subscription_id: SubscriptionId(Uuid::new_v4()),
-            topology_version: 7,
-            assigned: vec![AssignedPartition {
-                topic: GtsInstanceId::try_new(CACHE_TOPIC_ID).unwrap(),
-                partition: 0,
-            }],
-        })
-    }
-    async fn get_subscription(
-        &self,
-        _: &SecurityContext,
-        _: SubscriptionId,
-    ) -> Result<Subscription, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_subscriptions(
-        &self,
-        _: &SecurityContext,
-    ) -> Result<Vec<Subscription>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn leave(&self, _: &SecurityContext, id: SubscriptionId) -> Result<(), EventBrokerError> {
-        self.leaves.lock().unwrap().push(id);
-        if self.leave_hangs.load(Ordering::SeqCst) {
-            std::future::pending::<()>().await;
-        }
-        Ok(())
-    }
-    async fn stream(
-        &self,
-        _: &SecurityContext,
-        _: SubscriptionId,
-    ) -> Result<FrameStream, EventBrokerError> {
-        if self.streams_end_at_once.load(Ordering::SeqCst) {
-            return Ok(Box::pin(futures_util::stream::empty()));
-        }
-        let rx = self
-            .next_stream
-            .lock()
-            .unwrap()
-            .take()
-            .ok_or_else(unsupported)?;
-        Ok(Box::pin(futures_util::stream::unfold(
-            rx,
-            |mut rx| async move { rx.recv().await.map(|frame| (frame, rx)) },
-        )))
-    }
-    async fn seek(
-        &self,
-        _: &SecurityContext,
-        _: SubscriptionId,
-        topology_version: i64,
-        positions: &[SeekPosition],
-    ) -> Result<Vec<SeekResult>, EventBrokerError> {
-        assert_eq!(topology_version, 7);
-        self.seeks.lock().unwrap().push(positions.to_vec());
-        Ok(Vec::new())
-    }
-    async fn list_topics(&self, _: &SecurityContext) -> Result<Vec<Topic>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_topic_segments(
-        &self,
-        _: &SecurityContext,
-        _: &str,
-        _: u32,
-        _: PartitionRange,
-    ) -> Result<TopicSegment, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_event_types(
-        &self,
-        _: &SecurityContext,
-    ) -> Result<Vec<EventType>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn get_event_type(
-        &self,
-        _: &SecurityContext,
-        _: &str,
-    ) -> Result<EventType, EventBrokerError> {
-        Err(unsupported())
-    }
-}
 
 /// A registry that accepts, or refuses every document.
 struct Registry {
@@ -339,32 +82,6 @@ impl PlatformScope for Scope {
     }
 }
 
-#[derive(Clone, Default)]
-struct LogBuf(Arc<Mutex<Vec<u8>>>);
-
-impl LogBuf {
-    fn text(&self) -> String {
-        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
-    }
-}
-
-impl std::io::Write for LogBuf {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogBuf {
-    type Writer = Self;
-    fn make_writer(&'a self) -> Self::Writer {
-        self.clone()
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Fixture
 // ---------------------------------------------------------------------------
@@ -389,7 +106,9 @@ fn fixture(registry_refuses: bool, plugged: bool) -> Fixture {
             .finish(),
     );
     let hub = Arc::new(ClientHub::new());
-    let broker = Arc::new(ScriptedBroker::default());
+    let broker = Arc::new(
+        ScriptedBroker::on_topic(CACHE_TOPIC_ID).expecting_agent_prefix("settings-service:"),
+    );
     if plugged {
         hub.register::<dyn EventBrokerApi>(Arc::clone(&broker) as Arc<dyn EventBrokerApi>);
     }
@@ -460,11 +179,22 @@ async fn until(what: &str, mut done: impl FnMut() -> bool) {
 /// A delivered event as the broker streams it: stored, so its position is
 /// stamped, and carrying `trace_parent` when given one.
 fn delivered(type_id: &str, data: Value, trace_parent: Option<&str>) -> EventV1 {
+    delivered_at(type_id, data, trace_parent, Utc::now())
+}
+
+/// [`delivered`], produced at `occurred_at`.
+fn delivered_at(
+    type_id: &str,
+    data: Value,
+    trace_parent: Option<&str>,
+    occurred_at: chrono::DateTime<Utc>,
+) -> EventV1 {
     let builder = EventV1::builder_for(GtsTypeId::new(type_id), data)
         .tenant_id(ROOT)
         .source("settings-service")
         .subject(tenant(1).to_string())
-        .subject_type_id(GtsTypeId::new(ACTIVATION_SUBJECT_TYPE));
+        .subject_type_id(GtsTypeId::new(ACTIVATION_SUBJECT_TYPE))
+        .occurred_at(occurred_at);
     match trace_parent {
         Some(trace_parent) => builder.trace_parent(trace_parent),
         None => builder,
@@ -642,7 +372,7 @@ async fn stop_leaves_and_deletes_the_group_once_and_logs_start_and_stop() {
 #[tokio::test]
 async fn a_failed_delete_on_stop_warns_and_the_task_still_ends() {
     let mut f = fixture(false, true);
-    *f.broker.delete_fails.lock().unwrap() = true;
+    f.broker.delete_fails.store(true, Ordering::SeqCst);
     f.start();
     until("the stream to open", || f.broker.opened_streams() == 1).await;
 
@@ -686,11 +416,11 @@ async fn a_stream_that_ends_pauses_deletes_the_group_and_resumes_on_a_new_one() 
 #[tokio::test]
 async fn a_stream_error_is_a_lost_broker_and_a_failed_delete_still_drops_the_group() {
     let mut f = fixture(false, true);
-    *f.broker.delete_fails.lock().unwrap() = true;
+    f.broker.delete_fails.store(true, Ordering::SeqCst);
     f.start();
     until("the first stream", || f.broker.opened_streams() == 1).await;
 
-    f.broker.send(Err(refused()));
+    f.broker.send(Err(refused(false)));
     until("a second group", || f.broker.creates() == 2).await;
 
     assert_eq!(f.broker.deletes().len(), 1, "one best-effort attempt");
@@ -844,6 +574,45 @@ fn a_delivery_without_a_traceparent_opens_a_fresh_root_and_still_evicts() {
         "a root span"
     );
     assert!(f.cache.get("k.one", tenant(2)).is_none());
+}
+
+// ---------------------------------------------------------------------------
+// publish-to-deliver
+// ---------------------------------------------------------------------------
+
+#[test]
+fn every_cache_invalidate_delivery_observes_publish_to_deliver_even_a_malformed_one() {
+    let f = fixture(false, true);
+    let metrics = Arc::new(RecordingNotifyMetrics::default());
+    let consumer = CacheInvalidationConsumer::new(f.client.clone(), f.cache)
+        .with_metrics(Arc::clone(&metrics) as Arc<dyn NotifyMetrics>);
+    for data in [invalidation(&["k.one"]), json!({ "tenant": "not-a-uuid" })] {
+        let event = delivered_at(
+            CACHE_INVALIDATE_EVENT_TYPE,
+            data,
+            None,
+            Utc::now() - chrono::Duration::seconds(3),
+        );
+        consumer.deliver(&event);
+    }
+    // Another type is not a cache_invalidate delivery and is not observed.
+    let WireFrame::Event(other) = wire(
+        "gts.cf.core.events.event.v1~cf.core.other.thing.v1~",
+        invalidation(&["k.one"]),
+    ) else {
+        unreachable!("wire builds an event frame");
+    };
+    consumer.deliver(&other);
+
+    let observed = metrics.delivered.lock().unwrap().clone();
+    assert_eq!(observed.len(), 2, "the malformed delivery is observed too");
+    for (event, elapsed) in observed {
+        assert_eq!(event, "cache_invalidate");
+        assert!(
+            elapsed >= Duration::from_secs(3) && elapsed < Duration::from_secs(60),
+            "{elapsed:?} runs from occurred_at to receipt"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1042,4 +811,182 @@ async fn a_quiet_stream_that_stays_open_long_enough_resets_the_backoff() {
         super::Taken::Ended(super::Ended::Cancelled)
     ));
     assert_eq!(pause.ceiling(), Duration::from_millis(1), "reset");
+}
+
+// ---------------------------------------------------------------------------
+// Deliveries waiting together are evicted together
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn deliveries_already_waiting_on_the_stream_are_evicted_in_one_call_over_their_union() {
+    let f = fixture(false, true);
+    for (key, t) in [("k.one", 2), ("k.one", 3), ("k.two", 2), ("k.keep", 2)] {
+        f.cache.seed(Arc::new(tests_entry(key, tenant(t))));
+    }
+    let consumer = CacheInvalidationConsumer::new(Arc::clone(&f.client), Arc::clone(&f.cache));
+    let mut pause = f.client.backoff();
+    // Two deliveries, ready at once, with a heartbeat between them.
+    let ready: super::FrameStream = Box::pin(futures_util::stream::iter([
+        Ok(wire(CACHE_INVALIDATE_EVENT_TYPE, invalidation(&["k.one"]))),
+        Ok(WireFrame::Heartbeat {
+            at: "now".to_owned(),
+        }),
+        Ok(wire(
+            CACHE_INVALIDATE_EVENT_TYPE,
+            invalidation(&["k.two", "k.one"]),
+        )),
+    ]));
+    let before = f.cache.eviction_stats();
+
+    let taken = consumer
+        .take(ready, &mut pause, &CancellationToken::new())
+        .await;
+
+    assert!(matches!(taken, super::Taken::Ended(super::Ended::Lost)));
+    let after = f.cache.eviction_stats();
+    assert_eq!(after.key_passes - before.key_passes, 1, "one eviction call");
+    assert_eq!(
+        after.visited - before.visited,
+        3,
+        "over the union: k.one at two tenants and k.two once"
+    );
+    assert!(f.cache.get("k.one", tenant(3)).is_none());
+    assert!(f.cache.get("k.two", tenant(2)).is_none());
+    assert!(f.cache.get("k.keep", tenant(2)).is_some());
+}
+
+#[tokio::test]
+async fn a_terminal_frame_behind_a_delivery_still_lets_the_delivery_evict_first() {
+    let f = fixture(false, true);
+    f.cache.seed(Arc::new(tests_entry("k.one", tenant(2))));
+    let consumer = CacheInvalidationConsumer::new(Arc::clone(&f.client), Arc::clone(&f.cache));
+    let mut pause = f.client.backoff();
+    let frames: super::FrameStream = Box::pin(futures_util::stream::iter([
+        Ok(wire(CACHE_INVALIDATE_EVENT_TYPE, invalidation(&["k.one"]))),
+        Ok(WireFrame::Control {
+            code: ControlCode::Terminal,
+            positions: Vec::new(),
+            reason: None,
+        }),
+    ]));
+    let taken = consumer
+        .take(frames, &mut pause, &CancellationToken::new())
+        .await;
+    assert!(matches!(taken, super::Taken::Rejoin));
+    assert!(f.cache.get("k.one", tenant(2)).is_none());
+    assert_eq!(f.cache.eviction_stats().key_passes, 1);
+}
+
+// ---------------------------------------------------------------------------
+// The subscription survives a stop that cancels its leave
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn a_stop_during_a_rejoins_leave_still_leaves_the_subscription_before_the_delete() {
+    let mut f = fixture(false, true);
+    f.start();
+    until("the stream to open", || f.broker.opened_streams() == 1).await;
+    let group = f.broker.creates.lock().unwrap()[0];
+    f.broker.leave_hangs.store(true, Ordering::SeqCst);
+
+    f.broker.send(Ok(WireFrame::Control {
+        code: ControlCode::Terminal,
+        positions: Vec::new(),
+        reason: None,
+    }));
+    until("the rejoin's leave to start", || {
+        f.broker.leaves.lock().unwrap().len() == 1
+    })
+    .await;
+    f.stop().await;
+
+    let leaves = f.broker.leaves.lock().unwrap().clone();
+    assert_eq!(
+        leaves.len(),
+        2,
+        "the cancelled leave is made again on release"
+    );
+    assert_eq!(leaves[0], leaves[1], "of the same subscription");
+    assert_eq!(
+        f.broker.deletes(),
+        vec![group],
+        "and the group deleted after"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The shared group-session lifecycle table
+// ---------------------------------------------------------------------------
+
+/// The cache consumer under the lifecycle table both consumers of the shared
+/// group session run.
+struct CacheHarness(Fixture);
+
+impl CacheHarness {
+    fn new() -> Self {
+        Self(fixture(false, true))
+    }
+}
+
+impl lifecycle::Harness for CacheHarness {
+    fn scripted(&self) -> Arc<dyn EventBrokerApi> {
+        Arc::clone(&self.0.broker) as Arc<dyn EventBrokerApi>
+    }
+    fn plug(&self, broker: Arc<dyn EventBrokerApi>) {
+        self.0.hub.register::<dyn EventBrokerApi>(broker);
+    }
+    fn refuse_creates(&self, n: usize) {
+        self.0.broker.create_refusals.store(n, Ordering::SeqCst);
+    }
+    fn refuse_joins(&self, n: usize) {
+        self.0.broker.join_refusals.store(n, Ordering::SeqCst);
+    }
+    fn hang_leaves(&self) {
+        self.0.broker.leave_hangs.store(true, Ordering::SeqCst);
+    }
+    fn send_terminal(&self) {
+        self.0.broker.send(Ok(WireFrame::Control {
+            code: ControlCode::Terminal,
+            positions: Vec::new(),
+            reason: None,
+        }));
+    }
+    fn end_stream(&self) {
+        self.0.broker.end_stream();
+    }
+    async fn start(&mut self) {
+        self.0.start();
+    }
+    async fn stop(&mut self) {
+        self.0.stop().await;
+    }
+    fn logs(&self) -> String {
+        self.0.logs.text()
+    }
+}
+
+#[tokio::test]
+async fn lifecycle_stop_leaves_the_subscription_then_deletes_the_group() {
+    lifecycle::stop_leaves_the_subscription_then_deletes_the_group(CacheHarness::new()).await;
+}
+
+#[tokio::test]
+async fn lifecycle_refusals_are_retried_on_one_group_and_leak_none() {
+    lifecycle::refusals_are_retried_on_one_group_and_leak_none(CacheHarness::new()).await;
+}
+
+#[tokio::test]
+async fn lifecycle_a_terminal_frame_rejoins_through_the_same_group() {
+    lifecycle::a_terminal_frame_rejoins_through_the_same_group(CacheHarness::new()).await;
+}
+
+#[tokio::test]
+async fn lifecycle_a_lost_stream_releases_the_group_and_a_new_one_is_created() {
+    lifecycle::a_lost_stream_releases_the_group_and_a_new_one_is_created(CacheHarness::new()).await;
+}
+
+#[tokio::test]
+async fn lifecycle_a_stop_during_a_rejoins_leave_still_leaves_before_the_delete() {
+    lifecycle::a_stop_during_a_rejoins_leave_still_leaves_before_the_delete(CacheHarness::new())
+        .await;
 }

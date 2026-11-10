@@ -3,6 +3,11 @@
 //! three identifiers (`ACTIVATION_SUBJECT_TYPE`, `CACHE_TOPIC_ID`,
 //! `CACHE_INVALIDATE_EVENT_TYPE`) are part of the SDK, in `settings_service_sdk::gts`.
 //!
+//! The `change_notification` body is not defined here: it is the SDK's
+//! (`settings_service_sdk::activation::ChangeNotification`), re-exported below
+//! so the publisher and the consuming client read and write one definition;
+//! only its event-type schema is built here.
+//!
 //! Every replica of the gear publishes one [`CacheInvalidation`] per tenant a
 //! request touched on the cache topic and consumes the ones its peers publish.
 //! The body is a thin event (ADR-003): it names *what* changed, never *to
@@ -19,7 +24,8 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use settings_service_sdk::gts::{
-    ACTIVATION_SUBJECT_TYPE, CACHE_INVALIDATE_EVENT_TYPE, CACHE_TOPIC_ID,
+    ACTIVATION_SUBJECT_TYPE, ACTIVATION_TOPIC_ID, CACHE_INVALIDATE_EVENT_TYPE, CACHE_TOPIC_ID,
+    CHANGE_NOTIFICATION_EVENT_TYPE,
 };
 
 /// The `data` of a `cache_invalidate` event.
@@ -129,6 +135,60 @@ pub fn cache_topic_instance() -> Value {
     json!({
         "id": CACHE_TOPIC_ID,
         "description": "Settings Service replica cache coherence: cache_invalidate broadcasts between the service's own replicas",
+    })
+}
+
+// The body is the SDK's: the publishing service and the consuming SDK read and
+// write one definition (`settings_service_sdk::activation`), identifiers only.
+pub use settings_service_sdk::activation::{ChangeNotification, NotifiedKey};
+
+/// The `data` schema of [`ChangeNotification`]. Unknown properties are allowed
+/// so attributes can be added within a major version.
+fn change_notification_data_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "tenant": { "type": "string" },
+            "subscriber": { "type": "string" },
+            "changes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "key": { "type": "string" },
+                        "change_ref": { "type": "string", "format": "uuid" }
+                    },
+                    "required": ["key", "change_ref"]
+                }
+            },
+            "subject_type": { "type": "string" },
+            "subject_id": { "type": "string" }
+        },
+        "required": ["tenant", "subscriber", "changes"]
+    })
+}
+
+/// The derived event-type schema of [`CHANGE_NOTIFICATION_EVENT_TYPE`] on
+/// [`ACTIVATION_TOPIC_ID`]. It keeps the broker's default partition key
+/// (`/tenant_id`) and names [`ACTIVATION_SUBJECT_TYPE`] as its only allowed
+/// subject type.
+#[must_use]
+pub fn change_notification_event_type_schema() -> Value {
+    derived_event_type_schema(
+        CHANGE_NOTIFICATION_EVENT_TYPE,
+        ACTIVATION_TOPIC_ID,
+        change_notification_data_schema(),
+        &[ACTIVATION_SUBJECT_TYPE],
+    )
+}
+
+/// The activation topic as an instance of the broker's topic base, ready to
+/// register. Retention is left to the broker's configured default.
+#[must_use]
+pub fn activation_topic_instance() -> Value {
+    json!({
+        "id": ACTIVATION_TOPIC_ID,
+        "description": "Settings Service consumer activation: filtered change_notification events for the gears that subscribed to a setting",
     })
 }
 

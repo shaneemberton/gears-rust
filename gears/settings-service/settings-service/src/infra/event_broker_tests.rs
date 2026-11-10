@@ -13,7 +13,10 @@ use event_broker_sdk::{
     SeekResult, Subscription, SubscriptionAssignment, SubscriptionId, Topic, TopicSegment,
 };
 use serde_json::Value;
-use settings_service_sdk::gts::{CACHE_INVALIDATE_EVENT_TYPE, CACHE_TOPIC_ID};
+use settings_service_sdk::gts::{
+    ACTIVATION_SUBJECT_TYPE, ACTIVATION_TOPIC_ID, CACHE_INVALIDATE_EVENT_TYPE, CACHE_TOPIC_ID,
+    CHANGE_NOTIFICATION_EVENT_TYPE,
+};
 use tokio_util::sync::CancellationToken;
 use toolkit::ClientHub;
 use toolkit_canonical_errors::CanonicalError;
@@ -22,6 +25,8 @@ use types_registry_sdk::RegisterResult;
 use uuid::Uuid;
 
 use super::{Backoff, CacheSchemaRegistry, EventBrokerClient};
+use crate::domain::activation::testing::{capture, logged};
+use crate::domain::activation::{ActivationPairs, NotificationGateway};
 use crate::domain::coherence::testing::CountingMetrics;
 use crate::domain::coherence::{
     BroadcastContext, BroadcastGateway, BroadcastMetrics, BroadcastSink, ChangeOutcome,
@@ -33,6 +38,7 @@ use crate::domain::resolution::scope_class;
 use crate::infra::broadcast::build_broadcasts;
 use crate::infra::event_schemas::CacheInvalidation;
 use crate::infra::service_identity::service_principal;
+use crate::test_support::event_broker_stubs::event_broker_impl;
 
 // ---------------------------------------------------------------------------
 // Doubles
@@ -43,6 +49,10 @@ enum Mode {
     Accept,
     Refuse,
     Stall,
+    /// Accept each publish after this long.
+    Slow(Duration),
+    /// Refuse each publish for a missing grant.
+    Deny,
 }
 
 /// A broker that accepts, refuses or stalls every publish; the rest is refused.
@@ -64,149 +74,40 @@ fn unsupported() -> EventBrokerError {
     EventBrokerError::Internal("not supported by the scripted broker".to_owned())
 }
 
-#[async_trait]
-impl EventBrokerApi for ScriptedBroker {
-    async fn register_producer(
-        &self,
-        _: &SecurityContext,
-        _: ProducerMode,
-        _: &str,
-    ) -> Result<ProducerId, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn publish(
-        &self,
-        ctx: &SecurityContext,
-        event: &EventV1,
-        ack: Ack,
-    ) -> Result<IngestOutcome, EventBrokerError> {
-        let mode = *self.mode.lock().unwrap();
-        match mode {
-            Mode::Refuse => return Err(unsupported()),
-            Mode::Stall => std::future::pending::<()>().await,
-            Mode::Accept => {}
+event_broker_impl! {
+    impl EventBrokerApi for ScriptedBroker {
+        async fn publish(
+            &self,
+            ctx: &SecurityContext,
+            event: &EventV1,
+            ack: Ack,
+        ) -> Result<IngestOutcome, EventBrokerError> {
+            let mode = *self.mode.lock().unwrap();
+            match mode {
+                Mode::Refuse => return Err(unsupported()),
+                Mode::Stall => std::future::pending::<()>().await,
+                Mode::Slow(delay) => tokio::time::sleep(delay).await,
+                Mode::Deny => {
+                    return Err(EventBrokerError::Unauthorized {
+                        detail: "no produce grant".to_owned(),
+                    });
+                }
+                Mode::Accept => {}
+            }
+            self.published
+                .lock()
+                .unwrap()
+                .push((ctx.clone(), event.clone(), ack));
+            Ok(IngestOutcome::Accepted)
         }
-        self.published
-            .lock()
-            .unwrap()
-            .push((ctx.clone(), event.clone(), ack));
-        Ok(IngestOutcome::Accepted)
     }
-    async fn publish_batch(
-        &self,
-        _: &SecurityContext,
-        _: &[EventV1],
-        _: Ack,
-    ) -> Result<IngestOutcome, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn get_producer_cursors(
-        &self,
-        _: &SecurityContext,
-        _: ProducerId,
-    ) -> Result<ProducerCursors, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn reset_producer_chain(
-        &self,
-        _: &SecurityContext,
-        _: ProducerId,
-        _: ResetScope<'_>,
-    ) -> Result<(), EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn create_consumer_group(
-        &self,
-        _: &SecurityContext,
-        _: CreateConsumerGroupRequest,
-    ) -> Result<ConsumerGroup, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn get_consumer_group(
-        &self,
-        _: &SecurityContext,
-        _: &ConsumerGroupId,
-    ) -> Result<ConsumerGroup, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_consumer_groups(
-        &self,
-        _: &SecurityContext,
-        _: ConsumerGroupQuery,
-    ) -> Result<Page<ConsumerGroup>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn delete_consumer_group(
-        &self,
-        _: &SecurityContext,
-        _: &ConsumerGroupId,
-    ) -> Result<(), EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn join(
-        &self,
-        _: &SecurityContext,
-        _: JoinRequest,
-    ) -> Result<SubscriptionAssignment, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn get_subscription(
-        &self,
-        _: &SecurityContext,
-        _: SubscriptionId,
-    ) -> Result<Subscription, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_subscriptions(
-        &self,
-        _: &SecurityContext,
-    ) -> Result<Vec<Subscription>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn leave(&self, _: &SecurityContext, _: SubscriptionId) -> Result<(), EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn stream(
-        &self,
-        _: &SecurityContext,
-        _: SubscriptionId,
-    ) -> Result<FrameStream, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn seek(
-        &self,
-        _: &SecurityContext,
-        _: SubscriptionId,
-        _: i64,
-        _: &[SeekPosition],
-    ) -> Result<Vec<SeekResult>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_topics(&self, _: &SecurityContext) -> Result<Vec<Topic>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_topic_segments(
-        &self,
-        _: &SecurityContext,
-        _: &str,
-        _: u32,
-        _: PartitionRange,
-    ) -> Result<TopicSegment, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn list_event_types(
-        &self,
-        _: &SecurityContext,
-    ) -> Result<Vec<EventType>, EventBrokerError> {
-        Err(unsupported())
-    }
-    async fn get_event_type(
-        &self,
-        _: &SecurityContext,
-        _: &str,
-    ) -> Result<EventType, EventBrokerError> {
-        Err(unsupported())
-    }
+    unsupported: [
+        register_producer, publish_batch, get_producer_cursors, reset_producer_chain,
+        create_consumer_group, get_consumer_group, list_consumer_groups, delete_consumer_group,
+        join, get_subscription, list_subscriptions, leave,
+        stream, seek, list_topics, list_topic_segments,
+        list_event_types, get_event_type,
+    ]
 }
 
 /// A registry that refuses a scripted number of calls per document, can answer
@@ -353,40 +254,6 @@ fn an_event() -> EventV1 {
         keys: vec!["acme.net.proxy".to_owned()],
     }];
     build_broadcasts(&touched, &ctx).remove(0)
-}
-
-#[derive(Clone, Default)]
-struct LogBuf(Arc<Mutex<Vec<u8>>>);
-
-impl std::io::Write for LogBuf {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogBuf {
-    type Writer = Self;
-    fn make_writer(&'a self) -> Self::Writer {
-        self.clone()
-    }
-}
-
-/// Captures this thread's log lines until the guard drops.
-fn capture() -> (LogBuf, tracing::subscriber::DefaultGuard) {
-    let buf = LogBuf::default();
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(buf.clone())
-        .with_ansi(false)
-        .finish();
-    (buf, tracing::subscriber::set_default(subscriber))
-}
-
-fn logged(buf: &LogBuf) -> String {
-    String::from_utf8(buf.0.lock().unwrap().clone()).unwrap()
 }
 
 // ---------------------------------------------------------------------------
@@ -748,6 +615,7 @@ async fn one_refused_publish_through_the_client_is_exactly_one_warn() {
             ),
         ],
         Uuid::from_u128(0xc5),
+        &ActivationPairs::new(),
     )
     .await;
     assert_eq!(metrics.all(), ["failed", "skipped"]);
@@ -851,4 +719,466 @@ fn the_group_alias_names_the_instance() {
         f.client.group_alias(),
         format!("settings-service:{}", Uuid::from_u128(0x1d))
     );
+}
+
+// ---------------------------------------------------------------------------
+// The activation half of the registration
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn the_activation_types_are_unregistered_until_the_delivery_loop_registers_them() {
+    let f = plain();
+    plug(&f, Mode::Accept);
+    assert!(!f.client.notifications_registered());
+    // The cache half's resolution registers the cache documents and nothing
+    // of the activation half.
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    assert!(!f.client.notifications_registered());
+    assert!(
+        f.registry
+            .topics
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|t| t["id"] != ACTIVATION_TOPIC_ID)
+    );
+}
+
+#[tokio::test]
+async fn the_activation_topic_and_type_are_registered_once_and_idempotently() {
+    let f = plain();
+    plug(&f, Mode::Accept);
+    let cancel = CancellationToken::new();
+    assert!(f.client.register_notifications_once(&cancel).await);
+    assert!(f.client.notifications_registered());
+    assert!(f.client.register_notifications_once(&cancel).await);
+
+    let topics = f.registry.topics.lock().unwrap();
+    assert_eq!(topics.len(), 1, "registered once");
+    assert_eq!(topics[0]["id"], ACTIVATION_TOPIC_ID);
+    let types = f.registry.types.lock().unwrap();
+    assert_eq!(types.len(), 1, "registered once");
+    let schema = types[0].to_string();
+    assert!(schema.contains(CHANGE_NOTIFICATION_EVENT_TYPE), "{schema}");
+    assert!(schema.contains(ACTIVATION_SUBJECT_TYPE), "{schema}");
+    assert!(schema.contains(ACTIVATION_TOPIC_ID), "{schema}");
+}
+
+#[tokio::test]
+async fn already_registered_activation_documents_count_as_registered() {
+    let f = fixture(
+        ScriptedRegistry {
+            already_registered: true,
+            ..Default::default()
+        },
+        0,
+        Duration::from_secs(2),
+    );
+    plug(&f, Mode::Accept);
+    assert!(
+        f.client
+            .register_notifications_once(&CancellationToken::new())
+            .await
+    );
+    assert!(f.client.notifications_registered());
+}
+
+#[tokio::test]
+async fn a_refused_activation_registration_warns_and_is_retried_without_redoing_the_topic() {
+    let f = fixture(
+        ScriptedRegistry {
+            type_refusals: AtomicUsize::new(1),
+            ..Default::default()
+        },
+        0,
+        Duration::from_secs(2),
+    );
+    plug(&f, Mode::Accept);
+    let (buf, _guard) = capture();
+    let cancel = CancellationToken::new();
+
+    assert!(!f.client.register_notifications_once(&cancel).await);
+    assert!(!f.client.notifications_registered());
+    let log = logged(&buf);
+    assert!(
+        log.contains("WARN") && log.contains("change_notification type"),
+        "{log}"
+    );
+
+    assert!(f.client.register_notifications_once(&cancel).await);
+    assert!(f.client.notifications_registered());
+    assert_eq!(
+        f.registry.topics.lock().unwrap().len(),
+        1,
+        "the topic stays registered"
+    );
+    assert_eq!(f.registry.types.lock().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn a_refused_activation_topic_keeps_the_type_unregistered_too() {
+    let f = fixture(
+        ScriptedRegistry {
+            topic_refusals: AtomicUsize::new(1),
+            ..Default::default()
+        },
+        0,
+        Duration::from_secs(2),
+    );
+    plug(&f, Mode::Accept);
+    let cancel = CancellationToken::new();
+    assert!(!f.client.register_notifications_once(&cancel).await);
+    assert!(
+        f.registry.types.lock().unwrap().is_empty(),
+        "the type waits for its topic"
+    );
+    assert!(f.client.register_notifications_once(&cancel).await);
+}
+
+#[tokio::test]
+async fn a_registration_cut_short_by_the_stop_is_not_registered() {
+    let f = plain();
+    plug(&f, Mode::Accept);
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    assert!(!f.client.register_notifications_once(&cancel).await);
+    assert!(!f.client.notifications_registered());
+}
+
+#[tokio::test]
+async fn the_notification_gateway_reads_the_clients_state() {
+    use crate::domain::activation::NotificationGateway;
+    let f = plain();
+    assert!(!NotificationGateway::broker_present(f.client.as_ref()));
+    assert!(NotificationGateway::session(f.client.as_ref()).is_none());
+    plug(&f, Mode::Accept);
+    assert!(NotificationGateway::broker_present(f.client.as_ref()));
+    // A session needs the root tenant too.
+    assert!(NotificationGateway::session(f.client.as_ref()).is_none());
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    assert!(NotificationGateway::session(f.client.as_ref()).is_some());
+    assert_eq!(
+        NotificationGateway::root_tenant(f.client.as_ref()),
+        Some(ROOT)
+    );
+    assert!(!NotificationGateway::registered(f.client.as_ref()));
+    assert!(NotificationGateway::register(f.client.as_ref(), &CancellationToken::new()).await);
+    assert!(NotificationGateway::registered(f.client.as_ref()));
+}
+
+#[tokio::test]
+async fn a_notification_is_published_under_the_publishing_identity() {
+    use crate::domain::activation::{NotifiedChange, SubscriberTenant};
+    let f = plain();
+    let broker = plug(&f, Mode::Accept);
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    let pair = SubscriberTenant {
+        subscriber: "gear-x".to_owned(),
+        tenant: Uuid::from_u128(0x7e).to_string(),
+    };
+    let built = crate::infra::broadcast::build_notifications(
+        &pair,
+        &[NotifiedChange {
+            key: "acme.net.proxy".to_owned(),
+            change_ref: Uuid::from_u128(1),
+        }],
+        None,
+    );
+    let session = f.client.session().expect("a session");
+    for notification in built {
+        session.publish(notification.event).await.expect("accepted");
+    }
+    let published = broker.published.lock().unwrap();
+    assert_eq!(published.len(), 1);
+    assert_eq!(published[0].0.subject_id(), service_principal());
+    assert_eq!(
+        published[0].0.subject_tenant_id(),
+        ROOT,
+        "the broker path acts under the root tenant"
+    );
+}
+
+#[tokio::test]
+async fn a_stalled_notification_times_out_once_and_skips_the_requests_remaining_publishes() {
+    use crate::domain::activation::testing::{
+        FakeScanLock, InMemoryNotificationRepo, RecordingNotifyMetrics,
+    };
+    use crate::domain::activation::{
+        ActivationNotifier, NotificationGateway, NotificationStore, NotifyMetrics, ScanLock,
+    };
+    // The activation types registered, the publish timeout 50 ms, a broker that
+    // accepts nothing in time: two pairs of one request cost one timeout.
+    let f = fixture(ScriptedRegistry::default(), 0, Duration::from_millis(50));
+    plug(&f, Mode::Stall);
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    assert!(
+        f.client
+            .register_notifications_once(&CancellationToken::new())
+            .await
+    );
+    let repo = InMemoryNotificationRepo::new();
+    let (t1, t2) = (
+        Uuid::from_u128(0xc1).to_string(),
+        Uuid::from_u128(0xc2).to_string(),
+    );
+    repo.add("gear-x", &t1, "acme.net.proxy", Uuid::from_u128(1));
+    repo.add("gear-x", &t2, "acme.net.proxy", Uuid::from_u128(2));
+    let notifier = Arc::new(ActivationNotifier::new(
+        Arc::clone(&repo) as Arc<dyn NotificationStore>,
+        Arc::clone(&f.client) as Arc<dyn NotificationGateway>,
+        Arc::new(FakeScanLock::default()) as Arc<dyn ScanLock>,
+        Arc::new(RecordingNotifyMetrics::default()) as Arc<dyn NotifyMetrics>,
+        Duration::from_secs(30),
+    ));
+    let metrics = Arc::new(CountingMetrics::default());
+    let hook = CoherencePublisher::new(
+        Arc::clone(&f.client) as Arc<dyn BroadcastGateway>,
+        Arc::clone(&metrics) as Arc<dyn BroadcastMetrics>,
+    )
+    .with_notifier(notifier);
+    let mut pairs = ActivationPairs::new();
+    pairs.remember([
+        crate::domain::activation::SubscriberTenant {
+            subscriber: "gear-x".to_owned(),
+            tenant: t1.clone(),
+        },
+        crate::domain::activation::SubscriberTenant {
+            subscriber: "gear-x".to_owned(),
+            tenant: t2.clone(),
+        },
+    ]);
+    let (buf, _guard) = capture();
+
+    let started = std::time::Instant::now();
+    hook.publish_value_writes([], Uuid::from_u128(0xc5), &pairs)
+        .await;
+
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "the request paid one timeout, not one per pair"
+    );
+    let log = logged(&buf);
+    assert_eq!(log.matches("WARN").count(), 1, "one warn: {log}");
+    assert!(log.contains(&t1) && !log.contains(&t2), "{log}");
+    assert_eq!(
+        repo.row("gear-x", &t1, "acme.net.proxy")
+            .unwrap()
+            .last_notified,
+        None
+    );
+    assert_eq!(
+        repo.row("gear-x", &t2, "acme.net.proxy")
+            .unwrap()
+            .last_notified,
+        None
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The request's publish budget and the failure memory
+// ---------------------------------------------------------------------------
+
+/// A hook over the client and the counter of its broadcast results.
+fn hook(f: &Fixture) -> (CoherencePublisher, Arc<CountingMetrics>) {
+    let metrics = Arc::new(CountingMetrics::default());
+    let hook = CoherencePublisher::new(
+        Arc::clone(&f.client) as Arc<dyn BroadcastGateway>,
+        Arc::clone(&metrics) as Arc<dyn BroadcastMetrics>,
+    );
+    (hook, metrics)
+}
+
+/// One request that wrote one local key at each of `tenants` tenants: one
+/// broadcast per tenant.
+async fn request(hook: &CoherencePublisher, tenants: u128) {
+    hook.publish_value_writes(
+        (1..=tenants).map(|t| {
+            ChangeOutcome::value_write(
+                "acme.net.proxy",
+                Uuid::from_u128(t),
+                scope_class::LOCAL,
+                true,
+            )
+        }),
+        Uuid::from_u128(0xc5),
+        &ActivationPairs::new(),
+    )
+    .await;
+}
+
+fn published(broker: &ScriptedBroker) -> usize {
+    broker.published.lock().unwrap().len()
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_broker_accepting_each_publish_just_inside_the_timeout_costs_the_request_one_budget() {
+    // Each publish is accepted 1.5 s in, inside the 2 s timeout: bounded per
+    // publish only, four tenants would hold the request for 6 s.
+    let f = fixture(ScriptedRegistry::default(), 0, Duration::from_secs(2));
+    let broker = plug(&f, Mode::Slow(Duration::from_millis(1500)));
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    let (hook, metrics) = hook(&f);
+
+    let started = tokio::time::Instant::now();
+    request(&hook, 4).await;
+
+    assert_eq!(
+        started.elapsed(),
+        Duration::from_secs(2),
+        "the phase ends at the budget"
+    );
+    assert_eq!(
+        metrics.all(),
+        ["sent", "skipped", "skipped", "skipped"],
+        "the publish in flight at the budget is cut, not failed; the rest are skipped"
+    );
+    assert_eq!(published(&broker), 1);
+    assert!(
+        f.client.session().is_some(),
+        "a request that ran out of its budget mutes nothing"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_budget_covers_the_notifications_on_the_same_session_and_an_exhausted_session_attempts_nothing()
+ {
+    let f = fixture(ScriptedRegistry::default(), 0, Duration::from_secs(2));
+    let broker = plug(&f, Mode::Slow(Duration::from_millis(1500)));
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+
+    let session = f.client.session().expect("a session");
+    assert!(!session.exhausted());
+    session
+        .publish(an_event())
+        .await
+        .expect("accepted at 1.5 s");
+    assert_eq!(
+        session.publish(an_event()).await.unwrap_err(),
+        PublishError::BudgetSpent,
+        "cut at the budget, 0.5 s later, not at its own 2 s, after an accepted publish"
+    );
+    assert!(session.exhausted());
+    assert_eq!(published(&broker), 1);
+
+    // The delivery loop's session has no budget across its publishes and
+    // ignores the request path's failure memory.
+    *broker.mode.lock().unwrap() = Mode::Accept;
+    let delivery = NotificationGateway::session(f.client.as_ref()).expect("a delivery session");
+    assert!(!delivery.exhausted());
+    delivery.publish(an_event()).await.expect("accepted");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_timed_out_publish_mutes_the_next_requests_for_the_cooling_window_only() {
+    let f = fixture(ScriptedRegistry::default(), 0, Duration::from_secs(2));
+    let broker = plug(&f, Mode::Stall);
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    let (hook, metrics) = hook(&f);
+
+    request(&hook, 2).await;
+    assert_eq!(metrics.all(), ["failed", "skipped"]);
+
+    // The broker is well again, but within the window nothing is attempted.
+    *broker.mode.lock().unwrap() = Mode::Accept;
+    tokio::time::advance(super::FAILURE_COOLING.saturating_sub(Duration::from_millis(1))).await;
+    let started = tokio::time::Instant::now();
+    request(&hook, 2).await;
+    assert_eq!(started.elapsed(), Duration::ZERO, "no wait at all");
+    assert_eq!(metrics.all()[2..], ["skipped", "skipped"]);
+    assert!(f.client.session().is_none());
+    assert_eq!(published(&broker), 0);
+
+    // After it, the request path publishes again.
+    tokio::time::advance(Duration::from_millis(1)).await;
+    request(&hook, 2).await;
+    assert_eq!(metrics.all()[4..], ["sent", "sent"]);
+    assert_eq!(published(&broker), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_broker_side_refusal_mutes_the_next_request_and_a_refused_grant_does_not() {
+    let f = fixture(ScriptedRegistry::default(), 0, Duration::from_secs(2));
+    let broker = plug(&f, Mode::Deny);
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    let (hook, metrics) = hook(&f);
+
+    // A missing grant recurs whatever the broker's health: not remembered.
+    request(&hook, 1).await;
+    *broker.mode.lock().unwrap() = Mode::Accept;
+    request(&hook, 1).await;
+    assert_eq!(metrics.all(), ["failed", "sent"]);
+
+    // A broker-side failure is.
+    *broker.mode.lock().unwrap() = Mode::Refuse;
+    request(&hook, 1).await;
+    *broker.mode.lock().unwrap() = Mode::Accept;
+    request(&hook, 1).await;
+    assert_eq!(metrics.all()[2..], ["failed", "skipped"]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_healthy_broker_over_the_request_budget_counts_the_cut_publish_skipped_and_mutes_nothing()
+{
+    // Each publish is accepted 150 ms in, far inside its own 2 s timeout; the
+    // request touched 25 tenants, more than one budget holds. The publish in
+    // flight at the budget is the request's running out of time, not the
+    // broker's failing.
+    let f = fixture(ScriptedRegistry::default(), 0, Duration::from_secs(2));
+    let broker = plug(&f, Mode::Slow(Duration::from_millis(150)));
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    let (hook, metrics) = hook(&f);
+    let (buf, _guard) = capture();
+
+    let started = tokio::time::Instant::now();
+    request(&hook, 25).await;
+
+    assert_eq!(started.elapsed(), Duration::from_secs(2), "one budget");
+    let all = metrics.all();
+    assert_eq!(all[..13], ["sent"; 13], "{all:?}");
+    assert_eq!(all[13..], ["skipped"; 12], "the cut one too: {all:?}");
+    assert_eq!(published(&broker), 13);
+    let log = logged(&buf);
+    assert!(
+        !log.contains("broadcast dropped"),
+        "no broker failure is reported: {log}"
+    );
+
+    // The next request publishes at once: no cooling window was started.
+    assert!(
+        f.client.session().is_some(),
+        "the request path is not muted"
+    );
+    request(&hook, 1).await;
+    assert_eq!(metrics.all()[25..], ["sent"]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_publish_that_exceeds_its_own_timeout_still_mutes_the_request_path() {
+    let f = fixture(ScriptedRegistry::default(), 0, Duration::from_secs(2));
+    plug(&f, Mode::Stall);
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+
+    let session = f.client.session().expect("a session");
+    let started = tokio::time::Instant::now();
+    assert_eq!(
+        session.publish(an_event()).await.unwrap_err(),
+        PublishError::TimedOut
+    );
+    assert_eq!(started.elapsed(), Duration::from_secs(2), "its own timeout");
+    assert!(f.client.session().is_none(), "the cooling window runs");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_healthy_broker_is_untouched_by_the_budget_and_the_memory() {
+    let f = plain();
+    let broker = plug(&f, Mode::Slow(Duration::from_millis(100)));
+    assert!(f.client.resolve_once(&CancellationToken::new()).await);
+    let (hook, metrics) = hook(&f);
+
+    for _ in 0..3 {
+        request(&hook, 5).await;
+    }
+
+    assert_eq!(metrics.all(), ["sent"; 15]);
+    assert_eq!(published(&broker), 15);
 }

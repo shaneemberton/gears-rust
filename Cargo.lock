@@ -4289,7 +4289,7 @@ dependencies = [
 
 [[package]]
 name = "cf-gears-settings-service"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4319,12 +4319,14 @@ dependencies = [
  "fnv",
  "futures-util",
  "gts",
+ "hex",
  "http",
  "inventory",
  "jsonschema 0.60.2",
  "opentelemetry",
  "opentelemetry_sdk",
  "regex",
+ "ryu",
  "sea-orm",
  "sea-orm-migration",
  "secrecy",
@@ -4343,11 +4345,12 @@ dependencies = [
  "tracing-test",
  "utoipa",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
 name = "cf-gears-settings-service-sdk"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "cf-gears-toolkit-canonical-errors",
@@ -4356,13 +4359,17 @@ dependencies = [
  "cf-gears-toolkit-odata-macros",
  "cf-gears-toolkit-security",
  "gts-id",
+ "hex",
+ "hostname",
  "jsonschema 0.60.2",
+ "ryu",
  "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]

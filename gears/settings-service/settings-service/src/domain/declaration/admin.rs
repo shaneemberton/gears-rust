@@ -21,6 +21,7 @@ use toolkit_security::AccessScope;
 use uuid::Uuid;
 
 use crate::audit::{ActorTenant, AuditOperation, AuditRecord, AuditSink, AuditValue};
+use crate::domain::activation::ActivationRepository;
 use crate::domain::category::repo::CategoryRepository;
 use crate::domain::category::visibility;
 use crate::domain::coherence::{CoherencePublisher, correlation_id};
@@ -621,7 +622,7 @@ fn optional_string(value: &Value) -> Option<String> {
 // @cpt-dod:cpt-cf-settings-service-dod-setting-declarations-audit:p1
 // @cpt-dod:cpt-cf-settings-service-dod-setting-declarations-revival-report:p1
 #[domain_model]
-pub struct DeclarationAdmin<R, Cat, Val, S, P> {
+pub struct DeclarationAdmin<R, Cat, Val, S, P, Act> {
     declarations: R,
     categories: Cat,
     values: Val,
@@ -634,15 +635,17 @@ pub struct DeclarationAdmin<R, Cat, Val, S, P> {
     secrets: Arc<dyn SecretManager>,
     metrics: Arc<dyn WriteMetrics>,
     coherence: Option<Arc<CoherencePublisher>>,
+    activation: Act,
 }
 
-impl<R, Cat, Val, S, P> DeclarationAdmin<R, Cat, Val, S, P>
+impl<R, Cat, Val, S, P, Act> DeclarationAdmin<R, Cat, Val, S, P, Act>
 where
     R: DeclarationRepository,
     Cat: CategoryRepository,
     Val: ValueRepository,
     S: AuditSink,
     P: PendingSecretRepository,
+    Act: ActivationRepository,
 {
     /// Assemble the service over its repositories and ports.
     #[allow(clippy::too_many_arguments)]
@@ -658,6 +661,7 @@ where
         pending: P,
         secrets: Arc<dyn SecretManager>,
         metrics: Arc<dyn WriteMetrics>,
+        activation: Act,
     ) -> Self {
         Self {
             declarations,
@@ -672,6 +676,7 @@ where
             secrets,
             metrics,
             coherence: None,
+            activation,
         }
     }
 
@@ -1832,6 +1837,12 @@ where
         if_match: Option<&str>,
         actor: &WriteActor,
     ) -> Result<(Declaration, bool), DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-record:p1:inst-ca-record-28
+        // A declaration lifecycle change — retire, reactivate, evolve, update, or a
+        // reconcile pass of contributed declarations — takes no mutation lock: it
+        // changes no stored value, and nothing in this service holds the lock a
+        // value write takes.
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-record:p1:inst-ca-record-28
         // @cpt-begin:cpt-cf-settings-service-flow-setting-declarations-retire:p1:inst-decl-retire-4
         // @cpt-begin:cpt-cf-settings-service-flow-setting-declarations-retire:p1:inst-decl-retire-5
         // Retire drops a live setting out of resolution at once: gated like a
@@ -1992,6 +2003,7 @@ where
             .delete(conn, scope, id, current.updated_at)
             .await?;
         // @cpt-end:cpt-cf-settings-service-flow-setting-declarations-purge:p2:inst-decl-purge-13
+        self.delete_activation(conn, &current.key).await?;
         // @cpt-begin:cpt-cf-settings-service-flow-setting-declarations-purge:p2:inst-decl-purge-14
         // The definition is the pre-image; nothing is left to be a post-image.
         self.record(
@@ -2013,6 +2025,27 @@ where
             secrets: entries,
             kept_secrets: kept,
         })
+    }
+
+    /// Delete every subscription and activation state of a purged declaration's
+    /// key, in the purge's transaction.
+    async fn delete_activation<C: DBRunner>(&self, conn: &C, key: &str) -> Result<(), DomainError> {
+        // @cpt-begin:cpt-cf-settings-service-flow-setting-declarations-purge:p2:inst-decl-purge-24
+        // The activation tables hold no foreign key to the declaration, so the
+        // cascade leaves them: every subscription and state of the key goes in
+        // this transaction, nothing reported for it. Keys are unique across
+        // declarations, so these rows are exactly the purged declaration's.
+        let (subscriptions, states) = self.activation.delete_key(conn, key).await?;
+        if subscriptions + states > 0 {
+            tracing::info!(
+                key = %key,
+                subscriptions,
+                states,
+                "a purge deleted the subscriptions and activation states of the key"
+            );
+        }
+        Ok(())
+        // @cpt-end:cpt-cf-settings-service-flow-setting-declarations-purge:p2:inst-decl-purge-24
     }
 
     /// After the commit, re-check the Credential Store references the purge

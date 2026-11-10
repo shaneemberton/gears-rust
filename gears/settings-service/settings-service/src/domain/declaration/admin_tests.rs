@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use super::{CreateDeclaration, DeclarationAdmin, FieldClass, classify_field, etag_of};
 use crate::audit::AuditOperation;
+use crate::domain::activation::testing::one;
 use crate::domain::declaration::{
     Declaration, DeclarationDraft, DeclarationRepository, DeclarationStatus,
 };
@@ -22,6 +23,7 @@ use crate::domain::ports::StepUpOperation;
 use crate::domain::stepup::{StepUpRefusal, StepUpVerifier, USER_SUBJECT_TYPE};
 use crate::domain::value::ValueRepository;
 use crate::domain::writes::WriteActor;
+use crate::infra::storage::activation_repo::ActivationRepo;
 use crate::infra::storage::category_repo::CategoryRepo;
 use crate::infra::storage::declaration_repo::DeclarationRepo;
 use crate::infra::storage::pending_secret_repo::PendingSecretRepo;
@@ -38,6 +40,7 @@ type Admin = DeclarationAdmin<
     ValueRepo,
     Arc<RecordingAudit>,
     PendingSecretRepo,
+    ActivationRepo,
 >;
 
 struct Harness {
@@ -101,6 +104,7 @@ impl Harness {
             PendingSecretRepo,
             Arc::clone(&secrets) as Arc<dyn crate::domain::ports::SecretManager>,
             Arc::clone(&metrics) as Arc<dyn crate::domain::ports::WriteMetrics>,
+            ActivationRepo,
         );
         let admin = match hook {
             Some(hook) => admin.with_coherence(hook),
@@ -2093,6 +2097,7 @@ async fn a_validator_that_goes_down_at_the_row_re_validation_fails_the_report_un
         PendingSecretRepo,
         Arc::clone(&h.secrets) as Arc<dyn crate::domain::ports::SecretManager>,
         Arc::clone(&h.metrics) as Arc<dyn crate::domain::ports::WriteMetrics>,
+        ActivationRepo,
     );
     let conn = h.base.db.conn().expect("connection");
     let scope = AccessScope::allow_all();
@@ -2286,6 +2291,7 @@ async fn rows_holding_the_same_value_are_judged_once_and_each_gets_its_own_verdi
         PendingSecretRepo,
         Arc::clone(&h.secrets) as Arc<dyn crate::domain::ports::SecretManager>,
         Arc::clone(&h.metrics) as Arc<dyn crate::domain::ports::WriteMetrics>,
+        ActivationRepo,
     );
     let conn = h.base.db.conn().expect("connection");
     let scope = AccessScope::allow_all();
@@ -2584,6 +2590,7 @@ async fn report_over(
         PendingSecretRepo,
         Arc::clone(&h.secrets) as Arc<dyn crate::domain::ports::SecretManager>,
         Arc::clone(&h.metrics) as Arc<dyn crate::domain::ports::WriteMetrics>,
+        ActivationRepo,
     );
     let conn = h.base.db.conn().expect("connection");
     let scope = AccessScope::allow_all();
@@ -2821,6 +2828,94 @@ async fn a_purge_collects_every_reference_held_at_any_scope_and_subject_and_reco
 }
 
 #[tokio::test]
+async fn a_purge_deletes_the_subscriptions_and_states_of_its_key_and_only_of_its_key() {
+    use crate::domain::activation::ActivationRepository as _;
+    use crate::domain::activation::publisher::{StateRow, StateWrite};
+
+    let h = Harness::verified().await;
+    let (id, tag) = h.retired("tokens").await;
+    let key = h.load(id).await.key;
+    let other = "other.key";
+    let conn = h.base.db.conn().expect("connection");
+    let tenants = [h.base.tree.root, h.base.tree.a];
+    // Two subscribers at two tenants hold the purged key, one the other key; a
+    // state is written for each.
+    for key_name in [key.as_str(), other] {
+        for subscriber in ["alpha", "beta"] {
+            for tenant in tenants {
+                let tenant = tenant.to_string();
+                let subscription = ActivationRepo
+                    .register(&conn, &one(subscriber, key_name, &tenant), None)
+                    .await
+                    .expect("registered");
+                ActivationRepo
+                    .write_states(
+                        &conn,
+                        &StateWrite {
+                            key: key_name.to_owned(),
+                            change_ref: Uuid::new_v4(),
+                            rows: vec![StateRow {
+                                subscription_id: subscription.id,
+                                tenant,
+                                expected_value: "true".to_owned(),
+                            }],
+                        },
+                    )
+                    .await
+                    .expect("state written");
+            }
+        }
+    }
+    assert_eq!(
+        ActivationRepo
+            .of_key(&conn, &key)
+            .await
+            .expect("read")
+            .len(),
+        4
+    );
+
+    h.purge(id, Some(tag.as_str()), &admin_actor())
+        .await
+        .expect("purged");
+
+    assert!(
+        ActivationRepo
+            .of_key(&conn, &key)
+            .await
+            .expect("read")
+            .is_empty()
+    );
+    for subscriber in ["alpha", "beta"] {
+        for tenant in tenants {
+            let tenant = tenant.to_string();
+            assert!(
+                ActivationRepo
+                    .state(&conn, &one(subscriber, key.as_str(), &tenant))
+                    .await
+                    .expect("state")
+                    .is_none()
+            );
+            assert!(
+                ActivationRepo
+                    .state(&conn, &one(subscriber, other, &tenant))
+                    .await
+                    .expect("state")
+                    .is_some()
+            );
+        }
+    }
+    assert_eq!(
+        ActivationRepo
+            .of_key(&conn, other)
+            .await
+            .expect("read")
+            .len(),
+        4
+    );
+}
+
+#[tokio::test]
 async fn every_declaration_action_counts_its_step_up_under_its_own_operation() {
     let h = Harness::verified().await;
 
@@ -3047,6 +3142,7 @@ fn admin_over(h: &Harness, secrets: Arc<dyn crate::domain::ports::SecretManager>
         PendingSecretRepo,
         secrets,
         Arc::clone(&h.metrics) as Arc<dyn crate::domain::ports::WriteMetrics>,
+        ActivationRepo,
     )
 }
 

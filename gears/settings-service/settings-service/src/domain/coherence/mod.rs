@@ -16,6 +16,8 @@ use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::domain::activation::NotificationPublisher;
+pub use crate::domain::broker_sink::{BroadcastSink, NotificationResult, PublishError};
 use crate::domain::resolution::{EffectiveCache, scope_class};
 use toolkit_macros::domain_model;
 
@@ -229,33 +231,6 @@ pub struct BroadcastContext {
 // The broadcast outcome
 // ---------------------------------------------------------------------------
 
-/// Why a publish did not complete.
-#[domain_model]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PublishError {
-    /// The broker refused it, a missing `produce` grant included.
-    Refused(String),
-    /// The broker did not accept it within `publish_timeout_seconds`.
-    TimedOut,
-}
-
-impl std::fmt::Display for PublishError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Refused(reason) => write!(f, "refused: {reason}"),
-            Self::TimedOut => f.write_str("not accepted within the publish timeout"),
-        }
-    }
-}
-
-/// The publishing end of the broker client: hands the broker one event and
-/// waits at most `publish_timeout_seconds` for its acceptance.
-#[async_trait]
-pub trait BroadcastSink: Send + Sync {
-    /// Publish `event` under the publishing identity.
-    async fn publish(&self, event: EventV1) -> Result<(), PublishError>;
-}
-
 /// The result of one broadcast.
 #[domain_model]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -304,7 +279,26 @@ pub struct RequestBroadcast<'a> {
     metrics: &'a dyn BroadcastMetrics,
     state: BroadcastState,
     change_set_id: Uuid,
+    notifications_registered: bool,
     failed: bool,
+}
+
+/// The request's session as the activation notifier publishes through it: the
+/// notifier names only [`NotificationPublisher`], and this is the one place the
+/// two halves meet.
+#[async_trait]
+impl NotificationPublisher for RequestBroadcast<'_> {
+    fn can_notify(&self) -> bool {
+        RequestBroadcast::can_notify(self)
+    }
+
+    fn has_failed(&self) -> bool {
+        RequestBroadcast::has_failed(self)
+    }
+
+    async fn publish_notification(&mut self, event: EventV1) -> NotificationResult {
+        RequestBroadcast::publish_notification(self, event).await
+    }
 }
 
 impl<'a> RequestBroadcast<'a> {
@@ -321,7 +315,55 @@ impl<'a> RequestBroadcast<'a> {
             metrics,
             state,
             change_set_id,
+            notifications_registered: false,
             failed: false,
+        }
+    }
+
+    /// Say whether the activation topic and the `change_notification` type are
+    /// registered: until they are, the request's notifications are not
+    /// published.
+    #[must_use]
+    pub const fn with_notifications(mut self, registered: bool) -> Self {
+        self.notifications_registered = registered;
+        self
+    }
+
+    /// Whether the request can publish a notification at all: a broker
+    /// resolved, the activation types registered and the root tenant's id
+    /// known.
+    #[must_use]
+    pub const fn can_notify(&self) -> bool {
+        self.sink.is_some() && self.notifications_registered && self.state.root_tenant_known
+    }
+
+    /// Publish one `change_notification` of the request, under the same skip
+    /// rule as the broadcasts: nothing is attempted once a publish of the
+    /// request — a `cache_invalidate` broadcast included — has failed or the
+    /// session's publish budget is spent, so the request pays at most one
+    /// `publish_timeout_seconds` for its whole publish phase.
+    pub async fn publish_notification(&mut self, event: EventV1) -> NotificationResult {
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-publish:p1:inst-ca-publish-3
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-publish:p1:inst-ca-publish-4
+        let Some(sink) = self.sink.filter(|_| self.can_notify()) else {
+            return NotificationResult::Skipped;
+        };
+        if self.failed || sink.exhausted() {
+            return NotificationResult::Skipped;
+        }
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-publish:p1:inst-ca-publish-4
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-publish:p1:inst-ca-publish-3
+        // @cpt-begin:cpt-cf-settings-service-flow-consumer-activation-publish:p1:inst-ca-publish-9
+        let published = sink.publish(event).await;
+        // @cpt-end:cpt-cf-settings-service-flow-consumer-activation-publish:p1:inst-ca-publish-9
+        match published {
+            Ok(()) => NotificationResult::Accepted,
+            // The budget ran out under it: skipped like the publishes after it.
+            Err(PublishError::BudgetSpent) => NotificationResult::Skipped,
+            Err(reason) => {
+                self.failed = true;
+                NotificationResult::Failed(reason)
+            }
         }
     }
 
@@ -365,7 +407,9 @@ impl<'a> RequestBroadcast<'a> {
         };
         // @cpt-end:cpt-cf-settings-service-algo-replica-coherence-outcome:p1:inst-rc-outcome-1
         // @cpt-begin:cpt-cf-settings-service-algo-replica-coherence-outcome:p1:inst-rc-outcome-2
-        if self.failed {
+        // An earlier failure of the request, or its publish budget — one
+        // `publish_timeout_seconds` for the whole phase — spent.
+        if self.failed || sink.exhausted() {
             return BroadcastResult::Skipped;
         }
         // @cpt-end:cpt-cf-settings-service-algo-replica-coherence-outcome:p1:inst-rc-outcome-2
@@ -379,6 +423,10 @@ impl<'a> RequestBroadcast<'a> {
             Ok(()) => BroadcastResult::Sent,
             // @cpt-end:cpt-cf-settings-service-algo-replica-coherence-outcome:p1:inst-rc-outcome-4
             // @cpt-begin:cpt-cf-settings-service-algo-replica-coherence-outcome:p1:inst-rc-outcome-5
+            // Cut by the end of the budget after the broker accepted an earlier
+            // publish of the request: the request ran out of time, the broker
+            // did not fail. Skipped like the publishes after it, nothing logged.
+            Err(PublishError::BudgetSpent) => BroadcastResult::Skipped,
             Err(reason) => {
                 tracing::warn!(
                     %change_set_id,
@@ -444,14 +492,14 @@ struct Delivery {
     changed_keys: Vec<String>,
 }
 
-/// Decode a `cache_invalidate` delivery's `data` and evict what it names.
+/// Decode a `cache_invalidate` delivery's `data`: the keys it names, or `None`
+/// for a malformed one, logged at `warn` with `event_id`.
 ///
-/// `event_id` is the delivered event's id, for the warning.
-pub fn consume_cache_invalidation(
-    cache: &EffectiveCache,
-    event_id: Uuid,
-    data: Option<&Value>,
-) -> ConsumeOutcome {
+/// The decode is per delivery; the eviction is the caller's, so a consumer
+/// that took several deliveries at once evicts the union of their keys in one
+/// call of [`evict_keys`].
+#[must_use]
+pub fn decode_cache_invalidation(event_id: Uuid, data: Option<&Value>) -> Option<Vec<String>> {
     // @cpt-begin:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-3
     // @cpt-begin:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-4
     // `Delivery` names only what this version needs; serde skips the rest.
@@ -463,18 +511,30 @@ pub fn consume_cache_invalidation(
             %event_id,
             "malformed cache_invalidate delivery ignored; cache_ttl_seconds bounds what this replica serves"
         );
-        return ConsumeOutcome::Malformed;
+        return None;
     };
     // @cpt-end:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-4
     // @cpt-end:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-3
+    Some(delivery.changed_keys)
+}
+
+/// Decode one `cache_invalidate` delivery's `data` and evict what it names.
+///
+/// `event_id` is the delivered event's id, for the warning.
+pub fn consume_cache_invalidation(
+    cache: &EffectiveCache,
+    event_id: Uuid,
+    data: Option<&Value>,
+) -> ConsumeOutcome {
+    let Some(keys) = decode_cache_invalidation(event_id, data) else {
+        return ConsumeOutcome::Malformed;
+    };
     // @cpt-begin:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-5
-    evict_keys(cache, &delivery.changed_keys);
+    evict_keys(cache, &keys);
     // @cpt-end:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-5
     // @cpt-begin:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-6
     // Nothing to acknowledge; a repeated delivery evicts what is already gone.
-    ConsumeOutcome::Evicted {
-        keys: delivery.changed_keys.len(),
-    }
+    ConsumeOutcome::Evicted { keys: keys.len() }
     // @cpt-end:cpt-cf-settings-service-flow-replica-coherence-consume:p1:inst-rc-consume-6
 }
 

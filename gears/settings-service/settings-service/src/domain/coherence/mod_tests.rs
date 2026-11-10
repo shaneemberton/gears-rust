@@ -14,6 +14,7 @@ use super::{
     BroadcastMetrics, BroadcastResult, BroadcastSink, BroadcastState, ChangeOutcome,
     ConsumeOutcome, PublishError, RequestBroadcast, TouchedTenants, consume_cache_invalidation,
 };
+use crate::domain::activation::testing::{LogBuf, logged};
 use crate::domain::resolution::cache::tests_entry;
 use crate::domain::resolution::{EffectiveCache, scope_class};
 
@@ -43,6 +44,8 @@ impl BroadcastMetrics for Counts {
 struct ScriptedSink {
     script: Mutex<VecDeque<Result<(), PublishError>>>,
     seen: Mutex<Vec<EventV1>>,
+    /// The publish budget is spent.
+    spent: Mutex<bool>,
 }
 
 impl ScriptedSink {
@@ -50,6 +53,7 @@ impl ScriptedSink {
         Self {
             script: Mutex::new(script.into()),
             seen: Mutex::default(),
+            spent: Mutex::default(),
         }
     }
     fn calls(&self) -> usize {
@@ -62,6 +66,10 @@ impl BroadcastSink for ScriptedSink {
     async fn publish(&self, event: EventV1) -> Result<(), PublishError> {
         self.seen.lock().unwrap().push(event);
         self.script.lock().unwrap().pop_front().unwrap_or(Ok(()))
+    }
+
+    fn exhausted(&self) -> bool {
+        *self.spent.lock().unwrap()
     }
 }
 
@@ -221,6 +229,45 @@ async fn a_failure_in_one_request_does_not_skip_the_next_request() {
 }
 
 #[tokio::test]
+async fn a_publish_cut_by_the_budget_counts_skipped_not_failed() {
+    use crate::domain::broker_sink::NotificationResult;
+    let sink = ScriptedSink::with(vec![
+        Err(PublishError::BudgetSpent),
+        Err(PublishError::BudgetSpent),
+    ]);
+    let metrics = Counts::default();
+    let mut request =
+        RequestBroadcast::new(Some(&sink), &metrics, READY, Uuid::nil()).with_notifications(true);
+    assert_eq!(request.publish(one_event()).await, BroadcastResult::Skipped);
+    assert_eq!(metrics.all(), ["skipped"]);
+    assert!(!request.has_failed(), "the broker did not fail");
+    assert_eq!(
+        request.publish_notification(one_event()).await,
+        NotificationResult::Skipped
+    );
+    assert!(!request.has_failed());
+}
+
+#[tokio::test]
+async fn a_spent_budget_skips_the_remaining_broadcasts_and_notifications_unattempted() {
+    use crate::domain::broker_sink::NotificationResult;
+    let sink = ScriptedSink::default();
+    let metrics = Counts::default();
+    let mut request =
+        RequestBroadcast::new(Some(&sink), &metrics, READY, Uuid::nil()).with_notifications(true);
+    assert_eq!(request.publish(one_event()).await, BroadcastResult::Sent);
+    *sink.spent.lock().unwrap() = true;
+    let results = request.publish_all(vec![one_event(), one_event()]).await;
+    assert_eq!(results, [BroadcastResult::Skipped; 2]);
+    assert_eq!(
+        request.publish_notification(one_event()).await,
+        NotificationResult::Skipped
+    );
+    assert_eq!(metrics.all(), ["sent", "skipped", "skipped"]);
+    assert_eq!(sink.calls(), 1, "nothing attempted past the budget");
+}
+
+#[tokio::test]
 async fn no_broker_counts_skipped_per_tenant() {
     let metrics = Counts::default();
     let mut request = RequestBroadcast::new(None, &metrics, READY, Uuid::nil());
@@ -335,26 +382,6 @@ fn an_unknown_attribute_is_ignored_and_its_keys_are_evicted() {
     assert!(cache.get("k", id(2)).is_none());
 }
 
-#[derive(Clone, Default)]
-struct LogBuf(Arc<Mutex<Vec<u8>>>);
-
-impl std::io::Write for LogBuf {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogBuf {
-    type Writer = LogBuf;
-    fn make_writer(&'a self) -> Self::Writer {
-        self.clone()
-    }
-}
-
 #[test]
 fn a_malformed_delivery_evicts_nothing_and_warns() {
     let malformed = [
@@ -377,7 +404,7 @@ fn a_malformed_delivery_evicts_nothing_and_warns() {
         });
         assert_eq!(out, ConsumeOutcome::Malformed, "{data:?}");
         assert!(cache.get("k", id(2)).is_some(), "nothing evicted: {data:?}");
-        let log = String::from_utf8(buf.0.lock().unwrap().clone()).unwrap();
+        let log = logged(&buf);
         assert!(
             log.contains("WARN") && log.contains(&id(0xe1).to_string()),
             "{log}"

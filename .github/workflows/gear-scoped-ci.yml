@@ -248,9 +248,9 @@ jobs:
 
       - name: Install protoc
         if: runner.environment == 'github-hosted'
-        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
-          repo-token: ${{ steps.app.outputs.token || github.token }}
+          tool: protoc@3.34.1
 
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

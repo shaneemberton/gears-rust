@@ -24,12 +24,19 @@
 //! contract for them (see `config::SettingsServiceConfig`).
 //!
 //! The `gear-scaffold` definition of done is still open for a different
-//! reason: it also asks for the remaining GTS control-plane schemas and the
-//! minimal category seed at init, which are not here yet. Its checkbox stays
+//! reason: it also asks for the rest of the GTS control-plane schemas and the
+//! minimal category seed at init, which are not here yet. Category, declaration
+//! and value are published as authorization-label stubs, which register the
+//! identifier and constrain nothing; their body schemas, effective value,
+//! change set and the event schemas are not published yet. Its checkbox stays
 //! unticked for those, not for the bindings.
 
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]
+
+// The gear publishes this crate's GTS declarations through its
+// `gts_publication(...)`; see `gts`.
+toolkit_gts::declare_gts_inventory!();
 
 pub mod api;
 pub mod audit;
@@ -37,6 +44,7 @@ pub mod config;
 pub mod domain;
 pub mod field;
 pub mod gear;
+pub(crate) mod gts;
 pub mod infra;
 pub mod log_text;
 pub mod precondition;

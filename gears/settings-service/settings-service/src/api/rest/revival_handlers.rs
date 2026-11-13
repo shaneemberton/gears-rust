@@ -18,7 +18,7 @@ use serde_json::Value;
 use toolkit::api::canonical_prelude::*;
 use toolkit_security::SecurityContext;
 
-use crate::api::authz::{self, resource};
+use crate::api::authz::{Permission, PermissionEnforcer};
 use crate::api::rest::declaration_dto::{
     CreateDeclarationRequest, NeedsReviewDto, RevivalReportDto, RevivalValueDto,
 };
@@ -120,7 +120,7 @@ pub async fn revival_report(
     Extension(admin): Extension<Arc<ConcreteDeclarationAdmin>>,
     Extension(resolver): Extension<Arc<ConcreteResolver>>,
     Extension(db): Extension<Arc<toolkit_db::DBProvider<toolkit_db::DbError>>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Query(params): Query<RevivalParams>,
     body: Result<Json<CreateDeclarationRequest>, JsonRejection>,
 ) -> ApiResult<Response> {
@@ -130,9 +130,12 @@ pub async fn revival_report(
     // @cpt-begin:cpt-cf-settings-service-flow-setting-declarations-revival-report:p1:inst-decl-revival-2
     // Both decisions come before the body is answered, so the answer does
     // not depend on what exists.
-    let declaration_scope =
-        authz::access_scope(&enforcer, &ctx, &resource::DECLARATION, "create", None).await?;
-    let value_scope = authz::access_scope(&enforcer, &ctx, &resource::VALUE, "read", None).await?;
+    let declaration_scope = enforcer
+        .access_scope(&ctx, Permission::DeclarationCreate, None)
+        .await?;
+    let value_scope = enforcer
+        .access_scope(&ctx, Permission::ValueRead, None)
+        .await?;
     // @cpt-end:cpt-cf-settings-service-flow-setting-declarations-revival-report:p1:inst-decl-revival-2
     let conn = db.conn().map_err(|err| conn_error(&err))?;
     // The caller's chain is read before anything else is asked, so a tenant

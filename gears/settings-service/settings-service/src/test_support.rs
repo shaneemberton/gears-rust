@@ -1859,7 +1859,9 @@ impl RestHarness {
         directory: Arc<dyn crate::infra::actor_names::ActorDirectory>,
     ) -> Self {
         *inner.hierarchy.connection_guard.lock().expect("lock") = Some(Arc::clone(&inner.db));
-        let enforcer = Arc::new(authz_resolver_sdk::PolicyEnforcer::new(pdp));
+        let enforcer = Arc::new(crate::api::authz::PermissionEnforcer::over(
+            authz_resolver_sdk::PolicyEnforcer::new(pdp),
+        ));
         let openapi = toolkit::api::OpenApiRegistryImpl::new();
         let search = Arc::new(crate::domain::search::service::SearchService::new(
             crate::infra::storage::search_repo::SearchRepo::new(inner.db.db().backend()),

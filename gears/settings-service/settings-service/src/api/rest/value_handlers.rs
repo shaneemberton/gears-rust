@@ -16,7 +16,7 @@ use toolkit_canonical_errors::CanonicalError;
 use toolkit_security::SecurityContext;
 use uuid::Uuid;
 
-use crate::api::authz::{self, resource};
+use crate::api::authz::{Permission, PermissionEnforcer};
 use crate::api::rest::if_match;
 use crate::api::rest::setting_dto::{Reader, render};
 use crate::api::rest::setting_handlers::{TenantParam, target_chain};
@@ -34,10 +34,6 @@ use crate::field;
 use crate::infra::value_writes::{
     BATCH_LIMIT, BatchChange, RefusedEntry, WriteCoordinator, batch_too_large,
 };
-
-const READ: &str = "read";
-const WRITE: &str = "write";
-const READ_UNMASKED: &str = "read_unmasked";
 
 /// The header a fresh step-up token travels in. Absent, the bearer token
 /// itself is the assertion: a session re-authenticated just now carries a
@@ -140,11 +136,9 @@ fn respond<T: IntoResponse>(outcome: Result<T, DomainError>) -> ApiResult<Respon
     }
 }
 
-async fn may_read_pii(
-    enforcer: &authz_resolver_sdk::PolicyEnforcer,
-    ctx: &SecurityContext,
-) -> bool {
-    authz::access_scope(enforcer, ctx, &resource::VALUE, READ_UNMASKED, None)
+async fn may_read_pii(enforcer: &PermissionEnforcer, ctx: &SecurityContext) -> bool {
+    enforcer
+        .access_scope(ctx, Permission::ValueReadUnmasked, None)
         .await
         .is_ok()
 }
@@ -162,7 +156,7 @@ async fn may_read_pii(
 pub async fn set_value(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Path(key): Path<String>,
     Query(params): Query<TenantParam>,
     headers: HeaderMap,
@@ -173,7 +167,9 @@ pub async fn set_value(
     // @cpt-begin:cpt-cf-settings-service-algo-value-writes-gates:p1:inst-vw-gate-1
     // Authorization first, and alone: an unauthorized caller never has its
     // step-up token looked at.
-    let scope = authz::access_scope(&enforcer, &ctx, &resource::VALUE, WRITE, None).await?;
+    let scope = enforcer
+        .access_scope(&ctx, Permission::ValueWrite, None)
+        .await?;
     // @cpt-end:cpt-cf-settings-service-algo-value-writes-gates:p1:inst-vw-gate-1
     let actor = actor(&ctx, &headers, domain_visibility(&scope));
     let outcome = writes
@@ -199,7 +195,7 @@ pub async fn set_value(
 async fn fall_back(
     ctx: &SecurityContext,
     writes: &WriteCoordinator,
-    enforcer: &authz_resolver_sdk::PolicyEnforcer,
+    enforcer: &PermissionEnforcer,
     key: String,
     params: TenantParam,
     headers: HeaderMap,
@@ -208,7 +204,9 @@ async fn fall_back(
 ) -> ApiResult<Response> {
     let key = parse_key(&key)?;
     let tenant = parse_tenant(params.tenant.as_deref())?;
-    let scope = authz::access_scope(enforcer, ctx, &resource::VALUE, WRITE, None).await?;
+    let scope = enforcer
+        .access_scope(ctx, Permission::ValueWrite, None)
+        .await?;
     let actor = actor(ctx, &headers, domain_visibility(&scope));
     let outcome = writes
         .change(&actor, &key, tenant, change, if_match(&headers), operation)
@@ -256,7 +254,7 @@ async fn fall_back(
 pub async fn revert_value(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Path(key): Path<String>,
     Query(params): Query<TenantParam>,
     headers: HeaderMap,
@@ -287,7 +285,7 @@ pub async fn revert_value(
 pub async fn remove_value(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Path(key): Path<String>,
     Query(params): Query<TenantParam>,
     headers: HeaderMap,
@@ -319,7 +317,7 @@ pub async fn remove_value(
 pub async fn clone_value(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Path(key): Path<String>,
     Query(params): Query<TenantParam>,
     headers: HeaderMap,
@@ -331,8 +329,12 @@ pub async fn clone_value(
     // @cpt-end:cpt-cf-settings-service-flow-value-writes-clone:p1:inst-vw-clone-1
     // Both ends authorized: `read` for the source, `write` for the target,
     // and the declaration visible under both answers.
-    let readable = authz::access_scope(&enforcer, &ctx, &resource::VALUE, READ, None).await?;
-    let writable = authz::access_scope(&enforcer, &ctx, &resource::VALUE, WRITE, None).await?;
+    let readable = enforcer
+        .access_scope(&ctx, Permission::ValueRead, None)
+        .await?;
+    let writable = enforcer
+        .access_scope(&ctx, Permission::ValueWrite, None)
+        .await?;
     let visibility = domain_visibility(&readable).narrowed(domain_visibility(&writable));
     let actor = actor(&ctx, &headers, visibility);
     let outcome = writes
@@ -358,12 +360,14 @@ pub async fn clone_value(
 pub async fn batch_set(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     headers: HeaderMap,
     Json(body): Json<BatchRequest>,
 ) -> ApiResult<Response> {
     // @cpt-begin:cpt-cf-settings-service-flow-value-writes-batch:p1:inst-vw-batch-1
-    let scope = authz::access_scope(&enforcer, &ctx, &resource::VALUE, WRITE, None).await?;
+    let scope = enforcer
+        .access_scope(&ctx, Permission::ValueWrite, None)
+        .await?;
     // The size first, on the deserialized list, before a key is cloned or
     // parsed; the coordinator's own check stays as the backstop for callers
     // that do not come through REST.
@@ -430,7 +434,7 @@ pub async fn batch_set(
 pub async fn stage_secret(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Path(key): Path<String>,
     Query(params): Query<TenantParam>,
     headers: HeaderMap,
@@ -440,7 +444,9 @@ pub async fn stage_secret(
     let tenant = parse_tenant(params.tenant.as_deref())?;
     // @cpt-begin:cpt-cf-settings-service-flow-secret-values-stage:p1:inst-sv-stage-1
     // The same `write` a set needs, decided first and alone.
-    let scope = authz::access_scope(&enforcer, &ctx, &resource::VALUE, WRITE, None).await?;
+    let scope = enforcer
+        .access_scope(&ctx, Permission::ValueWrite, None)
+        .await?;
     let actor = actor(&ctx, &headers, domain_visibility(&scope));
     let pending = writes
         .stage_secret(&actor, &key, tenant, checked_value(&body.value)?)
@@ -460,7 +466,7 @@ pub async fn stage_secret(
 pub async fn validate_value(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Path(key): Path<String>,
     Query(params): Query<TenantParam>,
     headers: HeaderMap,
@@ -472,7 +478,9 @@ pub async fn validate_value(
     // @cpt-end:cpt-cf-settings-service-flow-value-writes-validate:p1:inst-vw-val-1
     // @cpt-begin:cpt-cf-settings-service-flow-value-writes-validate:p1:inst-vw-val-2
     // `read`, and no step-up: nothing is written.
-    let scope = authz::access_scope(&enforcer, &ctx, &resource::VALUE, READ, None).await?;
+    let scope = enforcer
+        .access_scope(&ctx, Permission::ValueRead, None)
+        .await?;
     // @cpt-end:cpt-cf-settings-service-flow-value-writes-validate:p1:inst-vw-val-2
     let actor = actor(&ctx, &headers, domain_visibility(&scope));
     let page = if body.impact == Some(false) {
@@ -516,7 +524,7 @@ pub async fn validate_value(
 pub async fn impact(
     Extension(ctx): Extension<SecurityContext>,
     Extension(writes): Extension<Arc<WriteCoordinator>>,
-    Extension(enforcer): Extension<Arc<authz_resolver_sdk::PolicyEnforcer>>,
+    Extension(enforcer): Extension<Arc<PermissionEnforcer>>,
     Path(key): Path<String>,
     Query(params): Query<TenantParam>,
     headers: HeaderMap,
@@ -526,7 +534,9 @@ pub async fn impact(
     let key = parse_key(&key)?;
     let tenant = parse_tenant(params.tenant.as_deref())?;
     // @cpt-end:cpt-cf-settings-service-flow-value-writes-impact:p1:inst-vw-imp-1
-    let scope = authz::access_scope(&enforcer, &ctx, &resource::VALUE, READ, None).await?;
+    let scope = enforcer
+        .access_scope(&ctx, Permission::ValueRead, None)
+        .await?;
     let actor = actor(&ctx, &headers, domain_visibility(&scope));
     let outcome = writes
         .impact(

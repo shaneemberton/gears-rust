@@ -4340,7 +4340,7 @@ dependencies = [
 
 [[package]]
 name = "cf-gears-settings-service"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4364,6 +4364,7 @@ dependencies = [
  "cf-gears-toolkit-security",
  "cf-gears-types-registry",
  "cf-gears-types-registry-sdk",
+ "figment",
  "fnv",
  "futures-util",
  "gts",
@@ -4392,7 +4393,7 @@ dependencies = [
 
 [[package]]
 name = "cf-gears-settings-service-sdk"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "async-trait",
  "cf-gears-toolkit-canonical-errors",

@@ -137,3 +137,14 @@ fn the_browse_description_no_longer_says_the_filter_lists_the_flagged_rows() {
     );
     assert!(browse.contains("needs_review eq true"), "{browse}");
 }
+
+#[test]
+fn the_browse_description_states_the_matched_field_vocabulary() {
+    let browse = operation("settings_service.browse_settings");
+    for phrase in [
+        "`matched_field`",
+        "`key`, `display_name`, `description`, `category_name`, `default_value` or `value`",
+    ] {
+        assert!(browse.contains(phrase), "must say {phrase}: {browse}");
+    }
+}

@@ -4340,7 +4340,7 @@ dependencies = [
 
 [[package]]
 name = "cf-gears-settings-service"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "async-trait",

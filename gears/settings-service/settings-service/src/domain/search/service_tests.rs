@@ -10,7 +10,7 @@ use toolkit_odata::{ODataQuery, PageInfo};
 use toolkit_security::AccessScope;
 use uuid::Uuid;
 
-use super::{SearchService, declaration_match};
+use super::{SearchService, declaration_match, unnamed_match};
 use crate::domain::category::Category;
 use crate::domain::category::visibility::DomainVisibility;
 use crate::domain::declaration::{Declaration, DeclarationStatus};
@@ -186,38 +186,38 @@ fn a_declaration_level_hit_names_the_first_field_that_matched_in_the_order_told(
         "public",
     );
     assert_eq!(
-        declaration_match(&by_key, Some(&cat), &needle, Corpus::Public),
+        declaration_match(&by_key, Some(cat.name.as_str()), &needle, Corpus::Public),
         Some(MatchedField::Key),
         "the key outranks every other field that also matched"
     );
     let by_description = declaration("relay", Some("Use a proxy"), json!("proxy"), "public");
     assert_eq!(
-        declaration_match(&by_description, Some(&cat), &needle, Corpus::Public),
+        declaration_match(
+            &by_description,
+            Some(cat.name.as_str()),
+            &needle,
+            Corpus::Public
+        ),
         Some(MatchedField::Description)
     );
     let by_category = declaration("relay", None, json!("proxy"), "public");
     assert_eq!(
-        declaration_match(&by_category, Some(&cat), &needle, Corpus::Public),
+        declaration_match(
+            &by_category,
+            Some(cat.name.as_str()),
+            &needle,
+            Corpus::Public
+        ),
         Some(MatchedField::CategoryName)
     );
     let by_default = declaration("relay", None, json!("proxy"), "public");
     assert_eq!(
-        declaration_match(
-            &by_default,
-            Some(&category("Network")),
-            &needle,
-            Corpus::Public
-        ),
+        declaration_match(&by_default, Some("Network"), &needle, Corpus::Public),
         Some(MatchedField::DefaultValue)
     );
     let by_nothing = declaration("relay", None, json!("direct"), "public");
     assert_eq!(
-        declaration_match(
-            &by_nothing,
-            Some(&category("Network")),
-            &needle,
-            Corpus::Public
-        ),
+        declaration_match(&by_nothing, Some("Network"), &needle, Corpus::Public),
         None
     );
 }
@@ -423,7 +423,7 @@ fn a_needle_found_only_in_the_display_name_is_attributed_to_it() {
     let needle = Needle::parse("tls").expect("a needle");
     let d = labelled("relay", "Minimum TLS version", None);
     assert_eq!(
-        declaration_match(&d, Some(&category("Network")), &needle, Corpus::Public),
+        declaration_match(&d, Some("Network"), &needle, Corpus::Public),
         Some(MatchedField::DisplayName)
     );
 }
@@ -437,7 +437,7 @@ fn the_display_name_outranks_the_description_but_not_the_key() {
     assert_eq!(
         declaration_match(
             &both_label_and_description,
-            Some(&cat),
+            Some(cat.name.as_str()),
             &needle,
             Corpus::Public
         ),
@@ -446,7 +446,12 @@ fn the_display_name_outranks_the_description_but_not_the_key() {
     );
     let both_key_and_label = labelled("proxy_host", "Proxy host", None);
     assert_eq!(
-        declaration_match(&both_key_and_label, Some(&cat), &needle, Corpus::Public),
+        declaration_match(
+            &both_key_and_label,
+            Some(cat.name.as_str()),
+            &needle,
+            Corpus::Public
+        ),
         Some(MatchedField::Key),
         "the key outranks the display name that also matched"
     );
@@ -459,7 +464,7 @@ fn a_declaration_without_a_display_name_never_matches_on_one() {
     let needle = Needle::parse("host").expect("a needle");
     let d = declaration("relay", None, json!("direct"), "public");
     assert_eq!(
-        declaration_match(&d, Some(&category("Network")), &needle, Corpus::Public),
+        declaration_match(&d, Some("Network"), &needle, Corpus::Public),
         None
     );
 }
@@ -486,5 +491,63 @@ async fn a_display_name_hit_is_a_declaration_level_hit_with_no_row() {
         hits,
         vec![("relay".to_owned(), MatchedField::DisplayName, None)],
         "the label belongs to the declaration, so the hit carries no scope"
+    );
+}
+
+#[test]
+fn a_hit_no_field_names_is_attributed_to_the_default_in_the_corpus_else_to_the_key() {
+    // The database matched the declaration's text and nothing in Rust names
+    // the field: the search hit is attributed, never dropped and never to a
+    // field outside the corpus.
+    let needle = Needle::parse("zzz").expect("a needle");
+    let public = declaration("relay", None, json!("direct"), "public");
+    assert_eq!(
+        declaration_match(&public, Some("Network"), &needle, Corpus::Public),
+        None
+    );
+    assert_eq!(
+        unnamed_match(&public, Corpus::Public),
+        MatchedField::DefaultValue
+    );
+    let null_default = declaration("unset", None, json!(null), "public");
+    assert_eq!(
+        unnamed_match(&null_default, Corpus::Public),
+        MatchedField::Key
+    );
+    let pii = declaration("contact", None, json!("ops@example.test"), "pii");
+    assert_eq!(unnamed_match(&pii, Corpus::Public), MatchedField::Key);
+    assert_eq!(
+        unnamed_match(&pii, Corpus::PublicAndPii),
+        MatchedField::DefaultValue
+    );
+    let secret = declaration("token", None, json!("zzz"), "secret");
+    assert_eq!(
+        unnamed_match(&secret, Corpus::PublicAndPii),
+        MatchedField::Key
+    );
+}
+
+#[test]
+fn a_match_a_field_names_keeps_the_order_and_ignores_an_unseen_category() {
+    let needle = Needle::parse("proxy").expect("a needle");
+    let d = declaration(
+        "relay",
+        Some("Routes via the proxy"),
+        json!("proxy"),
+        "public",
+    );
+    assert_eq!(
+        declaration_match(&d, Some("Proxy things"), &needle, Corpus::Public),
+        Some(MatchedField::Description)
+    );
+    let by_category = declaration("relay", None, json!("proxy"), "public");
+    assert_eq!(
+        declaration_match(&by_category, Some("Proxy things"), &needle, Corpus::Public),
+        Some(MatchedField::CategoryName)
+    );
+    // A category whose name the database could not match is not named.
+    assert_eq!(
+        declaration_match(&by_category, None, &needle, Corpus::Public),
+        Some(MatchedField::DefaultValue)
     );
 }

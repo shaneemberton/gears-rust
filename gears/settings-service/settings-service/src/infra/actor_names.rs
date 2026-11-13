@@ -6,8 +6,8 @@
 //! what this caller may see and no privileged context is used. A name is kept
 //! in this process for [`NAME_TTL`] for the caller AM gave it to and nobody
 //! else. AM is a soft dependency: the client is found in the hub at each pass,
-//! and a refused, absent, failed or late lookup reads `null`; the history never
-//! fails because of it.
+//! and a refused, absent, failed or late lookup reads no name and a status that
+//! says why ([`ActorName`]); the history never fails because of it.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -89,30 +89,36 @@ impl ActorDirectory for AmDirectory {
 /// The caller a name was resolved for: its tenant and subject.
 type Caller = (Uuid, Uuid);
 
+/// A user as a lookup asks for it: the tenant the actor acted from, then the
+/// actor. A name and a failure both belong to the pair, never to the actor alone.
+type Asked = (Uuid, Uuid);
+
 /// A resolved name and the instant it stops being reused.
 type Entry = (String, tokio::time::Instant);
 
-/// Resolved names by caller and actor.
+/// Resolved names by caller and asked user. It holds names only: a lookup that
+/// gave no name has nothing to keep here.
 #[derive(Default)]
 struct NameCache {
-    entries: Mutex<HashMap<(Caller, Uuid), Entry>>,
+    entries: Mutex<HashMap<(Caller, Asked), Entry>>,
 }
 
 impl NameCache {
-    /// The names of `ids` this caller was given and that are fresh at `now`.
+    /// The names of `asked` this caller was given and that are fresh at `now`.
     fn fresh(
         &self,
         caller: Caller,
-        ids: &BTreeSet<Uuid>,
+        asked: &BTreeSet<Asked>,
         now: tokio::time::Instant,
-    ) -> BTreeMap<Uuid, String> {
+    ) -> BTreeMap<Asked, String> {
         let entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
-        ids.iter()
-            .filter_map(|id| {
+        asked
+            .iter()
+            .filter_map(|user| {
                 entries
-                    .get(&(caller, *id))
+                    .get(&(caller, *user))
                     .filter(|(_, until)| *until > now)
-                    .map(|(name, _)| (*id, name.clone()))
+                    .map(|(name, _)| (*user, name.clone()))
             })
             .collect()
     }
@@ -122,7 +128,7 @@ impl NameCache {
     fn keep(
         &self,
         caller: Caller,
-        names: &BTreeMap<Uuid, String>,
+        names: &BTreeMap<Asked, String>,
         now: tokio::time::Instant,
         ttl: Duration,
     ) {
@@ -135,8 +141,8 @@ impl NameCache {
             }
         }
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-4
-        for (id, name) in names.iter().take(NAME_CACHE_CAPACITY) {
-            entries.insert((caller, *id), (name.clone(), now + ttl));
+        for (user, name) in names.iter().take(NAME_CACHE_CAPACITY) {
+            entries.insert((caller, *user), (name.clone(), now + ttl));
         }
     }
 }
@@ -165,11 +171,28 @@ impl Degraded {
     }
 }
 
-/// What a lookup learned: the names it got, and whether any chunk degraded.
+/// What a lookup learned of the users it asked for.
 #[derive(Default)]
 struct Outcome {
-    names: BTreeMap<Uuid, String>,
+    /// The names it got.
+    names: BTreeMap<Asked, String>,
+    /// The users no finished lookup answered for: those a degraded chunk had
+    /// not been answered when it stopped, or all of them without a directory.
+    unanswered: BTreeSet<Asked>,
+    /// Whether any chunk degraded.
     degraded: bool,
+}
+
+impl Outcome {
+    /// What one asked user reads: its name; without one, `Unavailable` when no
+    /// finished lookup answered for it and `Unknown` when one did.
+    fn of(&self, user: Asked) -> ActorName {
+        match self.names.get(&user) {
+            Some(name) => ActorName::Resolved(name.clone()),
+            None if self.unanswered.contains(&user) => ActorName::Unavailable,
+            None => ActorName::Unknown,
+        }
+    }
 }
 
 /// One actor of a history page, as the resolver needs it.
@@ -180,32 +203,60 @@ pub struct ActorRef {
     pub actor_tenant_id: Option<Uuid>,
     /// The actor as rendered: a user id, a module name or the mask token.
     pub actor: String,
-    /// Whether the caller may not see the actor: it reads no name and is never looked up.
+    /// Whether the caller may not see the actor: it reads [`ActorName::Masked`] and is
+    /// never looked up.
     pub masked: bool,
 }
 
 /// What a history record reads for its actor's name, as the resolver decides
-/// it; [`ActorName::as_str`] spells it for the record.
+/// it: [`ActorName::status`] says which case it is and [`ActorName::as_str`]
+/// spells the name, which only `Resolved` and `System` have.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ActorName {
+    /// A user's current name, as Account Management gave it to this caller.
+    Resolved(String),
     /// The nil id, the platform's system context, unmasked: reads `"System"`.
     System,
-    /// A user's current name, as Account Management gave it to this caller.
-    User(String),
-    /// No name, read as `null`: the actor is masked or withheld, is a module,
-    /// or its name could not be had — no tenant recorded, unknown to Account
-    /// Management, or the lookup was refused, failed or late.
-    Absent,
+    /// The caller may not see the actor, for the PII entitlement or the upward
+    /// disclosure boundary. It is never looked up, whatever it is.
+    Masked,
+    /// The actor is not a user id: a module, whose name is the actor itself.
+    Module,
+    /// A user whose record names no tenant it acted from, so no tenant is asked.
+    NotRecorded,
+    /// No finished lookup answered for the user: no directory, a failed or late
+    /// chunk, or one whose pages drifted. A later read may resolve it.
+    Unavailable,
+    /// A lookup answered and gave no name: Account Management refused the
+    /// read, does not list the user for this caller or lists it without a
+    /// name, or the context has no subject to ask as.
+    Unknown,
 }
 
 impl ActorName {
-    /// The name the record shows, or `None` for `null`.
+    /// The name the record shows, if it has one.
     #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
+            Self::Resolved(name) => Some(name),
             Self::System => Some(SYSTEM_NAME),
-            Self::User(name) => Some(name),
-            Self::Absent => None,
+            Self::Masked | Self::Module | Self::NotRecorded | Self::Unavailable | Self::Unknown => {
+                None
+            }
+        }
+    }
+
+    /// The status as the record spells it.
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        match self {
+            Self::Resolved(_) => "resolved",
+            Self::System => "system",
+            Self::Masked => "masked",
+            Self::Module => "module",
+            Self::NotRecorded => "not_recorded",
+            Self::Unavailable => "unavailable",
+            Self::Unknown => "unknown",
         }
     }
 }
@@ -249,30 +300,30 @@ impl ActorNameResolver {
 
     /// The name of each actor of a page, in input order, and report the pass once.
     ///
-    /// An actor reads [`ActorName::Absent`] when it is masked, is not a user id, is
-    /// not found, or its lookup was refused, failed or late; the nil id reads
-    /// [`ActorName::System`] when unmasked.
+    /// The mask decides first: a masked actor reads [`ActorName::Masked`] whatever
+    /// it is. Then the actor's shape: the nil id reads [`ActorName::System`], a
+    /// text that is no user id [`ActorName::Module`]. A user without a recorded
+    /// tenant reads [`ActorName::NotRecorded`]; any other reads what the lookup
+    /// learned of it in the tenant it acted from.
     pub async fn names_for_page(
         &self,
         ctx: &SecurityContext,
         actors: &[ActorRef],
     ) -> Vec<ActorName> {
         let started = tokio::time::Instant::now();
-        let (names, result) = self.lookup(ctx, actors).await;
+        let (looked, result) = self.lookup(ctx, actors).await;
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-16
         let out = actors
             .iter()
             .map(|a| {
                 if a.masked {
-                    ActorName::Absent
+                    ActorName::Masked
                 } else {
-                    match Uuid::parse_str(&a.actor) {
-                        Ok(id) if id.is_nil() => ActorName::System,
-                        Ok(id) => names
-                            .get(&id)
-                            .cloned()
-                            .map_or(ActorName::Absent, ActorName::User),
-                        Err(_) => ActorName::Absent,
+                    match (Uuid::parse_str(&a.actor), a.actor_tenant_id) {
+                        (Err(_), _) => ActorName::Module,
+                        (Ok(id), _) if id.is_nil() => ActorName::System,
+                        (Ok(_), None) => ActorName::NotRecorded,
+                        (Ok(id), Some(tenant)) => looked.of((tenant, id)),
                     }
                 }
             })
@@ -287,39 +338,43 @@ impl ActorNameResolver {
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-15
     }
 
-    /// The resolved names by actor id, and the pass's result.
+    /// What the pass learned of each user it asked for, and the pass's result.
     async fn lookup(
         &self,
         ctx: &SecurityContext,
         actors_in: &[ActorRef],
-    ) -> (BTreeMap<Uuid, String>, &'static str) {
+    ) -> (Outcome, &'static str) {
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-1
         // An actor is asked for in the tenant it acted from. A record without
-        // one, written before the tenant was recorded, reads `null`.
-        let mut collected: BTreeMap<Uuid, BTreeSet<Uuid>> = BTreeMap::new();
+        // one, written before the tenant was recorded, is asked nowhere.
+        let mut asked: BTreeSet<Asked> = BTreeSet::new();
         for record in actors_in.iter().filter(|r| !r.masked) {
             if let Some(tenant) = record.actor_tenant_id
                 && let Ok(actor) = Uuid::parse_str(&record.actor)
                 && !actor.is_nil()
             {
-                collected.entry(tenant).or_default().insert(actor);
+                asked.insert((tenant, actor));
             }
         }
-        let actors: BTreeSet<Uuid> = collected.values().flatten().copied().collect();
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-1
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-17
-        if actors.is_empty() {
-            return (BTreeMap::new(), "skipped");
+        if asked.is_empty() {
+            return (Outcome::default(), "skipped");
         }
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-17
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-2
+        // Nobody to ask as: the answer Account Management would give, final.
         if ctx.is_anonymous() {
-            return (BTreeMap::new(), "skipped");
+            return (Outcome::default(), "skipped");
         }
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-2
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-3
         if !self.directory.is_available() {
-            return (BTreeMap::new(), "skipped");
+            let unanswered = Outcome {
+                unanswered: asked,
+                ..Outcome::default()
+            };
+            return (unanswered, "skipped");
         }
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-3
 
@@ -328,13 +383,17 @@ impl ActorNameResolver {
         let caller = self
             .ttl
             .map(|ttl| ((ctx.subject_tenant_id(), ctx.subject_id()), ttl));
-        let mut names = caller.map_or_else(BTreeMap::new, |(caller, _)| {
-            self.cache.fresh(caller, &actors, now)
+        let names = caller.map_or_else(BTreeMap::new, |(caller, _)| {
+            self.cache.fresh(caller, &asked, now)
         });
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-4
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-5
-        if names.len() == actors.len() {
-            return (names, "ok");
+        if names.len() == asked.len() {
+            let cached = Outcome {
+                names,
+                ..Outcome::default()
+            };
+            return (cached, "ok");
         }
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-5
 
@@ -343,15 +402,12 @@ impl ActorNameResolver {
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-6
 
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-7
-        let requests: Vec<(Uuid, Vec<Uuid>)> = collected
-            .iter()
-            .map(|(tenant, ids)| {
-                let ids = ids.iter().filter(|id| !names.contains_key(id)).copied();
-                (*tenant, ids.collect::<Vec<_>>())
-            })
-            .filter(|(_, ids)| !ids.is_empty())
-            .collect();
-        let fresh = self.resolve(ctx, &requests, budget_end).await;
+        let mut requests: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::new();
+        for (tenant, actor) in asked.iter().filter(|user| !names.contains_key(user)) {
+            requests.entry(*tenant).or_default().push(*actor);
+        }
+        let requests: Vec<(Uuid, Vec<Uuid>)> = requests.into_iter().collect();
+        let mut fresh = self.resolve(ctx, &requests, budget_end).await;
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-7
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-11
         if let Some((caller, ttl)) = caller {
@@ -359,10 +415,12 @@ impl ActorNameResolver {
         }
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-11
         // @cpt-begin:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-19
-        // Whatever AM did not answer is absent from the map and reads `null`.
-        names.extend(fresh.names);
+        // Whatever AM gave no name for is absent from the names, final: no
+        // other tenant is asked.
+        fresh.names.extend(names);
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-19
-        (names, if fresh.degraded { "degraded" } else { "ok" })
+        let result = if fresh.degraded { "degraded" } else { "ok" };
+        (fresh, result)
     }
 
     /// Run the lookup: the requests in chunks, at most [`LOOKUP_CONCURRENCY`] at once.
@@ -390,6 +448,7 @@ impl ActorNameResolver {
         for outcome in outcomes {
             all.degraded |= outcome.degraded;
             all.names.extend(outcome.names);
+            all.unanswered.extend(outcome.unanswered);
         }
         all
     }
@@ -397,7 +456,8 @@ impl ActorNameResolver {
     /// One chunk: the whole filtered set is read before an id counts as absent. Every page
     /// must make progress and return only new requested ids; a provider that drifts never
     /// shows an unrelated profile. A chunk that degrades with ids left logs one warn line:
-    /// the reason kind and the id count.
+    /// the reason kind and the id count; the ids it had not been answered for are unanswered,
+    /// while a chunk AM answered or refused leaves none.
     async fn resolve_chunk(
         &self,
         ctx: &SecurityContext,
@@ -446,7 +506,7 @@ impl ActorNameResolver {
             for user in page.items {
                 remaining.remove(&user.id);
                 if let Some(name) = project_name(&user) {
-                    names.insert(user.id, name);
+                    names.insert((tenant, user.id), name);
                 }
             }
             // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-11
@@ -469,12 +529,18 @@ impl ActorNameResolver {
             tracing::warn!(
                 reason = reason.as_str(),
                 ids = unresolved,
-                "actor names: a lookup degraded, these names read null"
+                "actor names: a lookup degraded, these actors read no name"
             );
         }
         // @cpt-end:cpt-cf-settings-service-algo-audit-store-actor-names:p2:inst-as-names-13
+        let unanswered = if failure.is_some() {
+            remaining.into_iter().map(|id| (tenant, id)).collect()
+        } else {
+            BTreeSet::new()
+        };
         Outcome {
             names,
+            unanswered,
             degraded: failure.is_some(),
         }
     }

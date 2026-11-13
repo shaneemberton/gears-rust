@@ -1093,8 +1093,8 @@ pub async fn get_history(
         })
         .collect();
     let actor_names = names.names_for_page(&ctx, &actors).await;
-    for (item, name) in items.iter_mut().zip(actor_names) {
-        item.actor_name = name.as_str().map(str::to_owned);
+    for (item, name) in items.iter_mut().zip(&actor_names) {
+        item.name_actor(name);
     }
     // @cpt-begin:cpt-cf-settings-service-flow-audit-store-history:p1:inst-as-hist-9
     Ok(Json(PageDto {

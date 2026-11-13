@@ -1665,7 +1665,7 @@ pub struct Answer {
     pub headers: HashMap<String, String>,
 }
 
-/// A directory that lists nobody: every history name reads `null`.
+/// A directory that lists nobody: every user of a history page reads `unknown`.
 struct NobodyDirectory;
 
 #[async_trait]
@@ -1886,6 +1886,13 @@ impl RestHarness {
     /// rewrite raw, through [`RestHarness::probe_query`] and
     /// [`RestHarness::probe_exec`].
     pub async fn probed() -> Self {
+        Self::probed_with_directory(nobody()).await
+    }
+
+    /// The probed surface with a directory the test scripts.
+    pub async fn probed_with_directory(
+        directory: Arc<dyn crate::infra::actor_names::ActorDirectory>,
+    ) -> Self {
         let (inner, probe) = ResolutionHarness::probed().await;
         Self::build_over(
             inner,
@@ -1893,7 +1900,7 @@ impl RestHarness {
             Arc::new(AllowAll),
             Arc::new(FixedStepUp::verified()),
             resolution_catalogue(),
-            nobody(),
+            directory,
         )
     }
 

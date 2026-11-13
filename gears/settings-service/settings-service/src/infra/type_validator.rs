@@ -34,6 +34,7 @@ use types_registry_sdk::{GtsTypeSchema, TypesRegistryClient};
 use crate::domain::error::DomainError;
 use crate::domain::validation::{
     FieldViolation, MalformedTrait, TraitSet, TypeValidator, ValidationResult, cron, guards,
+    is_gear_type_outside_catalogue,
 };
 use crate::field;
 
@@ -77,7 +78,13 @@ impl SchemaSource for Arc<dyn TypesRegistryClient> {
     async fn type_schema(&self, type_id: &str) -> Result<Option<GtsTypeSchema>, DomainError> {
         match self.get_type_schema(type_id).await {
             Ok(schema) => Ok(Some(schema)),
-            Err(CanonicalError::NotFound { .. }) => Ok(None),
+            // Absent, or not a type id at all — the registry refuses an id
+            // without the trailing `~` before it looks anything up: either
+            // way no such type is registered, which is not a failure of the
+            // lookup.
+            Err(CanonicalError::NotFound { .. } | CanonicalError::InvalidArgument { .. }) => {
+                Ok(None)
+            }
             Err(err) => Err(unavailable("get_type_schema", &err)),
         }
     }
@@ -170,8 +177,73 @@ fn malformed_trait(value_type_id: &str, malformed: &MalformedTrait) -> FieldViol
     }
 }
 
+/// Whether the type itself is marked abstract. `GtsTypeSchema` does not
+/// surface the keyword, so it is read off the registered document; a type
+/// derived from an abstract one does not carry it and is concrete.
+fn is_abstract(schema: &GtsTypeSchema) -> bool {
+    schema.raw_schema.get("x-gts-abstract") == Some(&Value::Bool(true))
+}
+
+/// The validator of a resolved type. The effective schema has the parent
+/// chain inlined. `format` keywords are asserted, not annotated: `uri`, `ipv4`
+/// and their kind reject a value that does not match, exactly as `type` or
+/// `maximum` would.
+///
+/// It does not build when the schema refers to a type outside that chain: a
+/// `gts://` reference is left as it is, and nothing here resolves it.
+fn compile(
+    schema: &GtsTypeSchema,
+) -> Result<jsonschema::Validator, jsonschema::ValidationError<'static>> {
+    jsonschema::options()
+        .should_validate_formats(true)
+        .build(&schema.effective_schema())
+}
+
+fn not_a_value_type(message: String) -> DomainError {
+    DomainError::Validation {
+        field: "value_type_id".to_owned(),
+        code: field::NOT_A_VALUE_TYPE,
+        message,
+    }
+}
+
 #[async_trait]
 impl<S: SchemaSource> TypeValidator for GtsTypeValidator<S> {
+    async fn ensure_value_type(&self, value_type_id: &str) -> Result<(), DomainError> {
+        // The identifier first: a setting key or the setting base is refused
+        // for what it names, registered or not, without a round trip.
+        if is_gear_type_outside_catalogue(value_type_id) {
+            return Err(not_a_value_type(format!(
+                "`{value_type_id}` is not a value type: among this service's own types only \
+                 the catalogue `{}*` describes the shape of a value",
+                settings_service_sdk::catalogue::value_type_prefix()
+            )));
+        }
+        let schema = self.resolve(value_type_id).await?;
+        if is_abstract(&schema) {
+            return Err(not_a_value_type(format!(
+                "`{value_type_id}` is an abstract type and describes no value a setting \
+                 could hold"
+            )));
+        }
+        // A type whose schema does not build can check no value. Refused
+        // here, while the declaration can still name another type; a value
+        // of a row already stored with such a type meets it as an internal
+        // fault in `validate_value`, as before.
+        if compile(&schema).is_err() {
+            return Err(DomainError::Validation {
+                field: "value_type_id".to_owned(),
+                code: field::VALUE_TYPE_UNSUPPORTED,
+                message: format!(
+                    "`{value_type_id}` is registered, but its schema does not build into a \
+                     validator in this service: a reference to a type outside its own parent \
+                     chain is not resolved, so no value of it could be checked"
+                ),
+            });
+        }
+        Ok(())
+    }
+
     async fn validate_value(
         &self,
         value_type_id: &str,
@@ -228,18 +300,11 @@ impl<S: SchemaSource> TypeValidator for GtsTypeValidator<S> {
 
         // @cpt-begin:cpt-cf-settings-service-algo-typed-value-validation-validate:p1:inst-tvv-val-5
         // @cpt-begin:cpt-cf-settings-service-algo-typed-value-validation-validate:p1:inst-tvv-val-6
-        // The effective schema has the parent chain inlined. `format` keywords
-        // are asserted, not annotated: `uri`, `ipv4` and their kind reject a
-        // value that does not match, exactly as `type` or `maximum` would.
-        let effective = schema.effective_schema();
-        let validator = jsonschema::options()
-            .should_validate_formats(true)
-            .build(&effective)
-            .map_err(|e| DomainError::Internal {
-                diagnostic: format!(
-                    "GTS type `{value_type_id}` is not a valid JSON Schema (catalogue drift): {e}"
-                ),
-            })?;
+        let validator = compile(&schema).map_err(|e| DomainError::Internal {
+            diagnostic: format!(
+                "GTS type `{value_type_id}` is not a valid JSON Schema (catalogue drift): {e}"
+            ),
+        })?;
         for error in validator.iter_errors(value) {
             let code = match error.kind() {
                 jsonschema::error::ValidationErrorKind::Format { .. } => field::VALUE_FORMAT,

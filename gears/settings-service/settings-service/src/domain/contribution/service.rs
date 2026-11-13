@@ -441,6 +441,34 @@ where
     /// Classification, secret handling and the flags, derived from the value
     /// type's traits and what the caller supplied.
     async fn derive(&self, contributed: &ContributedDeclaration) -> Result<Derived, ItemError> {
+        // The value type has to be one before anything is derived from it,
+        // on every reconcile — a first registration, a same-major update, a
+        // reactivation and an upgrade all derive first.
+        match self
+            .validator
+            .ensure_value_type(&contributed.value_type_id)
+            .await
+        {
+            Ok(()) => {}
+            Err(DomainError::Validation { code, message, .. })
+                if code == crate::field::NOT_A_VALUE_TYPE =>
+            {
+                return Err(refused(reason::NOT_A_VALUE_TYPE, message));
+            }
+            Err(DomainError::Validation { code, message, .. })
+                if code == crate::field::VALUE_TYPE_UNKNOWN =>
+            {
+                return Err(refused(reason::VALUE_TYPE_UNKNOWN, message));
+            }
+            Err(DomainError::Validation { code, message, .. })
+                if code == crate::field::VALUE_TYPE_UNSUPPORTED =>
+            {
+                return Err(refused(reason::VALUE_TYPE_UNSUPPORTED, message));
+            }
+            // Any other fault keeps its own name: it fails the item as it
+            // is, never relabelled as an unknown type.
+            Err(other) => return Err(other.into()),
+        }
         let traits = match self
             .validator
             .resolve_traits(&contributed.value_type_id)

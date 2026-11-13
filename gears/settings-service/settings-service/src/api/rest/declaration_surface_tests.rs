@@ -9,7 +9,7 @@
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::test_support::{BOOL, RestHarness};
+use crate::test_support::{BOOL, DECLARED_SETTING, MODULE_TYPE, RestHarness};
 
 const DECLARATIONS: &str = "/settings-service/v1/declarations";
 
@@ -107,6 +107,106 @@ async fn a_value_type_the_registry_does_not_know_is_refused_400() {
         .send("POST", DECLARATIONS, Some(body), None, h.inner.tree.root)
         .await;
     assert_eq!(answer.status, 400, "{}", answer.body);
+}
+
+/// A create naming `value_type_id`, with a default of that type's shape.
+async fn create_typed(
+    h: &RestHarness,
+    name: &str,
+    value_type_id: &str,
+    default_value: Value,
+) -> crate::test_support::Answer {
+    let mut body = create_body(h, name);
+    body["value_type_id"] = json!(value_type_id);
+    body["default_value"] = default_value;
+    h.send("POST", DECLARATIONS, Some(body), None, h.inner.tree.root)
+        .await
+}
+
+fn assert_not_a_value_type(answer: &crate::test_support::Answer) {
+    assert_eq!(answer.status, 400, "{}", answer.body);
+    let violation = &answer.body["context"]["field_violations"][0];
+    assert_eq!(
+        violation["field"],
+        json!("value_type_id"),
+        "{}",
+        answer.body
+    );
+    assert_eq!(
+        violation["reason"],
+        json!("not_a_value_type"),
+        "{}",
+        answer.body
+    );
+}
+
+#[tokio::test]
+async fn a_value_type_id_that_is_no_type_id_is_refused_400_on_value_type_id() {
+    let h = RestHarness::new().await;
+    for id in crate::test_support::NOT_TYPE_IDS {
+        let answer = create_typed(&h, "proxy_enabled", id, json!(true)).await;
+        assert_eq!(answer.status, 400, "{}", answer.body);
+        let violation = &answer.body["context"]["field_violations"][0];
+        assert_eq!(
+            violation["field"],
+            json!("value_type_id"),
+            "{}",
+            answer.body
+        );
+        assert_eq!(
+            violation["reason"],
+            json!("value_type_unknown"),
+            "{}",
+            answer.body
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_declared_setting_named_as_the_value_type_is_refused_400_on_value_type_id() {
+    // A setting key is a GTS type too, and the registry knows it; it says
+    // what the setting is, not what shape a value has.
+    let h = RestHarness::new().await;
+    let answer = create_typed(&h, "proxy_enabled", DECLARED_SETTING, json!(true)).await;
+    assert_not_a_value_type(&answer);
+    assert!(
+        h.registrar.registered.lock().expect("lock").is_empty(),
+        "no setting type was registered for the refused declaration"
+    );
+}
+
+#[tokio::test]
+async fn the_abstract_setting_base_named_as_the_value_type_is_refused_400_on_value_type_id() {
+    // The base accepts any object with a `payload`, so a default of that
+    // shape would validate: the type is refused for what it is.
+    let h = RestHarness::new().await;
+    let answer = create_typed(
+        &h,
+        "proxy_enabled",
+        settings_service_sdk::gts::SETTING_TYPE_BASE,
+        json!({ "payload": true }),
+    )
+    .await;
+    assert_not_a_value_type(&answer);
+
+    let listed = h
+        .send("GET", DECLARATIONS, None, None, h.inner.tree.root)
+        .await;
+    assert_eq!(listed.status, 200, "{}", listed.body);
+    assert_eq!(
+        listed.body["items"],
+        json!([]),
+        "nothing was declared: {}",
+        listed.body
+    );
+}
+
+#[tokio::test]
+async fn a_value_type_a_module_registered_in_its_own_namespace_is_accepted_201() {
+    let h = RestHarness::new().await;
+    let answer = create_typed(&h, "retry_limit", MODULE_TYPE, json!(3)).await;
+    assert_eq!(answer.status, 201, "{}", answer.body);
+    assert_eq!(answer.body["value_type_id"], json!(MODULE_TYPE));
 }
 
 #[tokio::test]

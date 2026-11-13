@@ -6,7 +6,11 @@ use super::GtsTypeValidator;
 use crate::domain::error::DomainError;
 use crate::domain::validation::TypeValidator;
 use crate::field;
-use crate::test_support::FakeSource;
+use crate::test_support::{
+    BOOL, DECLARED_SETTING, FakeSource, MODULE_TYPE, NOT_TYPE_IDS, REFERRING_TYPE, TEXT,
+    referring_type_schema, registry_client, resolution_catalogue,
+};
+use settings_service_sdk::gts::SETTING_TYPE_BASE;
 
 const PORT_TYPE: &str = "gts.cf.core.settings.type_port.v1~";
 const IP_TYPE: &str = "gts.cf.core.settings.type_ipv4.v1~";
@@ -721,4 +725,203 @@ async fn dynamic_enum_members_are_resolved_in_one_lookup_whatever_their_number()
         1,
         "fifty leaves, one lookup"
     );
+}
+
+// ── A type that is not a value type ──────────────────────────────────────────
+
+#[tokio::test]
+async fn a_declared_setting_named_as_a_type_does_not_compile_into_a_validator() {
+    // What a declaration naming a setting key as its value type ran into
+    // before the value-type check stood in front: the setting's own type
+    // narrows `payload` by a `gts://` reference to its value type, the
+    // effective schema inlines the parent chain and nothing else, and a
+    // reference left unresolved does not build. The port reports that as an
+    // internal fault — a `500` on the wire.
+    let v = GtsTypeValidator::new(resolution_catalogue());
+    assert!(
+        v.resolve_traits(DECLARED_SETTING).await.is_ok(),
+        "the traits resolve: nothing refuses the id before the schema is compiled"
+    );
+    match v.validate_value(DECLARED_SETTING, &json!(true)).await {
+        Err(DomainError::Internal { diagnostic }) => {
+            assert!(
+                diagnostic.contains("is not a valid JSON Schema"),
+                "{diagnostic}"
+            );
+        }
+        other => panic!("expected the internal fault, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn the_abstract_base_named_as_a_type_validates_any_object_with_a_payload() {
+    // The other half: the base constrains nothing but the presence of
+    // `payload`, so as a value type it accepts a default of that shape, and
+    // only the value-type check keeps a declaration from adopting it.
+    let v = GtsTypeValidator::new(resolution_catalogue());
+    let result = v
+        .validate_value(SETTING_TYPE_BASE, &json!({ "payload": 1 }))
+        .await
+        .expect("validated");
+    assert!(result.is_accepted(), "{result:?}");
+}
+
+fn refused_as_not_a_value_type(outcome: Result<(), DomainError>, what: &str) {
+    match outcome {
+        Err(DomainError::Validation { field, code, .. }) => {
+            assert_eq!(field, "value_type_id", "{what}");
+            assert_eq!(code, field::NOT_A_VALUE_TYPE, "{what}");
+        }
+        other => panic!("{what}: expected the refusal, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn a_type_of_the_gears_namespace_outside_the_catalogue_is_not_a_value_type() {
+    // The setting base, a declared setting and a resource type of the gear:
+    // refused on the identifier, registered or not, without asking the
+    // registry.
+    let v = GtsTypeValidator::new(resolution_catalogue());
+    for id in [
+        SETTING_TYPE_BASE,
+        DECLARED_SETTING,
+        "gts.cf.core.settings.setting_type.v1~acme.settings.network.never_declared.v1~",
+        "gts.cf.core.settings.declaration.v1~",
+    ] {
+        refused_as_not_a_value_type(v.ensure_value_type(id).await, id);
+    }
+    assert_eq!(
+        v.source()
+            .schema_lookups
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the identifier decides"
+    );
+}
+
+#[tokio::test]
+async fn an_abstract_type_of_any_namespace_is_not_a_value_type() {
+    const ENVELOPE: &str = "gts.acme.demo.values.envelope.v1~";
+    const CONCRETE: &str = "gts.acme.demo.values.envelope.v1~acme.demo.values.retry.v1~";
+    let source = resolution_catalogue()
+        .with_type(
+            ENVELOPE,
+            json!({
+                "$id": format!("gts://{ENVELOPE}"),
+                "type": "object",
+                "x-gts-abstract": true
+            }),
+        )
+        .with_derived_type(
+            CONCRETE,
+            json!({
+                "$id": format!("gts://{CONCRETE}"),
+                "allOf": [{ "$ref": format!("gts://{ENVELOPE}") }],
+                "properties": { "attempts": { "type": "integer" } }
+            }),
+        );
+    let v = GtsTypeValidator::new(source);
+    refused_as_not_a_value_type(v.ensure_value_type(ENVELOPE).await, ENVELOPE);
+    // The keyword marks the type that carries it: a concrete type derived
+    // from an abstract one is a value type.
+    v.ensure_value_type(CONCRETE)
+        .await
+        .expect("a concrete derived type");
+}
+
+#[tokio::test]
+async fn a_catalogue_type_a_type_derived_from_one_and_a_module_type_are_value_types() {
+    const SHORT_TEXT: &str =
+        "gts.cf.core.settings.type_plain_text.v1~acme.demo.values.short_text.v1~";
+    let source = resolution_catalogue().with_derived_type(
+        SHORT_TEXT,
+        json!({
+            "$id": format!("gts://{SHORT_TEXT}"),
+            "allOf": [{ "$ref": format!("gts://{TEXT}") }],
+            "maxLength": 16
+        }),
+    );
+    let v = GtsTypeValidator::new(source);
+    for id in [BOOL, SHORT_TEXT, MODULE_TYPE] {
+        v.ensure_value_type(id)
+            .await
+            .unwrap_or_else(|err| panic!("{id}: {err:?}"));
+    }
+}
+
+#[tokio::test]
+async fn an_unregistered_or_unreachable_type_is_never_taken_for_a_value_type() {
+    let v = GtsTypeValidator::new(resolution_catalogue());
+    for id in [
+        "gts.cf.core.settings.type_missing.v1~",
+        "gts.acme.demo.values.missing.v1~",
+    ] {
+        match v.ensure_value_type(id).await {
+            Err(DomainError::Validation { field, code, .. }) => {
+                assert_eq!(field, "value_type_id");
+                assert_eq!(code, field::VALUE_TYPE_UNKNOWN, "{id}");
+            }
+            other => panic!("{id}: {other:?}"),
+        }
+    }
+    let down = GtsTypeValidator::new(FakeSource {
+        unavailable: true,
+        ..resolution_catalogue()
+    });
+    assert!(matches!(
+        down.ensure_value_type(BOOL).await,
+        Err(DomainError::Unavailable { .. })
+    ));
+}
+
+#[tokio::test]
+async fn an_id_the_registry_refuses_as_no_type_id_is_an_unknown_type_not_an_outage() {
+    // The registry answers an id without the trailing `~` with a refusal of
+    // the argument before it looks anything up. To a declaration that is the
+    // same fact as an absent type: nothing is registered under the id.
+    let v = GtsTypeValidator::new(registry_client());
+    for id in NOT_TYPE_IDS {
+        match v.ensure_value_type(id).await {
+            Err(DomainError::Validation { field, code, .. }) => {
+                assert_eq!(field, "value_type_id", "{id}");
+                assert_eq!(code, field::VALUE_TYPE_UNKNOWN, "{id}");
+            }
+            other => panic!("{id}: {other:?}"),
+        }
+        match v.resolve_traits(id).await {
+            Err(DomainError::Validation { code, .. }) => {
+                assert_eq!(code, field::VALUE_TYPE_UNKNOWN, "{id}");
+            }
+            other => panic!("{id}: {other:?}"),
+        }
+        let result = v.validate_value(id, &json!(true)).await.expect("judged");
+        assert_eq!(codes(&result), vec![field::VALUE_TYPE_UNKNOWN], "{id}");
+    }
+    v.ensure_value_type(BOOL)
+        .await
+        .expect("the registered type is still one");
+}
+
+#[tokio::test]
+async fn a_type_whose_schema_refers_outside_its_parent_chain_is_refused_as_unsupported() {
+    // A module's concrete type that takes a property's shape from another
+    // type by `gts://`. The effective schema keeps the reference, which does
+    // not build: the declaration is told so, on the type it named.
+    let v = GtsTypeValidator::new(
+        resolution_catalogue().with_type(REFERRING_TYPE, referring_type_schema()),
+    );
+    match v.ensure_value_type(REFERRING_TYPE).await {
+        Err(DomainError::Validation { field, code, .. }) => {
+            assert_eq!(field, "value_type_id");
+            assert_eq!(code, field::VALUE_TYPE_UNSUPPORTED);
+        }
+        other => panic!("expected the refusal, got {other:?}"),
+    }
+    // A value of a row already stored with such a type is not re-labelled:
+    // validating it is the internal fault it was.
+    assert!(matches!(
+        v.validate_value(REFERRING_TYPE, &json!({ "inner": 3 }))
+            .await,
+        Err(DomainError::Internal { .. })
+    ));
 }

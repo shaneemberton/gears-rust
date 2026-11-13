@@ -126,6 +126,10 @@ struct PlainValidator;
 
 #[async_trait]
 impl TypeValidator for PlainValidator {
+    async fn ensure_value_type(&self, _value_type_id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
     async fn validate_value(
         &self,
         _value_type_id: &str,

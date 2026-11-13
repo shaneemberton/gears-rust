@@ -228,9 +228,46 @@ impl TraitSet {
     }
 }
 
+/// The namespace this gear registers its own types under: the value-type
+/// catalogue, the abstract base every setting key derives from — and so every
+/// declared setting — and the gear's resource types.
+fn gear_namespace() -> String {
+    format!("{}cf.core.settings.", toolkit_gts::GTS_ID_PREFIX)
+}
+
+/// Whether `type_id` is one of this gear's own types that is not a value
+/// type: under the gear's namespace, and outside the catalogue prefix
+/// `type_`. The setting base and every setting key are such ids; a catalogue
+/// type, a type derived from one, and any type of another namespace are not.
+///
+/// Decided on the identifier alone, so the answer needs no registry.
+#[must_use]
+pub(crate) fn is_gear_type_outside_catalogue(type_id: &str) -> bool {
+    type_id.starts_with(&gear_namespace())
+        && !type_id.starts_with(&settings_service_sdk::catalogue::value_type_prefix())
+}
+
 /// Validation of values against GTS types, and resolution of a type's traits.
 #[async_trait]
 pub trait TypeValidator: Send + Sync {
+    /// Whether `value_type_id` names a value type — a type a declaration may
+    /// take the shape of its values from. Asked wherever a declaration is
+    /// accepted, before its traits are resolved or its default is validated.
+    ///
+    /// A value type is a catalogue type, or one a module registered in its
+    /// own namespace. Refused are the types of this gear's namespace outside
+    /// the catalogue (see `is_gear_type_outside_catalogue`), and any type
+    /// whose own schema is marked `x-gts-abstract`.
+    ///
+    /// # Errors
+    /// [`DomainError::Validation`] on `value_type_id`: with
+    /// [`crate::field::NOT_A_VALUE_TYPE`] for a type that is not a value
+    /// type, with [`crate::field::VALUE_TYPE_UNKNOWN`] for one that is not
+    /// registered, with [`crate::field::VALUE_TYPE_UNSUPPORTED`] for one
+    /// whose schema does not build into a validator;
+    /// [`DomainError::Unavailable`] when the registry cannot be reached.
+    async fn ensure_value_type(&self, value_type_id: &str) -> Result<(), DomainError>;
+
     /// Validate `value` against the type `value_type_id` names.
     ///
     /// Every rule is a hard check, and every fault of the rules that ran is

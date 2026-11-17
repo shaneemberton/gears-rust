@@ -1,7 +1,7 @@
 # Constructor Studio pinned cfs version
 [cfs]
-version = "v1.8.0"
-requested_ref = "v1.8.0"
+version = "3e73a118af4108fa45b306e02f20c9692d1bc1d6"
+requested_ref = "3e73a118af4108fa45b306e02f20c9692d1bc1d6"
 source_type = "github"
-canonical_source = "https://api.github.com/repos/constructorfabric/studio"
-effective_source = "https://api.github.com/repos/constructorfabric/studio"
+canonical_source = "https://api.github.com/repos/ainetx/studio"
+effective_source = "https://api.github.com/repos/ainetx/studio"

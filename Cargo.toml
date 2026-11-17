@@ -991,4 +991,4 @@ ignored = [
 ]
 
 [workspace.metadata.dylint]
-libraries = [{ git = "https://github.com/constructorfabric/cargo-gears", tag = "cargo-gears-v0.0.10", pattern = "crates/cargo-gears-lints" }]
+libraries = [{ git = "https://github.com/ainetx/cargo-gears", tag = "cargo-gears-v0.0.10", pattern = "crates/cargo-gears-lints" }]

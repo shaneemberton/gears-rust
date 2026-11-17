@@ -1584,5 +1584,16 @@ jobs:
           git -C "$mirror" symbolic-ref HEAD refs/heads/master
           git config --global url."file://$mirror".insteadOf https://github.com/rust-lang/rust-clippy
 
+      # Fork-only: constructorfabric/cargo-gears is private. The cargo-gears binary names it, with
+      # its own tag, as the source of the lint library, and the workspace metadata names it too.
+      # Serve both from a public fork that carries the same tags.
+      - name: Fork-only, read the lint library from a public fork
+        shell: bash
+        run: |
+          git config --global url."https://github.com/ainetx/cargo-gears".insteadOf https://github.com/constructorfabric/cargo-gears
+
       - name: Run architecture lints
+        env:
+          # cargo's built-in git client does not apply `insteadOf`; the git CLI does.
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: tools/scripts/with_rust_annotations.sh make dylint

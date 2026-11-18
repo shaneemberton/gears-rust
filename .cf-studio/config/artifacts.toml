@@ -720,3 +720,13 @@ required = false
 require_kind_registered_in_kit = true
 require_md_extension = true
 fail_on_unmatched_markdown = true
+
+# Fork-only, not for the pull request: main carries a dangling reference to
+# `cpt-cf-adr-two-plane-auth` in these two quota-resolver documents, which fails
+# `cfs validate` (3 errors). Ignored here so the rest of the CI can go green.
+[[ignore]]
+reason = "Fork-only: dangling reference cpt-cf-adr-two-plane-auth in quota-resolver DESIGN and ADR-0003 on main."
+patterns = [
+  "gears/system/quota-resolver/docs/DESIGN.md",
+  "gears/system/quota-resolver/docs/ADR/0003-cpt-cf-quota-resolver-adr-two-planes.md",
+]

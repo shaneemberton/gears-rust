@@ -42,6 +42,10 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Fork-only: constructorfabric/studio is private. This is the commit of its
+      # v1.8.0 tag (the pin in .cf-studio/version.toml), reached through a public fork.
+      CFS_PIPX_SPEC: git+https://github.com/ainetx/studio.git@3e73a118af4108fa45b306e02f20c9692d1bc1d6
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

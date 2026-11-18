@@ -1132,15 +1132,20 @@ jobs:
           shared-key: pr-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-onnx
           save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
+      # Fork-only: github.com/microsoft/onnxruntime answers 404, so the release tarball cannot be
+      # fetched. The PyPI wheel of the same version ships the same shared library.
       - name: Fetch ONNX Runtime shared library
         shell: bash
+        env:
+          ONNXRUNTIME_WHEEL_SHA256: 85f8e8406c52658735fe5c7fbfd3ebaa1ed340768324f6252e4274e374580a23
         run: |
           set -euo pipefail
-          curl -sL --fail -o /tmp/onnxruntime.tgz \
-            "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz"
-          echo "${ONNXRUNTIME_SHA256}  /tmp/onnxruntime.tgz" | sha256sum --check
-          tar xzf /tmp/onnxruntime.tgz -C /tmp
-          echo "ORT_DYLIB_PATH=/tmp/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}/lib/libonnxruntime.so" >> "$GITHUB_ENV"
+          python3 -m pip download "onnxruntime==${ONNXRUNTIME_VERSION}" --no-deps --only-binary=:all: \
+            --platform manylinux_2_28_x86_64 --python-version 3.11 --implementation cp --abi cp311 -d /tmp/ort-dl
+          wheel=$(ls /tmp/ort-dl/onnxruntime-*.whl)
+          echo "${ONNXRUNTIME_WHEEL_SHA256}  ${wheel}" | sha256sum --check
+          python3 -m zipfile -e "${wheel}" /tmp/ort-wheel
+          echo "ORT_DYLIB_PATH=/tmp/ort-wheel/onnxruntime/capi/libonnxruntime.so.${ONNXRUNTIME_VERSION}" >> "$GITHUB_ENV"
 
       - name: Fetch the model and tokenizer
         shell: bash
@@ -1269,15 +1274,20 @@ jobs:
           shared-key: pr-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-magika
           save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
+      # Fork-only: github.com/microsoft/onnxruntime answers 404, so the release tarball cannot be
+      # fetched. The PyPI wheel of the same version ships the same shared library.
       - name: Fetch ONNX Runtime shared library
         shell: bash
+        env:
+          ONNXRUNTIME_WHEEL_SHA256: 85f8e8406c52658735fe5c7fbfd3ebaa1ed340768324f6252e4274e374580a23
         run: |
           set -euo pipefail
-          curl -sL --fail -o /tmp/onnxruntime.tgz \
-            "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz"
-          echo "${ONNXRUNTIME_SHA256}  /tmp/onnxruntime.tgz" | sha256sum --check
-          tar xzf /tmp/onnxruntime.tgz -C /tmp
-          echo "ORT_DYLIB_PATH=/tmp/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}/lib/libonnxruntime.so" >> "$GITHUB_ENV"
+          python3 -m pip download "onnxruntime==${ONNXRUNTIME_VERSION}" --no-deps --only-binary=:all: \
+            --platform manylinux_2_28_x86_64 --python-version 3.11 --implementation cp --abi cp311 -d /tmp/ort-dl
+          wheel=$(ls /tmp/ort-dl/onnxruntime-*.whl)
+          echo "${ONNXRUNTIME_WHEEL_SHA256}  ${wheel}" | sha256sum --check
+          python3 -m zipfile -e "${wheel}" /tmp/ort-wheel
+          echo "ORT_DYLIB_PATH=/tmp/ort-wheel/onnxruntime/capi/libonnxruntime.so.${ONNXRUNTIME_VERSION}" >> "$GITHUB_ENV"
 
       - name: cargo test (file-parser, magika feature)
         shell: bash
@@ -1584,5 +1594,16 @@ jobs:
           git -C "$mirror" symbolic-ref HEAD refs/heads/master
           git config --global url."file://$mirror".insteadOf https://github.com/rust-lang/rust-clippy
 
+      # Fork-only: constructorfabric/cargo-gears is private. The cargo-gears binary names it, with
+      # its own tag, as the source of the lint library, and the workspace metadata names it too.
+      # Serve both from a public fork that carries the same tags.
+      - name: Fork-only, read the lint library from a public fork
+        shell: bash
+        run: |
+          git config --global url."https://github.com/ainetx/cargo-gears".insteadOf https://github.com/constructorfabric/cargo-gears
+
       - name: Run architecture lints
+        env:
+          # cargo's built-in git client does not apply `insteadOf`; the git CLI does.
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: tools/scripts/with_rust_annotations.sh make dylint

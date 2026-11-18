@@ -220,8 +220,8 @@ impl DomainError {
     #[must_use]
     pub fn from_enforcer(err: EnforcerError, operation: &'static str) -> Self {
         match err {
-            EnforcerError::Denied { deny_reason } => {
-                tracing::debug!(operation, ?deny_reason, "pdp denied");
+            EnforcerError::AccessDenied(denial) => {
+                tracing::debug!(operation, ?denial, "pdp denied");
                 Self::not_permitted(operation)
             }
             EnforcerError::CompileFailed(e) => {
@@ -229,6 +229,9 @@ impl DomainError {
                 Self::not_permitted(operation)
             }
             EnforcerError::EvaluationFailed(e) => Self::unavailable(Dependency::Pdp, e),
+            unknown => Self::internal(format!(
+                "authorization failed with an unknown outcome: {unknown}"
+            )),
         }
     }
 
@@ -625,7 +628,10 @@ mod tests {
 
     #[test]
     fn enforcer_mapping() {
-        let e = DomainError::from_enforcer(EnforcerError::Denied { deny_reason: None }, "op");
+        let e = DomainError::from_enforcer(
+            EnforcerError::AccessDenied(authz_resolver_sdk::AccessDenial::Pdp { reason: None }),
+            "op",
+        );
         assert!(matches!(e, DomainError::NotPermitted { .. }));
         let e = DomainError::from_enforcer(
             EnforcerError::EvaluationFailed(CanonicalError::service_unavailable().create()),

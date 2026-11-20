@@ -90,7 +90,8 @@ bss-orders = [
     "dep:standalone-cluster-plugin",
     "dep:sqlite-event-broker-plugin",
 ]
-bss-pricing = ["dep:bss_pricing", "bss-products"]
+# Pricing declares its tenant settings in the Settings Service and names that gear in its `deps`.
+bss-pricing = ["dep:bss_pricing", "bss-products", "settings-service"]
 bss-approvals = ["dep:bss_approvals"]
 # The admission gate links its default engine plugin, policy-engine.
 admission-control = ["dep:admission-control", "policy-engine"]

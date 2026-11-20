@@ -23,6 +23,10 @@ config_gears:
   - account-management
   # Linked through account-management; it boots only with its database block.
   - resource-group
+  # Linked through bss-pricing, which declares its tenant settings there; the Settings Service
+  # reads its configuration fail-closed and resolves a credential store client at init.
+  - settings-service
+  - credstore
   - static-idp-plugin
 env:
   # An isolated data root. The shared config's `~/.cf-gears` may hold a

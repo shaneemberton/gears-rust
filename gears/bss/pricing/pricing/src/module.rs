@@ -18,7 +18,7 @@ struct PricingRuntime {
     state: Arc<crate::api::rest::authoring::AuthoringState>,
 }
 
-#[toolkit::gear(name = "bss-pricing", capabilities = [db, rest, stateful], deps = [types_registry, authz_resolver], lifecycle(entry = "serve", stop_timeout = "30s"))]
+#[toolkit::gear(name = "bss-pricing", capabilities = [db, rest, stateful], deps = [types_registry, authz_resolver, settings_service], lifecycle(entry = "serve", stop_timeout = "30s"))]
 pub struct BssPricingGear {
     runtime: ArcSwapOption<PricingRuntime>,
 }
@@ -149,6 +149,7 @@ impl Gear for BssPricingGear {
                 );
             }
         }
+        crate::infra::settings_declarations::register_value_types(registry.as_ref()).await?;
 
         let state = Arc::new(
             crate::api::rest::authoring::AuthoringState::new(db, ctx.client_hub())
@@ -196,6 +197,17 @@ impl Gear for BssPricingGear {
         self.runtime
             .store(Some(Arc::new(PricingRuntime { enforcer, state })));
         Ok(())
+    }
+
+    /// Declares the tenant pricing settings. Here and not in `init`: the Settings Service reads
+    /// a declaration's value type from the types registry, which serves what `init` registered
+    /// only once every `init` has run.
+    async fn post_init(&self, ctx: &GearCtx) -> Result<()> {
+        // A gear the deployment does not configure registered no value type and serves nothing.
+        if self.runtime.load().is_none() {
+            return Ok(());
+        }
+        crate::infra::settings_declarations::register_declarations(&ctx.client_hub()).await
     }
 }
 

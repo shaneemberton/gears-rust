@@ -59,6 +59,12 @@ authz-resolver = { workspace = true }
 authz-resolver-sdk = { workspace = true }
 types-registry = { workspace = true }
 types-registry-sdk = { workspace = true }
+# The tenant pricing settings are declared in the Settings Service through its contribution
+# contract (`infra::settings_declarations`).
+settings-service-sdk = { workspace = true }
+# Named in the gear's `deps`, so the Settings Service's contribution client is bound before this
+# gear starts.
+settings-service = { workspace = true }
 toolkit-security = { workspace = true }
 toolkit-gts = { workspace = true }
 # `gts_instance!`'s expansion references the `gts` crate directly.
@@ -91,3 +97,11 @@ tower = { workspace = true }
 # A test's `SQLite` file lives in its own temporary directory, removed with the test (the database,
 # its `-wal` and its `-shm`); before, every run left its files in the user's temp dir.
 tempfile = { workspace = true }
+# The schemas of the declared settings' value types are compiled as the Settings Service compiles
+# a type's schema: this crate, formats asserted, the draft read from the schema's `$schema`.
+jsonschema = { workspace = true }
+# The Settings Service resolves a credential store client at its init; the test hands it a double.
+credstore-sdk = { workspace = true, features = ["test-util"] }
+# The Settings Service walks a tenant's chain through the tenant resolver on every read; the
+# test hands it a double.
+tenant-resolver-sdk = { workspace = true }

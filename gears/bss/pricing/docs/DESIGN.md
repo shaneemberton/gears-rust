@@ -603,6 +603,15 @@ bound to the receipt and object. Products versions?as_of provides descriptor his
 SkuChanged listener/local SKU read model in phase 2 (D-399). Subscriptions migration execution and Rating
 adaptation are independent programmes; approval here cannot claim a subscription moved.
 
+The Settings Service is a hard start dependency (D-540). The gear names `settings_service` in its `deps`, so the
+Settings Service starts first and binds `SettingsContributionClient` in the ClientHub. Pricing declares its tenant
+settings there in two phases: `init` registers the settings' value types in the types registry, and `post_init`
+registers the declarations in one reconcile, because the registry serves what an `init` registered only after its
+finalize step. The gear does not start when the client is absent, the reconcile fails or a declaration is refused.
+The Settings Service then owns the declared settings: their catalogue, value validation against the registered
+types, stored values with their history, and their REST surface. Pricing does not read them yet: resolve, the plan
+checks and the new-book currency check read the gear's own settings row, and `/settings` serves it.
+
 ### 3.6 Interactions & Sequences
 
 #### Publish changes

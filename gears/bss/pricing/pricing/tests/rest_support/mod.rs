@@ -3,19 +3,14 @@
 
 use async_trait::async_trait;
 use axum::Router;
+use bss_pricing::infra::settings_declarations::doubles::{Answer, RecordingRegistry};
 use bss_pricing::module::BssPricingGear;
-use std::collections::HashMap;
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::sync::Arc;
 use toolkit::api::OpenApiRegistryImpl;
 use toolkit::contracts::RestApiCapability;
 use toolkit::{Gear, GearCtx};
 use toolkit_canonical_errors::CanonicalError;
-use types_registry_sdk::{
-    GtsInstance, GtsTypeSchema, InstanceQuery, RegisterResult, TypeSchemaQuery, TypesRegistryClient,
-};
+use types_registry_sdk::TypesRegistryClient;
 use uuid::Uuid;
 
 #[path = "../common/mod.rs"]
@@ -69,91 +64,12 @@ impl authz_resolver_sdk::AuthZResolverApi for AllowingResolver {
     }
 }
 
-/// Captures the mandatory authz schema registration, even for the empty frame.
-#[derive(Default)]
-pub struct Registry {
-    pub calls: AtomicUsize,
-}
-#[async_trait]
-impl TypesRegistryClient for Registry {
-    async fn register(
-        &self,
-        entities: Vec<serde_json::Value>,
-    ) -> Result<Vec<RegisterResult>, CanonicalError> {
-        assert_eq!(entities, bss_pricing::authz::authz_label_type_schemas());
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        Ok(Vec::new())
-    }
-    async fn register_type_schemas(
-        &self,
-        _type_schemas: Vec<serde_json::Value>,
-    ) -> Result<Vec<RegisterResult>, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-    async fn get_type_schema(&self, _type_id: &str) -> Result<GtsTypeSchema, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-    async fn get_type_schema_by_uuid(
-        &self,
-        _type_uuid: Uuid,
-    ) -> Result<GtsTypeSchema, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-    async fn get_type_schemas(
-        &self,
-        _type_ids: Vec<String>,
-    ) -> HashMap<String, Result<GtsTypeSchema, CanonicalError>> {
-        HashMap::new()
-    }
-    async fn get_type_schemas_by_uuid(
-        &self,
-        _type_uuids: Vec<Uuid>,
-    ) -> HashMap<Uuid, Result<GtsTypeSchema, CanonicalError>> {
-        HashMap::new()
-    }
-    async fn list_type_schemas(
-        &self,
-        _query: TypeSchemaQuery,
-    ) -> Result<Vec<GtsTypeSchema>, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-    async fn register_instances(
-        &self,
-        _instances: Vec<serde_json::Value>,
-    ) -> Result<Vec<RegisterResult>, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-    async fn get_instance(&self, _id: &str) -> Result<GtsInstance, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-    async fn get_instance_by_uuid(&self, _uuid: Uuid) -> Result<GtsInstance, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-    async fn get_instances(
-        &self,
-        _ids: Vec<String>,
-    ) -> HashMap<String, Result<GtsInstance, CanonicalError>> {
-        HashMap::new()
-    }
-    async fn get_instances_by_uuid(
-        &self,
-        _uuids: Vec<Uuid>,
-    ) -> HashMap<Uuid, Result<GtsInstance, CanonicalError>> {
-        HashMap::new()
-    }
-    async fn list_instances(
-        &self,
-        _query: InstanceQuery,
-    ) -> Result<Vec<GtsInstance>, CanonicalError> {
-        Err(CanonicalError::internal("unexpected registry call").create())
-    }
-}
-
 /// An initialized pricing gear and its real configuration/database context.
 pub struct Harness {
     pub gear: BssPricingGear,
     pub ctx: GearCtx,
-    pub registry: Arc<Registry>,
+    /// What `init` sent to the types registry.
+    pub registry: Arc<RecordingRegistry>,
 }
 
 impl Harness {
@@ -196,7 +112,7 @@ impl Harness {
         if let Some(pdp) = pdp {
             hub.register::<dyn authz_resolver_sdk::AuthZResolverApi>(pdp);
         }
-        let registry = Arc::new(Registry::default());
+        let registry = Arc::new(RecordingRegistry::answering(Answer::Admits));
         hub.register::<dyn TypesRegistryClient>(registry.clone());
         let ctx = GearCtx::new(
             "bss-pricing",

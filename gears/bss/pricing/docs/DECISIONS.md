@@ -160,6 +160,7 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-537 | M | The currency table is a read: GET /currencies | DECIDED 2026-10-14 · Owner, 2026-10-14; extends D-529; amended 2026-10-21 (no permission) |
 | D-538 | M | A field violation names the refused decimal's path | DECIDED 2026-10-21 · Owner, 2026-10-21 (a client parsed the prose); extends D-528 |
 | D-539 | M | Snapshot prices carry their currency spec | DECIDED 2026-10-21 · Owner, 2026-10-21 (a review rendered money without its scale); extends D-531 |
+| D-540 | M | The tenant settings are declared in the Settings Service | DECIDED 2026-11-20 · Owner, 2026-11-20 (the tenant settings move to the Settings Service); relates to D-438, D-457, D-529 |
 
 ## Entries
 
@@ -2503,3 +2504,28 @@ Pricing rates the actual quantity. No tariff field says "per started hour" or "w
 - **A plan revision.** Its snapshot names entries and SKUs, no money, so nothing is added there.
 
 **Source:** Owner, 2026-10-21 (a review needed the currency table or other prices to show the right decimals). Extends D-531, D-516.
+
+#### D-540 [M] The tenant settings are declared in the Settings Service
+
+**Status:** DECIDED 2026-11-20.
+
+- **What is declared.** At startup the gear declares one setting in the Settings Service for each field of the tenant settings (D-438), under the owner `bss-pricing`: `default_timing`, `default_gl`, `default_tax_category`, `invoice_line_template_recurring`, `invoice_line_template_usage`, `invoice_line_template_one_time`, `invoice_line_template_bundle` and `offered_currencies`. A setting's key is `gts.cf.core.settings.setting_type.v1~cf.bss.pricing.<name>.v1~`: vendor `cf`, package `bss`, category `pricing`, major version 1. The templates are four settings, one per SKU type, and not one object: resolve looks a template up by SKU type, and each then has its own cap and its own history.
+- **Frozen.** A stored value is filed under its setting's key and judged by its value type. A renamed key is a new setting that reads its default, so the keys and the value type ids below do not change. A value of another shape is a setting of a new major version.
+- **Scope and protection.** Every setting is `local`: a value belongs to one tenant and no tenant inherits it, as a settings row belongs to one tenant. Every setting is classified `public` and is not served without authentication. Every setting requires step-up (`requires_step_up = true`): a write needs a fresh re-authentication, so a service principal cannot write one.
+- **Value types.** The Settings Service's catalogue has no closed set, no bounded string and no list. The gear registers its own types under `gts.cf.bss.pricing.`, each a concrete draft-07 schema that refers to no other type:
+
+| Value type | Settings | A value is |
+| --- | --- | --- |
+| `gts.cf.bss.pricing.setting_billing_timing.v1~` | `default_timing` | `advance` or `arrears` |
+| `gts.cf.bss.pricing.setting_short_code.v1~` | `default_gl`, `default_tax_category` | A string of at most 64 characters (D-457) |
+| `gts.cf.bss.pricing.setting_line_template.v1~` | The four templates | A string of at most 2000 characters (D-457): text and the placeholders `{sku}`, `{sku_code}`, `{unit}`, `{plan}`, `{period}` and `{dimension}`. A brace outside a placeholder and any other name in braces are refused, as `domain::price_book_entry::validate_template` refuses them in an entry's own template |
+| `gts.cf.bss.pricing.setting_currency_codes.v1~` | `offered_currencies` | A list of codes of three uppercase letters, each once |
+
+- **Currency codes.** The currency type judges a code's form only. It does not ask the currency table (D-529): a deployment's non-ISO code is a value, and so is a code the table does not resolve. `PUT /settings` refuses such a code with `CURRENCY_INVALID` (D-528); the Settings Service does not.
+- **Defaults.** `default_timing` is `advance`, `offered_currencies` is `[]` (any currency), and each code and each template is the empty string. The empty string means "not set", where the settings row holds null or no template for the SKU type: every declaration carries a default of its own value type, and these types admit no null. `PUT /settings` refuses an empty or blank template (`LINE_TEMPLATE_EMPTY`); here the empty string is a value, and so is a template made only of spaces. The defaults are what a tenant without a settings row has (D-438).
+- **Registration.** `init` registers the value types in the types registry, in one batch. `post_init` registers the declarations, in one reconcile. The split is needed: the Settings Service reads a declaration's value type from the types registry, and the registry serves what an `init` registered only after its finalize step, which the runtime runs after every gear's `init`. A start over the same declarations registers and changes nothing. The outcome of the reconcile is logged once.
+- **A hard dependency.** The gear names `settings_service` in its `deps`: the Settings Service starts first, and a server that links pricing links it (the example server's `bss-pricing` feature enables `settings-service`). The gear does not start when the types registry refuses a value type, when no `SettingsContributionClient` is bound, when the reconcile fails, or when the Settings Service refuses a declaration. A refused declaration comes back inside a successful reconcile, and the gear reads it there. A deployment that does not configure the gear declares nothing.
+- **Not yet.** Nothing in pricing reads these settings. Resolve, the plan checks and the offered-currency check of a new book read the `pricing_settings` row, and `GET` and `PUT /bss-pricing/v1/settings` read and write it (D-438, D-518, D-519). A value written through the Settings Service changes nothing in pricing, and a value written through `PUT /settings` does not reach the Settings Service. Later changes move the reads to the Settings Service and remove the two doors, and amend D-438 then.
+- **The tests.** `src/infra/settings_declarations_tests.rs` writes each key and value type id out and judges values by each schema; one test holds the template schema to `validate_template`. `tests/settings_declarations.rs` starts the gear over the real types registry and the real Settings Service (`init`, the finalize step, `post_init`), reads each default as a tenant that stored nothing, and judges values with the Settings Service's own validator.
+
+**Source:** Owner, 2026-11-20 (the tenant settings move to the Settings Service). Relates to D-438, D-457 and D-529; amends none of them yet.

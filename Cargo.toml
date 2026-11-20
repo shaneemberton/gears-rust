@@ -985,6 +985,7 @@ ignored = [
     "grpc_hub",
     "oagw",
     "resource-group",
+    "settings-service",
     "tenant-resolver",
     "types-registry",
     "usage-collector",

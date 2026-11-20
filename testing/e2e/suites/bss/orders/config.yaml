@@ -474,6 +474,14 @@ gears:
       file: "settings.db"
     config: {}
 
+  # Linked through bss-pricing, which declares its tenant settings there. The empty `config`
+  # is required: the gear reads its configuration fail-closed.
+  settings-service:
+    database:
+      server: "sqlite_orders_e2e"
+      file: "settings-service.db"
+    config: {}
+
   file-parser:
     config:
       allowed_local_base_dir: /tmp

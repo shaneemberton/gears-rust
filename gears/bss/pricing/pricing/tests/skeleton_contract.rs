@@ -41,15 +41,18 @@ async fn pricing_alone_initializes_serves_authoring_routes_and_stops() {
         http::{Request, StatusCode},
         routing::get,
     };
-    use std::sync::{Arc, atomic::Ordering};
+    use std::sync::Arc;
     use toolkit::lifecycle::Runnable;
     use tower::ServiceExt as _;
 
     let harness = rest_support::Harness::new().await.unwrap();
     assert_eq!(
-        harness.registry.calls.load(Ordering::SeqCst),
-        1,
-        "real init must register schemas"
+        harness.registry.batches(),
+        vec![
+            bss_pricing::authz::authz_label_type_schemas(),
+            bss_pricing::infra::settings_declarations::value_type_schemas(),
+        ],
+        "real init must register the authz labels and the settings value types"
     );
     let (empty, openapi) = harness.router(Router::new()).unwrap();
     assert!(empty.has_routes());

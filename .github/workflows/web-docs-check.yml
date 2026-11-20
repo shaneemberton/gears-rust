@@ -40,5 +40,11 @@ jobs:
         with:
           tool: lychee
 
+      # Fork-only: constructorfabric/gears-rust-web-docs and constructorfabric/cargo-gears are
+      # private; docs-preview.sh clones both, and takes the sources from these overrides.
+      # Both are public forks (the docs site fork is a few commits behind its upstream).
       - name: Check web docs links
+        env:
+          GEARS_DOCS_REPO: https://github.com/MikeFalcon77/gears-rust-web-docs.git
+          CARGO_GEARS_REPO: https://github.com/ainetx/cargo-gears.git
         run: make web-docs-check

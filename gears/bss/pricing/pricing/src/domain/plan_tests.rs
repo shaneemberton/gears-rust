@@ -320,10 +320,10 @@ fn ctx(name: &str, book: u128, items: Vec<Item>) -> PlanContext {
         dimension_values: vec![],
         published_sku_ids: vec![],
         quorum: 0,
-        defaults: Defaults {
+        defaults: Some(Defaults {
             gl: Some("4000-GEN".into()),
             tax_category: Some("standard".into()),
-        },
+        }),
     }
 }
 fn basic() -> PlanContext {

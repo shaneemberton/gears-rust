@@ -153,7 +153,8 @@ pub struct PlanContext {
     /// clone, which is a new plan.
     pub published_sku_ids: Vec<Uuid>,
     pub quorum: u32,
-    pub defaults: Defaults,
+    /// `None` when the tenant settings could not be read: the row that shows them names no value.
+    pub defaults: Option<Defaults>,
 }
 /// An item a check row is about (D-466): the item, its SKU and the entry it names. The wire names
 /// (`item_id`, ...) are the DTO's, `PricingPlanCheckSubject`; the domain names the aggregates (the
@@ -869,12 +870,17 @@ fn sku_rows(ctx: &PlanContext, t: &Tally) -> Vec<Check> {
     ]
 }
 fn info_rows(ctx: &PlanContext) -> Vec<Check> {
-    let d = &ctx.defaults;
-    let descriptors = format!(
-        "invoice line: entry override -> SKU -> tenant default; GL: SKU -> {}; tax {}",
-        d.gl.as_deref().unwrap_or("none"),
-        d.tax_category.as_deref().unwrap_or("none")
-    );
+    // Unread settings are not shown as "none": that would say the tenant set no default.
+    let descriptors = match &ctx.defaults {
+        Some(d) => format!(
+            "invoice line: entry override -> SKU -> tenant default; GL: SKU -> {}; tax {}",
+            d.gl.as_deref().unwrap_or("none"),
+            d.tax_category.as_deref().unwrap_or("none")
+        ),
+        None => "invoice line: entry override -> SKU -> tenant default; GL: SKU -> tenant \
+                 default; tax: SKU -> tenant default"
+            .to_owned(),
+    };
     let approval = if ctx.quorum == 0 {
         "publishes directly - no second person".to_owned()
     } else {

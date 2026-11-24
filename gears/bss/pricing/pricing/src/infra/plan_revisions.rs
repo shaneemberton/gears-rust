@@ -484,7 +484,9 @@ impl PlanRevisionSubject {
     }
     /// The checks of `GET /plan-revisions/{id}/checks` on the stored state of this transaction
     /// and fresh SKU reads, on the subject's day (its UTC date). No scheduled revision stands
-    /// beside the pending one it judges (D-451), so its plan's revisions read as stored.
+    /// beside the pending one it judges (D-451), so its plan's revisions read as stored. The
+    /// tenant settings are not read: they feed an information row only, a verdict takes the red
+    /// ones, and the Settings Service cannot be asked inside this transaction (D-541).
     async fn judge(&self, tx: &DbTx<'_>) -> Result<Vec<plan::Check>, ApprovalError> {
         let today = self.now.to_offset(time::UtcOffset::UTC).date();
         let mut context =

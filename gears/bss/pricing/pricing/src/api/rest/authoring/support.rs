@@ -500,6 +500,21 @@ pub fn unavailable() -> CanonicalError {
         .with_detail("REGISTRY_UNAVAILABLE: Products reference registry is unavailable")
         .create()
 }
+/// The tenant settings could not be read: the cause reaches the log, the caller sees only 503
+/// `SETTINGS_UNAVAILABLE`.
+pub fn settings_unavailable(
+    error: &crate::domain::tenant_settings::SettingsUnavailable,
+) -> CanonicalError {
+    tracing::warn!(
+        status = error.status,
+        cause = %error.detail,
+        diagnostic = error.diagnostic.as_deref().unwrap_or_default(),
+        "pricing: the tenant settings could not be read from the Settings Service"
+    );
+    CanonicalError::service_unavailable()
+        .with_detail("SETTINGS_UNAVAILABLE: the tenant pricing settings are unavailable")
+        .create()
+}
 /// A 400 problem that names the unit's current generation for the reviewer's client.
 #[must_use]
 pub fn generation_problem(code: &str, generation: i32) -> toolkit::api::canonical_prelude::Problem {

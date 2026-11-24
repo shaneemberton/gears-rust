@@ -3037,6 +3037,7 @@ async fn real_pricing_entry_blocks_retirement_until_delete_and_ticker_pass() {
     hub.register::<bss_products_sdk::PricingReferenceRegistry>(Arc::new(
         bss_products_sdk::PricingReferenceRegistry(Arc::new(registry)),
     ));
+    bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new().install(&hub);
     let state = Arc::new(
         bss_pricing::api::rest::authoring::AuthoringState::new(
             toolkit_db::DBProvider::new(db),

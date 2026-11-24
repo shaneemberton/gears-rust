@@ -171,11 +171,25 @@ pub async fn dimension(f: &Fixture, key: &str, values: &[&str]) {
         .await;
     assert_eq!(s, 200, "{b}");
 }
-/// Write the tenant settings through their door.
-pub async fn settings(f: &Fixture, body: Value) {
-    let (_, _, tag) = f.call("GET", "/settings", json!({}), None, None).await;
-    let (s, b, _) = f.call("PUT", "/settings", body, Some(&tag), None).await;
-    assert_eq!(s, 200, "{b}");
+/// The fixture tenant sets its settings in the Settings Service. `body` names them as the
+/// settings door does: a field it leaves out, or gives as `null`, is left as it was, and a
+/// template is set for each SKU kind `invoice_line_templates` names.
+pub fn settings(f: &Fixture, body: &Value) {
+    for (field, name) in [
+        ("default_timing", "default_timing"),
+        ("default_gl", "default_gl"),
+        ("default_tax_category", "default_tax_category"),
+        ("currencies", "offered_currencies"),
+    ] {
+        if let Some(value) = body.get(field).filter(|v| !v.is_null()) {
+            f.set_setting(name, value.clone());
+        }
+    }
+    if let Some(templates) = body["invoice_line_templates"].as_object() {
+        for (kind, text) in templates {
+            f.set_setting(&format!("invoice_line_template_{kind}"), text.clone());
+        }
+    }
 }
 pub async fn resolve(f: &Fixture, query: &str) -> (u16, Value) {
     let (s, b, tag) = f

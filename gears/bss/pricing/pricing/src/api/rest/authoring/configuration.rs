@@ -147,18 +147,12 @@ pub async fn put_settings(
         Some(version + 1),
     )?)
 }
-/// D-438: a NEW book takes a currency the tenant offers; an empty list (or no settings) offers
-/// every currency. The settings are read tenant-scoped: the book author needs no config read.
+/// D-438: a NEW book takes a currency the tenant offers; an empty list offers every currency.
+/// `offered` is the tenant's list as the Settings Service told it before the transaction
+/// (D-541): the book author needs no grant on the settings.
 /// # Errors
-/// 409 `CURRENCY_NOT_OFFERED`; storage failures.
-pub async fn offer_currency(
-    tx: &impl DBRunner,
-    tenant: Uuid,
-    currency: &str,
-) -> Result<(), DoorError> {
-    let offered = settings(tx, &AccessScope::for_tenant(tenant), tenant)
-        .await?
-        .currencies;
+/// 409 `CURRENCY_NOT_OFFERED`.
+pub fn offer_currency(offered: &[String], currency: &str) -> Result<(), DoorError> {
     if offered.is_empty() || offered.iter().any(|c| c == currency) {
         return Ok(());
     }

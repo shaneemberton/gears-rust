@@ -20,6 +20,7 @@ pub mod reference_ticker;
 pub mod reference_events;
 
 pub mod settings_declarations;
+pub mod tenant_settings;
 
 pub(crate) mod pricing_reads;
 

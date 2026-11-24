@@ -155,6 +155,7 @@ async fn a_bound_producer_delivers_committed_events_retries_dispatch_and_drops_r
         bss_products_sdk::PricingReferenceRegistry(Arc::new(Script::default())),
     ));
     hub.register::<dyn EventBrokerApi>(broker.broker());
+    bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new().install(&hub);
     let state = Arc::new(AuthoringState::new(db, hub).await.unwrap());
 
     // The broker refuses every dispatch for now (a real `RateLimited` on its publish path):
@@ -336,6 +337,7 @@ async fn pooled_state() -> (
         bss_products_sdk::PricingReferenceRegistry(Arc::new(Script::default())),
     ));
     hub.register::<dyn EventBrokerApi>(broker.broker());
+    bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new().install(&hub);
     let state = Arc::new(
         AuthoringState::new(toolkit_db::DBProvider::new(db), hub)
             .await
@@ -591,6 +593,7 @@ async fn bind_with(
         bss_products_sdk::PricingReferenceRegistry(Arc::new(Script::default())),
     ));
     hub.register::<dyn EventBrokerApi>(broker.broker());
+    bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new().install(&hub);
     AuthoringState::new(db, hub)
         .await
         .map(|state| (Arc::new(state), dsn, broker))

@@ -4,9 +4,10 @@
 //!
 //! A read writes nothing: no audit row, no idempotency key, no binding. `resolve` reads the stored
 //! revision in ONE transaction (the revision, its plan and items, each entry with ALL its prices,
-//! the dimension registry, the settings and the `keep_for_bound` ids); an unknown or another
+//! the dimension registry and the `keep_for_bound` ids); an unknown or another
 //! tenant's revision is 404 there, before any Products read. The pure model then judges the pins
-//! (`domain::resolve::matrix`), and only then, outside the transaction, is each SKU version read
+//! (`domain::resolve::matrix`), and only then, outside the transaction, are the tenant settings
+//! read from the Settings Service (D-541) and each SKU version read
 //! as of the date through the detached registry (D-421), as pricing's system actor (D-424): the
 //! caller has passed `plan:read` and its tenant holds the revision, the plan read already
 //! discloses the items' SKU ids, and Products' registry refuses every other system subject — so a
@@ -75,7 +76,8 @@ pub fn router(state: Arc<AuthoringState>, openapi: &dyn OpenApiRegistry) -> Rout
              PIN_DUPLICATE or PINS_TOO_MANY; 404 for an unknown revision or item; 409 \
              REVISION_NOT_PUBLISHED for a draft or pending revision, REVISION_NOT_YET_AVAILABLE \
              for a scheduled one before its sale date; Products' own refusal of a SKU read; 503 \
-             REGISTRY_UNAVAILABLE when Products cannot answer.",
+             REGISTRY_UNAVAILABLE when Products cannot answer, SETTINGS_UNAVAILABLE when the \
+             tenant's settings cannot be read from the Settings Service (D-541).",
         )
         .tag("Pricing")
         .authenticated()

@@ -6,6 +6,7 @@
 //! `init` registered.
 
 use std::num::NonZeroU32;
+use std::sync::LazyLock;
 
 use anyhow::Context as _;
 use serde_json::{Value, json};
@@ -195,6 +196,23 @@ pub fn declarations() -> Result<Vec<ContributedDeclaration>, SettingKeyError> {
             Ok(declaration)
         })
         .collect()
+}
+
+/// The keys of the declared settings, built once: every read of a tenant's settings asks for them.
+///
+/// # Errors
+///
+/// When a setting key does not parse, which is a defect in this gear.
+pub fn setting_keys() -> Result<&'static [SettingKey], &'static str> {
+    static KEYS: LazyLock<Result<Vec<SettingKey>, String>> = LazyLock::new(|| {
+        declarations()
+            .map(|declared| declared.into_iter().map(|d| d.key).collect())
+            .map_err(|error| error.to_string())
+    });
+    match &*KEYS {
+        Ok(keys) => Ok(keys),
+        Err(error) => Err(error),
+    }
 }
 
 /// Register the gear's own value types in the types registry. Called from the gear's `init`.

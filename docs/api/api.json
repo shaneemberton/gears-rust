@@ -39476,7 +39476,7 @@
     },
     "/bss-pricing/v1/currencies": {
       "get": {
-        "description": "Returns every currency a price book can use, with the number of decimal places a new price in that currency uses: the active ISO 4217 codes, and the codes the deployment's currency_scales config adds (iso false). The list is sorted by code and is the same for every tenant; the settings' currencies limit only which currency a new book can use (D-438, D-529, D-537). A saved price keeps the scale it was saved with (D-531). Any authenticated caller reads the table: it holds no tenant data, so no permission is asked.",
+        "description": "Returns every currency a price book can use, with the number of decimal places a new price in that currency uses: the active ISO 4217 codes, and the codes the deployment's currency_scales config adds (iso false). The list is sorted by code and is the same for every tenant; the tenant's offered_currencies setting limits only which currency a new book can use (D-438, D-529, D-537, D-541). A saved price keeps the scale it was saved with (D-531). Any authenticated caller reads the table: it holds no tenant data, so no permission is asked.",
         "operationId": "bss_pricing.list_currencies",
         "responses": {
           "200": {
@@ -40347,7 +40347,7 @@
     },
     "/bss-pricing/v1/plan-revisions/checks": {
       "get": {
-        "description": "Returns the checks of 1 to 50 revisions, each byte-identical to GET /plan-revisions/{id}/checks, and missing: the ids the tenant does not hold or the caller's plan-read scope does not admit (that door's 404). One stored read and one Products call over the union of SKUs. An answer that is all missing makes no Products call. The plans list gains no ready flag (D-460). Refusals: 400 QUERY_INVALID for an empty list, more than 50 ids, a repeated id, a repeated revision_ids key, a malformed id, or any other key; Products' own refusal; 503 REGISTRY_UNAVAILABLE.",
+        "description": "Returns the checks of 1 to 50 revisions, each byte-identical to GET /plan-revisions/{id}/checks, and missing: the ids the tenant does not hold or the caller's plan-read scope does not admit (that door's 404). One stored read and one Products call over the union of SKUs. An answer that is all missing makes no Products call. The information row DESCRIPTORS names the tenant's GL code and tax category from the Settings Service, read once for the whole set, and names neither while they cannot be read (D-541). The plans list gains no ready flag (D-460). Refusals: 400 QUERY_INVALID for an empty list, more than 50 ids, a repeated id, a repeated revision_ids key, a malformed id, or any other key; Products' own refusal; 503 REGISTRY_UNAVAILABLE.",
         "operationId": "bss_pricing.get_plan_revision_checks_batch",
         "parameters": [
           {
@@ -40844,7 +40844,7 @@
     },
     "/bss-pricing/v1/plan-revisions/{id}/checks": {
       "get": {
-        "description": "Returns every check of the revision on its sale date (coverage, SKUs, references, book), whether it may be submitted, and quorum_required, the plan_revision quorum a submit will need (D-481), from fresh SKU reads. An item with no entry keeps the row ITEM_ENTRY_MISSING (\"Every item points at a price\") red (D-512); submit, the scheduled apply and publish refuse the revision while any row is red. Refusals: 404 for a revision the tenant does not hold; Products' own refusal; 503 REGISTRY_UNAVAILABLE.",
+        "description": "Returns every check of the revision on its sale date (coverage, SKUs, references, book), whether it may be submitted, and quorum_required, the plan_revision quorum a submit will need (D-481), from fresh SKU reads. The information row DESCRIPTORS names the tenant's GL code and tax category from the Settings Service; while they cannot be read it names neither, and the answer stays 200 with ready unchanged (D-541). An item with no entry keeps the row ITEM_ENTRY_MISSING (\"Every item points at a price\") red (D-512); submit, the scheduled apply and publish refuse the revision while any row is red. Refusals: 404 for a revision the tenant does not hold; Products' own refusal; 503 REGISTRY_UNAVAILABLE.",
         "operationId": "bss_pricing.get_plan_revision_checks",
         "parameters": [
           {
@@ -43818,7 +43818,7 @@
         }
       },
       "post": {
-        "description": "Creates a price book of the tenant with a code, a name, one currency, an optional validity window and an optional description of at most 2000 characters (D-444); the Idempotency-Key replays the first answer. The currency must be one the currency table resolves: an ISO 4217 code with a scale, or a non-ISO code the deployment's currency_scales adds (D-529); else 400 BOOK_CURRENCY_INVALID. It must also be one the tenant settings offer, when they offer any (D-438). The code is at most 64 characters and the name 200 (D-457). Refusals: 400 BOOK_CODE_REQUIRED, BOOK_NAME_REQUIRED, BOOK_CURRENCY_INVALID, BOOK_VALIDITY_INVALID, BOOK_DESCRIPTION_TOO_LONG, or FIELD_TOO_LONG on a code or a name over its cap; 409 CURRENCY_NOT_OFFERED, BOOK_CODE_TAKEN or IDEMPOTENCY_CONFLICT.",
+        "description": "Creates a price book of the tenant with a code, a name, one currency, an optional validity window and an optional description of at most 2000 characters (D-444); the Idempotency-Key replays the first answer. The currency must be one the currency table resolves: an ISO 4217 code with a scale, or a non-ISO code the deployment's currency_scales adds (D-529); else 400 BOOK_CURRENCY_INVALID. It must also be one the tenant offers, when it offers any: the Settings Service setting offered_currencies, whose empty list offers every currency (D-438, D-541). A change of that setting reaches this door no later than the Settings Service's cache time-to-live, up to 30 seconds, after it is written. The code is at most 64 characters and the name 200 (D-457). Refusals: 400 BOOK_CODE_REQUIRED, BOOK_NAME_REQUIRED, BOOK_CURRENCY_INVALID, BOOK_VALIDITY_INVALID, BOOK_DESCRIPTION_TOO_LONG, or FIELD_TOO_LONG on a code or a name over its cap; 409 CURRENCY_NOT_OFFERED, BOOK_CODE_TAKEN or IDEMPOTENCY_CONFLICT; 503 SETTINGS_UNAVAILABLE when the offered currencies cannot be read, judged after a replay and the 400s, and no book is created.",
         "operationId": "bss_pricing.create_book",
         "parameters": [
           {
@@ -46240,7 +46240,7 @@
     },
     "/bss-pricing/v1/resolve": {
       "get": {
-        "description": "Returns, per item of a published or superseded plan revision, or of a scheduled one on or after its sale date, the chain matrix (the default chain and every dimension value) with the price bound on the date, the SKU version in force and the resolved invoice inputs; pins renew a subscription's bindings. A scheduled revision whose date has come resolves as published, on every date, whether or not its switch is persisted yet. No totals. Refusals: 400 QUERY_INVALID, DATE_INVALID, PIN_FOREIGN, PIN_DUPLICATE or PINS_TOO_MANY; 404 for an unknown revision or item; 409 REVISION_NOT_PUBLISHED for a draft or pending revision, REVISION_NOT_YET_AVAILABLE for a scheduled one before its sale date; Products' own refusal of a SKU read; 503 REGISTRY_UNAVAILABLE when Products cannot answer.",
+        "description": "Returns, per item of a published or superseded plan revision, or of a scheduled one on or after its sale date, the chain matrix (the default chain and every dimension value) with the price bound on the date, the SKU version in force and the resolved invoice inputs; pins renew a subscription's bindings. A scheduled revision whose date has come resolves as published, on every date, whether or not its switch is persisted yet. No totals. Refusals: 400 QUERY_INVALID, DATE_INVALID, PIN_FOREIGN, PIN_DUPLICATE or PINS_TOO_MANY; 404 for an unknown revision or item; 409 REVISION_NOT_PUBLISHED for a draft or pending revision, REVISION_NOT_YET_AVAILABLE for a scheduled one before its sale date; Products' own refusal of a SKU read; 503 REGISTRY_UNAVAILABLE when Products cannot answer, SETTINGS_UNAVAILABLE when the tenant's settings cannot be read from the Settings Service (D-541).",
         "operationId": "bss_pricing.resolve",
         "parameters": [
           {
@@ -46385,7 +46385,7 @@
     },
     "/bss-pricing/v1/settings": {
       "get": {
-        "description": "Returns the tenant's billing defaults (timing, GL code, tax category), invoice-line templates by SKU type and the currencies a new book may take (empty: any), with who wrote them last and when, and its version as the ETag; the defaults apply, with no writer, until the settings are first written. An If-None-Match that matches that ETag by weak comparison is 304 with an empty body and the same ETag; both answers carry Cache-Control private, no-cache (D-518).",
+        "description": "Returns the settings row this door stores: billing defaults (timing, GL code, tax category), invoice-line templates by SKU type and a list of currencies, with who wrote them last and when, and its version as the ETag; before the first write it answers the defaults, with no writer. No pricing decision reads this row: resolve, the acceptance of a sale, the plan checks and a new book's currency read the tenant's settings in the Settings Service (D-541). An If-None-Match that matches that ETag by weak comparison is 304 with an empty body and the same ETag; both answers carry Cache-Control private, no-cache (D-518).",
         "operationId": "bss_pricing.get_settings",
         "parameters": [
           {
@@ -46532,7 +46532,7 @@
         ]
       },
       "put": {
-        "description": "Replaces the tenant settings at the version the caller read (If-Match), currencies included (required; [] offers any currency, D-438), and records the caller and the time. Each offered currency is one the currency table resolves, listed once; else 400 CURRENCY_INVALID naming the code and the reason (D-529), or with a fixed message that does not repeat a value that is not three uppercase letters. A GL code or a tax category other than the stored one is at most 64 characters, and a line template other than the one stored for its SKU type 2000; a stored text sent back unchanged passes whatever its length (D-457). Refusals: 400 TIMING_INVALID, SKU_TYPE_INVALID, CURRENCY_INVALID, an invalid line template (LINE_TEMPLATE_EMPTY, LINE_TEMPLATE_INVALID), or FIELD_TOO_LONG on a changed default_gl, default_tax_category or invoice_line_templates over its cap; 409 STALE_REVISION.",
+        "description": "Replaces the settings row this door stores at the version the caller read (If-Match), currencies included (required, D-438), and records the caller and the time. What it stores changes no pricing decision: resolve, the acceptance of a sale, the plan checks and a new book's currency read the tenant's settings in the Settings Service (D-541). Each listed currency is one the currency table resolves, listed once; else 400 CURRENCY_INVALID naming the code and the reason (D-529), or with a fixed message that does not repeat a value that is not three uppercase letters. A GL code or a tax category other than the stored one is at most 64 characters, and a line template other than the one stored for its SKU type 2000; a stored text sent back unchanged passes whatever its length (D-457). Refusals: 400 TIMING_INVALID, SKU_TYPE_INVALID, CURRENCY_INVALID, an invalid line template (LINE_TEMPLATE_EMPTY, LINE_TEMPLATE_INVALID), or FIELD_TOO_LONG on a changed default_gl, default_tax_category or invoice_line_templates over its cap; 409 STALE_REVISION.",
         "operationId": "bss_pricing.put_settings",
         "parameters": [
           {

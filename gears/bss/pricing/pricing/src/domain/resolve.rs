@@ -3,9 +3,9 @@
 //! binding carries.
 //!
 //! Plain data only. The resolve door reads the revision's items, the entry each item names with
-//! ALL its prices, today's registered values of each entry's dimension key, the `keep_for_bound`
-//! price ids and the tenant settings in one transaction, and each SKU version as of the date
-//! outside it; this module decides. Nothing here computes a total or picks a promotion (D-409,
+//! ALL its prices, today's registered values of each entry's dimension key and the
+//! `keep_for_bound` price ids in one transaction, and the tenant settings and each SKU version as
+//! of the date outside it; this module decides. Nothing here computes a total or picks a promotion (D-409,
 //! D-415): a chain no price covers is `uncovered`, never an invented price and never a refusal.
 //!
 //! @cpt-dod:cpt-cf-bss-pricing-dod-resolve-matrix:p1
@@ -124,7 +124,7 @@ pub struct ItemResolution {
     pub chains: Vec<Chain>,
 }
 /// The tenant settings D-421 falls back to. `invoice_line_templates` is keyed by SKU type
-/// (`recurring`, `usage`, `one_time`, `bundle`), as `PUT /settings` stores it.
+/// (`recurring`, `usage`, `one_time`, `bundle`): one Settings Service setting per type (D-541).
 #[toolkit_macros::domain_model]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TenantDefaults {

@@ -4,6 +4,7 @@
 #[path = "../policy_support/mod.rs"]
 pub mod policy_support;
 use axum::{Router, body::Body, http::Request};
+use bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader;
 use serde_json::{Value, json};
 use std::sync::Arc;
 use toolkit_security::SecurityContext;
@@ -70,6 +71,21 @@ impl authz_resolver_sdk::AuthZResolverApi for Resolver {
         })
     }
 }
+/// Put a Settings Service reader into `hub`: one that knows pricing's declared settings, answers
+/// their defaults until a test sets a value, and refuses a read made inside a transaction of the
+/// database layer, as the Settings Service's own reader does.
+pub fn settings_reader_in(
+    hub: &toolkit::ClientHub,
+    db: &toolkit_db::DBProvider<toolkit_db::DbError>,
+) -> Arc<FakeSettingsReader> {
+    FakeSettingsReader::new()
+        .refusing_reads_in_transactions(db.db())
+        .install(hub)
+}
+/// The Settings Service reader [`settings_reader_in`] put into `hub`.
+pub fn settings_reader_of(hub: &toolkit::ClientHub) -> Arc<FakeSettingsReader> {
+    hub.get::<FakeSettingsReader>().unwrap()
+}
 /// Authoring state over any database, with the scripted registry in its hub.
 pub async fn state_on(
     db: toolkit_db::DBProvider<toolkit_db::DbError>,
@@ -95,6 +111,7 @@ pub async fn state_with_clock(
     hub.register::<bss_products_sdk::PricingReferenceRegistry>(Arc::new(
         bss_products_sdk::PricingReferenceRegistry(registry),
     ));
+    settings_reader_in(&hub, &db);
     Arc::new(
         bss_pricing::api::rest::authoring::AuthoringState::new(db, hub)
             .await
@@ -293,6 +310,7 @@ impl Fixture {
         hub.register::<bss_products_sdk::PricingReferenceRegistry>(Arc::new(
             bss_products_sdk::PricingReferenceRegistry(registry),
         ));
+        settings_reader_in(&hub, &db);
         let state = bss_pricing::api::rest::authoring::AuthoringState::new(db.clone(), hub)
             .await
             .unwrap();
@@ -423,6 +441,15 @@ impl Fixture {
                 every_subject: false,
             }),
         )))
+    }
+    /// The Settings Service reader the fixture's doors read the tenant settings from.
+    pub fn settings(&self) -> Arc<FakeSettingsReader> {
+        settings_reader_of(&self.state.hub)
+    }
+    /// The fixture tenant sets the setting `name` to `value` in the Settings Service.
+    pub fn set_setting(&self, name: &str, value: Value) {
+        self.settings()
+            .set(self.ctx.subject_tenant_id(), name, value);
     }
     /// Call as another principal of the same tenant.
     pub async fn call_as(

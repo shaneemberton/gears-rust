@@ -911,10 +911,9 @@ async fn a_sku_products_does_not_know_resolves_with_a_null_sku_version() {
     publish(&f, id_of(&created["id"]), revision).await;
     settings(
         &f,
-        json!({"default_timing":"arrears","default_gl":"9000",
+        &json!({"default_timing":"arrears","default_gl":"9000",
                "default_tax_category":"std","invoice_line_templates":{"recurring":"{sku} per {period}"},"currencies":[]}),
-    )
-    .await;
+    );
     let (s, b) = resolve(&f, &format!("plan_revision_id={revision}&date=2026-10-05")).await;
     assert_eq!(s, 200, "{b}");
     let item = &b["items"][0];
@@ -961,10 +960,9 @@ async fn september_binds_sku_version_one_and_october_version_two() {
     catalog.version(sku, 2, "2026-10-01", v2);
     settings(
         &f,
-        json!({"default_timing":"arrears","default_gl":"9000",
+        &json!({"default_timing":"arrears","default_gl":"9000",
                "default_tax_category":"std","invoice_line_templates":{"usage":"{sku} usage"},"currencies":[]}),
-    )
-    .await;
+    );
     let entry = entry_of(&f, eur, sku, "usage", (None, None, None)).await;
     let price = put(
         &f,

@@ -1,6 +1,6 @@
 //! Shared tenant-authorized local snapshots and detached dated Products reads.
 use crate::api::rest::authoring::{
-    AuthoringState, configuration,
+    AuthoringState,
     support::{self, DoorError, authz_failure},
 };
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
         plan::RevisionState,
         price::PriceState,
         price_book_entry::ChargeKind,
-        resolve::{self, ItemResolution, Pin, ResolveContext, TenantDefaults},
+        resolve::{self, ItemResolution, Pin, ResolveContext},
     },
     infra::{
         reference_registry, reference_ticker, reference_work,
@@ -107,7 +107,6 @@ pub struct ReadSnapshot {
     pub context: ResolveContext,
     /// Every price of the entries the items name, as stored: a binding renders its row.
     pub rows: BTreeMap<Uuid, price::Model>,
-    pub defaults: TenantDefaults,
     pub dimensions: BTreeMap<Uuid, Option<String>>,
     pub resolved: Vec<ItemResolution>,
     pub versions: BTreeMap<Uuid, SkuVersion>,
@@ -123,7 +122,6 @@ pub struct LocalGeneration {
     entries: Vec<price_book_entry::Model>,
     book: price_book::Model,
     dimensions: Vec<crate::infra::storage::entity::dimension_key::Model>,
-    settings: serde_json::Value,
 }
 
 impl LocalGeneration {
@@ -300,13 +298,6 @@ pub async fn read_stored_at(
                 .and_then(|entry| entries.get(&entry).cloned()),
         });
     }
-    let settings = configuration::settings(tx, &children, tenant).await?;
-    let invoice_line_templates = serde_json::from_value(settings.invoice_line_templates.clone())
-        .map_err(|_| {
-            corrupt(format!(
-                "settings of tenant {tenant} invoice_line_templates"
-            ))
-        })?;
     Ok(ReadSnapshot {
         generation: LocalGeneration {
             plan,
@@ -315,7 +306,6 @@ pub async fn read_stored_at(
             entries: entry_rows,
             book: book.clone(),
             dimensions: dimension_rows,
-            settings: serde_json::to_value(&settings).map_err(|e| corrupt(e.to_string()))?,
         },
         policies,
         revision,
@@ -326,12 +316,6 @@ pub async fn read_stored_at(
             keep_for_bound,
         },
         rows: prices,
-        defaults: TenantDefaults {
-            default_timing: settings.default_timing.as_str().to_owned(),
-            default_gl: settings.default_gl,
-            default_tax_category: settings.default_tax_category,
-            invoice_line_templates,
-        },
         dimensions,
         resolved: Vec::new(),
         versions: BTreeMap::new(),
@@ -500,8 +484,10 @@ async fn snapshot(
     .await
     .map_err(|e| read_failure(e, plan_conflict))
 }
-/// Finish a snapshot: the matrix, then each SKU version as pricing's system actor (D-424).
-/// `ctx` is the caller who already passed `plan:read`. It is not the Products subject.
+/// Finish a snapshot: the matrix, then the tenant settings and each SKU version as pricing's
+/// system actor (D-424). `ctx` is the caller who already passed `plan:read`. It is not the
+/// Products subject. Called outside any transaction: the Settings Service's reader cannot answer
+/// inside one (D-541).
 pub async fn finish(
     state: &AuthoringState,
     stored: &mut ReadSnapshot,
@@ -516,6 +502,7 @@ pub async fn finish(
         .into_iter()
         .filter(|r| item.is_none_or(|id| r.item_id == id))
         .collect();
+    let settings = state.tenant_settings(tenant).await?;
     // @cpt-begin:cpt-cf-bss-pricing-flow-read-contract-events:p1:inst-read-contract-events-flow-4
     stored.versions = versions_as_of(
         &state.hub,
@@ -540,7 +527,7 @@ pub async fn finish(
                 resolve::invoice_inputs(
                     entry_override,
                     stored.versions.get(&item.sku_id),
-                    &stored.defaults,
+                    &settings.defaults,
                     item.charge_kind,
                 ),
             )

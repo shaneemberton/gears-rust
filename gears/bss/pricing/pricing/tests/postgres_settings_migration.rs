@@ -150,22 +150,4 @@ async fn postgres_the_forward_migration_adds_currencies_and_updated_by_and_keeps
     assert_eq!(s, 200, "{saved}");
     assert_eq!(saved["currencies"], json!(["EUR", "USD"]));
     assert_eq!(saved["updated_by"], ctx.subject_id().to_string());
-    let (s, refused) = {
-        let (s, b, _) = request(
-            &app,
-            &ctx,
-            "POST",
-            "/price-books",
-            json!({"code":"gbp","name":"gbp","currency":"GBP"}),
-            None,
-            Some("gbp"),
-        )
-        .await;
-        (s, b)
-    };
-    assert_eq!(s, 409, "{refused}");
-    assert!(
-        refused.to_string().contains("CURRENCY_NOT_OFFERED"),
-        "{refused}"
-    );
 }

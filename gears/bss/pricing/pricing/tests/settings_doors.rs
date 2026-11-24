@@ -154,8 +154,8 @@ async fn a_new_book_takes_an_offered_currency() {
     let (f, _) = setup().await;
     // No settings, or an empty list: any currency.
     assert_eq!(create_book(&f, "jpy", "JPY").await.0, 201);
-    let (s, b, _) = put(&f, body(json!(["EUR", "USD"]))).await;
-    assert_eq!(s, 200, "{b}");
+    // The list a new book is judged by is the one the Settings Service holds.
+    f.set_setting("offered_currencies", json!(["EUR", "USD"]));
     assert_eq!(create_book(&f, "eur", "EUR").await.0, 201);
     let (s, b) = create_book(&f, "gbp", "GBP").await;
     assert_eq!(s, 409, "{b}");
@@ -184,8 +184,7 @@ async fn a_new_book_takes_an_offered_currency() {
         books["page_info"]["next_cursor"].is_null(),
         "one page is the whole list: {books}"
     );
-    let (s, _, _) = put(&f, body(json!([]))).await;
-    assert_eq!(s, 200);
+    f.set_setting("offered_currencies", json!([]));
     assert_eq!(create_book(&f, "gbp2", "GBP").await.0, 201);
 }
 

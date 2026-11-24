@@ -150,7 +150,8 @@ toolkit-http = { workspace = true }
 secrecy = { workspace = true }
 
 [dev-dependencies]
-bss-pricing = { workspace = true }
+# `test-support` brings pricing's fake settings reader: book creation reads the tenant settings.
+bss-pricing = { workspace = true, features = ["test-support"] }
 # The approvals inbox over this gear and pricing in one process (P-D-250): the facade's own router.
 bss-approvals = { workspace = true }
 # The SKU list and counts prove a fixed statement count with toolkit-db's `QueryRecorder`

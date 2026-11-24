@@ -312,6 +312,7 @@ async fn inbox_on(
         fresh_pricing_db().await
     };
     let hub = Arc::new(toolkit::ClientHub::default());
+    bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new().install(&hub);
     hub.register::<dyn bss_pricing_sdk::meter_semantics::UsageMeterSemanticsV1>(Arc::new(
         pricing_policy_support::MeterProvider::default(),
     ));

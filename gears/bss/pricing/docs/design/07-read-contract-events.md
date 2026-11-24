@@ -334,7 +334,8 @@ validation, then serializable generation recheck and receipt commit. New resolut
 plan/price read grants. Exact authorized replay never consults live dependencies or refreshes TTL.
 
 The snapshot records all revision/price generations and the local inputs used to project bindings.
-Recheck covers entries, policies, dimensions and settings too. A local change rolls back and uses
+Recheck covers entries, policies and dimensions too. The tenant settings are not local: they are
+read once from the Settings Service with the detached reads and are not rechecked (D-541). A local change rolls back and uses
 the G2 bounded capture loop; repeated change returns ResolutionChanged. Server time is sampled only
 after rechecking command/business uniqueness and generations in the final transaction. A revision
 becoming due during provider work forces recapture. Price windows are UTC and half-open; temporary

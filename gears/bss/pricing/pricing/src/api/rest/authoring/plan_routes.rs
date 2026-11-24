@@ -654,7 +654,10 @@ pub(super) fn item_routes(router: Router, openapi: &dyn OpenApiRegistry) -> Rout
              /plan-revisions/{id}/checks, and missing: the ids the tenant does not hold or the \
              caller's plan-read scope does not admit (that door's 404). One stored read and one \
              Products call over the union of SKUs. An answer that is all missing makes no \
-             Products call. The plans list gains no ready flag (D-460). Refusals: 400 \
+             Products call. The information row DESCRIPTORS names the tenant's GL code and tax \
+             category from the Settings Service, read once for the whole set, and names neither \
+             while they cannot be read (D-541). The plans list gains no ready flag (D-460). \
+             Refusals: 400 \
              QUERY_INVALID for an empty list, more than 50 ids, a repeated id, a repeated \
              revision_ids key, a malformed id, or any other key; Products' own refusal; 503 \
              REGISTRY_UNAVAILABLE.",
@@ -683,7 +686,10 @@ pub(super) fn item_routes(router: Router, openapi: &dyn OpenApiRegistry) -> Rout
         .description(
             "Returns every check of the revision on its sale date (coverage, SKUs, references, \
              book), whether it may be submitted, and quorum_required, the plan_revision quorum a \
-             submit will need (D-481), from fresh SKU reads. An item with no entry keeps the row \
+             submit will need (D-481), from fresh SKU reads. The information row DESCRIPTORS names \
+             the tenant's GL code and tax category from the Settings Service; while they cannot \
+             be read it names neither, and the answer stays 200 with ready unchanged (D-541). An \
+             item with no entry keeps the row \
              ITEM_ENTRY_MISSING (\"Every item points at a price\") red (D-512); submit, the \
              scheduled apply and publish refuse the revision while any row is red. Refusals: 404 \
              for a revision the tenant does not hold; Products' own refusal; 503 \

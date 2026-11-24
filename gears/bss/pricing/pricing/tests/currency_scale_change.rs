@@ -795,18 +795,7 @@ async fn the_currency_table_read_answers_todays_table() {
 
     let w = World::new().await;
     // The settings offer EUR alone: they narrow a new book's currency, never the table.
-    let (_, _, tag) = w.f.call("GET", "/settings", json!({}), None, None).await;
-    let settings = json!({
-        "default_timing": "advance",
-        "default_gl": null,
-        "default_tax_category": null,
-        "invoice_line_templates": {},
-        "currencies": ["EUR"],
-    });
-    let (status, saved, _) =
-        w.f.call("PUT", "/settings", settings, Some(&tag), None)
-            .await;
-    assert_eq!(status, 200, "{saved}");
+    w.f.set_setting("offered_currencies", json!(["EUR"]));
     let (status, before) = w
         .call(&w.f.app, "GET", "/currencies", json!({}), None)
         .await;

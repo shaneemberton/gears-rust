@@ -1160,11 +1160,12 @@ def _settings_body(read: dict) -> dict:
 
 
 @pytest.mark.timeout(120)
-def test_where_a_sku_is_priced_and_sold_and_the_settings_offer_currencies(api):
+def test_where_a_sku_is_priced_and_sold_and_the_settings_door_round_trips(api):
     """D-434 to D-438 and P-D-216 on the real binary, whose chain ran migration 000014.
 
     The settings PUT requires ``currencies``, has no rounding (``default_rounding`` is an unknown
-    field) and says who wrote it; a new book outside the offered currencies is 409. A kind's quorum
+    field) and says who wrote it. The list it stores narrows no new book: a book is judged by the
+    ``offered_currencies`` setting in the Settings Service (D-541). A kind's quorum
     override is reset by DELETE in both gears, and the default is never deleted. A SKU priced today
     in a EUR book and sold by a published plan reads where it is priced (its entry with its book,
     usage and the price in force) and where it is sold (the plan, and the plan item alone). The
@@ -1201,13 +1202,6 @@ def test_where_a_sku_is_priced_and_sold_and_the_settings_offer_currencies(api):
         assert saved["currencies"] == ["EUR", "USD"], saved
         assert "default_rounding" not in saved, saved
         assert uuid.UUID(saved["updated_by"]) and saved["updated_at"], saved
-        r = api.post(
-            f"{PRICING}/price-books",
-            json={"code": f"gbp-sold-{run}", "name": f"GBP {run}", "currency": "GBP"},
-            headers=_key(),
-        )
-        assert r.status_code == 409, r.text
-        assert "CURRENCY_NOT_OFFERED" in r.text, r.text
 
         # Products: an override reset by DELETE; the default is never deleted (P-D-216).
         _products_quorum_zero(api)

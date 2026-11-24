@@ -68,13 +68,10 @@ use bss_pricing::domain::{
 };
 use bss_pricing::infra::storage::{
     RepoError,
-    entity::{
-        dimension_key, plan, plan_item, plan_revision, price, price_book, price_book_entry,
-        settings,
-    },
+    entity::{dimension_key, plan, plan_item, plan_revision, price, price_book, price_book_entry},
     repo::{
         approval_repo::PricingApprovalStore, book_repo, dimension_repo, plan_item_repo, plan_repo,
-        plan_revision_repo, price_book_entry_repo, price_repo, settings_repo,
+        plan_revision_repo, price_book_entry_repo, price_repo,
     },
 };
 use bss_products_sdk::models::{BillingTiming, Lifecycle, SkuContent, SkuType, SkuVersion};
@@ -901,27 +898,22 @@ fn products(names: &mut Names, catalog: &Catalog) {
 /// The tenant's settings and dimension registry, its price units, its book and entries.
 async fn book_and_entries(w: &mut Writer<'_>) {
     let conn = w.f.db.conn().unwrap();
-    settings_repo::insert(
-        &conn,
-        &w.scope,
-        settings::Model {
-            tenant_id: w.tenant,
-            default_timing: "arrears".into(),
-            default_gl: Some("9000".into()),
-            default_tax_category: Some("std".into()),
-            invoice_line_templates: json!({
-                "recurring": "{plan}: {sku} for {period}",
-                "usage": "{sku} ({dimension}) in {unit}"
-            }),
-            version: 1,
-            created_at: at(2025, 12, 1),
-            updated_at: at(2025, 12, 1),
-            currencies: json!([]),
-            updated_by: None,
-        },
-    )
-    .await
-    .unwrap();
+    let settings = w.f.settings();
+    for (name, value) in [
+        ("default_timing", "arrears"),
+        ("default_gl", "9000"),
+        ("default_tax_category", "std"),
+        (
+            "invoice_line_template_recurring",
+            "{plan}: {sku} for {period}",
+        ),
+        (
+            "invoice_line_template_usage",
+            "{sku} ({dimension}) in {unit}",
+        ),
+    ] {
+        settings.set(w.tenant, name, json!(value));
+    }
     dimension_repo::insert(
         &conn,
         &w.scope,

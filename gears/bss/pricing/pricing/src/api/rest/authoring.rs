@@ -81,6 +81,8 @@ pub struct AuthoringState {
     /// The currencies a book and the settings may name, with their scales: the ISO 4217 table
     /// unless the deployment adds non-ISO codes.
     currency_scales: Arc<crate::domain::currency::CurrencyScales>,
+    /// Where the tenant settings every pricing decision reads come from (D-541).
+    tenant_settings: Arc<dyn crate::domain::tenant_settings::TenantSettingsSource>,
     pipeline: tokio::sync::Mutex<Option<Pipeline>>,
 }
 /// The running outbox processor: the broker SDK's producer, or the holding one.
@@ -132,6 +134,9 @@ impl AuthoringState {
             )
         };
         let actor_names = bss_rest::actor_names::ActorNames::from_hub(hub.clone(), &SYSTEM_ACTORS);
+        let tenant_settings = Arc::new(crate::infra::tenant_settings::SettingsServiceSource::new(
+            hub.clone(),
+        ));
         Ok(Self {
             db,
             hub,
@@ -139,6 +144,7 @@ impl AuthoringState {
             clock: Arc::new(crate::infra::reference_work::WallClock),
             actor_names,
             currency_scales: Arc::default(),
+            tenant_settings,
             pipeline: tokio::sync::Mutex::new(Some(pipeline)),
         })
     }
@@ -167,6 +173,29 @@ impl AuthoringState {
             currency_scales,
             ..self
         }
+    }
+    /// The effective pricing settings of `tenant`, read from the Settings Service now. Never
+    /// called inside a database transaction: the Settings Service's reader cannot answer there.
+    /// # Errors
+    /// 503 `SETTINGS_UNAVAILABLE` when they cannot be told for certain; the cause reaches the log.
+    pub async fn tenant_settings(
+        &self,
+        tenant: Uuid,
+    ) -> Result<crate::domain::tenant_settings::TenantSettings, CanonicalError> {
+        self.read_tenant_settings(tenant)
+            .await
+            .map_err(|error| support::settings_unavailable(&error))
+    }
+    /// [`Self::tenant_settings`] with the failure kept as it is, for a door that refuses for
+    /// other reasons first and reports this one only where it needs the settings.
+    async fn read_tenant_settings(
+        &self,
+        tenant: Uuid,
+    ) -> Result<
+        crate::domain::tenant_settings::TenantSettings,
+        crate::domain::tenant_settings::SettingsUnavailable,
+    > {
+        self.tenant_settings.effective(tenant).await
     }
     /// The currencies this gear prices in, and the scale of each.
     #[must_use]
@@ -207,11 +236,16 @@ pub fn router(state: Arc<AuthoringState>, openapi: &dyn OpenApiRegistry) -> Rout
              Idempotency-Key replays the first answer. The currency must be one the currency \
              table resolves: an ISO 4217 code with a scale, or a non-ISO code the deployment's \
              currency_scales adds (D-529); else 400 BOOK_CURRENCY_INVALID. It must also be one \
-             the tenant settings offer, when they offer any (D-438). The code is at most 64 \
+             the tenant offers, when it offers any: the Settings Service setting \
+             offered_currencies, whose empty list offers every currency (D-438, D-541). A change \
+             of that setting reaches this door no later than the Settings Service's cache \
+             time-to-live, up to 30 seconds, after it is written. The code is at most 64 \
              characters and the name 200 (D-457). Refusals: 400 BOOK_CODE_REQUIRED, BOOK_NAME_REQUIRED, \
              BOOK_CURRENCY_INVALID, BOOK_VALIDITY_INVALID, BOOK_DESCRIPTION_TOO_LONG, or \
              FIELD_TOO_LONG on a code or a name over its cap; 409 CURRENCY_NOT_OFFERED, \
-             BOOK_CODE_TAKEN or IDEMPOTENCY_CONFLICT.",
+             BOOK_CODE_TAKEN or IDEMPOTENCY_CONFLICT; 503 SETTINGS_UNAVAILABLE when the offered \
+             currencies cannot be read, judged after a replay and the 400s, and no book is \
+             created.",
         )
         .tag("Pricing")
         .authenticated()
@@ -313,10 +347,12 @@ pub fn router(state: Arc<AuthoringState>, openapi: &dyn OpenApiRegistry) -> Rout
         .operation_id("bss_pricing.get_settings")
         .summary("Read the tenant settings")
         .description(
-            "Returns the tenant's billing defaults (timing, GL code, tax category), \
-             invoice-line templates by SKU type and the currencies a new book may take (empty: \
-             any), with who wrote them last and when, and its version as the ETag; the defaults \
-             apply, with no writer, until the settings are first written. An If-None-Match that \
+            "Returns the settings row this door stores: billing defaults (timing, GL code, tax \
+             category), invoice-line templates by SKU type and a list of currencies, with who \
+             wrote them last and when, and its version as the ETag; before the first write it \
+             answers the defaults, with no writer. No pricing decision reads this row: resolve, \
+             the acceptance of a sale, the plan checks and a new book's currency read the \
+             tenant's settings in the Settings Service (D-541). An If-None-Match that \
              matches that ETag by weak comparison is 304 with an empty body and the same ETag; \
              both answers carry Cache-Control private, no-cache (D-518).",
         )
@@ -341,9 +377,11 @@ pub fn router(state: Arc<AuthoringState>, openapi: &dyn OpenApiRegistry) -> Rout
         .operation_id("bss_pricing.put_settings")
         .summary("Write the tenant settings")
         .description(
-            "Replaces the tenant settings at the version the caller read (If-Match), currencies \
-             included (required; [] offers any currency, D-438), and records the caller and the \
-             time. Each offered currency is one the currency table resolves, listed once; else 400 \
+            "Replaces the settings row this door stores at the version the caller read \
+             (If-Match), currencies included (required, D-438), and records the caller and the \
+             time. What it stores changes no pricing decision: resolve, the acceptance of a sale, \
+             the plan checks and a new book's currency read the tenant's settings in the Settings \
+             Service (D-541). Each listed currency is one the currency table resolves, listed once; else 400 \
              CURRENCY_INVALID naming the code and the reason (D-529), or with a fixed message that \
              does not repeat a value that is not three uppercase letters. A GL code or a tax \
              category other than the stored one is at most 64 characters, and a line template \
@@ -371,8 +409,8 @@ pub fn router(state: Arc<AuthoringState>, openapi: &dyn OpenApiRegistry) -> Rout
             "Returns every currency a price book can use, with the number of decimal places a \
              new price in that currency uses: the active ISO 4217 codes, and the codes the \
              deployment's currency_scales config adds (iso false). The list is sorted by code and \
-             is the same for every tenant; the settings' currencies limit only which currency a \
-             new book can use (D-438, D-529, D-537). A saved price keeps the scale it was saved \
+             is the same for every tenant; the tenant's offered_currencies setting limits only \
+             which currency a new book can use (D-438, D-529, D-537, D-541). A saved price keeps the scale it was saved \
              with (D-531). Any authenticated caller reads the table: it holds no tenant data, so no \
              permission is asked.",
         )
@@ -2167,12 +2205,32 @@ async fn create_book(
     let body: PriceBookCreate = preconditions::parse_body(&body)?;
     body.caps()?;
     let scales = Arc::clone(&state.currency_scales);
+    // D-541: read before the transaction, which the Settings Service's reader cannot answer in.
+    // A failed read is carried in: the door refuses with it only where it needs the list, after
+    // a replay and the body's own refusals.
+    let offered = Arc::new(
+        state
+            .read_tenant_settings(ctx.subject_tenant_id())
+            .await
+            .map(|settings| settings.offered_currencies),
+    );
     transaction(&state.db.db(), move |tx| {
         let (scope, ctx, body) = (scope.clone(), ctx.clone(), body.clone());
         let (key, digest) = (key.clone(), digest.clone());
-        let scales = Arc::clone(&scales);
+        let (scales, offered) = (Arc::clone(&scales), Arc::clone(&offered));
         Box::pin(async move {
-            books::create(tx, &scope, &ctx, correlation, &key, &digest, body, &scales).await
+            books::create(
+                tx,
+                &scope,
+                &ctx,
+                correlation,
+                &key,
+                &digest,
+                body,
+                &scales,
+                &offered,
+            )
+            .await
         })
     })
     .await

@@ -15,7 +15,7 @@
 //!
 //! @cpt-dod:cpt-cf-bss-pricing-dod-plan-clone:p1
 use super::{
-    AuthoringState, configuration,
+    AuthoringState,
     dto::{
         self, PlanReading, PricingPlanApprovalProgress, PricingPlanChecksDto, PricingPlanClone,
         PricingPlanCreate, PricingPlanDto, PricingPlanList, PricingPlanPatch,
@@ -1212,6 +1212,7 @@ pub(super) async fn checks(
     let today = today();
     let conn = state.db.conn().map_err(DoorError::from)?;
     let mut context = stored_context(&conn, &scope, tenant, id, today).await?;
+    context.defaults = shown_defaults(state, tenant).await;
     // @cpt-begin:cpt-cf-bss-pricing-flow-plans:p1:inst-plans-flow-3
     context.skus = fresh_skus(&state.hub, &ctx, context.items.iter().map(|i| i.sku_id)).await?;
     let body = checks_dto(&context, today);
@@ -1241,7 +1242,9 @@ pub(super) async fn checks_batch(
             .flat_map(|context| context.items.iter().map(|item| item.sku_id))
             .collect();
         let found = fresh_skus(&state.hub, &ctx, named).await?;
+        let defaults = shown_defaults(state, tenant).await;
         for context in contexts.values_mut() {
+            context.defaults.clone_from(&defaults);
             let wanted: BTreeSet<Uuid> = context.items.iter().map(|item| item.sku_id).collect();
             context.skus = found
                 .iter()
@@ -1312,8 +1315,18 @@ pub async fn fresh_skus(
 fn corrupt(what: String) -> DoorError {
     RepoError::CorruptRow(what).into()
 }
-/// Everything the checks read from storage, with no SKU yet: the checks door and the
-/// `plan_revision` subject build the checks' context through this one function. The plan's
+/// The tenant's GL code and tax category for the checks' information row (D-541). The row is not
+/// a rule, so settings that cannot be read leave it without values instead of failing the read.
+async fn shown_defaults(state: &AuthoringState, tenant: Uuid) -> Option<plan::Defaults> {
+    let settings = state.tenant_settings(tenant).await.ok()?;
+    Some(plan::Defaults {
+        gl: settings.defaults.default_gl,
+        tax_category: settings.defaults.default_tax_category,
+    })
+}
+/// Everything the checks read from storage, with no SKU and no tenant default yet: the checks
+/// door and the `plan_revision` subject build the checks' context through this one function. The
+/// plan's
 /// revisions are read as they read on `today` (D-447), so the published revision whose SKUs a
 /// deprecated SKU may be carried from is the one in effect, before the job persists a due switch
 /// as after it.
@@ -1332,10 +1345,10 @@ pub async fn stored_context(
         .ok_or_else(|| support::missing_what("plan_revision").into())
 }
 /// The checks' stored context for every revision among `ids` the caller's scope admits, each
-/// built from the same reads as [`stored_context`] (D-482). Eleven statements whatever the number
-/// of revisions and entries, once any revision is held: the revisions, their plans, their items,
-/// the entries, the prices, the books, the dimensions, the plans' revisions, the in-effect items,
-/// the policy and the settings. An id the tenant does not hold, or the scope does not admit, is
+/// built from the same reads as [`stored_context`] (D-482): each kind of row is read once for the
+/// whole set, so the statements are the same whatever the number of revisions and entries, once
+/// any revision is held. The tenant settings are not storage's to read: a caller outside a
+/// transaction adds them (D-541). An id the tenant does not hold, or the scope does not admit, is
 /// absent. The caller's scope is used only to admit the revisions; the rest is the tenant's, as
 /// the single read's is.
 ///
@@ -1412,11 +1425,6 @@ pub async fn stored_contexts(
     let quorum = approval_repo::read_policy(tx, &children, tenant)
         .await?
         .quorum_for(plan::KIND_PLAN_REVISION);
-    let settings = configuration::settings(tx, &children, tenant).await?;
-    let defaults = plan::Defaults {
-        gl: settings.default_gl,
-        tax_category: settings.default_tax_category,
-    };
     let loaded = Loaded {
         plans: &plans,
         items_of: &items_of,
@@ -1427,7 +1435,6 @@ pub async fn stored_contexts(
         published_skus: &published_skus,
         dimension_values: &dimension_values,
         quorum,
-        defaults: &defaults,
     };
     let mut out = BTreeMap::new();
     for revision in revisions {
@@ -1446,7 +1453,6 @@ struct Loaded<'a> {
     published_skus: &'a BTreeMap<Uuid, Vec<Uuid>>,
     dimension_values: &'a [(String, Vec<String>)],
     quorum: u32,
-    defaults: &'a plan::Defaults,
 }
 fn assemble(
     revision: &plan_revision::Model,
@@ -1489,7 +1495,7 @@ fn assemble(
         dimension_values: loaded.dimension_values.to_vec(),
         published_sku_ids,
         quorum: loaded.quorum,
-        defaults: loaded.defaults.clone(),
+        defaults: None,
     })
 }
 fn named_entries(items_of: &BTreeMap<Uuid, Vec<plan_item::Model>>) -> Vec<Uuid> {

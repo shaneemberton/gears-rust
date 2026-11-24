@@ -86,12 +86,12 @@ async fn service(
     pdp: Arc<Pdp>,
     clock: Arc<FixedClock>,
 ) -> Arc<CommercialTermsService> {
+    let hub = Arc::new(toolkit::ClientHub::new());
+    bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new()
+        .refusing_reads_in_transactions(db.db())
+        .install(&hub);
     Arc::new(CommercialTermsService::new(
-        Arc::new(
-            AuthoringState::new(db, Arc::new(toolkit::ClientHub::new()))
-                .await
-                .unwrap(),
-        ),
+        Arc::new(AuthoringState::new(db, hub).await.unwrap()),
         Arc::new(authz_resolver_sdk::PolicyEnforcer::new(pdp)),
         clock,
         SellerHoldPolicy::default(),

@@ -114,6 +114,7 @@ impl Harness {
         }
         let registry = Arc::new(RecordingRegistry::answering(Answer::Admits));
         hub.register::<dyn TypesRegistryClient>(registry.clone());
+        bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new().install(&hub);
         let ctx = GearCtx::new(
             "bss-pricing",
             Uuid::new_v4(),

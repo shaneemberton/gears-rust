@@ -27,6 +27,8 @@ use toolkit_canonical_errors::CanonicalError;
 use toolkit_db::secure::{AccessScope, DBRunner};
 use toolkit_security::SecurityContext;
 use uuid::Uuid;
+
+use crate::domain::tenant_settings::SettingsUnavailable;
 pub async fn find(
     tx: &impl DBRunner,
     scope: &AccessScope,
@@ -67,8 +69,9 @@ fn checked(
 }
 #[expect(
     clippy::too_many_arguments,
-    reason = "the replay needs the key and digest beside the request, and the currency table is \
-              the one thing the door takes from the state; a parameter struct would only hide them"
+    reason = "the replay needs the key and digest beside the request, and the currency table and \
+              the offered currencies are what the door takes from the state; a parameter struct \
+              would only hide them"
 )]
 pub async fn create(
     tx: &impl DBRunner,
@@ -79,6 +82,7 @@ pub async fn create(
     digest: &[u8],
     body: PriceBookCreate,
     scales: &CurrencyScales,
+    offered: &Result<Vec<String>, SettingsUnavailable>,
 ) -> Result<Response, DoorError> {
     let tenant = ctx.subject_tenant_id();
     let now = crate::infra::storage::stored_now();
@@ -120,7 +124,11 @@ pub async fn create(
     };
     validate_new(&model, scales)?;
     // D-438: a new book takes a currency the tenant offers (any, while it offers none).
-    super::configuration::offer_currency(tx, tenant, &model.currency).await?;
+    // While the list cannot be told no book is created: any currency would pass otherwise.
+    let offered = offered
+        .as_ref()
+        .map_err(super::support::settings_unavailable)?;
+    super::configuration::offer_currency(offered, &model.currency)?;
     let model = book_repo::insert(tx, scope, model).await?;
     audit(tx, ctx, correlation, "price_book.create", model.id, 1).await?;
     let body = value(&PriceBookDto::from(model))?;

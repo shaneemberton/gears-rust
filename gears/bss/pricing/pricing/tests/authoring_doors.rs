@@ -64,13 +64,14 @@ struct Fixture {
 impl Fixture {
     async fn new() -> Self {
         let (db, _, tenant, dsn) = storage_support::test_db().await;
+        let hub = Arc::new(toolkit::ClientHub::default());
+        bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new()
+            .refusing_reads_in_transactions(db.db())
+            .install(&hub);
         let state = Arc::new(
-            bss_pricing::api::rest::authoring::AuthoringState::new(
-                db.clone(),
-                Arc::new(toolkit::ClientHub::default()),
-            )
-            .await
-            .unwrap(),
+            bss_pricing::api::rest::authoring::AuthoringState::new(db.clone(), hub)
+                .await
+                .unwrap(),
         );
         // The gear mounts two routers (`module.rs`): authoring and the consumer reads.
         let production = |registry: &toolkit::api::OpenApiRegistryImpl| {

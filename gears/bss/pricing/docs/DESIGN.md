@@ -490,7 +490,8 @@ a check's code and a proposal's chain stay string on the responses.
 | A new price, a PATCH, a submit or an approval in a book whose currency the table no longer lists | 409 BOOK_CURRENCY_INVALID; no edit makes the draft a price (D-528) |
 | At submit or approval, a draft stored at another currency scale than the table gives today | 409 CURRENCY_SCALE_CHANGED, naming both scales and the remedy; the draft is left as it is (D-531) |
 | A stored price that is not canonical text, breaks the numeric profile, has a min_fee off the increment of its own stored currency_scale, or is in another currency than its book's | 500 (a corrupt row) in every read; no read repairs it (D-527) |
-| A new book in a currency the tenant settings do not offer | 409 CURRENCY_NOT_OFFERED (D-438) |
+| A new book in a currency the tenant settings do not offer | 409 CURRENCY_NOT_OFFERED (D-438); the list is the `offered_currencies` setting in the Settings Service (D-541) |
+| A resolve, a sale's acceptance or a new book while the tenant settings cannot be read from the Settings Service | 503 SETTINGS_UNAVAILABLE; nothing is recorded (D-541). The plan checks answer 200 and show no tenant GL code or tax category |
 | A book description over 2000 characters; the delete of a book an entry, a plan's live revision or only superseded revisions name | 400 BOOK_DESCRIPTION_TOO_LONG; 409 BOOK_HAS_ENTRIES, BOOK_IN_PLAN, BOOK_IN_PLAN_HISTORY, in that order (D-444) |
 | The archive of a book a live revision names, with a pending price, or with an entry being confirmed; the unarchive of a book with an entry whose release or re-reservation is still open; a write on an archived book's entries; a write on an entry an unarchive left released | 409 BOOK_IN_PLAN, BOOK_HAS_PENDING, ENTRY_CONFIRMATION_PENDING, in that order; 409 ENTRY_RELEASE_PENDING; 409 BOOK_ARCHIVED; 409 ENTRY_REFERENCE_RELEASED (D-522) |
 | A text over its cap (D-457): a code, a dimension key or value over 64 characters, a name over 200, a GL code or tax category over 64, an invoice line template over 2000, a usage-rating policy's usage_type_id, version, unit or accrual_policy_version over 64, or a list's q over 200; a price's, a vote's or a submitter's note over 2000 (a submitter's note judged before any read, D-464) | 400 FIELD_TOO_LONG on the field; 400 NOTE_TOO_LONG on note |
@@ -609,8 +610,18 @@ settings there in two phases: `init` registers the settings' value types in the 
 registers the declarations in one reconcile, because the registry serves what an `init` registered only after its
 finalize step. The gear does not start when the client is absent, the reconcile fails or a declaration is refused.
 The Settings Service then owns the declared settings: their catalogue, value validation against the registered
-types, stored values with their history, and their REST surface. Pricing does not read them yet: resolve, the plan
-checks and the new-book currency check read the gear's own settings row, and `/settings` serves it.
+types, stored values with their history, and their REST surface.
+
+Pricing reads the tenant settings from the Settings Service when a decision needs them (D-541): one bulk read of
+the declared keys at the scope `/tenants/{tenant_id}`, through `SettingsReaderClient`, as pricing's system actor.
+The reader cannot answer inside a database transaction, so every read is made outside pricing's transactions and
+the values are passed in. Resolve reads them after its read transaction. `SellabilityV1::check` reads them once at
+capture and freezes the resolved invoice inputs in the receipt; the commit does not compare them, and a mismatch
+with the offer is `ResolutionChanged` through the bindings digest. Book creation reads the offered currencies
+before its transaction. Settings that cannot be read are 503 `SETTINGS_UNAVAILABLE` for these three, and nothing
+is recorded. The plan checks stay readable: their `DESCRIPTORS` row then names no GL code and no tax category.
+A written value reaches pricing no later than the Settings Service's cache time-to-live, at most 30 seconds.
+`GET` and `PUT /settings` still serve the gear's own settings row, which no decision reads.
 
 ### 3.6 Interactions & Sequences
 

@@ -313,7 +313,7 @@ async fn the_batch_refuses_a_bad_query_a_missing_grant_and_an_unanswered_registr
 /// D-482: the checks read is the same statements for one revision and for a wide batch, on a
 /// connection, not under a serializable transaction.
 #[tokio::test]
-async fn the_checks_read_is_eleven_statements_whatever_the_set() {
+async fn the_checks_read_is_ten_statements_whatever_the_set() {
     let (f, catalog, recorder) = recorded().await;
     let one = draft_with_entries(&f, &catalog, "one", 1).await;
     recorder.clear();
@@ -345,7 +345,11 @@ async fn the_checks_read_is_eleven_statements_whatever_the_set() {
     let (status, body) = get(&f, &batch_path(&wide)).await;
     assert_eq!(status, 200, "{body}");
     let fifty = sql(&recorder);
-    assert_eq!(single.len(), 11, "{single:#?}");
+    assert_eq!(single.len(), 10, "{single:#?}");
+    assert!(
+        single.iter().all(|q| !q.contains("pricing_settings")),
+        "the checks read the tenant settings from the Settings Service, not their table"
+    );
     assert_eq!(single, five, "one revision and five");
     assert_eq!(
         five, fifty,

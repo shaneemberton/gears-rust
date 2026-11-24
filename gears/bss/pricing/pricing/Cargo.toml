@@ -60,7 +60,8 @@ authz-resolver-sdk = { workspace = true }
 types-registry = { workspace = true }
 types-registry-sdk = { workspace = true }
 # The tenant pricing settings are declared in the Settings Service through its contribution
-# contract (`infra::settings_declarations`).
+# contract (`infra::settings_declarations`) and read through its reader
+# (`infra::tenant_settings`).
 settings-service-sdk = { workspace = true }
 # Named in the gear's `deps`, so the Settings Service's contribution client is bound before this
 # gear starts.

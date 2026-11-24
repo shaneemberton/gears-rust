@@ -7,9 +7,12 @@
 //! registered types.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bss_pricing::domain::resolve::TenantDefaults;
+use bss_pricing::domain::tenant_settings::{TenantSettings, TenantSettingsSource};
 use bss_pricing::infra::reference_ticker::system_actor;
 use bss_pricing::infra::settings_declarations::doubles::{
     Answer, REFUSAL_CODE, RecordingRegistry, RecordingSettings,
@@ -17,10 +20,15 @@ use bss_pricing::infra::settings_declarations::doubles::{
 use bss_pricing::infra::settings_declarations::{
     declarations, register_value_types, value_type_schemas,
 };
+use bss_pricing::infra::tenant_settings::SettingsServiceSource;
 use bss_pricing::module::BssPricingGear;
 use serde_json::{Value, json};
 use settings_service::SettingsService;
+use settings_service::domain::category::DomainVisibility;
+use settings_service::domain::ports::StepUpOperation;
 use settings_service::domain::validation::TypeValidator as _;
+use settings_service::domain::writes::service::StepUpPolicy;
+use settings_service::domain::writes::{ABSENT_VALUE_TAG, Change, WriteActor};
 use settings_service::infra::type_validator::GtsTypeValidator;
 use settings_service_sdk::models::{GetEffectiveRequest, ReconcileResult};
 use settings_service_sdk::{
@@ -323,7 +331,7 @@ impl TenantResolverClient for TwoTenants {
 struct Platform {
     hub: Arc<ClientHub>,
     registry: TypesRegistryGear,
-    _settings: SettingsService,
+    settings: SettingsService,
 }
 
 impl Platform {
@@ -356,8 +364,51 @@ impl Platform {
         Self {
             hub,
             registry,
-            _settings: settings,
+            settings,
         }
+    }
+
+    /// `tenant` stores `value` under the setting `name`, through the Settings Service's own write
+    /// path: its gates, its validator and the eviction of what its reader cached. Who may write
+    /// and the step-up are decided at the service's REST door, before this path, so they are not
+    /// asked here.
+    async fn store(&self, tenant: Uuid, name: &str, value: Value) {
+        let writes = self.settings.writes().expect("the write coordinator");
+        let db = self.settings.db().expect("the Settings Service's database");
+        let actor = WriteActor {
+            ctx: SecurityContext::builder()
+                .subject_id(Uuid::new_v4())
+                .subject_tenant_id(tenant)
+                .subject_type("user")
+                .build()
+                .expect("an administrator of the tenant"),
+            request_id: Uuid::new_v4().to_string(),
+            step_up_token: None,
+            visibility: DomainVisibility::Unrestricted,
+        };
+        let key = SettingKey::parse(&key_of(name)).expect("a setting key");
+        let gated = writes
+            .writer()
+            .gate(
+                &db.conn().expect("a connection"),
+                &actor,
+                &key,
+                Some(tenant),
+                StepUpPolicy::AlreadyVerified,
+                StepUpOperation::Set,
+            )
+            .await
+            .unwrap_or_else(|error| panic!("{name} may be written: {error:?}"));
+        writes
+            .commit(
+                &actor,
+                gated,
+                Change::Set(value),
+                Some(ABSENT_VALUE_TAG),
+                Uuid::new_v4(),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("{name} is stored: {error:?}"));
     }
 
     /// What the runtime does between the last application `init` and the first `post_init`.
@@ -473,6 +524,92 @@ async fn the_gear_declares_its_settings_in_the_real_settings_service() {
         .await
         .expect("the reconcile runs");
     assert_eq!(again, ReconcileResult::default());
+}
+
+/// The read every pricing decision makes, against the real Settings Service: its bulk read knows
+/// the declared keys, answers their defaults for a tenant that stored nothing, and answers what
+/// the tenant stores, to that tenant alone.
+#[tokio::test]
+async fn the_settings_source_reads_the_real_settings_service() {
+    let (tenant, other) = (Uuid::new_v4(), Uuid::new_v4());
+    let platform = Platform::started_with(tenant).await;
+    platform
+        .hub
+        .register::<dyn authz_resolver_sdk::AuthZResolverApi>(Arc::new(UnreachablePdp));
+    let pricing = BssPricingGear::default();
+    let ctx = context(
+        PRICING,
+        &platform.hub,
+        common::migrated_db().await.expect("a migrated database"),
+    );
+    let source = SettingsServiceSource::new(Arc::clone(&platform.hub));
+
+    // Before the declarations are there the settings are unavailable, not defaults.
+    pricing.init(&ctx).await.expect("pricing init");
+    platform
+        .finalize_what_init_registered()
+        .await
+        .expect("the registry admits the value types when it finalizes");
+    source
+        .effective(tenant)
+        .await
+        .expect_err("nothing is declared before post_init");
+
+    pricing.post_init(&ctx).await.expect("pricing post_init");
+    let nothing_set = TenantSettings {
+        defaults: TenantDefaults {
+            default_timing: "advance".to_owned(),
+            default_gl: None,
+            default_tax_category: None,
+            invoice_line_templates: BTreeMap::new(),
+        },
+        offered_currencies: Vec::new(),
+    };
+    assert_eq!(
+        source
+            .effective(tenant)
+            .await
+            .expect("the declared defaults are read"),
+        nothing_set
+    );
+
+    platform
+        .store(tenant, "default_timing", json!("arrears"))
+        .await;
+    platform.store(tenant, "default_gl", json!("9000")).await;
+    platform
+        .store(tenant, "invoice_line_template_usage", json!("{sku} usage"))
+        .await;
+    platform
+        .store(tenant, "offered_currencies", json!(["EUR", "USD"]))
+        .await;
+    assert_eq!(
+        source
+            .effective(tenant)
+            .await
+            .expect("the stored values are read"),
+        TenantSettings {
+            defaults: TenantDefaults {
+                default_timing: "arrears".to_owned(),
+                default_gl: Some("9000".to_owned()),
+                default_tax_category: None,
+                invoice_line_templates: BTreeMap::from([(
+                    "usage".to_owned(),
+                    "{sku} usage".to_owned()
+                )]),
+            },
+            offered_currencies: vec!["EUR".to_owned(), "USD".to_owned()],
+        }
+    );
+
+    // The settings are local: what one tenant stores reaches no other.
+    assert_eq!(
+        source
+            .effective(other)
+            .await
+            .expect("another tenant reads the declared defaults"),
+        nothing_set
+    );
 }
 
 /// The Settings Service's own validator over the registered types: what a write of a value

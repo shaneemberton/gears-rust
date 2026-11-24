@@ -230,6 +230,7 @@ impl Deployment {
             bss_pricing::module::BssPricingGear::default().migrations(),
         )
         .await;
+        bss_pricing::infra::tenant_settings::doubles::FakeSettingsReader::new().install(&hub);
         let state = Arc::new(
             AuthoringState::new(toolkit_db::DBProvider::new(pricing_db), hub.clone())
                 .await

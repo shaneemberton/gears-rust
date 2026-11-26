@@ -20,8 +20,6 @@ fn census() -> census::Routes {
         ("POST", "/bss-pricing/v1/price-books/{id}/unarchive"),
         ("GET", "/bss-pricing/v1/price-books/{id}/entries"),
         ("GET", "/bss-pricing/v1/price-books/{id}/export"),
-        ("GET", "/bss-pricing/v1/settings"),
-        ("PUT", "/bss-pricing/v1/settings"),
         ("GET", "/bss-pricing/v1/currencies"),
         ("GET", "/bss-pricing/v1/dimension-keys"),
         ("PUT", "/bss-pricing/v1/dimension-keys"),
@@ -92,7 +90,7 @@ async fn the_census_covers_every_route_the_routers_register() {
     let mut asks_the_pdp = registered.clone();
     assert!(asks_the_pdp.remove(&("GET".to_owned(), "/bss-pricing/v1/currencies".to_owned())));
     assert_eq!(census::readers("authz::access_scope("), asks_the_pdp);
-    assert_eq!(registered.len(), 61);
+    assert_eq!(registered.len(), 59);
     assert_eq!(bss_pricing::authz::labels::ALL.len(), 7);
     // D-526: the registered pricing instances are exactly the nineteen catalog permissions.
     let permissions: std::collections::BTreeSet<String> =
@@ -151,7 +149,7 @@ async fn no_rest_door_serves_pricings_system_actor() {
             (method.to_owned(), path.to_owned())
         })
         .collect();
-    assert_eq!(doors.len(), 61, "every served door");
+    assert_eq!(doors.len(), 59, "every served door");
     for (method, template) in doors {
         let path = template
             .replace("{id}", &uuid::Uuid::new_v4().to_string())
@@ -194,7 +192,7 @@ async fn no_rest_door_serves_pricings_system_actor() {
 
 #[test]
 fn the_authentication_and_authz_parsers_have_positive_controls() {
-    // One per route (61), and more: `require_authenticated(` is also its own definition;
+    // One per route (59), and more: `require_authenticated(` is also its own definition;
     // `authz::access_scope(` is also the SKU usage port, which authorizes the Products caller it
     // serves (D-428), and the money's second judgement, price_book read, in the one helper the
     // SKU's entry list, the two entry reads and an entry's prices call (D-434, D-440).
@@ -204,11 +202,11 @@ fn the_authentication_and_authz_parsers_have_positive_controls() {
     // as the list and the counts doors do, once, in one helper (D-490); its card and votes call
     // the doors. The source's page also authenticates once more before it asks its read grant and
     // the two flag grants at once (one PDP round trip), so a 401 still comes first.
-    // The currency table (D-537) authenticates and asks no permission: 61 routes authenticate,
-    // 60 ask the PDP.
+    // The currency table (D-537) authenticates and asks no permission: 59 routes authenticate,
+    // 58 ask the PDP.
     for (needle, routes, more) in [
-        ("require_authenticated(", 61, 3),
-        ("authz::access_scope(", 60, 5),
+        ("require_authenticated(", 59, 3),
+        ("authz::access_scope(", 58, 5),
     ] {
         assert_eq!(census::count_in_functions(census::CONTROL, needle), 2);
         assert_eq!(census::production_count(needle), routes + more, "{needle}");
@@ -221,7 +219,7 @@ fn the_authentication_and_authz_parsers_have_positive_controls() {
             .count(),
         2
     );
-    assert_eq!(census::source_routes().len(), 61);
+    assert_eq!(census::source_routes().len(), 59);
 }
 
 #[test]
@@ -260,8 +258,6 @@ fn every_mounted_router_is_merged_into_both_censuses() {
 // PATCH /price-books/{id} price_book:author true false
 // GET /price-books/{id}/entries price_book_entry:read false false
 // GET /price-books/{id}/export price_book:read false false
-// GET /settings config:read false false
-// PUT /settings config:settings true false
 // GET /currencies authenticated false false (D-537: no permission, no PDP call)
 // GET /dimension-keys config:read false false
 // PUT /dimension-keys config:settings true false

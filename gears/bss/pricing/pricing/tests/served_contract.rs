@@ -74,7 +74,7 @@ async fn an_op_that_is_not_served_has_no_text_to_read() {
 async fn every_op_declares_its_503() {
     let api = served().await;
     let all = ops(&api);
-    assert_eq!(all.len(), 61, "the route census holds 61 ops");
+    assert_eq!(all.len(), 59, "the route census holds 59 ops");
     let missing: Vec<_> = all
         .iter()
         .filter(|(_, _, op)| {

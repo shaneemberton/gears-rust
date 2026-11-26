@@ -41,7 +41,6 @@ const UNIT_STATE: &[&str] = &["pending", "approved", "rejected", "withdrawn"];
 const UNIT_KIND: &[&str] = &["prices", "plan_revision"];
 const DECISION: &[&str] = &["approve", "reject"];
 const VOTE_OUTCOME: &[&str] = &["pending", "applied", "rejected", "withdrawn"];
-const TIMING: &[&str] = &["advance", "arrears"];
 const SOURCE: &[&str] = &["entry", "sku", "tenant"];
 
 /// (schema, field, the exact values in order, nullable).
@@ -96,7 +95,6 @@ const CLOSED: &[Closed] = &[
     ("PricingApprovalUnitDto", "kind", UNIT_KIND, false),
     ("PricingDecisionDto", "decision", DECISION, false),
     ("PricingVoteReceipt", "outcome", VOTE_OUTCOME, false),
-    ("PricingSettingsDto", "default_timing", TIMING, false),
     ("PricingResolveDto", "state", RESOLVED_REVISION, false),
     ("PricingResolveItemDto", "charge_kind", CHARGE_KIND, true),
     ("PricingResolveItemDto", "period", PERIOD, true),
@@ -132,7 +130,6 @@ const REQUEST_STRING: &[(&str, &str)] = &[
     ("PricingPriceBookEntryCreate", "period"),
     ("PricingPriceCreate", "eligibility"),
     ("PricingPricePatch", "eligibility"),
-    ("PricingSettingsPut", "default_timing"),
     ("PricingApprovalPolicyPut", "kind"),
 ];
 

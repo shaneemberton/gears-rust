@@ -1,21 +1,18 @@
 //! D-438 on Postgres: the same forward migration as `settings_migration.rs`, tables in schema
 //! `bss`. A database is migrated by the gear's whole list without 000014 through the toolkit
-//! runner and holds one tenant's settings row; the list runs again and applies 000014 alone. The structure is proved by the Postgres schema dump, before and after and
-//! against a fresh chain; the row by its columns; and the application's doors read and rewrite it.
+//! runner and holds one tenant's settings row; the list runs again and applies 000014 alone. The
+//! structure is proved by the Postgres schema dump, before and after and against a fresh chain;
+//! the row by its columns. The table has no reader or writer in the application (D-542).
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-mod entry_support;
 mod pg_support;
 mod schema_dump;
 
 use bss_pricing::module::BssPricingGear;
-use entry_support::{Script, app_for, request, state_on, user_of};
 use pg_support::Pg;
 use sea_orm::{ConnectionTrait, DbBackend, Statement};
 use serde_json::{Value, json};
-use std::sync::Arc;
 use toolkit::contracts::DatabaseCapability;
-use toolkit_db::DBProvider;
 use toolkit_db::migration_runner::{MigrationError, MigrationResult, run_migrations_for_testing};
 use uuid::Uuid;
 
@@ -130,24 +127,4 @@ async fn postgres_the_forward_migration_adds_currencies_and_updated_by_and_keeps
     let fresh = Pg::applied().await;
     assert_eq!(dump_after, dump(&fresh).await, "upgraded and fresh agree");
     assert!(migrate(&pg, None).await.unwrap().applied_names.is_empty());
-
-    // Through the application: the legacy row reads, and a PUT that rewrites it stamps the writer.
-    let state = state_on(DBProvider::new(pg.db().await), Arc::new(Script::default())).await;
-    let app = app_for(state, TENANT);
-    let ctx = user_of(TENANT);
-    let (s, read, tag) = request(&app, &ctx, "GET", "/settings", json!({}), None, None).await;
-    assert_eq!(s, 200, "{read}");
-    assert_eq!(tag, "\"3\"");
-    assert_eq!(read["currencies"], json!([]));
-    assert!(read["updated_by"].is_null(), "{read}");
-    assert!(read["updated_at"].is_string(), "{read}");
-    let mut body = read.clone();
-    for field in ["version", "updated_at", "updated_by"] {
-        body.as_object_mut().unwrap().remove(field);
-    }
-    body["currencies"] = json!(["EUR", "USD"]);
-    let (s, saved, _) = request(&app, &ctx, "PUT", "/settings", body, Some(&tag), None).await;
-    assert_eq!(s, 200, "{saved}");
-    assert_eq!(saved["currencies"], json!(["EUR", "USD"]));
-    assert_eq!(saved["updated_by"], ctx.subject_id().to_string());
 }

@@ -1,4 +1,4 @@
-//! Books, entries, prices, approvals, plans, dimension keys and settings REST doors.
+//! Books, entries, prices, approvals, plans and dimension keys REST doors.
 mod approvals;
 mod book_list;
 mod books;
@@ -29,7 +29,6 @@ use caps::Capped;
 use dto::{
     PriceBookCreate, PriceBookDto, PriceBookExport, PriceBookPatch, PricingCurrencyTable,
     PricingDimensionKeyPatch, PricingDimensionRegistry, PricingDimensions, PricingPriceBookReadDto,
-    PricingSettingsDto, PricingSettingsPut,
 };
 use std::sync::Arc;
 use support::{
@@ -78,7 +77,7 @@ pub struct AuthoringState {
     /// The names of the actors a read shows (D-519), through Account Management when the hub
     /// holds it.
     actor_names: bss_rest::actor_names::ActorNames,
-    /// The currencies a book and the settings may name, with their scales: the ISO 4217 table
+    /// The currencies a book may name, with their scales: the ISO 4217 table
     /// unless the deployment adds non-ISO codes.
     currency_scales: Arc<crate::domain::currency::CurrencyScales>,
     /// Where the tenant settings every pricing decision reads come from (D-541).
@@ -340,65 +339,6 @@ pub fn router(state: Arc<AuthoringState>, openapi: &dyn OpenApiRegistry) -> Rout
         .path_param("id", "Price book id")
         .handler(export_book)
         .json_response_with_schema::<PriceBookExport>(openapi, StatusCode::OK, "Response")
-        .standard_errors(openapi)
-        .error_503(openapi)
-        .register(router, openapi);
-    let router = OperationBuilder::get("/bss-pricing/v1/settings")
-        .operation_id("bss_pricing.get_settings")
-        .summary("Read the tenant settings")
-        .description(
-            "Returns the settings row this door stores: billing defaults (timing, GL code, tax \
-             category), invoice-line templates by SKU type and a list of currencies, with who \
-             wrote them last and when, and its version as the ETag; before the first write it \
-             answers the defaults, with no writer. No pricing decision reads this row: resolve, \
-             the acceptance of a sale, the plan checks and a new book's currency read the \
-             tenant's settings in the Settings Service (D-541). An If-None-Match that \
-             matches that ETag by weak comparison is 304 with an empty body and the same ETag; \
-             both answers carry Cache-Control private, no-cache (D-518).",
-        )
-        .tag("Pricing")
-        .authenticated()
-        .no_license_required()
-        .param(support::if_none_match_version())
-        .handler(get_settings)
-        .json_response_with_schema::<PricingSettingsDto>(openapi, StatusCode::OK, "Response")
-        .response_header(etag())
-        .response_header(support::revalidate_header())
-        .no_content_response(
-            StatusCode::NOT_MODIFIED,
-            "The If-None-Match tag matches the settings version",
-        )
-        .response_header(etag())
-        .response_header(support::revalidate_header())
-        .standard_errors(openapi)
-        .error_503(openapi)
-        .register(router, openapi);
-    let router = OperationBuilder::put("/bss-pricing/v1/settings")
-        .operation_id("bss_pricing.put_settings")
-        .summary("Write the tenant settings")
-        .description(
-            "Replaces the settings row this door stores at the version the caller read \
-             (If-Match), currencies included (required, D-438), and records the caller and the \
-             time. What it stores changes no pricing decision: resolve, the acceptance of a sale, \
-             the plan checks and a new book's currency read the tenant's settings in the Settings \
-             Service (D-541). Each listed currency is one the currency table resolves, listed once; else 400 \
-             CURRENCY_INVALID naming the code and the reason (D-529), or with a fixed message that \
-             does not repeat a value that is not three uppercase letters. A GL code or a tax \
-             category other than the stored one is at most 64 characters, and a line template \
-             other than the one stored for its SKU type 2000; a stored text sent back unchanged \
-             passes whatever its length (D-457). Refusals: 400 TIMING_INVALID, SKU_TYPE_INVALID, \
-             CURRENCY_INVALID, an invalid line template (LINE_TEMPLATE_EMPTY, \
-             LINE_TEMPLATE_INVALID), or FIELD_TOO_LONG on a changed default_gl, \
-             default_tax_category or invoice_line_templates over its cap; 409 STALE_REVISION.",
-        )
-        .tag("Pricing")
-        .authenticated()
-        .no_license_required()
-        .json_request::<PricingSettingsPut>(openapi, "Request")
-        .param(header("If-Match"))
-        .handler(put_settings)
-        .json_response_with_schema::<PricingSettingsDto>(openapi, StatusCode::OK, "Response")
-        .response_header(etag())
         .standard_errors(openapi)
         .error_503(openapi)
         .register(router, openapi);
@@ -2588,73 +2528,6 @@ async fn export_book(
     })
     .await?;
     names::named(&state, &ctx, body, None).await
-}
-async fn get_settings(
-    Extension(state): Extension<Arc<AuthoringState>>,
-    Extension(enforcer): Extension<PolicyEnforcer>,
-    ctx: Option<Extension<SecurityContext>>,
-    headers: HeaderMap,
-) -> Result<Response, CanonicalError> {
-    let ctx = require_authenticated(ctx)?;
-    let scope = authz::access_scope(
-        &enforcer,
-        &ctx,
-        &resource_types::CONFIG,
-        actions::READ,
-        None,
-        None,
-    )
-    .await
-    .map_err(authz_failure)?;
-    let tenant = ctx.subject_tenant_id();
-    let (body, version) = transaction_read(&state.db.db(), move |tx| {
-        let scope = scope.clone();
-        Box::pin(async move {
-            let body = configuration::settings(tx, &scope, tenant).await?;
-            let version = preconditions::RowVersion::from_stored(body.version)
-                .map_err(CanonicalError::from)?
-                .get();
-            Ok((body, version))
-        })
-    })
-    .await?;
-    // D-519: the writer's name, after the transaction.
-    let answer = names::named(&state, &ctx, body, Some(version)).await?;
-    // D-518: the strong version tag stays; a matching If-None-Match is 304.
-    Ok(support::revalidate_version(&headers, answer))
-}
-async fn put_settings(
-    Extension(state): Extension<Arc<AuthoringState>>,
-    Extension(enforcer): Extension<PolicyEnforcer>,
-    ctx: Option<Extension<SecurityContext>>,
-    corr: Option<Extension<correlation::CorrelationId>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Response, CanonicalError> {
-    let ctx = require_authenticated(ctx)?;
-    let scope = authz::access_scope(
-        &enforcer,
-        &ctx,
-        &resource_types::CONFIG,
-        actions::SETTINGS,
-        Some(OwnerTenant(ctx.subject_tenant_id())),
-        None,
-    )
-    .await
-    .map_err(authz_failure)?;
-    let correlation = correlation::require_correlation(corr)?;
-    let version = preconditions::if_match(&headers)?.get();
-    // D-457: the caps are judged against the stored settings (`configuration::put_settings`).
-    let body: PricingSettingsPut = preconditions::parse_body(&body)?;
-    let scales = Arc::clone(&state.currency_scales);
-    transaction(&state.db.db(), move |tx| {
-        let (scope, ctx, body) = (scope.clone(), ctx.clone(), body.clone());
-        let scales = Arc::clone(&scales);
-        Box::pin(async move {
-            configuration::put_settings(tx, &scope, &ctx, correlation, version, body, &scales).await
-        })
-    })
-    .await
 }
 async fn list_currencies(
     Extension(state): Extension<Arc<AuthoringState>>,

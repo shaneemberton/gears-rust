@@ -1,9 +1,9 @@
 //! Pricing authoring wire contracts, with unique `OpenAPI` names and `snake_case` fields. A closed
 //! set on a response is its `enum` (D-439); a request keeps `string`, so its door's code refuses.
 use crate::api::rest::closed_sets::{
-    PricingApprovalKind, PricingBillingTiming, PricingChangeKind, PricingChargeKind,
-    PricingDecisionKind, PricingEligibility, PricingEntryReferenceState, PricingItemReferenceState,
-    PricingModel, PricingPeriod, PricingPlanChange, PricingPriceState, PricingPriceStatus,
+    PricingApprovalKind, PricingChangeKind, PricingChargeKind, PricingDecisionKind,
+    PricingEligibility, PricingEntryReferenceState, PricingItemReferenceState, PricingModel,
+    PricingPeriod, PricingPlanChange, PricingPriceState, PricingPriceStatus,
     PricingReferenceOpKind, PricingReferenceOpReason, PricingReferenceOpRefKind,
     PricingReferenceOpState, PricingRevisionState, PricingSkuEntryStatus, PricingUnitState,
     PricingVoteOutcome,
@@ -634,41 +634,6 @@ impl From<&crate::domain::currency::KnownCurrency> for PricingCurrency {
 pub struct PricingCurrencyTable {
     pub items: Vec<PricingCurrency>,
 }
-#[toolkit_macros::api_dto(request)]
-#[derive(Clone)]
-#[serde(deny_unknown_fields)]
-pub struct PricingSettingsPut {
-    pub default_timing: String,
-    pub default_gl: Option<String>,
-    pub default_tax_category: Option<String>,
-    pub invoice_line_templates: std::collections::BTreeMap<String, String>,
-    /// Required (D-438): the currencies a NEW book may take, a full replace; `[]` is any.
-    pub currencies: Vec<String>,
-    /// Ignored (D-519): the writer's name that `GET /settings` shows. It is accepted so that a
-    /// read's body without `version`, `updated_at` and `updated_by` stays a PUT body (D-438).
-    #[serde(default)]
-    pub updated_by_name: Option<String>,
-}
-#[toolkit_macros::api_dto(response)]
-pub struct PricingSettingsDto {
-    pub default_timing: PricingBillingTiming,
-    pub default_gl: Option<String>,
-    pub default_tax_category: Option<String>,
-    pub invoice_line_templates: serde_json::Value,
-    /// The currencies a new book may take; empty means any (D-438).
-    pub currencies: Vec<String>,
-    pub version: i64,
-    /// When the settings were last written; null before the first write (version 0).
-    #[serde(with = "time::serde::rfc3339::option")]
-    pub updated_at: Option<time::OffsetDateTime>,
-    /// Who wrote them last; null before the first write and on a row written before D-438.
-    pub updated_by: Option<Uuid>,
-    /// The current name of `updated_by` (D-519): its display name, else first and last name, else
-    /// username, from Account Management under the caller's rights; "System" for a system actor.
-    /// Null when `updated_by` is null, when no name is available now, and on a write answer.
-    pub updated_by_name: Option<String>,
-}
-
 #[toolkit_macros::api_dto(request)]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(deny_unknown_fields)]

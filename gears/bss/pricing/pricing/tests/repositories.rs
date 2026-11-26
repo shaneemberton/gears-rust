@@ -623,45 +623,10 @@ fn unique_messages_match_both_engines() {
     assert_eq!(unique_code("unrelated constraint"), None);
 }
 #[tokio::test]
-async fn settings_and_dimensions_roundtrip_and_version_guards() {
-    use bss_pricing::infra::storage::{
-        entity::{dimension_key, settings},
-        repo::{dimension_repo, settings_repo},
-    };
+async fn dimensions_roundtrip_and_version_guards() {
+    use bss_pricing::infra::storage::{entity::dimension_key, repo::dimension_repo};
     let (db, scope, tenant, _dsn) = test_db().await;
     let conn = db.conn().unwrap();
-    let s = settings::Model {
-        tenant_id: tenant,
-        default_timing: "arrears".into(),
-        default_gl: None,
-        default_tax_category: None,
-        invoice_line_templates: serde_json::json!({"usage":"{sku}"}),
-        version: 1,
-        created_at: at(9),
-        updated_at: at(9),
-        currencies: serde_json::json!(["EUR"]),
-        updated_by: Some(Uuid::from_u128(7)),
-    };
-    assert_eq!(
-        settings_repo::insert(&conn, &scope, s.clone())
-            .await
-            .unwrap(),
-        s
-    );
-    let mut changed = s.clone();
-    changed.default_timing = "advance".into();
-    settings_repo::update(&conn, &scope, changed.clone())
-        .await
-        .unwrap();
-    assert!(settings_repo::update(&conn, &scope, changed).await.is_err());
-    assert_eq!(
-        settings_repo::find(&conn, &scope, tenant, tenant)
-            .await
-            .unwrap()
-            .unwrap()
-            .default_timing,
-        "advance"
-    );
     let d = dimension_key::Model {
         tenant_id: tenant,
         key: "region".into(),

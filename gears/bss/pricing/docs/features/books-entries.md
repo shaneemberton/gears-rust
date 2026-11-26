@@ -47,7 +47,7 @@ is the schema and transaction authority. Unchecked phase 3/4 work is not part of
 
 ### 1.2 Purpose
 
-Author currency books and unique SKU entries, maintain dimensions/settings and export book facts; hand entry creation/removal to the reservation service.
+Author currency books and unique SKU entries, maintain dimensions and export book facts; hand entry creation/removal to the reservation service. The tenant settings are kept in the Settings Service and edited there (D-540, D-542).
 
 Requirements: `cpt-cf-bss-pricing-fr-dimension-registry`, `cpt-cf-bss-pricing-fr-price-book`, `cpt-cf-bss-pricing-fr-entry-key`, `cpt-cf-bss-pricing-fr-book-export`, `cpt-cf-bss-pricing-fr-settings`.
 
@@ -162,7 +162,7 @@ request must resolve its own evidence. Confirmation recovery preserves the origi
 
 - [ ] `p1` - **ID**: `cpt-cf-bss-pricing-algo-books-entries-settings-and-export`
 
-1. [ ] - `p1` - Authorize settings separately from book authoring and enforce If-Match on settings changes. - `inst-books-entries-settings-and-export-1`
+1. [ ] - `p1` - Mount no settings door: the tenant settings are edited through the Settings Service, under its own authorization and If-Match (D-542). - `inst-books-entries-settings-and-export-1`
 2. [ ] - `p1` - Resolve defaults by SKU billing-timing override then tenant timing; preserve per-type template inputs for binding. - `inst-books-entries-settings-and-export-2`
 3. [ ] - `p1` - For export, authorize read and select only the scoped book, entries and prices; preserve price identities and chain windows. - `inst-books-entries-settings-and-export-3`
 4. [ ] - `p1` - Return JSON without modifying state, submitting units or evaluating totals. - `inst-books-entries-settings-and-export-4`
@@ -173,7 +173,7 @@ request must resolve its own evidence. Confirmation recovery preserves the origi
 
 - [ ] `p1` - **ID**: `cpt-cf-bss-pricing-state-books-entries`
 
-A book is valid or invalid for a queried date according to its optional interval; no approval state is added. An entry progresses through reference confirmation in slice 03. Currency and key identity, the entry's model included (D-427), are fixed; editable metadata uses versions. Registry/settings changes are direct and versioned.
+A book is valid or invalid for a queried date according to its optional interval; no approval state is added. An entry progresses through reference confirmation in slice 03. Currency and key identity, the entry's model included (D-427), are fixed; editable metadata uses versions. Registry changes are direct and versioned. The tenant settings are changed in the Settings Service (D-542).
 
 ## 5. Definitions of Done
 
@@ -214,7 +214,7 @@ Requirement: `cpt-cf-bss-pricing-fr-dimension-registry`; PRD AC #1.
 
 - [ ] `p1` - **ID**: `cpt-cf-bss-pricing-dod-settings-defaults`
 
-Tenant timing, GL, tax and per-type invoice templates are stored and exposed. SKU timing overrides tenant timing at binding; settings permissions and optimistic versioning apply (spec §5). An invoice line always rounds HALF_EVEN, so the settings carry no rounding (D-535); the settings offer the currencies a new book may take and say who wrote them last and when (D-438). GET /currencies lists the currency table those codes come from, each with the scale a new price takes, to any authenticated caller without a permission (D-537). GET /settings keeps its version as the strong ETag a PUT sends back as If-Match; an If-None-Match that matches it is 304, and the read sends Cache-Control: private, no-cache (D-518). The read names its last writer (`updated_by_name`, D-519); the PUT accepts that field and ignores it, so a read without version, updated_at and updated_by stays a PUT body.
+Tenant timing, GL, tax and per-type invoice templates are settings declared in the Settings Service (D-540) and read from it (D-541). SKU timing overrides tenant timing at binding. Pricing mounts no settings door: a change is made on the Settings Service's own surface, under its permissions, a step-up and its per-setting If-Match (D-542). An invoice line always rounds HALF_EVEN, so the settings carry no rounding (D-535); the `offered_currencies` setting holds the currencies a new book may take (D-438). GET /currencies lists the currency table those codes come from, each with the scale a new price takes, to any authenticated caller without a permission (D-537). Who changed a setting, and when, is the Settings Service's record (D-542).
 
 Requirement: `cpt-cf-bss-pricing-fr-settings`; PRD AC #13.
 
@@ -242,7 +242,7 @@ Requirement: `cpt-cf-bss-pricing-fr-entry-key`; PRD AC #3.
 | `cpt-cf-bss-pricing-dod-entry-key-unique` | AC #3; `cpt-cf-bss-pricing-fr-entry-key` | Given the same nonrecurring SKU twice with one model, when concurrent creates use null period then only one entry persists; the same SKU with another model is a second entry of the book (D-427); a bundle has no entry. |
 | `cpt-cf-bss-pricing-dod-entry-metadata` | AC #3; `cpt-cf-bss-pricing-fr-entry-key` | Given a valued price, when a dimension change is requested then it is refused DIMENSION_KEY_IN_USE; given an approved or pending price, entry deletion is refused ENTRY_PRICES_IN_USE, and NOT_DRAFT_AUTHOR (D-404) while another author's draft exists; the caller's drafts and all rejected prices are deleted with the entry; allowed metadata updates retain receipt identity. |
 | `cpt-cf-bss-pricing-dod-dimension-registry` | AC #1; `cpt-cf-bss-pricing-fr-dimension-registry` | Given EU prices, when US is added then it is available; deleting EU or drafting UNKNOWN is refused without changing the registry. |
-| `cpt-cf-bss-pricing-dod-settings-defaults` | AC #13; `cpt-cf-bss-pricing-fr-settings` | Given default arrears and SKU advance, when inputs bind then advance wins; stale settings update fails with no partial changes. |
+| `cpt-cf-bss-pricing-dod-settings-defaults` | AC #13; `cpt-cf-bss-pricing-fr-settings` | Given default arrears and SKU advance, when inputs bind then advance wins; the default is the `default_timing` setting in the Settings Service, which refuses a stale change itself (D-542). |
 | `cpt-cf-bss-pricing-dod-book-export` | AC #12; `cpt-cf-bss-pricing-fr-book-export` | Given two tenants, when one exports its book then only its facts appear; foreign-book access is denied and price/unit counts do not change. |
 | `cpt-cf-bss-pricing-dod-entry-reference-handoff` | AC #3; `cpt-cf-bss-pricing-fr-entry-key` | Given Products unavailable before reserve, when an entry is created then REGISTRY_UNAVAILABLE leaves no entry; a successful create retains its live receipt. |
 

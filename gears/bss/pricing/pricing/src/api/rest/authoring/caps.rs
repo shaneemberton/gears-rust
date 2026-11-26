@@ -2,19 +2,17 @@
 //! body, before it reads or writes anything. A field the body does not carry is not judged, and
 //! only new text is: a text that must name a stored row (a dimension key or value an entry, a
 //! price or a PATCH of the registry names, a value it removes) is never capped, so a row stored
-//! before the caps never locks its registry (the second review of W1a, L1). The two full-replace
-//! PUTs are judged against the stored row, after their If-Match: the registry's caps only the
-//! keys and values it does not hold ([`new_dimension_text`]), the settings' only the texts that
-//! differ from the stored ones ([`changed_settings_text`], the second review of W1b, L2).
+//! before the caps never locks its registry. The registry's full-replace PUT is judged against
+//! the stored row, after its If-Match: it caps only the keys and values the registry does not
+//! hold ([`new_dimension_text`]).
 use super::dto::{
     PriceBookCreate, PriceBookPatch, PricingDimensionKeyPatch, PricingPlanClone, PricingPlanCreate,
     PricingPlanPatch, PricingPriceBookEntryCreate, PricingPriceBookEntryPatch, PricingPriceCreate,
-    PricingPricePatch, PricingPublishChangesRequest, PricingSettingsDto, PricingSettingsPut,
+    PricingPricePatch, PricingPublishChangesRequest,
 };
 use super::support::invalid_because;
 use crate::domain::caps::{
-    CODE_MAX_CHARS, LABEL_MAX_CHARS, METER_REF_MAX_CHARS, NAME_MAX_CHARS, NOTE_MAX_CHARS,
-    TEMPLATE_MAX_CHARS, over,
+    CODE_MAX_CHARS, METER_REF_MAX_CHARS, NAME_MAX_CHARS, NOTE_MAX_CHARS, TEMPLATE_MAX_CHARS, over,
 };
 use toolkit_canonical_errors::CanonicalError;
 
@@ -146,42 +144,6 @@ impl Capped for PricingPriceBookEntryPatch {
             _ => Ok(()),
         }
     }
-}
-/// The settings PUT (judged in `configuration::put_settings` against the stored settings, after
-/// If-Match): 400 `FIELD_TOO_LONG` on `default_gl` or `default_tax_category` for a value other than
-/// the stored one, and on `invoice_line_templates` for a template other than the one stored under
-/// its SKU type, longer than its cap. The PUT replaces the whole row, so every write carries the
-/// stored texts back: a text stored before the caps passes unchanged whatever its length, and never
-/// locks the settings.
-pub(super) fn changed_settings_text(
-    body: &PricingSettingsPut,
-    stored: &PricingSettingsDto,
-) -> Result<(), CanonicalError> {
-    for (name, sent, kept) in [
-        ("default_gl", &body.default_gl, &stored.default_gl),
-        (
-            "default_tax_category",
-            &body.default_tax_category,
-            &stored.default_tax_category,
-        ),
-    ] {
-        if let Some(text) = sent
-            .as_deref()
-            .filter(|text| Some(*text) != kept.as_deref())
-        {
-            field(name, text, LABEL_MAX_CHARS)?;
-        }
-    }
-    body.invoice_line_templates
-        .iter()
-        .filter(|(kind, line)| {
-            stored
-                .invoice_line_templates
-                .get(kind.as_str())
-                .and_then(serde_json::Value::as_str)
-                != Some(line.as_str())
-        })
-        .try_for_each(|(_, line)| field("invoice_line_templates", line, TEMPLATE_MAX_CHARS))
 }
 /// The PUT of the registry (`PricingDimensions`, judged in `configuration::put_dimensions` against
 /// the stored registry): 400 `FIELD_TOO_LONG` on `key` for a key the registry does not hold, and on

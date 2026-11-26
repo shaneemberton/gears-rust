@@ -9,9 +9,7 @@ pub const NAME_MAX_CHARS: usize = 200;
 /// A note or a description: a price's note, a vote's (the approval engine's cap) and a book's
 /// description.
 pub const NOTE_MAX_CHARS: usize = 2000;
-/// A GL code and a tax category, the settings' defaults.
-pub const LABEL_MAX_CHARS: usize = 64;
-/// An invoice line template: an entry's override and the settings' template of a SKU type.
+/// An invoice line template: an entry's override.
 pub const TEMPLATE_MAX_CHARS: usize = 2000;
 /// A meter reference and an accrual policy version in a usage rating policy: the cap Products puts on a
 /// SKU's `usage_type_ref` (512), which a policy's meter must equal. A derived meter's accrual version is

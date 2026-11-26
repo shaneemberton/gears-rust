@@ -344,6 +344,16 @@ fn a_short_code_is_a_string_of_at_most_64_characters() {
 }
 
 #[test]
+fn a_text_with_a_nul_character_is_no_value() {
+    for name in SHORT_CODES.iter().chain(TEMPLATES.iter()) {
+        let text = validator_of(name);
+        for refused in ["\u{0}", "gl\u{0}x", "line\u{0}"] {
+            assert!(!text.is_valid(&json!(refused)), "{name}: {refused:?}");
+        }
+    }
+}
+
+#[test]
 fn a_line_template_is_a_string_of_at_most_2000_characters() {
     for name in TEMPLATES {
         let template = validator_of(name);

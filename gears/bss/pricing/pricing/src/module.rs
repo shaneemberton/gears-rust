@@ -276,8 +276,6 @@ impl MigrationTrait for InvalidOutboxMigration {
 // PATCH /price-books/{id} price_book:author true false
 // GET /price-books/{id}/entries price_book_entry:read false false
 // GET /price-books/{id}/export price_book:read false false
-// GET /settings config:read false false
-// PUT /settings config:settings true false
 // GET /currencies authenticated false false (D-537: no permission, no PDP call)
 // GET /dimension-keys config:read false false
 // PUT /dimension-keys config:settings true false

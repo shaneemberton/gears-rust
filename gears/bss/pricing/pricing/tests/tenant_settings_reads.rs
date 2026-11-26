@@ -25,7 +25,7 @@ use bss_pricing_sdk::terms::{BillingTiming, InputSource, MeterRef};
 use bss_products_sdk::models::SkuType;
 use plan_support::entry_support::policy_support::MeterProvider;
 use plan_support::{
-    Catalog, Fixture, book, id_of, item, plan, policy_entry, publish, scope, setup,
+    Catalog, Fixture, book, holding, id_of, item, plan, policy_entry, publish, scope, setup,
 };
 use seam_support::{Row, World, entry_of, put, resolve, world, written};
 use serde_json::{Value, json};
@@ -172,31 +172,6 @@ async fn resolve_with_nothing_set_reads_the_declared_defaults_from_the_settings_
     );
     assert_eq!(reads[before].scope, format!("/tenants/{tenant}"));
     assert_eq!(settings.single_reads(), 0);
-}
-
-#[tokio::test]
-async fn the_settings_door_no_longer_feeds_resolve() {
-    let w = world().await;
-    let (_, _, tag) = w.f.call("GET", "/settings", json!({}), None, None).await;
-    let stored = json!({"default_timing":"arrears","default_gl":"1111",
-        "default_tax_category":"door","invoice_line_templates":{"recurring":"from the door"},
-        "currencies":[]});
-    let (status, body, _) = w.f.call("PUT", "/settings", stored, Some(&tag), None).await;
-    assert_eq!(status, 200, "{body}");
-    w.f.set_setting("default_gl", json!("9000"));
-
-    let item = resolved_item(&w).await;
-
-    assert_eq!(item["gl_code"], json!({"value":"9000","source":"tenant"}));
-    assert_eq!(
-        item["tax_category"],
-        json!({"value": null, "source": null}),
-        "a value only the door stores is not read"
-    );
-    assert_eq!(
-        item["billing_timing"],
-        json!({"value":"advance","source":"tenant"})
-    );
 }
 
 #[tokio::test]
@@ -507,24 +482,38 @@ async fn a_new_book_takes_a_currency_the_settings_service_says_is_offered() {
     let (status, body) = create_book(&f, "gbp", "GBP").await;
     assert_eq!(status, 409, "{body}");
     assert!(body.to_string().contains("CURRENCY_NOT_OFFERED"), "{body}");
-    assert_eq!(book_count(&f).await, 3, "the refused book is not there");
+    // A malformed code is still the book's own 400, judged first.
+    let (status, body) = create_book(&f, "bad", "gbp").await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.to_string().contains("BOOK_CURRENCY_INVALID"), "{body}");
+    // The book author needs no grant on the settings for the rule to hold.
+    let (status, body, _) = f
+        .call_as(
+            &holding(&f, "price_book:author"),
+            "POST",
+            "/price-books",
+            json!({"code":"chf","name":"chf","currency":"CHF"}),
+            None,
+            Some("book-chf"),
+        )
+        .await;
+    assert_eq!(status, 409, "{body}");
+    assert!(body.to_string().contains("CURRENCY_NOT_OFFERED"), "{body}");
+    assert_eq!(
+        book_count(&f).await,
+        3,
+        "the refused books are not there, and the earlier ones are untouched"
+    );
+
+    // A listed code the currency table does not know admits no book: the book's own check
+    // refuses it before the list is asked.
+    f.set_setting("offered_currencies", json!(["ZZZ"]));
+    let (status, body) = create_book(&f, "zzz", "ZZZ").await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.to_string().contains("BOOK_CURRENCY_INVALID"), "{body}");
 
     f.set_setting("offered_currencies", json!([]));
     assert_eq!(create_book(&f, "gbp", "GBP").await.0, 201);
-}
-
-#[tokio::test]
-async fn the_settings_door_no_longer_narrows_a_new_books_currency() {
-    let (f, _) = setup().await;
-    let (_, _, tag) = f.call("GET", "/settings", json!({}), None, None).await;
-    let stored = json!({"default_timing":"advance","default_gl":null,
-        "default_tax_category":null,"invoice_line_templates":{},"currencies":["EUR"]});
-    let (status, body, _) = f.call("PUT", "/settings", stored, Some(&tag), None).await;
-    assert_eq!(status, 200, "{body}");
-
-    let (status, body) = create_book(&f, "gbp", "GBP").await;
-
-    assert_eq!(status, 201, "only the Settings Service narrows it: {body}");
 }
 
 #[tokio::test]

@@ -371,7 +371,7 @@ Provide one read-only JSON export of a tenant-scoped book with its entries and p
 
 **Phase:** 2. **Source:** spec §2.2, §5–§7, §12–§13; phase 2 plan for delivery details.
 
-Tenant settings provide default billing timing, GL code, tax category and invoice-line templates by SKU type; an invoice line always rounds HALF_EVEN (D-535). SKU billing timing overrides the tenant default. Approval policy is per tenant with optional kind overrides, never per book or plan. Settings and dimension-registry edits are direct versioned changes.
+Tenant settings provide default billing timing, GL code, tax category and invoice-line templates by SKU type; an invoice line always rounds HALF_EVEN (D-535). SKU billing timing overrides the tenant default. Approval policy is per tenant with optional kind overrides, never per book or plan. Dimension-registry edits are direct versioned changes. The tenant settings are declared in the Settings Service (D-540), read from it (D-541) and edited through it: pricing mounts no settings door, and the Settings Service's own permissions, step-up and per-setting concurrency apply to a change (D-542).
 
 #### `fr-events`
 
@@ -485,10 +485,11 @@ All pricing POSTs require Idempotency-Key; PATCH/PUT require If-Match. Replay us
 ### 7.1 Public API Surface
 
 Authoring routes mount at `/bss-pricing/v1`: books and export, entries, prices, publish-changes, approval-units,
-approval-policy, settings and dimension-keys. Later routes add plans/revisions/checks; promotions (D-409) and migrations (D-410) are deferred.
+approval-policy and dimension-keys. The tenant settings have no route here: they are read and written on the Settings Service's own surface (D-542). Later routes add plans/revisions/checks; promotions (D-409) and migrations (D-410) are deferred.
 Phase 6 adds the operator reads and edits: where a SKU is priced and sold (a SKU's entries across books, the plans
 that name it, one plan item, D-434), the reset of a kind's quorum override (D-435), the one-key edit of dimension
-values with each value's use (D-436), and settings that offer currencies and say who changed them (D-438).
+values with each value's use (D-436), and settings that offer currencies and say who changed them (D-438; the settings
+doors were removed later, and the offered currencies are a setting in the Settings Service, D-542).
 Phase 7 adds the Price Books screen's reads: an entry's prices with their status today, its price in force and its
 approved prices by date (D-440), every book read's stats (D-441), and a book list that pages on the toolkit's OData
 pager and is searched by q and sku_id (D-442); and its writes: the dates of a temporary draft, whose pair follows
@@ -634,7 +635,7 @@ earlier pins retain the original GL. Pricing creates no refreeze prices or appro
 | AC #10 | `cpt-cf-bss-pricing-fr-approval-units` | Given a pending unit, when an independent reviewer meets quorum then it applies atomically; an item author receives SOD_VIOLATION, a stale generation cannot count, and content drift commits UNIT_STALE without publishing the old content. |
 | AC #11 | `cpt-cf-bss-pricing-fr-reference-protocol` | Given a reservation and committed entry, when confirm times out then the entry remains confirmation_pending and retry is durable; retire remains blocked, and only durable cancellation/deletion permits release. An op is durable before reserve and survives restart even without an entry. Confirmed entries reconcile released receipts through re-reserve when unfenced, or lost state otherwise. |
 | AC #12 | `cpt-cf-bss-pricing-fr-book-export` | Given an authorized reader, when a book is exported then its scoped entries and prices appear; another tenant cannot obtain its data and export creates no writes. |
-| AC #13 | `cpt-cf-bss-pricing-fr-settings` | Given arrears as the tenant default and advance on the SKU, when binding resolves timing then advance wins; stale settings If-Match and unauthorized settings changes are refused. |
+| AC #13 | `cpt-cf-bss-pricing-fr-settings` | Given arrears as the tenant default and advance on the SKU, when binding resolves timing then advance wins. The tenant default is the `default_timing` setting in the Settings Service, which refuses a stale or unauthorized change itself; pricing has no settings door (D-542). |
 | AC #14 | `cpt-cf-bss-pricing-fr-events` | Given an approved price unit, when commit succeeds then domain and terminal events are durable; an outbox failure rolls back state and no rejected or withdrawn unit emits PricesPublished. |
 | AC #15 | `cpt-cf-bss-pricing-fr-plans` | Given a revision awaiting a price unit, when checks run then ITEM_UNCOVERED names the blocking unit and submit is refused; once prices are approved checks pass, while mixed recurring frequencies and foreign-book entries still fail. |
 | AC #16 | `cpt-cf-bss-pricing-fr-promotions` | Deferred by the owner (D-409). Given an approved promotion, when a period starts on its end date then it receives no discount; overlapping promotions are refused, and an approved edit creates a new version without changing a prior pin. |

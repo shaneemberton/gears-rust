@@ -56,9 +56,10 @@ async fn pricing_alone_initializes_serves_authoring_routes_and_stops() {
     );
     let (empty, openapi) = harness.router(Router::new()).unwrap();
     assert!(empty.has_routes());
-    // 61: run 9.7's batch checks read, run 9.8b's plans counts, cancel and end, the book's
-    // archive and unarchive (D-522), and the currency table (D-537).
-    assert_eq!(openapi.operation_specs.len(), 61);
+    // 59: run 9.7's batch checks read, run 9.8b's plans counts, cancel and end, the book's
+    // archive and unarchive (D-522), and the currency table (D-537); the tenant settings have no
+    // door here (D-542).
+    assert_eq!(openapi.operation_specs.len(), 59);
     let (router, _) = harness
         .router(Router::new().route("/host", get(|| async { "host" })))
         .unwrap();

@@ -274,45 +274,6 @@ async fn books_positive_preconditions_validation_and_post_replay() {
     assert!(clear.1["valid_until"].is_null());
 }
 #[tokio::test]
-async fn settings_positive_preconditions_and_matrix_8_templates() {
-    let f = Fixture::new().await;
-    let (s, mut body, tag) = f.call("GET", "/settings", json!({}), None, None).await;
-    assert_eq!(s, 200);
-    assert_eq!(tag, "\"0\"");
-    // What the read adds to what the PUT takes (D-438): the version and who changed it when.
-    for field in ["version", "updated_at", "updated_by"] {
-        body.as_object_mut().unwrap().remove(field);
-    }
-    body["invoice_line_templates"] = json!({"usage":"{sku}"});
-    assert_eq!(
-        f.call("PUT", "/settings", body.clone(), None, None).await.0,
-        400
-    );
-    let saved = f
-        .call("PUT", "/settings", body.clone(), Some(&tag), None)
-        .await;
-    assert_eq!(saved.0, 200, "{saved:?}");
-    assert_eq!(
-        f.call("PUT", "/settings", body.clone(), Some(&tag), None)
-            .await
-            .0,
-        409
-    );
-    for template in ["", "{phase}", "{unknown}", "{sku_name"] {
-        body["invoice_line_templates"] = json!({"usage":template});
-        assert_eq!(
-            f.call("PUT", "/settings", body.clone(), Some(&saved.2), None)
-                .await
-                .0,
-            400
-        );
-    }
-    assert_eq!(
-        f.call("GET", "/settings", json!({}), None, None).await.1,
-        saved.1
-    );
-}
-#[tokio::test]
 async fn dimension_registry_positive_preconditions_and_matrix_11() {
     let f = Fixture::new().await;
     let (s, b, tag) = f
@@ -390,8 +351,6 @@ async fn every_route_denies_authorization_before_preconditions_or_disclosure() {
         ("POST", format!("/price-books/{id}/unarchive")),
         ("GET", format!("/price-books/{id}/entries")),
         ("GET", format!("/price-books/{id}/export")),
-        ("GET", "/settings".into()),
-        ("PUT", "/settings".into()),
         ("GET", "/dimension-keys".into()),
         ("PUT", "/dimension-keys".into()),
         ("POST", format!("/price-book-entries/{id}/prices")),
@@ -737,8 +696,6 @@ async fn authorization_labels_actions_and_cross_tenant_reads_are_pinned() {
             "price_book",
             "read",
         ),
-        ("GET", "/settings".into(), "config", "read"),
-        ("PUT", "/settings".into(), "config", "settings"),
         // D-537: the deployment's table, read by any authenticated caller; an empty label
         // marks the one door that asks no permission.
         ("GET", "/currencies".into(), "", ""),
@@ -892,10 +849,10 @@ async fn authorization_labels_actions_and_cross_tenant_reads_are_pinned() {
             )
         })
         .collect();
-    // 61: run 9.7's batch checks read (D-482), run 9.8b's plans counts (D-485), the cancel and
+    // 59: run 9.7's batch checks read (D-482), run 9.8b's plans counts (D-485), the cancel and
     // end doors (D-520, D-521), the book's archive and unarchive (D-522), and the currency table
-    // (D-537).
-    assert_eq!(table.len(), 61);
+    // (D-537); the tenant settings have no door here (D-542).
+    assert_eq!(table.len(), 59);
     assert_eq!(rows.len(), table.len(), "one row per route");
     assert_eq!(
         rows, f.registered,
@@ -977,16 +934,4 @@ async fn a_nul_character_in_free_text_is_refused_before_any_write() {
         list["page_info"]["next_cursor"].is_null(),
         "one page is the whole list: {list}"
     );
-    let (_, _, tag) = f.call("GET", "/settings", json!({}), None, None).await;
-    let (status, b, _) = f
-        .call(
-            "PUT",
-            "/settings",
-            json!({"default_timing":"advance","default_gl":"gl\u{0}x","invoice_line_templates":{}}),
-            Some(&tag),
-            None,
-        )
-        .await;
-    assert_eq!(status, 400, "{b}");
-    assert!(b.to_string().contains("VALIDATION"), "{b}");
 }

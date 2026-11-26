@@ -15,7 +15,6 @@ pub mod plan_summary;
 pub mod price_book_entry_repo;
 pub mod price_repo;
 pub mod reference_op_repo;
-pub mod settings_repo;
 /// The latest of `instant` over a group, as text [`latest_instant`] reads back (D-441): on
 /// Postgres the `timestamptz` maximum rendered in UTC to the microsecond it keeps; on `SQLite`,
 /// where an instant is RFC 3339 text whose fraction has as many digits as it needs (so `…00Z`

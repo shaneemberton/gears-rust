@@ -883,7 +883,6 @@ async fn every_conditional_door_answers_a_stale_token_with_stale_revision() {
             None,
         )
         .await;
-    let (_, _, settings_tag) = f.call("GET", "/settings", json!({}), None, None).await;
     let (_, _, dims_tag) = f
         .call("GET", "/dimension-keys", json!({}), None, None)
         .await;
@@ -908,12 +907,6 @@ async fn every_conditional_door_answers_a_stale_token_with_stale_revision() {
             format!("/prices/{}", price["items"][0]["id"].as_str().unwrap()),
             json!({"note":"changed"}),
             price_tag,
-        ),
-        (
-            "PUT",
-            "/settings".to_owned(),
-            json!({"default_timing":"arrears","invoice_line_templates":{},"currencies":[]}),
-            settings_tag,
         ),
         (
             "PUT",

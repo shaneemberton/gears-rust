@@ -57,7 +57,7 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-418 | H | A plan revision is submitted under plan:submit | DECIDED 2026-09-26 · Phase 3 review, fix run 7 (surface S-4); corrects the run 3.4 brief |
 | D-419 | H | Resolve answers one revision on one date, with the caller's pins | DECIDED 2026-09-26 · Phase 4 plan rev 3 (Run 4.2); spec §7.1; plan review M4 b, L4, L7; amended by D-454, D-467 |
 | D-420 | H | The matrix and the walk: a binding is always in force | DECIDED 2026-09-26 · Phase 4 plan rev 3 (Run 4.2); owner, 2026-09-26 (no promotion rule; rule 4 as recommended); spec §2.4, §5, §7.1; plan review H2, M4, L1; amended by D-467, D-512 |
-| D-421 | H | The binding carries resolved invoice inputs with their source | DECIDED 2026-09-26 · Phase 4 plan rev 3 (Run 4.2); PRD AC #13; plan review H3, L7; amended by D-467, D-531, D-535, D-541 |
+| D-421 | H | The binding carries resolved invoice inputs with their source | DECIDED 2026-09-26 · Phase 4 plan rev 3 (Run 4.2); PRD AC #13; plan review H3, L7; amended by D-467, D-531, D-535, D-541, D-542 |
 | D-422 | H | The pinned price read serves approved money forever | DECIDED 2026-09-26 · Phase 4 plan rev 3 (Run 4.2); spec §7.1; plan review H4; amended by D-520, D-531 |
 | D-423 | H | Both gears refuse a legacy or stale schema at boot | DECIDED 2026-09-26 · Phase 4 plan rev 2 (Run 4.1); plan review H1, M1, M2, L6 |
 | D-424 | H | Resolve reads SKU versions as pricing's system actor | DECIDED 2026-09-26 · Phase 4 review, fix run 8 (docs M1); amends D-421; amended 2026-10-02 (phase 9 review F1) |
@@ -74,8 +74,8 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-435 | M | An approval-policy override can be reset; the default cannot be deleted (twin of products P-D-216) | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2 |
 | D-436 | M | Dimension values edit one at a time and show their use | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2 |
 | D-437 | M | Tenant default rounding (superseded by D-535) | SUPERSEDED 2026-10-12 by D-535 · Owner, 2026-09-27; phase 6 plan rev 2 |
-| D-438 | M | The settings offer currencies and say who changed them | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; extended by D-519; amended by D-529, D-541 |
-| D-439 | M | Closed sets are enums on the responses; requests keep strings and their codes (twin of products P-D-217) | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; amended by D-467 and the phase 9 review (C, fix run 9.5d-1); amended by D-535 |
+| D-438 | M | The settings offer currencies and say who changed them | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; extended by D-519; amended by D-529, D-541, D-542 |
+| D-439 | M | Closed sets are enums on the responses; requests keep strings and their codes (twin of products P-D-217) | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; amended by D-467 and the phase 9 review (C, fix run 9.5d-1); amended by D-535; amended by D-542 |
 | D-440 | M | An entry's prices, its price in force and its approved prices by date | DECIDED 2026-09-28 · Owner, 2026-09-28; phase 7 plan rev 2; amends D-428, D-434; extended by D-456; amended by D-472, D-473 |
 | D-441 | M | Every book read carries its stats | DECIDED 2026-09-28 · Owner, 2026-09-28; phase 7 plan rev 2; amended by D-453 |
 | D-442 | M | The book list pages on the toolkit's OData pager, searched by q and sku_id | DECIDED 2026-09-28 · Owner, 2026-09-28; phase 7 plan rev 2; extended by D-522 |
@@ -93,7 +93,7 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-454 | M | Resolve serves a scheduled revision from its sale date | DECIDED 2026-09-29 · Owner, 2026-09-28; phase 8 plan rev 2 (run 8.2); plan review M3 |
 | D-455 | M | The outbox wakes its sequencer after the commit | DECIDED 2026-09-29 · Main sync of 2026-09-29 (toolkit-db 2bfc76aec); phase 8 plan rev 2 (run 8.2b) |
 | D-456 | M | A plan names only a book its author may read | DECIDED 2026-09-29 · Whole-branch review PS-08 (fix run W1a); extends D-440; extended by D-463, D-468 |
-| D-457 | M | Every text a request writes has an explicit length cap | DECIDED 2026-09-29 · Whole-branch review PS-09, PS-10, X-01 (fix run W1a); twin of a products decision in W1b; extended by D-468; amended 2026-10-02 (phase 9 review F1) |
+| D-457 | M | Every text a request writes has an explicit length cap | DECIDED 2026-09-29 · Whole-branch review PS-09, PS-10, X-01 (fix run W1a); twin of a products decision in W1b; extended by D-468; amended 2026-10-02 (phase 9 review F1); amended by D-542 |
 | D-458 | M | The approval-unit list pages and reads its page set-based | DECIDED 2026-09-29 · Owner, 2026-09-29 (dispositions O2, "2"); whole-branch review PS-13 (fix run W1a); amended by D-470 |
 | D-459 | M | One approve-eligibility predicate for the engine and its readers | DECIDED 2026-09-30 · Phase 9 plan rev 2 (W2, binding; plan review W2, L5); extends D-393; amended by the phase 9 review (E, fix run 9.5d-1) |
 | D-460 | M | The plans list names each plan's current revision and the one in effect | DECIDED 2026-09-30 · Owner, 2026-09-30 (validation 3 item 1); phase 9 plan rev 2 (decision 1; plan review M6, M7, W3, L4); amends D-434, D-453; amended by D-461, D-480, D-482, D-485, D-516; extended by D-519 |
@@ -105,7 +105,7 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-466 | M | Each check row names its items and its blocking prices | DECIDED 2026-09-30 · Owner, 2026-09-30 (validation 3 item 5); phase 9 plan rev 2 (decision 7); extends D-408; amended by the phase 9 review (fix run 9.5d-2) |
 | D-467 | H | A plan item is a SKU and its entry: no treatment, no included quantity, no minimum quantity | DECIDED 2026-09-30 · Owner, 2026-09-30 (the included quantity, then the treatment, then qty_min removed); phase 9 plan rev 2 (run 9.2); amends D-388, D-394, D-407, D-413, D-419, D-420, D-421, D-439; amended by the phase 9 review (G, fix run 9.5d-1); amended by D-512 |
 | D-468 | M | A new plan's code follows a declared rule | DECIDED 2026-09-30 · Owner, 2026-09-30 (ask 39, "do it"); phase 9 run 9.2 scope addition; extends D-456, D-457 |
-| D-469 | M | The served contract declares every door's 503, every ETag it sets and the refusals of the plan doors | DECIDED 2026-09-30 · Owner, 2026-09-30 (validation 3 item 2); phase 9 plan rev 2 (M1 and W1, binding; decisions 8 and 9; L8); extended by D-470; amended by the phase 9 review (fix run 9.5d-2); amended by D-512; extended by D-518 |
+| D-469 | M | The served contract declares every door's 503, every ETag it sets and the refusals of the plan doors | DECIDED 2026-09-30 · Owner, 2026-09-30 (validation 3 item 2); phase 9 plan rev 2 (M1 and W1, binding; decisions 8 and 9; L8); extended by D-470; amended by the phase 9 review (fix run 9.5d-2); amended by D-512; extended by D-518; amended by D-542 |
 | D-470 | M | The approval units are counted by state and kind, list newest first on request, and skip the live impact on request | DECIDED 2026-09-30 · Owner, 2026-09-30 (the approvals option 1, "ok"); phase 9 plan rev 2 (decision 10; plan review M3, M4, L11); amends D-458, extends D-469; amended by the phase 9 review (C, R32; fix run 9.5d-1; I, fix run 9.5d-2); amended by D-490 |
 | D-471 | M | A unit says whether its reader may approve it | DECIDED 2026-09-30 · Owner, 2026-09-30 (validation 3 item 4, "ok"); phase 9 plan rev 2 (decision 11; W2; plan review M2); amended by the phase 9 review (E, fix run 9.5d-1) |
 | D-472 | M | An entry names its next price | DECIDED 2026-10-01 · Owner, 2026-09-30 (validation 3 item 7, "ok"); phase 9 plan rev 2 (decision 12; plan review M5, L7); amends D-434, D-440; amended by D-473 |
@@ -138,8 +138,8 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-515 | M | A plan row's book carries its id and validity | DECIDED 2026-10-02 · Owner, 2026-10-02 (ask 67); amends D-485 |
 | D-516 | M | A named book carries its identity beside its id | DECIDED 2026-10-02 · Owner, 2026-10-02 (ask 54); amends D-460, D-408 |
 | D-517 | M | Entries can be read by id | DECIDED 2026-10-02 · Owner, 2026-10-02 (ask 68); amends D-486; amended 2026-10-03 (the filter's length and its declaration) |
-| D-518 | M | The plan list, the plan counts, the book list and the settings answer 304 | DECIDED 2026-10-03 · Owner, 2026-10-03 (asks 56, 57); extends D-469; amended 2026-10-04 (`no-cache`, not `no-store`) |
-| D-519 | M | Every actor id a read shows carries its current name | DECIDED 2026-10-03 · Owner, 2026-10-02 (ask 32: names on the server, through AM); extends D-438, D-460, D-461; amended 2026-10-04 (a resolved name is reused for five minutes per caller) |
+| D-518 | M | The plan list, the plan counts, the book list and the settings answer 304 | DECIDED 2026-10-03 · Owner, 2026-10-03 (asks 56, 57); extends D-469; amended 2026-10-04 (`no-cache`, not `no-store`); amended by D-542 |
+| D-519 | M | Every actor id a read shows carries its current name | DECIDED 2026-10-03 · Owner, 2026-10-02 (ask 32: names on the server, through AM); extends D-438, D-460, D-461; amended 2026-10-04 (a resolved name is reused for five minutes per caller); amended by D-542 |
 | D-520 | H | A scheduled price is cancelled through the prices unit | DECIDED 2026-10-03 · Owner, 2026-10-03; asks 19, 58a; amends D-390, D-393, D-422; amended 2026-10-03 (the event, the reads, the binding guard, the pairing CHECKs); amended 2026-10-04 (the pinned price's one-value status; the binding guard's scan noted as deferred) |
 | D-521 | H | A live price is ended through the prices unit | DECIDED 2026-10-03 · Owner, 2026-10-03; ask 58a; amends D-390, D-393; amended 2026-10-03 (the event) |
 | D-522 | H | A finished book can be archived, and archiving it releases its entries' SKU references (twin of products P-D-263) | DECIDED 2026-10-03 · Owner, 2026-10-03 ("archived"; ask 58b); amends D-408, D-444; extends D-407, D-442; amended 2026-10-03 (the submit's 409, the door's drive, the unarchive's answer, the op's reason, the mark's pairing); amended 2026-10-04 (the unarchive waits for open reference work; the plan revisions' references noted as deferred) |
@@ -148,20 +148,21 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-525 | H | A minimum fee is accepted on every rating window and scope; the floor is per window per scope | DECIDED 2026-10-06 · Owner, 2026-10-06; amends D-503, D-504; extends D-388 |
 | D-526 | M | The permission catalog is exactly the enforced pairs | DECIDED 2026-10-06 · Owner, 2026-10-06 |
 | D-527 | H | Every authored decimal is exact text within a published profile; a rate has at most 12 places | DECIDED 2026-10-12 · Owner, 2026-10-11 (the rate bound); pricing exact-money plan rev 2.1, Tasks 1, 2 and 5; amends D-504 |
-| D-528 | H | Each numeric and currency refusal has its code and names its cause | DECIDED 2026-10-12 · Pricing exact-money plan rev 2.1, Tasks 2 and 3; its mid-plan review |
-| D-529 | H | One ISO 4217 table; the deployment's table adds non-ISO codes only | DECIDED 2026-10-12 · Owner, 2026-10-11; pricing exact-money plan rev 2.1, Tasks 0 and 3; amends D-438; extended by D-537; amended by D-541 |
+| D-528 | H | Each numeric and currency refusal has its code and names its cause | DECIDED 2026-10-12 · Pricing exact-money plan rev 2.1, Tasks 2 and 3; its mid-plan review; amended by D-542 |
+| D-529 | H | One ISO 4217 table; the deployment's table adds non-ISO codes only | DECIDED 2026-10-12 · Owner, 2026-10-11; pricing exact-money plan rev 2.1, Tasks 0 and 3; amends D-438; extended by D-537; amended by D-541, D-542 |
 | D-530 | H | No gear overrides an ISO scale, and a non-ISO code has one scale in ledger and in pricing | DECIDED 2026-10-12 · Owner, 2026-10-12; agreed with ledger |
 | D-531 | H | Each price stores its currency spec, and every read and receipt uses it | DECIDED 2026-10-12 · Pricing exact-money plan rev 2.1, Task 3; amends D-421, D-422 |
 | D-532 | H | The money digest and the price projection carry the scale; digest domains and the receipt schema stay at version 1 | DECIDED 2026-10-12 · Owner, 2026-10-09 (no version bumps before production); pricing exact-money plan rev 2.1, Task 4; amends D-501, D-505 |
 | D-533 | H | An invoice line posts at its price's stored scale | DECIDED 2026-10-12 · Owner, 2026-10-12; pricing exact-money plan rev 2.1, Task 4; amends D-504 |
-| D-534 | M | The pricing migrations are edited in place for the price's currency spec and the settings | DECIDED 2026-10-12 · Owner, 2026-10-08 (fresh schema); amends D-412, D-427 |
+| D-534 | M | The pricing migrations are edited in place for the price's currency spec and the settings | DECIDED 2026-10-12 · Owner, 2026-10-08 (fresh schema); amends D-412, D-427; amended by D-542 |
 | D-535 | M | No tenant rounding setting; an invoice line rounds HALF_EVEN | DECIDED 2026-10-12 · Owner, 2026-10-11; BSS money ADR rule 7; supersedes D-437; amends D-421, D-439 |
 | D-536 | L | A minimum billable unit is deferred (owner, 2026-10-11) | DECIDED 2026-10-12 · Owner, 2026-10-11; BSS money ADR rule 5 |
-| D-537 | M | The currency table is a read: GET /currencies | DECIDED 2026-10-14 · Owner, 2026-10-14; extends D-529; amended 2026-10-21 (no permission) |
-| D-538 | M | A field violation names the refused decimal's path | DECIDED 2026-10-21 · Owner, 2026-10-21 (a client parsed the prose); extends D-528 |
+| D-537 | M | The currency table is a read: GET /currencies | DECIDED 2026-10-14 · Owner, 2026-10-14; extends D-529; amended 2026-10-21 (no permission); amended by D-542 |
+| D-538 | M | A field violation names the refused decimal's path | DECIDED 2026-10-21 · Owner, 2026-10-21 (a client parsed the prose); extends D-528; amended by D-542 |
 | D-539 | M | Snapshot prices carry their currency spec | DECIDED 2026-10-21 · Owner, 2026-10-21 (a review rendered money without its scale); extends D-531 |
-| D-540 | M | The tenant settings are declared in the Settings Service | DECIDED 2026-11-20 · Owner, 2026-11-20 (the tenant settings move to the Settings Service); relates to D-438, D-457, D-529; amended by D-541 |
-| D-541 | H | Pricing reads the tenant settings from the Settings Service, outside its transactions | DECIDED 2026-11-21 · Owner, 2026-11-21 (read on demand, once per decision, no second read); amends D-421, D-438, D-482, D-507, D-529, D-540 |
+| D-540 | M | The tenant settings are declared in the Settings Service | DECIDED 2026-11-20 · Owner, 2026-11-20 (the tenant settings move to the Settings Service); relates to D-438, D-457, D-529; amended by D-541, D-542 |
+| D-541 | H | Pricing reads the tenant settings from the Settings Service, outside its transactions | DECIDED 2026-11-21 · Owner, 2026-11-21 (read on demand, once per decision, no second read); amends D-421, D-438, D-482, D-507, D-529, D-540; amended by D-542 |
+| D-542 | H | The /settings doors are removed; the tenant settings are edited through the Settings Service | DECIDED 2026-11-26 · Owner, 2026-11-26 (the doors go with the console's move to the Settings Service; no facade over it); amends D-421, D-438, D-439, D-457, D-469, D-518, D-519, D-528, D-529, D-534, D-537, D-538, D-540, D-541 |
 
 ## Entries
 
@@ -480,7 +481,9 @@ Each item's SKU version is read as of date through sku_version_as_of (the detach
 
 Read precisely: settings.invoice_line_templates is keyed by SKU type (recurring, usage, one_time, bundle; PUT /settings refuses any other key). A charge kind's name is its SKU type's, so the entry's charge kind is the key; an item without an entry takes its SKU version's type, as the prototype does. A source that is absent or blank falls through to the next one; when none is left the field is { value: null, source: null } (the prototype's built-in "{sku}" line is not adopted). billing_timing always has a value: the tenant default_timing is advance until the settings are written.
 
-**Source:** Phase 4 plan rev 3 (Run 4.2); PRD AC #13 (fr-settings); spec §7.1 (what a pin carries), decision 14; plan review H3 and L7. Amended by D-424 (phase 4 review, fix run 8): the SKU version read is made as pricing's system actor. Amended by D-467: the item returns no stored treatment or quantity. Amended by D-531 and D-535 (2026-10-12): the scale is per binding, and resolve carries no rounding. Amended by D-541 (2026-11-21): the tenant values are the tenant's settings in the Settings Service, read once per resolve; the tenant template of a SKU type is the setting `invoice_line_template_<type>`; a resolve that cannot read them is 503 `SETTINGS_UNAVAILABLE`.
+**Source:** Phase 4 plan rev 3 (Run 4.2); PRD AC #13 (fr-settings); spec §7.1 (what a pin carries), decision 14; plan review H3 and L7. Amended by D-424 (phase 4 review, fix run 8): the SKU version read is made as pricing's system actor. Amended by D-467: the item returns no stored treatment or quantity. Amended by D-531 and D-535 (2026-10-12): the scale is per binding, and resolve carries no rounding. Amended by D-541 (2026-11-21): the tenant values are the tenant's settings in the Settings Service, read once per resolve; the tenant template of a SKU type is the setting `invoice_line_template_<type>`; a resolve that cannot read them is 503 `SETTINGS_UNAVAILABLE`. Amended by D-542 (2026-11-26): `PUT /settings` is removed.
+
+D-542 amends this entry: `PUT /settings` is removed, so no door refuses a template key. The tenant templates are the four declared settings, one per SKU type (D-540), and nothing else is a tenant template. "Until the settings are written" now means until the tenant stores a `default_timing` in the Settings Service.
 
 #### D-422 [H] The pinned price read serves approved money forever
 
@@ -681,7 +684,9 @@ Breaking: the PUT's body (currencies required), and a GET answer is a PUT body o
 
 D-519 extends this entry: `GET /settings` also carries `updated_by_name`, the writer's current name through Account Management, null when it is not available now. The PUT answer's is null.
 
-**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (asks 11f, 11g; plan review L6, L7). Extended by D-519. Amended by D-529 (2026-10-12): the currency table judges the codes. Amended by D-541 (2026-11-21): a new book is judged by the `offered_currencies` setting in the Settings Service, read before the book's transaction; the `currencies` a `PUT /settings` stores no longer narrow a book, and a book is not created (503 `SETTINGS_UNAVAILABLE`) while the list cannot be read.
+**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (asks 11f, 11g; plan review L6, L7). Extended by D-519. Amended by D-529 (2026-10-12): the currency table judges the codes. Amended by D-541 (2026-11-21): a new book is judged by the `offered_currencies` setting in the Settings Service, read before the book's transaction; the `currencies` a `PUT /settings` stores no longer narrow a book, and a book is not created (503 `SETTINGS_UNAVAILABLE`) while the list cannot be read. Amended by D-542 (2026-11-26): the two doors are removed.
+
+D-542 amends this entry: `GET` and `PUT /bss-pricing/v1/settings` are removed. Nothing reads or writes the `pricing_settings` row, so `currencies`, `version`, `updated_at`, `updated_by` and `updated_by_name` are served nowhere, and no door answers `CURRENCY_INVALID`. m20260927_000014 and its two columns stay as they are; its upgrade tests still prove the two added columns and the surviving row, and no longer read or write the row through the application (tests/settings_migration.rs). The offered currencies are the `offered_currencies` setting (D-541), edited through the Settings Service; `CURRENCY_NOT_OFFERED` is unchanged.
 
 #### D-439 [M] Closed sets are enums on the responses; requests keep strings and their codes (twin of products P-D-217)
 
@@ -697,7 +702,9 @@ D-467 amends this entry: a plan item's treatment is no longer on any response or
 
 The phase 9 review's theme C amends this entry (fix run 9.5d-1): an approval unit's kind is an enum on every response, PricingApprovalKind (prices, plan_revision). No CHECK holds the column still; the repository reads it through the set, so a unit of another kind is a corrupt row (500), never served (D-470). A unit's ref_type stays a string.
 
-**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (ask 12; plan review M5). Amended by D-467 and by the phase 9 review, theme C (fix run 9.5d-1). Amended by D-535 (2026-10-12): the settings and resolve carry no rounding.
+**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (ask 12; plan review M5). Amended by D-467 and by the phase 9 review, theme C (fix run 9.5d-1). Amended by D-535 (2026-10-12): the settings and resolve carry no rounding. Amended by D-542 (2026-11-26): the settings' default_timing leaves the contract.
+
+D-542 amends this entry: the settings' default_timing is on no response and no request, so its enum (PricingBillingTiming) and TIMING_INVALID are gone with `PUT /settings`. The column's CHECK stays on `pricing_settings`, which nothing writes.
 
 #### D-440 [M] An entry's prices, its price in force and its approved prices by date
 
@@ -985,7 +992,9 @@ D-468 extends this entry: a new plan's code also follows a rule of at most 32 ch
 
 **Amended 2026-10-02 (phase 9 review F1).** An entry create's usage-rating policy caps its quantity strings, each 400 `FIELD_TOO_LONG` on that field, before the meter provider is asked: `usage_type_id` and `accrual_policy_version` at 512 characters (Products' cap on a SKU's `usage_type_ref`, which the meter must equal; a derived accrual version is `derived-v1:` plus 64 hex digits, 75 characters), `version` and `unit` at a code's 64. A list's `q` (the plans list, the book list, and `GET /price-book-entries`) is at most a name's 200 characters, the same code on `q`, before it becomes a pattern.
 
-**Source:** Whole-branch review of 2026-09-29, PS-09, PS-10 and X-01 (fix run W1a; the dispositions' "Length caps"); the second reviews of W1a (L1) and W1b (L2). Extended by D-468. Amended 2026-10-02 (phase 9 review F1): the policy's quantity strings and a list's `q`.
+**Source:** Whole-branch review of 2026-09-29, PS-09, PS-10 and X-01 (fix run W1a; the dispositions' "Length caps"); the second reviews of W1a (L1) and W1b (L2). Extended by D-468. Amended 2026-10-02 (phase 9 review F1): the policy's quantity strings and a list's `q`. Amended by D-542 (2026-11-26): the settings' texts are judged by the Settings Service.
+
+D-542 amends this entry: the settings PUT is removed. Pricing judges no GL code, tax category or tenant template, and FIELD_TOO_LONG no longer names default_gl, default_tax_category or invoice_line_templates. The declared value types state the same limits themselves, 64 and 2000 characters and no NUL character (D-540), and the Settings Service judges every write of a setting by them and answers the refusal. The rule for a stored text over a cap no longer has a settings row to apply to; it holds for the dimension registry. Every other cap is unchanged. tests/settings_doors.rs is removed with the door.
 
 #### D-458 [M] The approval-unit list pages and reads its page set-based
 
@@ -1212,7 +1221,9 @@ The phase 9 review (fix run 9.5d-2; R27, R28): tests/read_contract.rs measures t
 
 D-518 extends this entry: the plan list, the plan counts and the book list declare a weak ETag of their JSON body on their 200 and their 304, and the settings read declares its version ETag on its 304 too. module_test counts 34 ETag declarations, not 27.
 
-**Source:** Owner, 2026-09-30 (validation 3 item 2, approved); phase 9 plan rev 2 (M1 and W1, binding: 503 on every op; decisions 8 and 9; L8: the contracts notes correct served texts to match the code). Extended by D-470. Amended by the phase 9 review (fix run 9.5d-2). Extended by D-518.
+**Source:** Owner, 2026-09-30 (validation 3 item 2, approved); phase 9 plan rev 2 (M1 and W1, binding: 503 on every op; decisions 8 and 9; L8: the contracts notes correct served texts to match the code). Extended by D-470. Amended by the phase 9 review (fix run 9.5d-2). Extended by D-518. Amended by D-542 (2026-11-26).
+
+D-542 amends this entry: the census is two ops fewer, `GET` and `PUT /settings`. `PUT /settings` leaves the write answers that set an ETag, and `GET /settings` leaves the reads that declare one, on its 200 and on its 304 (D-518): three ETag declarations fewer.
 
 #### D-470 [M] The approval units are counted by state and kind, list newest first on request, and skip the live impact on request
 
@@ -2167,7 +2178,9 @@ A screen that shows a revision, or a price unit, had only the book's id. It coul
 - **What still holds.** `private` keeps every answer out of shared caches: a proxy or a CDN stores none of them. `no-cache` makes the browser ask the server before each use of its copy, so the caller is authenticated and authorized again on every read. A list's tag is the caller's own body, so a `304` confirms only a copy that this caller would be served now, never another caller's view. The settings' tag is the row version (above): a `304` confirms the stored settings, and the copy's `updated_by_name` is the one read when the copy was stored (D-519).
 - **What stays.** Every other read keeps the headers it had.
 
-**Source:** Owner, 2026-10-03 (asks 56 and 57). Extends D-469. The 2026-10-04 amendment: the owner's answer to the branch review's question ("ok" to the recommendation).
+**Source:** Owner, 2026-10-03 (asks 56 and 57). Extends D-469. The 2026-10-04 amendment: the owner's answer to the branch review's question ("ok" to the recommendation). Amended by D-542 (2026-11-26): the settings read is removed.
+
+D-542 amends this entry: `GET /settings` is removed, so "The settings" no longer holds: pricing answers no settings read, and no single document revalidates on its version tag. The three list reads are unchanged, and the accepted trade-off covers those three only; no stored copy carries `updated_by_name`.
 
 #### D-519 [M] Every actor id a read shows carries its current name
 
@@ -2216,6 +2229,10 @@ an Account Management read per id of its own.
 
 **Source:** Owner, 2026-10-02 (ask 32: "there was already code that resolves the names through AM; do it that way on
 the server"). Ported from the approval participant names of commit `7da21fb75`. Extends D-438, D-460 and D-461.
+Amended by D-542 (2026-11-26): the settings read is removed.
+
+D-542 amends this entry: `PricingSettingsDto` and `GET /settings` are removed. `updated_by` is no longer one of the fields, the settings are no longer one of the reads, and "The settings PUT" and the settings sentence of "Caching" no longer hold. Every other field and read is unchanged. Who set a tenant setting is the Settings Service's record (D-542).
+
 #### D-520 [H] A scheduled price is cancelled through the prices unit
 
 **Status:** DECIDED 2026-10-03.
@@ -2400,7 +2417,9 @@ A book PATCH cannot change the currency, so it judges the currency's shape only.
 
 A refused input writes nothing: no price, approval unit, audit row, outbox event or idempotency result. Its idempotency key stays free. No input is rounded to fit a limit.
 
-**Source:** Pricing exact-money plan rev 2.1, Tasks 2 and 3; its mid-plan review (each refusal names its cause).
+**Source:** Pricing exact-money plan rev 2.1, Tasks 2 and 3; its mid-plan review (each refusal names its cause). Amended by D-542 (2026-11-26): `CURRENCY_INVALID` is gone with `PUT /settings`.
+
+D-542 amends this entry: the two `PUT /settings` rows no longer hold. That door is removed and nothing answers `CURRENCY_INVALID`. An offered code is judged by its form only, by the Settings Service (D-540).
 
 #### D-529 [H] One ISO 4217 table; the deployment's table adds non-ISO codes only
 
@@ -2410,7 +2429,9 @@ A refused input writes nothing: no price, approval unit, audit row, outbox event
 - **Pricing's resolution.** `domain::currency::CurrencyScales` resolves a code: the ISO scale first, else the deployment's `currency_scales` config (`BssPricingConfig`, empty by default). A key is three uppercase letters, is a code with no ISO 4217 minor-unit scale (`iso_scale` gives none), such as `XTS` or a code ISO does not list, and has a scale of 0 to 28. A table that breaks this stops the gear at startup (D-528).
 - **Who reads it.** A new book takes only a currency the table resolves, and so do the offered currencies of the settings (D-438). A new price, a draft edit, a submit and an approval read the table. Reads, receipts and replay never read it: they use the price's stored spec (D-531). `GET /currencies` lists it (D-537).
 
-**Source:** Owner, 2026-10-11 (the ISO table lands with the exact-money work). Pricing exact-money plan rev 2.1, Tasks 0 and 3. Amends D-438. Extended by D-537. Amended by D-541 (2026-11-21): the table judges the list `PUT /settings` stores, which no new book is judged by; the `offered_currencies` setting a new book is judged by is checked for its codes' form only.
+**Source:** Owner, 2026-10-11 (the ISO table lands with the exact-money work). Pricing exact-money plan rev 2.1, Tasks 0 and 3. Amends D-438. Extended by D-537. Amended by D-541 (2026-11-21): the table judges the list `PUT /settings` stores, which no new book is judged by; the `offered_currencies` setting a new book is judged by is checked for its codes' form only. Amended by D-542 (2026-11-26): the table judges no offered list.
+
+D-542 amends this entry: `PUT /settings` is removed, so "Who reads it" no longer includes the offered currencies of the settings. The table judges no list of offered currencies; it still judges the currency of a new book.
 
 #### D-530 [H] No gear overrides an ISO scale, and a non-ISO code has one scale in ledger and in pricing
 
@@ -2460,7 +2481,9 @@ The price's `currency` and `currency_scale` and the canonical `min_fee` CHECK ar
 
 This is the one exception to the closing rule of D-412 and D-427. Every other schema change is a new migration.
 
-**Source:** Owner, 2026-10-08 (fresh schema). Amends D-412 and D-427.
+**Source:** Owner, 2026-10-08 (fresh schema). Amends D-412 and D-427. Amended by D-542 (2026-11-26): the settings migrations stay as they are.
+
+D-542 amends this entry: the settings doors are removed, and nothing reads or writes `pricing_settings`. `m20260926_000001` and `m20260927_000014` are not edited for that: the table and its columns stay as these migrations create them, and the schema goldens are unchanged. Dropping the table is a later, new migration.
 
 #### D-535 [M] No tenant rounding setting; an invoice line rounds HALF_EVEN
 
@@ -2487,7 +2510,9 @@ Pricing rates the actual quantity. No tariff field says "per started hour" or "w
 - **What it is for.** A client takes the scale of a new price, the minimum-fee step and the list of currencies a book or the settings can use from this endpoint, not from its own copy of the table. The settings' `currencies` limit only which currency a new book can use (D-438). A saved price keeps its own `currency_scale` (D-531): when the table gives a different scale, submitting that draft is refused with `CURRENCY_SCALE_CHANGED`.
 - **One table.** `bss_money::iso_codes` returns the same ISO table that `iso_scale` reads, so this endpoint and the price checks use the same data.
 
-**Source:** Owner, 2026-10-14 (a client needs a currency's scale before its book has a price). Extends D-529. Amended 2026-10-21 (owner: `config:read` gated nothing on a table every tenant reads alike; before, the endpoint required it like `GET /settings`).
+**Source:** Owner, 2026-10-14 (a client needs a currency's scale before its book has a price). Extends D-529. Amended 2026-10-21 (owner: `config:read` gated nothing on a table every tenant reads alike; before, the endpoint required it like `GET /settings`). Amended by D-542 (2026-11-26).
+
+D-542 amends this entry: the settings' `currencies` is now the `offered_currencies` setting in the Settings Service (D-541), which does not ask the table. A client that edits that list takes its codes from this endpoint, as before.
 
 #### D-538 [M] A field violation names the refused decimal's path
 
@@ -2498,7 +2523,9 @@ Pricing rates the actual quantity. No tariff field says "per started hour" or "w
 - **The prose stays.** `reason` and `description` are as D-528 gives them: the description still says `rate must not be negative` or `"BTC" is not a currency the currency table knows`. A client maps the violation by `field` and `reason`, and no longer reads the description to learn which decimal or which code was refused. The refused value is in the client's own request at that path; the violation does not repeat it.
 - **Elsewhere.** No other door changes: a violation on a field of the body (`effective_from`, `dim_value`, `currency`, `code`) names it as before.
 
-**Source:** Owner, 2026-10-21 (a client parsed the description's English to find the sub-field and the refused code). Extends D-528.
+**Source:** Owner, 2026-10-21 (a client parsed the description's English to find the sub-field and the refused code). Extends D-528. Amended by D-542 (2026-11-26).
+
+D-542 amends this entry: "The settings" no longer holds. `PUT /settings` is removed, and with it `CURRENCY_INVALID` and its `currencies[1]` path.
 
 #### D-539 [M] Snapshot prices carry their currency spec
 
@@ -2522,8 +2549,8 @@ Pricing rates the actual quantity. No tariff field says "per started hour" or "w
 | Value type | Settings | A value is |
 | --- | --- | --- |
 | `gts.cf.bss.pricing.setting_billing_timing.v1~` | `default_timing` | `advance` or `arrears` |
-| `gts.cf.bss.pricing.setting_short_code.v1~` | `default_gl`, `default_tax_category` | A string of at most 64 characters (D-457) |
-| `gts.cf.bss.pricing.setting_line_template.v1~` | The four templates | A string of at most 2000 characters (D-457): text and the placeholders `{sku}`, `{sku_code}`, `{unit}`, `{plan}`, `{period}` and `{dimension}`. A brace outside a placeholder and any other name in braces are refused, as `domain::price_book_entry::validate_template` refuses them in an entry's own template |
+| `gts.cf.bss.pricing.setting_short_code.v1~` | `default_gl`, `default_tax_category` | A string of at most 64 characters (D-457), with no NUL character |
+| `gts.cf.bss.pricing.setting_line_template.v1~` | The four templates | A string of at most 2000 characters (D-457), with no NUL character: text and the placeholders `{sku}`, `{sku_code}`, `{unit}`, `{plan}`, `{period}` and `{dimension}`. A brace outside a placeholder and any other name in braces are refused, as `domain::price_book_entry::validate_template` refuses them in an entry's own template |
 | `gts.cf.bss.pricing.setting_currency_codes.v1~` | `offered_currencies` | A list of codes of three uppercase letters, each once |
 
 - **Currency codes.** The currency type judges a code's form only. It does not ask the currency table (D-529): a deployment's non-ISO code is a value, and so is a code the table does not resolve. `PUT /settings` refuses such a code with `CURRENCY_INVALID` (D-528); the Settings Service does not.
@@ -2533,9 +2560,11 @@ Pricing rates the actual quantity. No tariff field says "per started hour" or "w
 - **Not yet.** Nothing in pricing reads these settings. Resolve, the plan checks and the offered-currency check of a new book read the `pricing_settings` row, and `GET` and `PUT /bss-pricing/v1/settings` read and write it (D-438, D-518, D-519). A value written through the Settings Service changes nothing in pricing, and a value written through `PUT /settings` does not reach the Settings Service. Later changes move the reads to the Settings Service and remove the two doors, and amend D-438 then.
 - **The tests.** `src/infra/settings_declarations_tests.rs` writes each key and value type id out and judges values by each schema; one test holds the template schema to `validate_template`. `tests/settings_declarations.rs` starts the gear over the real types registry and the real Settings Service (`init`, the finalize step, `post_init`), reads each default as a tenant that stored nothing, and judges values with the Settings Service's own validator.
 
-**Source:** Owner, 2026-11-20 (the tenant settings move to the Settings Service). Relates to D-438, D-457 and D-529; amends none of them. Amended by D-541.
+**Source:** Owner, 2026-11-20 (the tenant settings move to the Settings Service). Relates to D-438, D-457 and D-529; amends none of them. Amended by D-541 and D-542.
 
 D-541 amends this entry: "Not yet" no longer holds for the reads. Resolve, the acceptance of a sale, the plan checks and the offered-currency check of a new book read these settings; none of them reads the `pricing_settings` row. The two `/settings` doors still read and write that row, and what they store reaches no pricing decision.
+
+D-542 amends this entry: the two `/settings` doors are removed. The sentences above about what `PUT /settings` refuses (`CURRENCY_INVALID`, `LINE_TEMPLATE_EMPTY`) describe a door that no longer exists, and nothing is left of "Not yet": these settings are the tenant settings, read by pricing (D-541) and written through the Settings Service only. The `pricing_settings` row is read and written by nothing.
 
 #### D-541 [H] Pricing reads the tenant settings from the Settings Service, outside its transactions
 
@@ -2556,4 +2585,27 @@ D-541 amends this entry: "Not yet" no longer holds for the reads. Resolve, the a
 - **Stored values are not carried over.** A value a tenant wrote through `PUT /settings` does not reach the Settings Service: no migration, script or import copies the `pricing_settings` rows. A tenant that had a row reads the declared defaults (D-540) until it writes its values through the Settings Service, and a sale accepted before then freezes those defaults in its receipt. Pricing had no real users when this was built, so no stored value was in use.
 - **The tests.** `src/infra/tenant_settings_tests.rs` holds the adapter to one bulk read, the scope, the actor and each way of being unavailable. `tests/settings_declarations.rs` runs the same read against the real Settings Service: the declared defaults, then values stored through its write path. `tests/tenant_settings_reads.rs` holds resolve, acceptance, book creation and the checks to the above. The contract goldens are unchanged: the same sale gives the same invoice inputs and sources.
 
-**Source:** Owner, 2026-11-21 (read on demand and not by subscription; once per decision, no second read; refuse while unavailable); pricing owner, 2026-11-26 (stored values are not carried over). Amends D-421, D-438, D-482, D-507, D-529 and D-540.
+**Source:** Owner, 2026-11-21 (read on demand and not by subscription; once per decision, no second read; refuse while unavailable); pricing owner, 2026-11-26 (stored values are not carried over). Amends D-421, D-438, D-482, D-507, D-529 and D-540. Amended by D-542.
+
+D-542 amends this entry: the later change is made. `GET` and `PUT /bss-pricing/v1/settings` are removed; the `pricing_settings` table stays in the schema, read and written by nothing, until a later migration drops it. In "Currency codes", no door is left that answers `CURRENCY_INVALID`.
+
+#### D-542 [H] The /settings doors are removed; the tenant settings are edited through the Settings Service
+
+**Status:** DECIDED 2026-11-26.
+
+- **The doors are gone.** `GET` and `PUT /bss-pricing/v1/settings` are not mounted. A request to either is a request to an unknown route. The served contract loses both operations, their two schemas, `PricingSettingsDto` and `PricingSettingsPut`, and the `PricingBillingTiming` enum that only they carried.
+- **Breaking.** The console's settings page and the published API contract use the two doors, and both are kept outside this repository. Each moves to the Settings Service's surface; nothing in pricing answers for the doors in the meantime.
+- **No facade.** Pricing keeps no door that forwards to the Settings Service. The Settings Service's SDK gives pricing a reader and a client that declares settings, and no client that writes a value. Every one of these settings requires step-up (D-540), and a setting that does refuses a write made by a service: a facade would have to carry the caller's own step-up through, and would add nothing to the Settings Service's own door.
+- **Where the settings are read and written.** On the Settings Service's own REST surface, under the keys `gts.cf.core.settings.setting_type.v1~cf.bss.pricing.<name>.v1~` (D-540), for the tenant the request names. Every setting is `local`, so a value belongs to that tenant alone and no tenant inherits it. The Settings Service's own permissions decide who reads and who writes a value, and a write needs a step-up. Pricing judges neither.
+- **Pricing's `config` permissions.** `config:read` and `config:settings` no longer gate the tenant settings. They gate what they gated besides: `config:read` the reads of the dimension registry and of the approval policy (`GET /dimension-keys`, `GET /approval-policy`); `config:settings` the writes of both (`PUT` and `PATCH /dimension-keys`, `PUT /approval-policy`, `DELETE /approval-policy/{kind}`) and `GET /reference-ops`. Both stay in the permission catalog, which holds its nineteen pairs (D-526). A role that held `config:settings` in order to edit the tenant settings no longer edits them; that right is granted in the Settings Service.
+- **One version over the row, given up.** The door kept one integer version over the whole row. A `PUT` sent it as `If-Match` and replaced every field or none, and a stale one was 409 `STALE_REVISION` (D-438). The Settings Service guards each setting's value by that setting's own tag, sent as `If-Match` on the write of that setting. A change of several settings is several writes, or one batch whose items are stored or refused each on its own. So some settings of one change can be stored while another is refused, and a decision that pricing makes between two of the writes reads the new value of one setting and the old value of another (D-541 reads the eight in one bulk read).
+- **No 304.** Pricing serves no settings read. The strong version tag of `GET /settings`, its 304 on a matching `If-None-Match` and its `Cache-Control: private, no-cache` (D-518) are gone. D-518 holds for the plan list, the plan counts and the book list.
+- **Who changed a value.** `updated_at`, `updated_by` and `updated_by_name` (D-438, D-519) are gone with the answer that carried them. Who set a value, and when, is the Settings Service's own record of that setting, shown under its own rules.
+- **The audit.** A settings write added the row `settings.update` to pricing's audit. Nothing writes that row now: a change of a setting is recorded in the Settings Service's history of that setting. The rows written before stay in pricing's audit.
+- **The texts.** The door capped a GL code and a tax category at 64 characters and a template at 2000 (D-457), and judged a template's placeholders. The declared value types state the same limits themselves (D-540): `setting_short_code` at most 64 characters, `setting_line_template` at most 2000 and only the placeholders an entry's own template may use, neither with a NUL character, which the door refused in every text, `setting_billing_timing` one of `advance` and `arrears`. The Settings Service judges every write of a setting by its type and answers the refusal. Pricing's codes are not answered for a setting: `FIELD_TOO_LONG` on `default_gl`, `default_tax_category` or `invoice_line_templates`, `TIMING_INVALID` and `SKU_TYPE_INVALID`. `LINE_TEMPLATE_EMPTY` and `LINE_TEMPLATE_INVALID` remain the refusals of an entry's own template. Two rules of the door are not kept. It refused an empty or blank template; the empty string now means "not set", and a template made only of spaces is a value that resolve treats as absent (D-540, D-541). It capped only a text that differed from the stored one; no stored text is carried over (D-541), so that rule has nothing to apply to.
+- **Currency codes.** The check that the currency table knows an offered code had become the door's alone (D-541). It is gone with the door: nothing answers `CURRENCY_INVALID`. An offered code is judged by its form only, three uppercase letters and each code once, by the Settings Service. A listed code the table does not know still admits no book, because `BOOK_CURRENCY_INVALID` refuses it first (D-529). `GET /currencies` lists the codes the table knows (D-537).
+- **The table.** `pricing_settings` stays in the schema, read and written by nothing. Its entity and its repository are removed. `m20260926_000001` and `m20260927_000014` are untouched (D-534), so the migration chain and the schema goldens do not change. A later migration drops the table. Stored values are not carried over (D-541).
+- **Unchanged.** When a written value takes effect, and what pricing answers while the settings cannot be read, are as D-541 gives them.
+- **The tests.** The route censuses hold 59 ops, not 61 (tests/module_test.rs, tests/rest_authz.rs, tests/rest_support/mod.rs), and tests/read_contract.rs measures 33 write ops, not 34. tests/settings_doors.rs is removed, and so are the settings cases of tests/conditional_reads.rs and tests/actor_names.rs. tests/settings_migration.rs and its Postgres twin still prove m20260927_000014 on a seeded row. The reads of the settings are held by the tests D-541 names.
+
+**Source:** Owner, 2026-11-26 (the doors go with the console's move to the Settings Service; no facade over it). Amends D-421, D-438, D-439, D-457, D-469, D-518, D-519, D-528, D-529, D-534, D-537, D-538, D-540 and D-541.

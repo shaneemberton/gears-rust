@@ -22,8 +22,6 @@ fn declared_paths() -> Routes {
         ("POST", "/bss-pricing/v1/price-books/{id}/unarchive"),
         ("GET", "/bss-pricing/v1/price-books/{id}/entries"),
         ("GET", "/bss-pricing/v1/price-books/{id}/export"),
-        ("GET", "/bss-pricing/v1/settings"),
-        ("PUT", "/bss-pricing/v1/settings"),
         ("GET", "/bss-pricing/v1/currencies"),
         ("GET", "/bss-pricing/v1/dimension-keys"),
         ("PUT", "/bss-pricing/v1/dimension-keys"),
@@ -81,7 +79,6 @@ fn if_match_routes() -> Routes {
         ("DELETE", "/bss-pricing/v1/price-books/{id}"),
         ("POST", "/bss-pricing/v1/price-books/{id}/archive"),
         ("POST", "/bss-pricing/v1/price-books/{id}/unarchive"),
-        ("PUT", "/bss-pricing/v1/settings"),
         ("PUT", "/bss-pricing/v1/dimension-keys"),
         ("PATCH", "/bss-pricing/v1/prices/{id}"),
         ("DELETE", "/bss-pricing/v1/prices/{id}"),
@@ -134,8 +131,83 @@ async fn the_registered_route_set_is_exactly_the_declared_paths() {
         .collect();
     assert_eq!(registered, declared_paths());
     assert_eq!(census::source_routes(), registered);
-    assert_eq!(registered.len(), 61);
+    assert_eq!(registered.len(), 59);
     assert!(router.has_routes());
+}
+
+/// D-542: the tenant settings are edited through the Settings Service, so pricing serves no
+/// `/settings` path: a read or a write of it is the router's answer to an unknown route, whatever
+/// the caller may do, and the registry describes no such operation.
+#[tokio::test]
+async fn the_settings_path_is_not_served() {
+    use tower::ServiceExt;
+    let tenant = uuid::Uuid::new_v4();
+    let caller = toolkit_security::SecurityContext::builder()
+        .subject_id(uuid::Uuid::new_v4())
+        .subject_tenant_id(tenant)
+        .subject_type("user")
+        .build()
+        .unwrap();
+    let harness = rest_support::Harness::with_pdp(
+        serde_json::json!({}),
+        Some(std::sync::Arc::new(rest_support::AllowingResolver {
+            tenant,
+        })),
+    )
+    .await
+    .unwrap();
+    let (router, openapi) = harness.router(axum::Router::new()).unwrap();
+    let ask = |method: &'static str, path: &'static str| {
+        let (router, caller) = (router.clone(), caller.clone());
+        async move {
+            let response = router
+                .oneshot(
+                    axum::http::Request::builder()
+                        .method(method)
+                        .uri(path)
+                        .extension(caller)
+                        .header("content-type", "application/json")
+                        .header("if-match", "\"0\"")
+                        .body(axum::body::Body::from("{}"))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let status = response.status().as_u16();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            (status, body)
+        }
+    };
+    let unknown = ask("GET", "/bss-pricing/v1/no-such-door").await;
+    assert_eq!(unknown.0, 404, "the router's answer to an unknown route");
+    for method in ["GET", "PUT"] {
+        let (status, body) = ask(method, "/bss-pricing/v1/settings").await;
+        assert_eq!(status, unknown.0, "{method} /settings is an unknown route");
+        assert_eq!(
+            String::from_utf8_lossy(&body),
+            String::from_utf8_lossy(&unknown.1).replace("no-such-door", "settings"),
+            "{method} /settings answers as any unknown route does"
+        );
+    }
+    assert_eq!(
+        ask("GET", "/bss-pricing/v1/currencies").await.0,
+        200,
+        "a served route answers the same caller"
+    );
+    for entry in &openapi.operation_specs {
+        assert!(
+            !entry.key().ends_with(":/bss-pricing/v1/settings"),
+            "{} is registered",
+            entry.key()
+        );
+        let id = entry.value().operation_id.as_deref().unwrap_or_default();
+        assert!(
+            !["bss_pricing.get_settings", "bss_pricing.put_settings"].contains(&id),
+            "{id} is described"
+        );
+    }
 }
 
 /// D-428, P-D-197: init registers pricing's SKU usage port under the key Products resolves at
@@ -193,8 +265,9 @@ fn every_precondition_reading_route_is_in_the_precondition_census() {
         idempotency_key_routes()
     );
     for (needle, control, production) in [
-        // + 2: the book's archive and unarchive (D-522).
-        ("preconditions::if_match(", 1, 15),
+        // + 2: the book's archive and unarchive (D-522); - 1: the settings have no PUT here
+        // (D-542).
+        ("preconditions::if_match(", 1, 14),
         ("preconditions::idempotency_key(", 1, 16),
         ("Query<", 1, 0),
         // + 1: plan_items::delete answers 204 below its door; + 16: the plan and revision doors
@@ -224,8 +297,9 @@ fn every_precondition_reading_route_is_in_the_precondition_census() {
         // (`StatusCode::OK` once), not each from its own function; + 3: the book's archive and
         // unarchive (D-522), two registrations and two 200 answers, while the book read answers
         // through `names::named` now; + 2: the currency table (D-537), its registration and its
-        // 200 answer.
-        ("StatusCode::", 2, 112),
+        // 200 answer; - 6: the settings doors (D-542), their three registered statuses, the
+        // write's 200 answer and the two of `revalidate_version`.
+        ("StatusCode::", 2, 106),
     ] {
         assert_eq!(census::count_in_functions(census::CONTROL, needle), control);
         assert_eq!(census::production_count(needle), production, "{needle}");
@@ -263,7 +337,6 @@ async fn every_precondition_reading_route_declares_the_header_it_reads() {
 fn etag_routes() -> Routes {
     [
         ("GET", "/bss-pricing/v1/price-books/{id}"),
-        ("GET", "/bss-pricing/v1/settings"),
         ("GET", "/bss-pricing/v1/dimension-keys"),
         ("GET", "/bss-pricing/v1/price-book-entries/{id}"),
         ("GET", "/bss-pricing/v1/approval-policy"),
@@ -280,7 +353,6 @@ fn etag_routes() -> Routes {
         // D-522: the archive mark moves the book's version.
         ("POST", "/bss-pricing/v1/price-books/{id}/archive"),
         ("POST", "/bss-pricing/v1/price-books/{id}/unarchive"),
-        ("PUT", "/bss-pricing/v1/settings"),
         ("PUT", "/bss-pricing/v1/dimension-keys"),
         ("PATCH", "/bss-pricing/v1/dimension-keys"),
         ("POST", "/bss-pricing/v1/price-books/{id}/entries"),
@@ -335,13 +407,13 @@ async fn every_operation_has_a_human_summary_and_a_description() {
         assert_ne!(description, summary, "{id}");
         described += 1;
     }
-    assert_eq!(described, 61);
+    assert_eq!(described, 59);
 }
 
 /// Every answer that sets an `ETag` declares the header on its success response, and nothing else
-/// declares one: the eight reads and the nineteen write answers of D-469, each the version a
-/// following If-Match takes, plus the three list reads of D-518 (a weak tag of the JSON body,
-/// also declared on the 304) and the settings read's 304 (its strong version tag, D-518).
+/// declares one: the reads and the write answers of D-469, each the version a following
+/// If-Match takes, plus the three list reads of D-518 (a weak tag of the JSON body, also
+/// declared on the 304).
 #[tokio::test]
 async fn every_answer_that_sets_an_etag_declares_it() {
     let harness = rest_support::Harness::new().await.unwrap();
@@ -374,10 +446,9 @@ async fn every_answer_that_sets_an_etag_declares_it() {
         })
         .count();
     assert_eq!(
-        anywhere, 38,
-        "only the success answer of those ops declares it, plus the 304 of the three list reads \
-         and of the settings read, the 201 of the cancel and end drafts, and the 200 of the book's \
-         archive and unarchive"
+        anywhere, 35,
+        "only the success answer of those ops declares it, plus the 304 of the three list reads, \
+         the 201 of the cancel and end drafts, and the 200 of the book's archive and unarchive"
     );
 }
 
@@ -408,8 +479,6 @@ async fn no_operation_declares_a_422() {
 // PATCH /price-books/{id} price_book:author true false
 // GET /price-books/{id}/entries price_book_entry:read false false
 // GET /price-books/{id}/export price_book:read false false
-// GET /settings config:read false false
-// PUT /settings config:settings true false
 // GET /currencies authenticated false false (D-537: no permission, no PDP call)
 // GET /dimension-keys config:read false false
 // PUT /dimension-keys config:settings true false

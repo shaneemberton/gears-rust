@@ -11,7 +11,7 @@ use super::dto::{
     PricingPlanList, PricingPlanRevisionDto, PricingPlanRevisionHeader, PricingPlanRevisionReadDto,
     PricingPriceBookEntryList, PricingPriceBookEntryReadDto, PricingPriceBookReadDto,
     PricingPriceBookUnarchiveDto, PricingPriceDto, PricingProposedPrice, PricingPublishChanges,
-    PricingSettingsDto, PricingSkuEntryDto, PricingSkuEntryList,
+    PricingSkuEntryDto, PricingSkuEntryList,
 };
 use super::{AuthoringState, support};
 use axum::{http::StatusCode, response::Response};
@@ -32,16 +32,6 @@ pub(super) async fn named<T: ActorFields + serde::Serialize>(
 ) -> Result<Response, CanonicalError> {
     state.actor_names.fill(ctx, &mut body).await;
     support::response(StatusCode::OK, &body, version)
-}
-
-/// The settings' writer is null before the first write.
-impl ActorFields for PricingSettingsDto {
-    fn actor_ids(&self, ids: &mut Vec<Uuid>) {
-        ids.extend(self.updated_by);
-    }
-    fn fill_names(&mut self, names: &Names) {
-        self.updated_by_name = self.updated_by.and_then(|id| label(names, id));
-    }
 }
 
 bss_rest::actor_fields!(PricingPriceDto { created_by => created_by_name } []);

@@ -1,24 +1,19 @@
-//! Atomic settings and dimension registry operations.
+//! Atomic dimension registry operations, and the offered-currency rule of a new book.
 //!
 //! @cpt-dod:cpt-cf-bss-pricing-dod-dimension-registry:p1
 use super::{
     dto::{
         PricingDimensionKey, PricingDimensionKeyPatch, PricingDimensionRegistry,
-        PricingDimensionValue, PricingDimensionValueUsage, PricingDimensions, PricingSettingsDto,
-        PricingSettingsPut,
+        PricingDimensionValue, PricingDimensionValueUsage, PricingDimensions,
     },
-    support::{
-        DoorError, audit, check_version, conflict, conflict_because, invalid, invalid_because,
-        response, value,
-    },
+    support::{DoorError, audit, conflict, conflict_because, invalid, response, value},
 };
 use crate::{
-    api::rest::closed_sets::PricingBillingTiming,
-    domain::{book, currency::CurrencyScales, dimension, price_book_entry::validate_template},
+    domain::dimension,
     infra::storage::{
         RepoError,
-        entity::{dimension_key, settings},
-        repo::{dimension_repo, price_book_entry_repo, price_repo, settings_repo},
+        entity::dimension_key,
+        repo::{dimension_repo, price_book_entry_repo, price_repo},
     },
 };
 use axum::{http::StatusCode, response::Response};
@@ -28,125 +23,6 @@ use toolkit_db::secure::{AccessScope, DBRunner};
 use toolkit_security::SecurityContext;
 use uuid::Uuid;
 
-pub async fn settings(
-    tx: &impl DBRunner,
-    scope: &AccessScope,
-    tenant: Uuid,
-) -> Result<PricingSettingsDto, DoorError> {
-    let Some(m) = settings_repo::find(tx, scope, tenant, tenant).await? else {
-        // Version 0: nothing was ever written, so nobody changed anything (D-438).
-        return Ok(PricingSettingsDto {
-            default_timing: PricingBillingTiming::Advance,
-            default_gl: None,
-            default_tax_category: None,
-            invoice_line_templates: serde_json::json!({}),
-            currencies: Vec::new(),
-            version: 0,
-            updated_at: None,
-            updated_by: None,
-            updated_by_name: None,
-        });
-    };
-    let currencies = serde_json::from_value(m.currencies)
-        .map_err(|_| RepoError::CorruptRow(format!("settings of {tenant}: currencies")))?;
-    Ok(PricingSettingsDto {
-        default_timing: PricingBillingTiming::stored(
-            &m.default_timing,
-            &format_args!("settings of {tenant}: default_timing"),
-        )?,
-        default_gl: m.default_gl,
-        default_tax_category: m.default_tax_category,
-        invoice_line_templates: m.invoice_line_templates,
-        currencies,
-        version: m.version,
-        updated_at: Some(m.updated_at),
-        updated_by: m.updated_by,
-        updated_by_name: None,
-    })
-}
-/// D-438: each offered code is one the currency table resolves, once. A value that is not three
-/// uppercase letters is refused first with a fixed message that does not repeat it. Any other
-/// refusal names the code and says whether the table does not know it or the list repeats it: a
-/// code stored earlier can stop being known when the deployment's table changes.
-fn validate_currencies(codes: &[String], scales: &CurrencyScales) -> Result<(), CanonicalError> {
-    let mut seen = BTreeSet::new();
-    // The violation names the offending code's place in the list (D-538): `currencies[1]`.
-    for (i, code) in codes.iter().enumerate() {
-        let reason = if !book::currency_code(code) {
-            "an offered currency is a currency code: three uppercase letters".to_owned()
-        } else if scales.resolve(code).is_none() {
-            format!("{code:?} is not a currency the currency table knows")
-        } else if !seen.insert(code.as_str()) {
-            format!("{code} is listed more than once")
-        } else {
-            continue;
-        };
-        return Err(invalid_because(
-            &format!("currencies[{i}]"),
-            "CURRENCY_INVALID",
-            &reason,
-        ));
-    }
-    Ok(())
-}
-pub async fn put_settings(
-    tx: &impl DBRunner,
-    scope: &AccessScope,
-    ctx: &SecurityContext,
-    correlation: Uuid,
-    version: u64,
-    body: PricingSettingsPut,
-    scales: &CurrencyScales,
-) -> Result<Response, DoorError> {
-    let tenant = ctx.subject_tenant_id();
-    let before = settings(tx, scope, tenant).await?;
-    check_version(version, before.version)?;
-    // D-457: only a text that differs from the stored one is capped, so settings stored before the
-    // caps never lock (the second review of W1b, L2).
-    super::caps::changed_settings_text(&body, &before)?;
-    if !matches!(body.default_timing.as_str(), "advance" | "arrears") {
-        return Err(invalid("default_timing", "TIMING_INVALID").into());
-    }
-    for (kind, template) in &body.invoice_line_templates {
-        if !matches!(kind.as_str(), "recurring" | "usage" | "one_time" | "bundle") {
-            return Err(invalid("invoice_line_templates", "SKU_TYPE_INVALID").into());
-        }
-        validate_template(template).map_err(|e| invalid("invoice_line_templates", e.code))?;
-    }
-    validate_currencies(&body.currencies, scales)?;
-    let now = crate::infra::storage::stored_now();
-    let m = settings::Model {
-        tenant_id: tenant,
-        default_timing: body.default_timing,
-        default_gl: body.default_gl,
-        default_tax_category: body.default_tax_category,
-        invoice_line_templates: value(&body.invoice_line_templates)?,
-        version: before.version,
-        created_at: now,
-        updated_at: now,
-        currencies: value(&body.currencies)?,
-        updated_by: Some(ctx.subject_id()),
-    };
-    if before.version == 0 {
-        settings_repo::insert(tx, scope, settings::Model { version: 1, ..m }).await?;
-    } else {
-        settings_repo::update(tx, scope, m).await?;
-    }
-    audit(
-        tx,
-        ctx,
-        correlation,
-        "settings.update",
-        tenant,
-        before.version + 1,
-    )
-    .await?;
-    Ok(response(
-        StatusCode::OK,
-        &settings(tx, scope, tenant).await?,
-        Some(version + 1),
-    )?)
-}
 /// D-438: a NEW book takes a currency the tenant offers; an empty list offers every currency.
 /// `offered` is the tenant's list as the Settings Service told it before the transaction
 /// (D-541): the book author needs no grant on the settings.

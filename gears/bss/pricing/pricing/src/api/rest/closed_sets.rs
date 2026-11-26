@@ -235,10 +235,6 @@ closed_set!(
     }
 );
 closed_set!(
-    /// When a charge is billed: in advance of its period or in arrears.
-    PricingBillingTiming { Advance => "advance", Arrears => "arrears" }
-);
-closed_set!(
     /// Where a resolved invoice input came from (D-421).
     PricingResolveSource from Source { Entry => "entry", Sku => "sku", Tenant => "tenant" }
 );

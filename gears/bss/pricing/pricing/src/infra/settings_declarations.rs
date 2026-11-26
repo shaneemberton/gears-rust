@@ -36,8 +36,12 @@ const CURRENCY_CODES: &str = gts_id!("cf.bss.pricing.setting_currency_codes.v1~"
 
 /// A template is text outside braces and, in braces, a placeholder a line can fill in. It follows
 /// `domain::price_book_entry::validate_template`, which judges an entry's own template: a tenant
-/// default that an entry could not carry would reach an invoice line unfilled.
-const LINE_TEMPLATE_PATTERN: &str = r"^(?:[^{}]|\{(?:sku|sku_code|unit|plan|period|dimension)\})*$";
+/// default that an entry could not carry would reach an invoice line unfilled. A NUL character
+/// is no text: the stores a resolved value is written to refuse it.
+const LINE_TEMPLATE_PATTERN: &str =
+    r"^(?:[^{}\x00]|\{(?:sku|sku_code|unit|plan|period|dimension)\})*$";
+/// A code is any text without a NUL character.
+const SHORT_CODE_PATTERN: &str = r"^[^\x00]*$";
 
 /// One declared setting: its leaf name, value type, default and what an administrator reads.
 struct Setting {
@@ -150,7 +154,7 @@ pub fn value_type_schemas() -> Vec<Value> {
         value_type_schema(
             SHORT_CODE,
             "BSS pricing short code",
-            json!({ "type": "string", "maxLength": 64 }),
+            json!({ "type": "string", "maxLength": 64, "pattern": SHORT_CODE_PATTERN }),
         ),
         value_type_schema(
             LINE_TEMPLATE,

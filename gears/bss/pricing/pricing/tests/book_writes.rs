@@ -977,6 +977,109 @@ async fn the_application_reads_edits_and_deletes_a_migrated_book() {
     assert_eq!(list["items"][0]["description"], "dated");
 }
 
+// ------------------------------------------------------------------ the currency
+
+async fn book_in(f: &Fixture, code: &str, currency: &str) -> (u16, Value) {
+    let (s, b, _) = f
+        .call(
+            "POST",
+            "/price-books",
+            json!({"code":code,"name":code,"currency":currency}),
+            None,
+            Some(&format!("book-{code}")),
+        )
+        .await;
+    (s, b)
+}
+/// The reason of a 400's first field violation.
+fn violation(b: &Value) -> &str {
+    b["context"]["field_violations"][0]["reason"]
+        .as_str()
+        .unwrap_or_default()
+}
+
+/// A currency the table does not resolve is refused at the book, before anything is written:
+/// `ZZZ` is no ISO 4217 code, and `XTS` is ISO's test code, which has no scale. Without a
+/// configured table the ISO codes only are known.
+#[tokio::test]
+async fn a_book_in_a_currency_the_table_does_not_know_is_refused() {
+    let (f, _) = fixture().await;
+    for code in ["ZZZ", "XTS", "XAU", "BTC"] {
+        let (s, b) = book_in(&f, &code.to_lowercase(), code).await;
+        assert_eq!(s, 400, "an unknown book currency is refused");
+        assert_eq!(
+            violation(&b),
+            "BOOK_CURRENCY_INVALID",
+            "the book names its currency"
+        );
+    }
+    // The ISO codes pass, at every scale.
+    for code in ["EUR", "JPY", "KWD", "CLF"] {
+        let (s, _) = book_in(&f, &code.to_lowercase(), code).await;
+        assert_eq!(s, 201, "an ISO code is a book currency");
+    }
+}
+
+/// A non-ISO code is known only where the deployment configures it, and only that code: the
+/// configured table adds to the ISO one and never replaces it.
+#[tokio::test]
+async fn a_book_takes_a_configured_non_iso_currency() {
+    let f = Fixture::with_currency_scales(Arc::new(Script::default()), &[("XTS", 2)]).await;
+    let (s, b) = book_in(&f, "xts", "XTS").await;
+    assert_eq!(s, 201, "a configured code is a book currency");
+    assert_eq!(b["currency"], "XTS");
+    assert_eq!(book_in(&f, "eur", "EUR").await.0, 201, "ISO stays known");
+    // The other unknown codes stay refused.
+    let (s, b) = book_in(&f, "zzz", "ZZZ").await;
+    assert_eq!(s, 400, "an unlisted code stays unknown to a book");
+    assert_eq!(violation(&b), "BOOK_CURRENCY_INVALID");
+}
+
+/// A book keeps its currency for life, so an edit does not judge it against today's table: a book
+/// stored under a currency the table no longer knows (a code a deployment stopped configuring)
+/// stays editable.
+#[tokio::test]
+async fn a_book_of_a_currency_the_table_forgot_stays_editable() {
+    use bss_pricing::infra::storage::{entity::price_book, repo::book_repo};
+    let (f, _) = fixture().await;
+    let now = time::OffsetDateTime::now_utc();
+    let id = Uuid::new_v4();
+    book_repo::insert(
+        &f.db.conn().unwrap(),
+        &plan_support::scope(&f),
+        price_book::Model {
+            id,
+            tenant_id: f.ctx.subject_tenant_id(),
+            code: "old".into(),
+            name: "old".into(),
+            currency: "ZZZ".into(),
+            valid_from: None,
+            valid_until: None,
+            description: None,
+            version: 1,
+            created_at: now,
+            updated_at: now,
+            archived_at: None,
+            archived_by: None,
+        },
+    )
+    .await
+    .unwrap();
+    let (s, b, tag) = f
+        .call(
+            "PATCH",
+            &format!("/price-books/{id}"),
+            json!({"name":"renamed"}),
+            Some("\"1\""),
+            None,
+        )
+        .await;
+    assert_eq!(s, 200, "the book is edited");
+    assert_eq!(b["name"], "renamed");
+    assert_eq!(b["currency"], "ZZZ");
+    assert_eq!(tag, "\"2\"");
+}
+
 // ------------------------------------------------------------------ length caps (D-457)
 
 /// One text over its cap: the request, and the field and code its refusal names.
@@ -1035,14 +1138,6 @@ fn ascii(n: usize) -> String {
 /// `dimension_values::a_stored_text_over_its_cap_never_locks_the_dimension_registry` covers it.
 async fn over_the_caps(f: &Fixture, named: &Named) -> Vec<Capped> {
     let tag_of = |path: String| async move { f.call("GET", &path, json!({}), None, None).await.2 };
-    let settings = |field: &str, value: Value| {
-        let mut body = json!({
-            "default_timing":"advance","default_gl":null,
-            "default_tax_category":null,"invoice_line_templates":{},"currencies":[]
-        });
-        body[field] = value;
-        body
-    };
     let Named {
         book,
         entry,
@@ -1055,7 +1150,6 @@ async fn over_the_caps(f: &Fixture, named: &Named) -> Vec<Capped> {
     // A draft's version is its create's ETag; the price read is the pinned consumer read.
     let price_tag = "\"1\"";
     let entry_tag = tag_of(format!("/price-book-entries/{entry}")).await;
-    let settings_tag = tag_of("/settings".to_owned()).await;
     let dimensions_tag = tag_of("/dimension-keys".to_owned()).await;
     let price = |extra: (&str, Value)| {
         let mut body =
@@ -1150,27 +1244,6 @@ async fn over_the_caps(f: &Fixture, named: &Named) -> Vec<Capped> {
         .at(&entry_tag),
         Capped::new(
             "PUT",
-            "/settings",
-            settings("default_gl", json!(ascii(65))),
-            "default_gl",
-        )
-        .at(&settings_tag),
-        Capped::new(
-            "PUT",
-            "/settings",
-            settings("default_tax_category", json!(ascii(65))),
-            "default_tax_category",
-        )
-        .at(&settings_tag),
-        Capped::new(
-            "PUT",
-            "/settings",
-            settings("invoice_line_templates", json!({"usage":ascii(2001)})),
-            "invoice_line_templates",
-        )
-        .at(&settings_tag),
-        Capped::new(
-            "PUT",
             "/dimension-keys",
             json!({"items":[{"key":ascii(65),"values":[]}]}),
             "key",
@@ -1193,12 +1266,11 @@ async fn over_the_caps(f: &Fixture, named: &Named) -> Vec<Capped> {
     ]
 }
 
-/// Every text a request writes has an explicit length cap, counted in characters (D-457, the
-/// whole-branch review's PS-09 and PS-10): a code, a dimension key and value 64, a name 200, a
-/// note 2000 (400 `NOTE_TOO_LONG`), a GL code and a tax category 64, an invoice line template
-/// 2000. A longer one is 400 `FIELD_TOO_LONG` on the field and nothing is written: before anything
-/// is read, except the two full-replace PUTs (the settings and the dimension registry), which judge
-/// against the stored row after their If-Match. The caps themselves pass, in two-byte characters.
+/// Every text a request writes has an explicit length cap, counted in characters (D-457): a code, a dimension key and value 64, a name 200, a
+/// note 2000 (400 `NOTE_TOO_LONG`), an invoice line template 2000. A longer one is 400
+/// `FIELD_TOO_LONG` on the field and nothing is written: before anything is read, except the
+/// dimension registry's full-replace PUT, which judges against the stored row after its
+/// If-Match. The caps themselves pass, in two-byte characters.
 #[tokio::test]
 async fn every_text_a_request_writes_has_a_length_cap() {
     use bss_products_sdk::models::SkuType;

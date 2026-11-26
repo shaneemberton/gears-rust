@@ -105,7 +105,6 @@ fn each_set_carries_its_stored_tokens_on_the_wire() {
         tokens!(PricingVoteOutcome),
         ["pending", "applied", "rejected", "withdrawn"]
     );
-    assert_eq!(tokens!(PricingBillingTiming), ["advance", "arrears"]);
     assert_eq!(tokens!(PricingResolveSource), ["entry", "sku", "tenant"]);
 }
 
@@ -287,11 +286,6 @@ fn a_stored_token_outside_its_set_is_a_corrupt_row_naming_it() {
             PricingResolvedRevisionState::stored("draft", &format_args!("revision {id} state"))
                 .unwrap_err(),
             "PricingResolvedRevisionState",
-        ),
-        (
-            PricingBillingTiming::stored("ADVANCE", &format_args!("settings {id} default_timing"))
-                .unwrap_err(),
-            "PricingBillingTiming",
         ),
     ] {
         let RepoError::CorruptRow(detail) = error else {

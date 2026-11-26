@@ -53,7 +53,7 @@ The spec is `docs/superpowers/specs/2026-09-24-pricebook-model-design.md`, espec
 
 - **Type**: Core
 - **Phases**: 2c.
-- **Purpose**: Author currency books and unique SKU entries, maintain dimensions/settings and export book facts; hand entry creation/removal to the reservation service.
+- **Purpose**: Author currency books and unique SKU entries, maintain dimensions and export book facts; hand entry creation/removal to the reservation service. The tenant settings are kept in the Settings Service and edited there (D-540, D-542).
 - **Depends On**: `cpt-cf-bss-pricing-feature-foundation`.
 - **Scope**: 7 implementation DoDs in the linked FEATURE; APIs and storage in slice 02.
 - **Out of scope**: Consumer adapter implementation, actual Subscriptions movement and deployed-data conversion. Later-phase behavior remains unimplemented at the phase 2 integration point.

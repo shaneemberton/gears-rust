@@ -171,9 +171,9 @@ pub async fn dimension(f: &Fixture, key: &str, values: &[&str]) {
         .await;
     assert_eq!(s, 200, "{b}");
 }
-/// The fixture tenant sets its settings in the Settings Service. `body` names them as the
-/// settings door does: a field it leaves out, or gives as `null`, is left as it was, and a
-/// template is set for each SKU kind `invoice_line_templates` names.
+/// The fixture tenant sets its settings in the Settings Service. `body` names them by field,
+/// `currencies` standing for `offered_currencies`: a field it leaves out, or gives as `null`, is
+/// left as it was, and a template is set for each SKU kind `invoice_line_templates` names.
 pub fn settings(f: &Fixture, body: &Value) {
     for (field, name) in [
         ("default_timing", "default_timing"),

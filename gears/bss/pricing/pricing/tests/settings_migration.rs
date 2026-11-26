@@ -6,20 +6,17 @@
 //! today — and holds one tenant's settings row, written with the encodings the application writes
 //! (a `Uuid` is a 16-byte blob; the timestamps are copied from a row the repository wrote). Then
 //! the whole list runs again and applies 000014 alone; the structure is proved by the schema dump
-//! and the table text, the row by its columns, and the application's own doors read and write it.
-//! The Postgres twin is `postgres_settings_migration.rs`.
+//! and the table text, the row by its columns. The table has no reader or writer in the
+//! application (D-542). The Postgres twin is `postgres_settings_migration.rs`.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-mod entry_support;
 mod schema_dump;
 
 use bss_pricing::infra::storage::entity::price_book;
 use bss_pricing::infra::storage::repo::book_repo;
 use bss_pricing::module::BssPricingGear;
-use entry_support::{Script, app_for, request, state_on, user_of};
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 use serde_json::json;
-use std::sync::Arc;
 use toolkit::contracts::DatabaseCapability;
 use toolkit_db::migration_runner::{MigrationError, MigrationResult, run_migrations_for_testing};
 use toolkit_db::secure::AccessScope;
@@ -253,44 +250,4 @@ async fn the_forward_migration_adds_currencies_and_updated_by_and_keeps_the_row(
     );
     // A second run applies nothing.
     assert!(db.migrate(None).await.unwrap().applied_names.is_empty());
-}
-
-/// The migrated row through the application: a legacy row reads `currencies: []` and no
-/// `updated_by`; a PUT that sends the read back with a currency list is accepted and stamps the
-/// writer.
-#[tokio::test]
-async fn the_application_reads_and_rewrites_a_migrated_row() {
-    let db = seeded().await;
-    db.migrate(None).await.unwrap();
-    let state = state_on(
-        DBProvider::new(db.pool().await),
-        Arc::new(Script::default()),
-    )
-    .await;
-    let app = app_for(state, TENANT);
-    let ctx = user_of(TENANT);
-    let (s, read, tag) = request(&app, &ctx, "GET", "/settings", json!({}), None, None).await;
-    assert_eq!(s, 200, "{read}");
-    assert_eq!(tag, "\"3\"");
-    assert!(
-        read.get("default_rounding").is_none(),
-        "no rounding setting"
-    );
-    assert_eq!(read["currencies"], json!([]));
-    assert!(read["updated_by"].is_null(), "{read}");
-    assert!(read["updated_at"].is_string(), "{read}");
-    let mut body = read.clone();
-    for field in ["version", "updated_at", "updated_by"] {
-        body.as_object_mut().unwrap().remove(field);
-    }
-    body["currencies"] = json!(["EUR"]);
-    let (s, saved, _) = request(&app, &ctx, "PUT", "/settings", body, Some(&tag), None).await;
-    assert_eq!(s, 200, "{saved}");
-    assert_eq!(saved["currencies"], json!(["EUR"]));
-    assert_eq!(saved["updated_by"], ctx.subject_id().to_string());
-    assert_eq!(saved["version"], 4);
-    assert_eq!(
-        saved["invoice_line_templates"],
-        json!({"usage":"{sku} usage"})
-    );
 }

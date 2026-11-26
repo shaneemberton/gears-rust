@@ -21,8 +21,9 @@ deleted (P-D-206), and the usage-type picker is products' own route (P-D-207). A
 reads the lifecycle moves its audit rows carry since migration 000008 (P-D-213), the version in
 force has its own path (P-D-214), and a category reads alone with its SKU count (P-D-215). Pricing
 says where a SKU is priced and sold (D-434), a kind's quorum override is reset in both gears
-(D-435, P-D-216), dimension values are edited one at a time with their use (D-436), and the
-settings offer currencies and say who wrote them (D-438); they carry no rounding.
+(D-435, P-D-216), and dimension values are edited one at a time with their use (D-436). The
+tenant settings live in the Settings Service (D-540 to D-542): pricing serves no ``/settings``
+path, and a tenant that set nothing there is offered every currency.
 
 Phase 9: a plan item is a SKU and its entry (D-467) and a new plan's code is upper case (D-468); the
 plans list names each plan's current revision and the one in effect (D-460); a plan submit and a
@@ -1148,60 +1149,28 @@ def test_a_skus_history_its_version_in_force_and_its_category_read(api):
 
 
 
-def _settings(api) -> tuple[dict, str]:
-    r = api.get(f"{PRICING}/settings")
-    assert r.status_code == 200, r.text
-    return r.json(), r.headers["etag"]
-
-
-def _settings_body(read: dict) -> dict:
-    """A settings read as a PUT body: without what the read adds (D-438)."""
-    return {k: v for k, v in read.items() if k not in ("version", "updated_at", "updated_by")}
-
-
 @pytest.mark.timeout(120)
-def test_where_a_sku_is_priced_and_sold_and_the_settings_door_round_trips(api):
-    """D-434 to D-438 and P-D-216 on the real binary, whose chain ran migration 000014.
+def test_where_a_sku_is_priced_and_sold(api):
+    """D-434 to D-436, D-542 and P-D-216 on the real binary.
 
-    The settings PUT requires ``currencies``, has no rounding (``default_rounding`` is an unknown
-    field) and says who wrote it. The list it stores narrows no new book: a book is judged by the
-    ``offered_currencies`` setting in the Settings Service (D-541). A kind's quorum
+    Pricing serves no ``/settings`` path: the tenant settings are edited through the Settings
+    Service (D-542). The tenant set none there, so the declared ``offered_currencies`` default, an
+    empty list, offers every currency and the EUR book below is created (D-541). A kind's quorum
     override is reset by DELETE in both gears, and the default is never deleted. A SKU priced today
     in a EUR book and sold by a published plan reads where it is priced (its entry with its book,
     usage and the price in force) and where it is sold (the plan, and the plan item alone). The
     Price Books screen's reads (D-440 to D-442): the entry's prices with their status, the entry
     read's price in force, and its book in the book list (a page with ``page_info``, found by ``q``
     and by ``sku_id``) with its stats. A dimension key's values are edited one at a time and each
-    value carries its use. The settings and both policies are restored.
+    value carries its use. The pricing policy is restored.
     """
     run = uuid.uuid4().hex[:8]
     code = f"E2E-SOLD-{run}"
-    settings_before, _ = _settings(api)
     policy_before, _ = _policy(api)
     try:
-        # The settings: currencies required, no rounding setting, the writer stamped.
-        read, tag = _settings(api)
-        body = _settings_body(read)
-        without = {k: v for k, v in body.items() if k != "currencies"}
-        r = api.put(f"{PRICING}/settings", json=without, headers={"If-Match": tag})
-        assert r.status_code == 400, r.text
-        r = api.put(
-            f"{PRICING}/settings",
-            json={**body, "default_rounding": "half_even", "currencies": []},
-            headers={"If-Match": tag},
-        )
-        assert r.status_code == 400, r.text
-        assert "default_rounding" in r.text, r.text
-        r = api.put(
-            f"{PRICING}/settings",
-            json={**body, "currencies": ["EUR", "USD"]},
-            headers={"If-Match": tag},
-        )
-        assert r.status_code == 200, r.text
-        saved = r.json()
-        assert saved["currencies"] == ["EUR", "USD"], saved
-        assert "default_rounding" not in saved, saved
-        assert uuid.UUID(saved["updated_by"]) and saved["updated_at"], saved
+        # The tenant settings have no door in pricing: the path is an unknown route.
+        r = api.get(f"{PRICING}/settings")
+        assert r.status_code == 404, r.text
 
         # Products: an override reset by DELETE; the default is never deleted (P-D-216).
         _products_quorum_zero(api)
@@ -1375,10 +1344,6 @@ def test_where_a_sku_is_priced_and_sold_and_the_settings_door_round_trips(api):
                 _, tag = _policy(api)
                 r = api.delete(f"{PRICING}/approval-policy/{kind}", headers={"If-Match": tag})
                 assert r.status_code in (200, 404), r.text
-        read, tag = _settings(api)
-        restored = {**_settings_body(settings_before), "currencies": settings_before["currencies"]}
-        r = api.put(f"{PRICING}/settings", json=restored, headers={"If-Match": tag})
-        assert r.status_code == 200, r.text
 
 
 def _counts(api, gear: str, **narrowing: str) -> dict:

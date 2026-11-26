@@ -103,7 +103,6 @@ async fn world() -> World {
     let rob = fixture.user();
     people.know(fixture.ctx.subject_id(), "Ann Author");
     people.know(rob.subject_id(), "Rob Reviewer");
-    settings_by_ann(&fixture).await;
     let eur = book(&fixture, "names").await;
     let (made, revision) = plan(&fixture, "names", eur).await;
     let sku = catalog.sku(SkuType::Usage);
@@ -123,24 +122,6 @@ async fn world() -> World {
         sku,
         unit,
     }
-}
-
-/// The settings, written by Ann.
-async fn settings_by_ann(fixture: &Fixture) {
-    let (status, read, tag) = fixture
-        .call("GET", "/settings", json!({}), None, None)
-        .await;
-    assert_eq!(status, 200, "{read}");
-    let (status, written, _) = fixture
-        .call(
-            "PUT",
-            "/settings",
-            json!({"default_timing":"arrears","invoice_line_templates":{},"currencies":[]}),
-            Some(&tag),
-            None,
-        )
-        .await;
-    assert_eq!(status, 200, "{written}");
 }
 
 /// A second item of `like`'s revision, on its own entry, made by pricing's system actor.
@@ -265,8 +246,6 @@ fn of_entry(items: &Value, entry: Uuid) -> &Value {
 /// Every read the world's actors show, with the name each `*_name` is expected to carry: Ann's,
 /// Rob's and the system actor's labels, or null for all of them.
 async fn every_read(w: &World, ann: Option<&str>, rob: Option<&str>, system: Option<&str>) {
-    let settings = w.read("/settings", true).await;
-    named(&settings, "updated_by", ann);
     plan_reads(w, ann, system).await;
     let card = w.read(&format!("/approval-units/{}", w.unit), true).await;
     named(&card, "submitted_by", ann);
@@ -539,25 +518,4 @@ async fn an_unregistered_account_management_reads_null_names() {
         .await;
     assert_eq!(s, 200, "{b}");
     named(&b, "created_by", None);
-}
-
-#[tokio::test]
-async fn a_settings_read_stays_a_put_body_and_its_name_is_never_written() {
-    let w = world().await;
-    let (s, mut body, tag) = w.f.call("GET", "/settings", json!({}), None, None).await;
-    assert_eq!(s, 200, "{body}");
-    named(&body, "updated_by", Some("Ann Author"));
-    // D-438: a read is a PUT body without these three; the name is accepted and ignored.
-    for field in ["version", "updated_at", "updated_by"] {
-        body.as_object_mut().unwrap().remove(field);
-    }
-    body["updated_by_name"] = json!("Mallory");
-    let (s, b, _) =
-        w.f.call_as(&w.rob, "PUT", "/settings", body, Some(&tag), None)
-            .await;
-    assert_eq!(s, 200, "{b}");
-    named(&b, "updated_by", None);
-    let after = w.read("/settings", true).await;
-    assert_eq!(after["updated_by"], json!(w.rob.subject_id()));
-    named(&after, "updated_by", Some("Rob Reviewer"));
 }

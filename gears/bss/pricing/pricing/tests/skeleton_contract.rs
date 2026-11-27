@@ -9,12 +9,13 @@ fn runtime_chain_contains_coord_pricing_and_toolkit_delivery() {
     let chain = BssPricingGear::default().migrations();
     assert_eq!(
         chain.len(),
-        27,
-        "the schema guard, coordination, twenty-three pricing migrations (000013, D-427; 000014, \
+        28,
+        "the schema guard, coordination, twenty-four pricing migrations (000013, D-427; 000014, \
          D-438; 000015, the book's description; 000016, the unit's note, D-445; 000017, the \
          scheduled revision, D-446; 000018, entry policies, D-502; 000019, commercial receipts, D-505; \
          000020, the plan summary, D-484; 000021, the policy references the SKU revision, D-514; \
-         000022, cancel and end, D-520; 000023, the book's archive, D-522) \
+         000022, cancel and end, D-520; 000023, the book's archive, D-522; 000024, the settings \
+         table dropped, D-543) \
          and two toolkit migrations"
     );
     assert_eq!(

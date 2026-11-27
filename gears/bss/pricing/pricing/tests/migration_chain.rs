@@ -2,7 +2,7 @@
 //! exceptions: the forward migration `m20260926_000013` (D-427) moves data and is irreversible, so it
 //! applies once through the runner and its down refuses; `m20260929_000017` (D-446) widens a CHECK a
 //! stored row may then need, so its down refuses too. The schema guard (D-423) sorts first and
-//! creates nothing.
+//! creates nothing. `m20261127_000024` (D-543) drops a table, so its down creates one.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use bss_pricing::infra::storage::migrations::Migrator;
@@ -158,12 +158,12 @@ async fn m20260926_000013_applies_once_and_refuses_to_revert() {
 }
 
 #[test]
-fn gear_chain_is_the_guard_coord_then_twenty_two_ordered_unique_migrations() {
+fn gear_chain_is_the_guard_then_coord_then_the_ordered_unique_migrations() {
     let names: Vec<_> = Migrator::migrations()
         .iter()
         .map(|m| m.name().to_owned())
         .collect();
-    assert_eq!(names.len(), 25);
+    assert_eq!(names.len(), 26);
     let mut sorted = names.clone();
     sorted.sort();
     sorted.dedup();
@@ -174,17 +174,105 @@ fn gear_chain_is_the_guard_coord_then_twenty_two_ordered_unique_migrations() {
     assert_eq!(names[10], "m20260926_000009_create_pricing_idempotency");
     assert_eq!(names[11], "m20260926_000010_create_pricing_plan");
     assert_eq!(names[13], "m20260926_000012_create_pricing_plan_item");
-    assert_eq!(names[14], "m20260926_000013_model_on_the_entry");
-    assert_eq!(names[15], "m20260927_000014_settings_currencies_and_author");
-    assert_eq!(names[16], "m20260928_000015_book_description");
-    assert_eq!(names[17], "m20260928_000016_unit_submit_note");
-    assert_eq!(names[18], "m20260929_000017_revision_scheduled");
-    assert_eq!(names[19], "m20260930_000018_usage_rating_policy");
-    assert_eq!(names[20], "m20260930_000019_commercial_receipts");
-    assert_eq!(names[21], "m20261002_000020_plan_summary");
-    assert_eq!(names[22], "m20261002_000021_policy_references_sku");
-    assert_eq!(names[23], "m20261003_000022_price_cancel_and_end");
-    assert_eq!(names[24], "m20261003_000023_book_archive");
+    assert_eq!(
+        names[14..],
+        [
+            "m20260926_000013_model_on_the_entry",
+            "m20260927_000014_settings_currencies_and_author",
+            "m20260928_000015_book_description",
+            "m20260928_000016_unit_submit_note",
+            "m20260929_000017_revision_scheduled",
+            "m20260930_000018_usage_rating_policy",
+            "m20260930_000019_commercial_receipts",
+            "m20261002_000020_plan_summary",
+            "m20261002_000021_policy_references_sku",
+            "m20261003_000022_price_cancel_and_end",
+            "m20261003_000023_book_archive",
+            "m20261127_000024_drop_pricing_settings",
+        ]
+    );
+}
+
+/// D-543: 000024 drops `pricing_settings` with its rows and nothing else. It re-applies without
+/// effect. Its down creates the table again, empty, with the text the database held before the
+/// drop, twice without effect, and the migrations that built the table still reverse after it.
+#[tokio::test]
+async fn m20261127_000024_drops_the_settings_table_and_its_down_restores_the_shape() {
+    let db = Database::connect("sqlite::memory:").await.unwrap();
+    let manager = SchemaManager::new(&db);
+    let chain = Migrator::migrations();
+    let at = chain
+        .iter()
+        .position(|m| m.name() == "m20261127_000024_drop_pricing_settings")
+        .unwrap();
+    for prior in &chain[..at] {
+        prior.up(&manager).await.unwrap();
+    }
+    let strings = |sql: &'static str| {
+        let db = &db;
+        async move {
+            db.query_all_raw(Statement::from_string(DbBackend::Sqlite, sql.to_owned()))
+                .await
+                .unwrap()
+                .iter()
+                .map(|r| r.try_get::<String>("", "v").unwrap())
+                .collect::<Vec<String>>()
+        }
+    };
+    // Every schema object but the settings table, by name and text.
+    let others = || {
+        strings(
+            "SELECT type || ' ' || name || ' ' || coalesce(sql, '') AS v FROM sqlite_master \
+             WHERE tbl_name <> 'pricing_settings' ORDER BY 1",
+        )
+    };
+    let settings = || {
+        strings(
+            "SELECT type || ' ' || name || ' ' || coalesce(sql, '') AS v FROM sqlite_master \
+             WHERE tbl_name = 'pricing_settings' ORDER BY 1",
+        )
+    };
+    let settings_before = settings().await;
+    let others_before = others().await;
+    assert!(
+        settings_before
+            .iter()
+            .any(|o| o.starts_with("table pricing_settings ")),
+        "{settings_before:?}"
+    );
+    db.execute_raw(Statement::from_string(
+        DbBackend::Sqlite,
+        "INSERT INTO pricing_settings (tenant_id, default_timing, invoice_line_templates, \
+         created_at, updated_at) VALUES ('t', 'advance', '{}', 'c', 'u')"
+            .to_owned(),
+    ))
+    .await
+    .unwrap();
+
+    let step = &chain[at];
+    step.up(&manager).await.unwrap();
+    step.up(&manager).await.unwrap();
+    assert!(settings().await.is_empty(), "the table and what hung on it");
+    assert_eq!(others().await, others_before, "nothing else changed");
+
+    step.down(&manager).await.unwrap();
+    step.down(&manager).await.unwrap();
+    assert_eq!(settings().await, settings_before, "the same text");
+    assert_eq!(others().await, others_before);
+    assert_eq!(
+        strings("SELECT count(*) || '' AS v FROM pricing_settings").await,
+        ["0"],
+        "the rows are not restored"
+    );
+    // The two migrations that built the table still reverse on the restored one.
+    for name in [
+        "m20260927_000014_settings_currencies_and_author",
+        "m20260926_000001_create_pricing_settings",
+    ] {
+        let built = chain.iter().find(|m| m.name() == name).unwrap();
+        built.down(&manager).await.unwrap();
+    }
+    assert!(!manager.has_table("pricing_settings").await.unwrap());
 }
 
 /// D-446: 000017 widens the revision state CHECK and adds the scheduled index. It replays without

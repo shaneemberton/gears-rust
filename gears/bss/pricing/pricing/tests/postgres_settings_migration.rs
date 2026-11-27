@@ -1,29 +1,37 @@
-//! D-438 on Postgres: the same forward migration as `settings_migration.rs`, tables in schema
-//! `bss`. A database is migrated by the gear's whole list without 000014 through the toolkit
-//! runner and holds one tenant's settings row; the list runs again and applies 000014 alone. The
-//! structure is proved by the Postgres schema dump, before and after and against a fresh chain;
-//! the row by its columns. The table has no reader or writer in the application (D-542).
+//! D-438 and D-543 on Postgres: the same two forward migrations as `settings_migration.rs`,
+//! tables in schema `bss`. A database is migrated by the gear's list without the two through the
+//! toolkit runner and holds one tenant's settings row. The list then runs with 000014 and applies
+//! it alone: the structure is proved by the Postgres schema dump, before and after and against a
+//! database built in one run; the row by its columns. The whole list then applies 000024 alone,
+//! and the dump loses the table and nothing else; its down then gives the dump back.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 mod pg_support;
 mod schema_dump;
 
+use bss_pricing::infra::storage::migrations::Migrator;
 use bss_pricing::module::BssPricingGear;
 use pg_support::Pg;
 use sea_orm::{ConnectionTrait, DbBackend, Statement};
+use sea_orm_migration::{MigratorTrait, SchemaManager};
 use serde_json::{Value, json};
 use toolkit::contracts::DatabaseCapability;
 use toolkit_db::migration_runner::{MigrationError, MigrationResult, run_migrations_for_testing};
 use uuid::Uuid;
 
 const MIGRATION: &str = "m20260927_000014_settings_currencies_and_author";
+const DROP: &str = "m20261127_000024_drop_pricing_settings";
+/// The table's columns in their stored order, which the schema dump does not carry.
+const COLUMNS_IN_ORDER: &str = "SELECT column_name::text AS v FROM information_schema.columns \
+     WHERE table_schema = 'bss' AND table_name = 'pricing_settings' ORDER BY ordinal_position";
 const TENANT: Uuid = Uuid::from_u128(0x7e0a_0000_0000_0000_0000_0000_0014_0002);
 
-async fn migrate(pg: &Pg, without: Option<&str>) -> Result<MigrationResult, MigrationError> {
+/// Run the gear's list without the named migrations.
+async fn migrate(pg: &Pg, without: &[&str]) -> Result<MigrationResult, MigrationError> {
     let chain = BssPricingGear::default()
         .migrations()
         .into_iter()
-        .filter(|m| Some(m.name()) != without)
+        .filter(|m| !without.contains(&m.name()))
         .collect();
     run_migrations_for_testing(&pg.db().await, chain).await
 }
@@ -58,9 +66,12 @@ async fn row(pg: &Pg) -> Value {
 }
 async fn seeded() -> Pg {
     let pg = Pg::empty().await;
-    let before = migrate(&pg, Some(MIGRATION)).await.unwrap();
+    let before = migrate(&pg, &[MIGRATION, DROP]).await.unwrap();
     assert!(
-        !before.applied_names.iter().any(|n| n == MIGRATION),
+        !before
+            .applied_names
+            .iter()
+            .any(|n| n == MIGRATION || n == DROP),
         "the chain before this run"
     );
     pg.raw()
@@ -87,7 +98,7 @@ async fn postgres_the_forward_migration_adds_currencies_and_updated_by_and_keeps
     let dump_before = dump(&pg).await;
     let row_before = row(&pg).await;
 
-    let result = migrate(&pg, None).await.unwrap();
+    let result = migrate(&pg, &[DROP]).await.unwrap();
     assert_eq!(result.applied_names, [MIGRATION], "only 000014 was pending");
 
     let dump_after = dump(&pg).await;
@@ -124,7 +135,91 @@ async fn postgres_the_forward_migration_adds_currencies_and_updated_by_and_keeps
     assert_eq!(obj.remove("currencies"), Some(json!([])));
     assert_eq!(obj.remove("updated_by"), Some(json!(null)));
     assert_eq!(row_after, row_before, "every old column as it was");
+    let fresh = Pg::empty().await;
+    migrate(&fresh, &[DROP]).await.unwrap();
+    assert_eq!(
+        dump_after,
+        dump(&fresh).await,
+        "upgraded and built in one run agree"
+    );
+    assert!(
+        migrate(&pg, &[DROP])
+            .await
+            .unwrap()
+            .applied_names
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs the Postgres harness"]
+async fn postgres_the_drop_removes_the_table_with_its_row_and_nothing_else() {
+    let pg = seeded().await;
+    migrate(&pg, &[DROP]).await.unwrap();
+    let dump_before = dump(&pg).await;
+    let columns_before = strings(&pg, COLUMNS_IN_ORDER).await;
+    assert_eq!(
+        strings(&pg, "SELECT count(*)::text AS v FROM bss.pricing_settings").await,
+        ["1"],
+        "the table holds the tenant's row"
+    );
+
+    let result = migrate(&pg, &[]).await.unwrap();
+    assert_eq!(result.applied_names, [DROP], "only 000024 was pending");
+
+    // The table's own lines are gone, its key's index with them; every other line is as it was.
+    let dump_after = dump(&pg).await;
+    let removed: Vec<&String> = dump_before
+        .iter()
+        .filter(|l| !dump_after.contains(l))
+        .collect();
+    let added: Vec<&String> = dump_after
+        .iter()
+        .filter(|l| !dump_before.contains(l))
+        .collect();
+    assert!(added.is_empty(), "{added:#?}");
+    assert!(
+        !removed.is_empty() && removed.iter().all(|l| l.contains("pricing_settings")),
+        "{removed:#?}"
+    );
+    assert!(
+        !dump_after.iter().any(|l| l.contains("pricing_settings")),
+        "nothing of the table is left"
+    );
+    assert_eq!(
+        strings(
+            &pg,
+            "SELECT count(*)::text AS v FROM information_schema.tables \
+             WHERE table_schema = 'bss' AND table_name = 'pricing_settings'"
+        )
+        .await,
+        ["0"]
+    );
     let fresh = Pg::applied().await;
     assert_eq!(dump_after, dump(&fresh).await, "upgraded and fresh agree");
-    assert!(migrate(&pg, None).await.unwrap().applied_names.is_empty());
+    assert!(migrate(&pg, &[]).await.unwrap().applied_names.is_empty());
+
+    // Its down creates the table again, empty, in the shape it had before the drop.
+    let raw = pg.raw().await;
+    let step = Migrator::migrations()
+        .into_iter()
+        .find(|m| m.name() == DROP)
+        .unwrap();
+    step.down(&SchemaManager::new(&raw)).await.unwrap();
+    step.down(&SchemaManager::new(&raw)).await.unwrap();
+    assert_eq!(
+        dump(&pg).await,
+        dump_before,
+        "the same columns, CHECK and key"
+    );
+    assert_eq!(
+        strings(&pg, COLUMNS_IN_ORDER).await,
+        columns_before,
+        "in the same order"
+    );
+    assert_eq!(
+        strings(&pg, "SELECT count(*)::text AS v FROM bss.pricing_settings").await,
+        ["0"],
+        "the rows are not restored"
+    );
 }

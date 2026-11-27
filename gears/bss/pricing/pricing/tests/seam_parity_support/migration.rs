@@ -70,7 +70,8 @@ pub async fn upgrade(
                 || name.contains("000020")
                 || name.contains("000021")
                 || name.contains("000022")
-                || name.contains("000023"))
+                || name.contains("000023")
+                || name.contains("000024"))
         })
         .collect();
     let applied = run_migrations_for_testing(&db.db(), prior).await.unwrap();
@@ -87,6 +88,7 @@ pub async fn upgrade(
             || s.contains("000021")
             || s.contains("000022")
             || s.contains("000023")
+            || s.contains("000024")
     }));
     let catalog = Arc::new(p::Catalog::default());
     let sku = catalog.sku(bss_products_sdk::models::SkuType::Usage);
@@ -157,7 +159,8 @@ pub async fn upgrade(
             "m20261002_000020_plan_summary",
             "m20261002_000021_policy_references_sku",
             "m20261003_000022_price_cancel_and_end",
-            "m20261003_000023_book_archive"
+            "m20261003_000023_book_archive",
+            "m20261127_000024_drop_pricing_settings"
         ]
     );
     let f = p::Fixture::on(db, tenant, dsn, catalog).await;

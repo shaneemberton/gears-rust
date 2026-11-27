@@ -1,13 +1,16 @@
-//! D-438 on `SQLite`: the forward migration `m20260927_000014_settings_currencies_and_author` adds
-//! `pricing_settings.currencies` (a JSON array, default `[]`) and `pricing_settings.updated_by`
-//! (nullable), inside the toolkit runner's transaction.
+//! The two forward migrations of `pricing_settings` on `SQLite`, inside the toolkit runner's
+//! transaction, on a database that holds a tenant's row.
 //!
-//! A file database is migrated by the gear's whole list without 000014 — the chain the deployment runs
-//! today — and holds one tenant's settings row, written with the encodings the application writes
-//! (a `Uuid` is a 16-byte blob; the timestamps are copied from a row the repository wrote). Then
-//! the whole list runs again and applies 000014 alone; the structure is proved by the schema dump
-//! and the table text, the row by its columns. The table has no reader or writer in the
-//! application (D-542). The Postgres twin is `postgres_settings_migration.rs`.
+//! D-438: `m20260927_000014_settings_currencies_and_author` adds `pricing_settings.currencies` (a
+//! JSON array, default `[]`) and `pricing_settings.updated_by` (nullable). D-543:
+//! `m20261127_000024_drop_pricing_settings` drops the table with its rows.
+//!
+//! A file database is migrated by the gear's list without the two and holds one tenant's settings
+//! row, written with the encodings the application wrote (a `Uuid` is a 16-byte blob; the
+//! timestamps are copied from a row the repository wrote). The list then runs with 000014 and
+//! applies it alone; the structure is proved by the schema dump and the table text, the row by its
+//! columns. The whole list then applies 000024 alone, and the dump loses the table and nothing
+//! else. The Postgres twin is `postgres_settings_migration.rs`.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 mod schema_dump;
@@ -24,6 +27,7 @@ use toolkit_db::{ConnectOpts, DBProvider, connect_db};
 use uuid::Uuid;
 
 const MIGRATION: &str = "m20260927_000014_settings_currencies_and_author";
+const DROP: &str = "m20261127_000024_drop_pricing_settings";
 const TENANT: Uuid = Uuid::from_u128(0x7e0a_0000_0000_0000_0000_0000_0014_0001);
 
 /// A file database, so the runner's pool, the repositories and a raw connection see one schema.
@@ -57,11 +61,12 @@ impl Lite {
         .await
         .unwrap()
     }
-    async fn migrate(&self, without: Option<&str>) -> Result<MigrationResult, MigrationError> {
+    /// Run the gear's list without the named migrations.
+    async fn migrate(&self, without: &[&str]) -> Result<MigrationResult, MigrationError> {
         let chain = BssPricingGear::default()
             .migrations()
             .into_iter()
-            .filter(|m| Some(m.name()) != without)
+            .filter(|m| !without.contains(&m.name()))
             .collect();
         run_migrations_for_testing(&self.pool().await, chain).await
     }
@@ -143,12 +148,15 @@ fn stanza_lines(dump: &str) -> Vec<String> {
     lines
 }
 
-/// The deployed database before this run: the chain without 000014 and one settings row.
+/// A database before the two migrations: the chain without them and one settings row.
 async fn seeded() -> Lite {
     let db = Lite::new();
-    let before = db.migrate(Some(MIGRATION)).await.unwrap();
+    let before = db.migrate(&[MIGRATION, DROP]).await.unwrap();
     assert!(
-        !before.applied_names.iter().any(|n| n == MIGRATION),
+        !before
+            .applied_names
+            .iter()
+            .any(|n| n == MIGRATION || n == DROP),
         "the chain before this run"
     );
     // A book written by the repository gives the timestamps the application's encoding.
@@ -193,7 +201,7 @@ async fn the_forward_migration_adds_currencies_and_updated_by_and_keeps_the_row(
     let ddl_before = db.ddl().await;
     let row_before: serde_json::Value = serde_json::from_str(&db.row().await).unwrap();
 
-    let result = db.migrate(None).await.unwrap();
+    let result = db.migrate(&[DROP]).await.unwrap();
     assert_eq!(result.applied_names, [MIGRATION], "only 000014 was pending");
 
     // The structure: exactly two columns added to pricing_settings.
@@ -242,6 +250,56 @@ async fn the_forward_migration_adds_currencies_and_updated_by_and_keeps_the_row(
     assert_eq!(obj.remove("currencies"), Some(json!("[]")));
     assert_eq!(obj.remove("updated_by"), Some(json!(null)));
     assert_eq!(row_after, row_before);
+    // An upgraded database and one built in a single run hold the same schema.
+    let fresh = Lite::new();
+    fresh.migrate(&[DROP]).await.unwrap();
+    assert_eq!(dump_after, fresh.dump().await);
+    // A second run applies nothing.
+    assert!(db.migrate(&[DROP]).await.unwrap().applied_names.is_empty());
+}
+
+#[tokio::test]
+async fn the_drop_removes_the_table_with_its_row_and_nothing_else() {
+    let db = seeded().await;
+    db.migrate(&[DROP]).await.unwrap();
+    let dump_before = db.dump().await;
+    assert_eq!(
+        db.strings("SELECT count(*) || '' AS v FROM pricing_settings")
+            .await,
+        ["1"],
+        "the table holds the tenant's row"
+    );
+
+    let result = db.migrate(&[]).await.unwrap();
+    assert_eq!(result.applied_names, [DROP], "only 000024 was pending");
+
+    // The structure: the table's own lines are gone, every other line is as it was.
+    let dump_after = db.dump().await;
+    let removed: Vec<&String> = dump_before
+        .iter()
+        .filter(|l| !dump_after.contains(l))
+        .collect();
+    let added: Vec<&String> = dump_after
+        .iter()
+        .filter(|l| !dump_before.contains(l))
+        .collect();
+    assert!(added.is_empty(), "{added:#?}");
+    assert!(
+        !removed.is_empty()
+            && removed
+                .iter()
+                .all(|l| l.starts_with("TABLE pricing_settings")),
+        "{removed:#?}"
+    );
+    assert!(
+        !dump_after.iter().any(|l| l.contains("pricing_settings")),
+        "nothing of the table is left"
+    );
+    assert!(
+        db.strings("SELECT name AS v FROM sqlite_master WHERE name = 'pricing_settings'")
+            .await
+            .is_empty()
+    );
     // An upgraded database and a fresh one hold the same schema.
     let fresh = Database::connect("sqlite::memory:").await.unwrap();
     assert_eq!(
@@ -249,5 +307,5 @@ async fn the_forward_migration_adds_currencies_and_updated_by_and_keeps_the_row(
         stanza_lines(&schema_dump::migrate_and_dump_sqlite(&fresh).await)
     );
     // A second run applies nothing.
-    assert!(db.migrate(None).await.unwrap().applied_names.is_empty());
+    assert!(db.migrate(&[]).await.unwrap().applied_names.is_empty());
 }

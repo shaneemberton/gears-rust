@@ -623,8 +623,8 @@ A written value reaches pricing no later than the Settings Service's cache time-
 Pricing mounts no settings door (D-542): a tenant's settings are read and written on the Settings Service's own
 REST surface, under its permissions, a step-up and its per-setting `If-Match`, and a change is recorded in its
 history, not in pricing's audit. Pricing's `config` permissions gate the dimension registry, the approval policy
-and the reference ops only. The `pricing_settings` table stays in the schema, read and written by nothing, until
-a later migration drops it.
+and the reference ops only. The `pricing_settings` table is dropped by m20261127_000024 (D-543); its rows are
+not carried over.
 
 ### 3.6 Interactions & Sequences
 
@@ -774,17 +774,8 @@ without ref_kind, pricing_price_row, pricing_price without price_book_entry_id, 
 from an empty data root / empty bss-pricing tables". Fresh databases and databases migrated by today's chain pass.
 
 ```sql
--- D-542: nothing reads or writes pricing_settings since the /settings doors were removed; the table stays
--- until a later migration drops it.
-CREATE TABLE bss.pricing_settings (
-  tenant_id uuid PRIMARY KEY, default_timing text NOT NULL CHECK (default_timing IN ('advance','arrears')),
-  default_gl text, default_tax_category text,
-  invoice_line_templates jsonb NOT NULL, version bigint NOT NULL DEFAULT 1,
-  created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL
-);
--- m20260927_000014 (D-438): the offered currencies ([] offers any) and the last writer.
-ALTER TABLE bss.pricing_settings ADD COLUMN currencies jsonb NOT NULL DEFAULT '[]'::jsonb;
-ALTER TABLE bss.pricing_settings ADD COLUMN updated_by uuid;
+-- D-543: m20261127_000024 drops pricing_settings, which m20260926_000001 and m20260927_000014 built. The tenant
+-- settings are in the Settings Service (D-540, D-541, D-542).
 CREATE TABLE bss.pricing_dimension_key (
   tenant_id uuid NOT NULL, key text NOT NULL, "values" jsonb NOT NULL,
   version bigint NOT NULL DEFAULT 1, PRIMARY KEY (tenant_id, key)

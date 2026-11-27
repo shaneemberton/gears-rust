@@ -74,8 +74,8 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-435 | M | An approval-policy override can be reset; the default cannot be deleted (twin of products P-D-216) | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2 |
 | D-436 | M | Dimension values edit one at a time and show their use | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2 |
 | D-437 | M | Tenant default rounding (superseded by D-535) | SUPERSEDED 2026-10-12 by D-535 · Owner, 2026-09-27; phase 6 plan rev 2 |
-| D-438 | M | The settings offer currencies and say who changed them | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; extended by D-519; amended by D-529, D-541, D-542 |
-| D-439 | M | Closed sets are enums on the responses; requests keep strings and their codes (twin of products P-D-217) | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; amended by D-467 and the phase 9 review (C, fix run 9.5d-1); amended by D-535; amended by D-542 |
+| D-438 | M | The settings offer currencies and say who changed them | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; extended by D-519; amended by D-529, D-541, D-542, D-543 |
+| D-439 | M | Closed sets are enums on the responses; requests keep strings and their codes (twin of products P-D-217) | DECIDED 2026-09-27 · Owner, 2026-09-27; phase 6 plan rev 2; amended by D-467 and the phase 9 review (C, fix run 9.5d-1); amended by D-535; amended by D-542, D-543 |
 | D-440 | M | An entry's prices, its price in force and its approved prices by date | DECIDED 2026-09-28 · Owner, 2026-09-28; phase 7 plan rev 2; amends D-428, D-434; extended by D-456; amended by D-472, D-473 |
 | D-441 | M | Every book read carries its stats | DECIDED 2026-09-28 · Owner, 2026-09-28; phase 7 plan rev 2; amended by D-453 |
 | D-442 | M | The book list pages on the toolkit's OData pager, searched by q and sku_id | DECIDED 2026-09-28 · Owner, 2026-09-28; phase 7 plan rev 2; extended by D-522 |
@@ -154,15 +154,16 @@ and the sold-as bundle and grants (D-411), and drops quote and the Studio wiring
 | D-531 | H | Each price stores its currency spec, and every read and receipt uses it | DECIDED 2026-10-12 · Pricing exact-money plan rev 2.1, Task 3; amends D-421, D-422 |
 | D-532 | H | The money digest and the price projection carry the scale; digest domains and the receipt schema stay at version 1 | DECIDED 2026-10-12 · Owner, 2026-10-09 (no version bumps before production); pricing exact-money plan rev 2.1, Task 4; amends D-501, D-505 |
 | D-533 | H | An invoice line posts at its price's stored scale | DECIDED 2026-10-12 · Owner, 2026-10-12; pricing exact-money plan rev 2.1, Task 4; amends D-504 |
-| D-534 | M | The pricing migrations are edited in place for the price's currency spec and the settings | DECIDED 2026-10-12 · Owner, 2026-10-08 (fresh schema); amends D-412, D-427; amended by D-542 |
+| D-534 | M | The pricing migrations are edited in place for the price's currency spec and the settings | DECIDED 2026-10-12 · Owner, 2026-10-08 (fresh schema); amends D-412, D-427; amended by D-542, D-543 |
 | D-535 | M | No tenant rounding setting; an invoice line rounds HALF_EVEN | DECIDED 2026-10-12 · Owner, 2026-10-11; BSS money ADR rule 7; supersedes D-437; amends D-421, D-439 |
 | D-536 | L | A minimum billable unit is deferred (owner, 2026-10-11) | DECIDED 2026-10-12 · Owner, 2026-10-11; BSS money ADR rule 5 |
 | D-537 | M | The currency table is a read: GET /currencies | DECIDED 2026-10-14 · Owner, 2026-10-14; extends D-529; amended 2026-10-21 (no permission); amended by D-542 |
 | D-538 | M | A field violation names the refused decimal's path | DECIDED 2026-10-21 · Owner, 2026-10-21 (a client parsed the prose); extends D-528; amended by D-542 |
 | D-539 | M | Snapshot prices carry their currency spec | DECIDED 2026-10-21 · Owner, 2026-10-21 (a review rendered money without its scale); extends D-531 |
-| D-540 | M | The tenant settings are declared in the Settings Service | DECIDED 2026-11-20 · Owner, 2026-11-20 (the tenant settings move to the Settings Service); relates to D-438, D-457, D-529; amended by D-541, D-542 |
-| D-541 | H | Pricing reads the tenant settings from the Settings Service, outside its transactions | DECIDED 2026-11-21 · Owner, 2026-11-21 (read on demand, once per decision, no second read); amends D-421, D-438, D-482, D-507, D-529, D-540; amended by D-542 |
-| D-542 | H | The /settings doors are removed; the tenant settings are edited through the Settings Service | DECIDED 2026-11-26 · Owner, 2026-11-26 (the doors go with the console's move to the Settings Service; no facade over it); amends D-421, D-438, D-439, D-457, D-469, D-518, D-519, D-528, D-529, D-534, D-537, D-538, D-540, D-541 |
+| D-540 | M | The tenant settings are declared in the Settings Service | DECIDED 2026-11-20 · Owner, 2026-11-20 (the tenant settings move to the Settings Service); relates to D-438, D-457, D-529; amended by D-541, D-542, D-543 |
+| D-541 | H | Pricing reads the tenant settings from the Settings Service, outside its transactions | DECIDED 2026-11-21 · Owner, 2026-11-21 (read on demand, once per decision, no second read); amends D-421, D-438, D-482, D-507, D-529, D-540; amended by D-542, D-543 |
+| D-542 | H | The /settings doors are removed; the tenant settings are edited through the Settings Service | DECIDED 2026-11-26 · Owner, 2026-11-26 (the doors go with the console's move to the Settings Service; no facade over it); amends D-421, D-438, D-439, D-457, D-469, D-518, D-519, D-528, D-529, D-534, D-537, D-538, D-540, D-541; amended by D-543 |
+| D-543 | M | The pricing_settings table is dropped | DECIDED 2026-11-27 · Owner, 2026-11-27 (the table goes in the same change as the doors); amends D-438, D-439, D-534, D-540, D-541, D-542 |
 
 ## Entries
 
@@ -684,9 +685,11 @@ Breaking: the PUT's body (currencies required), and a GET answer is a PUT body o
 
 D-519 extends this entry: `GET /settings` also carries `updated_by_name`, the writer's current name through Account Management, null when it is not available now. The PUT answer's is null.
 
-**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (asks 11f, 11g; plan review L6, L7). Extended by D-519. Amended by D-529 (2026-10-12): the currency table judges the codes. Amended by D-541 (2026-11-21): a new book is judged by the `offered_currencies` setting in the Settings Service, read before the book's transaction; the `currencies` a `PUT /settings` stores no longer narrow a book, and a book is not created (503 `SETTINGS_UNAVAILABLE`) while the list cannot be read. Amended by D-542 (2026-11-26): the two doors are removed.
+**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (asks 11f, 11g; plan review L6, L7). Extended by D-519. Amended by D-529 (2026-10-12): the currency table judges the codes. Amended by D-541 (2026-11-21): a new book is judged by the `offered_currencies` setting in the Settings Service, read before the book's transaction; the `currencies` a `PUT /settings` stores no longer narrow a book, and a book is not created (503 `SETTINGS_UNAVAILABLE`) while the list cannot be read. Amended by D-542 (2026-11-26): the two doors are removed. Amended by D-543 (2026-11-27): the table is dropped.
 
 D-542 amends this entry: `GET` and `PUT /bss-pricing/v1/settings` are removed. Nothing reads or writes the `pricing_settings` row, so `currencies`, `version`, `updated_at`, `updated_by` and `updated_by_name` are served nowhere, and no door answers `CURRENCY_INVALID`. m20260927_000014 and its two columns stay as they are; its upgrade tests still prove the two added columns and the surviving row, and no longer read or write the row through the application (tests/settings_migration.rs). The offered currencies are the `offered_currencies` setting (D-541), edited through the Settings Service; `CURRENCY_NOT_OFFERED` is unchanged.
+
+D-543 amends this entry: `pricing_settings` is dropped by m20261127_000024, so the two columns of m20260927_000014 exist only between the two migrations. m20260927_000014 stays in the chain as it is, and its upgrade test still proves it on a seeded row before the drop runs.
 
 #### D-439 [M] Closed sets are enums on the responses; requests keep strings and their codes (twin of products P-D-217)
 
@@ -702,9 +705,11 @@ D-467 amends this entry: a plan item's treatment is no longer on any response or
 
 The phase 9 review's theme C amends this entry (fix run 9.5d-1): an approval unit's kind is an enum on every response, PricingApprovalKind (prices, plan_revision). No CHECK holds the column still; the repository reads it through the set, so a unit of another kind is a corrupt row (500), never served (D-470). A unit's ref_type stays a string.
 
-**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (ask 12; plan review M5). Amended by D-467 and by the phase 9 review, theme C (fix run 9.5d-1). Amended by D-535 (2026-10-12): the settings and resolve carry no rounding. Amended by D-542 (2026-11-26): the settings' default_timing leaves the contract.
+**Source:** Owner, 2026-09-27; phase 6 plan rev 2 (ask 12; plan review M5). Amended by D-467 and by the phase 9 review, theme C (fix run 9.5d-1). Amended by D-535 (2026-10-12): the settings and resolve carry no rounding. Amended by D-542 (2026-11-26): the settings' default_timing leaves the contract. Amended by D-543 (2026-11-27): its column is dropped with the table.
 
 D-542 amends this entry: the settings' default_timing is on no response and no request, so its enum (PricingBillingTiming) and TIMING_INVALID are gone with `PUT /settings`. The column's CHECK stays on `pricing_settings`, which nothing writes.
+
+D-543 amends this entry: the column and its CHECK are gone with `pricing_settings`. The values `advance` and `arrears` are the enum of the declared type `setting_billing_timing` (D-540).
 
 #### D-440 [M] An entry's prices, its price in force and its approved prices by date
 
@@ -2481,9 +2486,11 @@ The price's `currency` and `currency_scale` and the canonical `min_fee` CHECK ar
 
 This is the one exception to the closing rule of D-412 and D-427. Every other schema change is a new migration.
 
-**Source:** Owner, 2026-10-08 (fresh schema). Amends D-412 and D-427. Amended by D-542 (2026-11-26): the settings migrations stay as they are.
+**Source:** Owner, 2026-10-08 (fresh schema). Amends D-412 and D-427. Amended by D-542 (2026-11-26): the settings migrations stay as they are. Amended by D-543 (2026-11-27): a new migration drops the table.
 
 D-542 amends this entry: the settings doors are removed, and nothing reads or writes `pricing_settings`. `m20260926_000001` and `m20260927_000014` are not edited for that: the table and its columns stay as these migrations create them, and the schema goldens are unchanged. Dropping the table is a later, new migration.
+
+D-543 amends this entry: that migration is m20261127_000024. It follows the closing rule above: a new migration, with `m20260926_000001` and `m20260927_000014` left as they are. The schema goldens lose the table on both dialects.
 
 #### D-535 [M] No tenant rounding setting; an invoice line rounds HALF_EVEN
 
@@ -2560,11 +2567,13 @@ D-542 amends this entry: "The settings" no longer holds. `PUT /settings` is remo
 - **Not yet.** Nothing in pricing reads these settings. Resolve, the plan checks and the offered-currency check of a new book read the `pricing_settings` row, and `GET` and `PUT /bss-pricing/v1/settings` read and write it (D-438, D-518, D-519). A value written through the Settings Service changes nothing in pricing, and a value written through `PUT /settings` does not reach the Settings Service. Later changes move the reads to the Settings Service and remove the two doors, and amend D-438 then.
 - **The tests.** `src/infra/settings_declarations_tests.rs` writes each key and value type id out and judges values by each schema; one test holds the template schema to `validate_template`. `tests/settings_declarations.rs` starts the gear over the real types registry and the real Settings Service (`init`, the finalize step, `post_init`), reads each default as a tenant that stored nothing, and judges values with the Settings Service's own validator.
 
-**Source:** Owner, 2026-11-20 (the tenant settings move to the Settings Service). Relates to D-438, D-457 and D-529; amends none of them. Amended by D-541 and D-542.
+**Source:** Owner, 2026-11-20 (the tenant settings move to the Settings Service). Relates to D-438, D-457 and D-529; amends none of them. Amended by D-541, D-542 and D-543.
 
 D-541 amends this entry: "Not yet" no longer holds for the reads. Resolve, the acceptance of a sale, the plan checks and the offered-currency check of a new book read these settings; none of them reads the `pricing_settings` row. The two `/settings` doors still read and write that row, and what they store reaches no pricing decision.
 
 D-542 amends this entry: the two `/settings` doors are removed. The sentences above about what `PUT /settings` refuses (`CURRENCY_INVALID`, `LINE_TEMPLATE_EMPTY`) describe a door that no longer exists, and nothing is left of "Not yet": these settings are the tenant settings, read by pricing (D-541) and written through the Settings Service only. The `pricing_settings` row is read and written by nothing.
+
+D-543 amends this entry: there is no `pricing_settings` row any more; the table is dropped.
 
 #### D-541 [H] Pricing reads the tenant settings from the Settings Service, outside its transactions
 
@@ -2585,9 +2594,11 @@ D-542 amends this entry: the two `/settings` doors are removed. The sentences ab
 - **Stored values are not carried over.** A value a tenant wrote through `PUT /settings` does not reach the Settings Service: no migration, script or import copies the `pricing_settings` rows. A tenant that had a row reads the declared defaults (D-540) until it writes its values through the Settings Service, and a sale accepted before then freezes those defaults in its receipt. Pricing had no real users when this was built, so no stored value was in use.
 - **The tests.** `src/infra/tenant_settings_tests.rs` holds the adapter to one bulk read, the scope, the actor and each way of being unavailable. `tests/settings_declarations.rs` runs the same read against the real Settings Service: the declared defaults, then values stored through its write path. `tests/tenant_settings_reads.rs` holds resolve, acceptance, book creation and the checks to the above. The contract goldens are unchanged: the same sale gives the same invoice inputs and sources.
 
-**Source:** Owner, 2026-11-21 (read on demand and not by subscription; once per decision, no second read; refuse while unavailable); pricing owner, 2026-11-26 (stored values are not carried over). Amends D-421, D-438, D-482, D-507, D-529 and D-540. Amended by D-542.
+**Source:** Owner, 2026-11-21 (read on demand and not by subscription; once per decision, no second read; refuse while unavailable); pricing owner, 2026-11-26 (stored values are not carried over). Amends D-421, D-438, D-482, D-507, D-529 and D-540. Amended by D-542 and D-543.
 
 D-542 amends this entry: the later change is made. `GET` and `PUT /bss-pricing/v1/settings` are removed; the `pricing_settings` table stays in the schema, read and written by nothing, until a later migration drops it. In "Currency codes", no door is left that answers `CURRENCY_INVALID`.
+
+D-543 amends this entry: the `pricing_settings` table is dropped, and its rows with it. "Stored values are not carried over" holds as written: nothing copies a row before the drop.
 
 #### D-542 [H] The /settings doors are removed; the tenant settings are edited through the Settings Service
 
@@ -2608,4 +2619,20 @@ D-542 amends this entry: the later change is made. `GET` and `PUT /bss-pricing/v
 - **Unchanged.** When a written value takes effect, and what pricing answers while the settings cannot be read, are as D-541 gives them.
 - **The tests.** The route censuses hold 59 ops, not 61 (tests/module_test.rs, tests/rest_authz.rs, tests/rest_support/mod.rs), and tests/read_contract.rs measures 33 write ops, not 34. tests/settings_doors.rs is removed, and so are the settings cases of tests/conditional_reads.rs and tests/actor_names.rs. tests/settings_migration.rs and its Postgres twin still prove m20260927_000014 on a seeded row. The reads of the settings are held by the tests D-541 names.
 
-**Source:** Owner, 2026-11-26 (the doors go with the console's move to the Settings Service; no facade over it). Amends D-421, D-438, D-439, D-457, D-469, D-518, D-519, D-528, D-529, D-534, D-537, D-538, D-540 and D-541.
+**Source:** Owner, 2026-11-26 (the doors go with the console's move to the Settings Service; no facade over it). Amends D-421, D-438, D-439, D-457, D-469, D-518, D-519, D-528, D-529, D-534, D-537, D-538, D-540 and D-541. Amended by D-543 (2026-11-27): the table is dropped.
+
+D-543 amends this entry: in "The table", the later migration is m20261127_000024, so the migration chain and the schema goldens do change. In "The tests", tests/settings_migration.rs and its Postgres twin prove m20260927_000014 on a seeded row and then the drop.
+
+#### D-543 [M] The pricing_settings table is dropped
+
+**Status:** DECIDED 2026-11-27.
+
+- **The migration.** m20261127_000024_drop_pricing_settings is a new forward migration, as every schema change but D-534's is. It runs `DROP TABLE IF EXISTS` on both dialects, so a replay changes nothing, and it runs in the runner's transaction. No other table references `pricing_settings`, and nothing in the gear reads or writes it (D-541, D-542).
+- **The rows.** They go with the table. No export, copy or check of the rows precedes the drop: stored values are not carried over (D-541).
+- **The older migrations.** `m20260926_000001` and `m20260927_000014` stay in the chain as they are. A deployed database has run them; a fresh one runs them and then the drop, and both end with the same schema.
+- **Down.** The migration's down creates the table again, empty, in the shape the two older migrations left: the same columns in the same order, the same CHECK and key. The rows are not restored. The two older migrations still reverse on the restored table.
+- **Earlier builds.** A build from before D-541 reads the table in resolve, in the plan checks and in book creation, and a build from before D-542 reads and writes it behind the `/settings` doors. On a database this migration has run on, those statements fail. So the reads from the Settings Service, the removal of the doors and the drop are released together.
+- **The guard.** The schema guard's legacy set (D-423) never held `pricing_settings`. A database that still has the table is not refused; it is migrated.
+- **The tests.** tests/migration_chain.rs proves the drop on SQLite: it removes the table and nothing else, replays, and its down gives back the text the database held. tests/settings_migration.rs and tests/postgres_settings_migration.rs run it through the runner on a database that holds a tenant's row, and the Postgres one also proves the down against the schema dump and the columns' stored order. The schema goldens lose the table on both dialects, the table censuses hold eighteen pricing tables (tests/sqlite_schema_dump.rs, tests/postgres_schema_dump.rs, tests/schema_guard.rs), and the gear's whole list holds 28 migrations (tests/skeleton_contract.rs).
+
+**Source:** Owner, 2026-11-27 (the table goes in the same change as the doors). Amends D-438, D-439, D-534, D-540, D-541 and D-542.
